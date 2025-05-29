@@ -1,4 +1,3 @@
-// 18:00-19:00 + 30min | 19:30
 #include <Arduino.h>
 
 #include "smart_home_config.h"
