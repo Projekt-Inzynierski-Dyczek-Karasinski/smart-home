@@ -4,19 +4,20 @@
 #include <Arduino.h>
 #include "debug_led.h"
 
-#define DEBOUNCING_TIME 50
-
 class PairingButton {
     private:
         static void IRAM_ATTR buttonISR();
-        static DebugLED *spDebugLED;
+        static DebugLED *mspDebugLED;
+        static uint8_t msButtonMode;
 
-        uint8_t buttonPressCounter = 0;
-        int8_t buttonNotPressedCounter = 3;
-        TimerHandle_t buttonPressTimer;
-        void startButtonPressTimer();
-        void buttonPressTimerCallback();
+        static uint8_t msButtonPressCounter;
+        static int8_t msButtonNotPressedCounter;
+        static TimerHandle_t msButtonPressTimer;
+        static void startButtonPressTimer();
+        static void buttonPressTimerCallback();
+        static void deleteButtonPressTimer();
         static void buttonPressTimerCallbackHandle(TimerHandle_t xTimer);
+
     public:
         PairingButton(DebugLED *debugLED);
         ~PairingButton();

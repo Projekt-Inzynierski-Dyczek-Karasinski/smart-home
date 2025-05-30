@@ -5,31 +5,30 @@
 
 class DebugLED {
 private:
-    // bool isOn;
-    TaskHandle_t connectionBlinkHandle;
-    TaskHandle_t resetBlinkHandle;
-    TimerHandle_t blinkTimeout;
+    static TaskHandle_t msPairingBlinkHandle;
+    static TaskHandle_t msPesetBlinkHandle;
+    static TimerHandle_t msBlinkTimeout;
 
-    void connectionBlink();
-    static void createConnectionBlinkTaskHandle(void *parameters);
+    static void pairingBlink();
+    static void createPairingBlinkTaskHandle(void *parameters);
 
-    void resetBlink();
+    static void resetBlink();
     static void createResetBlinkTaskHandle(void *parameters);
 
-    void startBlinkTimeout(uint32_t maxBlinkTime);
-    void blinkTimeoutCallback();
+    static void startBlinkTimeout(uint32_t maxBlinkTime);
+    static void blinkTimeoutCallback();
     static void startBlinkTimeoutHandle(TimerHandle_t xTimer);
     
 public:
     DebugLED();
     
-    void createConnectionBlinkTask();
-    void deleteConnectionBlinkTask();
-    TaskHandle_t getConnectionBlinkHandle();
+    static void createPairingBlinkTask();
+    static void deletePairingBlinkTask();
+    static TaskHandle_t getConnectionBlinkHandle();
 
-    void createResetBlinkTask();
-    void deleteResetBlinkTask();
-    TaskHandle_t getResetBlinkHandle();
+    static void createResetBlinkTask();
+    static void deleteResetBlinkTask();
+    static TaskHandle_t getResetBlinkHandle();
 
     ~DebugLED();
 };

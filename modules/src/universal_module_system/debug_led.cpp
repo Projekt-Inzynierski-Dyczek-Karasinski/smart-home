@@ -4,22 +4,23 @@
 #define CONNECTION_BLINK_DELAY 500
 #define RESET_BLINK_DELAY 100
 // tmp value
-#define MAX_CONNECTION_BLINK_TIME 5000
-#define MAX_RESET_BLINK_TIME 1000
+#define MAX_CONNECTION_BLINK_TIME 15000
+#define MAX_RESET_BLINK_TIME 3000
+
+TaskHandle_t DebugLED::msPairingBlinkHandle = NULL;
+TaskHandle_t DebugLED::msPesetBlinkHandle = NULL;;
+TimerHandle_t DebugLED::msBlinkTimeout = NULL;
 
 DebugLED::DebugLED() {
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, LOW);
-    connectionBlinkHandle = NULL;
-    blinkTimeout = NULL;
 }
-
 
 TaskHandle_t DebugLED::getConnectionBlinkHandle() {
-    return connectionBlinkHandle;
+    return msPairingBlinkHandle;
 }
 
-void DebugLED::connectionBlink() {
+void DebugLED::pairingBlink() {
     for(;;) {
         digitalWrite(LED_PIN, HIGH);
         vTaskDelay(pdMS_TO_TICKS(CONNECTION_BLINK_DELAY));
@@ -28,20 +29,25 @@ void DebugLED::connectionBlink() {
     }
 }
 
-void DebugLED::createConnectionBlinkTaskHandle(void *parameters) {
+void DebugLED::createPairingBlinkTaskHandle(void *parameters) {
     DebugLED* instance = static_cast<DebugLED*>(parameters);
-    instance->connectionBlink();
+    instance->pairingBlink();
 }
 
-void DebugLED::createConnectionBlinkTask() {
-    if (connectionBlinkHandle == NULL) {
+void DebugLED::createPairingBlinkTask() {
+    if (msPairingBlinkHandle == NULL) {
+        if (msPesetBlinkHandle != NULL) {
+            Serial.println("void createConnectionBlinkTask() - Deletes Reset Blink task");
+            deleteResetBlinkTask();
+        }
+
         xTaskCreate(
-            createConnectionBlinkTaskHandle,
+            createPairingBlinkTaskHandle,
             "Connection Blink",
             1024,
-            this,
+            NULL,
             0,
-            &connectionBlinkHandle
+            &msPairingBlinkHandle
         );
         startBlinkTimeout(MAX_CONNECTION_BLINK_TIME);
     } else {
@@ -49,18 +55,33 @@ void DebugLED::createConnectionBlinkTask() {
     }
 }
 
-void DebugLED::deleteConnectionBlinkTask() {
-    if (connectionBlinkHandle != NULL) {
-        if (blinkTimeout != NULL) {
-            xTimerDelete(blinkTimeout, portMAX_DELAY);
-            blinkTimeout = NULL;
+void DebugLED::deletePairingBlinkTask() {
+    if (msPairingBlinkHandle != NULL) {
+        if (msBlinkTimeout != NULL) {
+            xTimerDelete(msBlinkTimeout, portMAX_DELAY);
+            msBlinkTimeout = NULL;
         }
 
-        vTaskDelete(connectionBlinkHandle);
-        connectionBlinkHandle = NULL;
+        vTaskDelete(msPairingBlinkHandle);
+        msPairingBlinkHandle = NULL;
         digitalWrite(LED_PIN, LOW);
+    }
+}
+
+void DebugLED::blinkTimeoutCallback() {
+    if (msBlinkTimeout != NULL) {
+        xTimerDelete(msBlinkTimeout, portMAX_DELAY);
+        msBlinkTimeout = NULL;
+
+        if (msPairingBlinkHandle != NULL) {
+            deletePairingBlinkTask();
+        }
+
+        if (msPesetBlinkHandle != NULL) {
+            deleteResetBlinkTask();
+        }
     } else {
-        Serial.println("void deleteConnectionBlinkTask() - Can't delete Connection Blink task -> Connection Blink task not exists");
+        Serial.println("void blinkTimeoutCallback() - Can't delete blinkTimeout timer -> blinkTimeout timer not exists");
     }
 }
 
@@ -69,36 +90,19 @@ void DebugLED::startBlinkTimeoutHandle(TimerHandle_t xTimer) {
     instance->blinkTimeoutCallback();
 }
 
-void DebugLED::blinkTimeoutCallback() {
-    if (blinkTimeout != NULL) {
-        xTimerDelete(blinkTimeout, portMAX_DELAY);
-        blinkTimeout = NULL;
-
-        if (connectionBlinkHandle != NULL) {
-            deleteConnectionBlinkTask();
-        }
-
-        if (resetBlinkHandle != NULL) {
-            deleteResetBlinkTask();
-        }
-    } else {
-        Serial.println("void blinkTimeoutCallback() - Can't delete blinkTimeout timer -> blinkTimeout timer not exists");
-    }
-}
-
 void DebugLED::startBlinkTimeout(uint32_t maxBlinkTime) {
-    if (blinkTimeout == NULL) {
-        blinkTimeout = xTimerCreate(
+    if (msBlinkTimeout == NULL) {
+        msBlinkTimeout = xTimerCreate(
             "Blink Timeout",
             pdMS_TO_TICKS(maxBlinkTime),
             pdFALSE,
-            this,
+            NULL,
             startBlinkTimeoutHandle
         );
     }
     
-    if (blinkTimeout != NULL) {
-        xTimerStart(blinkTimeout, portMAX_DELAY);
+    if (msBlinkTimeout != NULL) {
+        xTimerStart(msBlinkTimeout, portMAX_DELAY);
     } else {
         Serial.println("void startBlinkTimeout() - Can't create blinkTimeout timer -> blinkTimeout timer not created");
     }
@@ -119,18 +123,18 @@ void DebugLED::createResetBlinkTaskHandle(void *parameters) {
 }
 
 void DebugLED::createResetBlinkTask() {
-    if (resetBlinkHandle == NULL) {
-        if(connectionBlinkHandle != NULL) {
+    if (msPesetBlinkHandle == NULL) {
+        if(msPairingBlinkHandle != NULL) {
             Serial.println("void createResetBlinkTask() - Deletes Connection Blink task");
-            deleteConnectionBlinkTask();
+            deletePairingBlinkTask();
         }
         xTaskCreate(
             createResetBlinkTaskHandle,
             "Reset Blink",
             1024,
-            this,
+            NULL,
             0,
-            &resetBlinkHandle
+            &msPesetBlinkHandle
         );
         startBlinkTimeout(MAX_RESET_BLINK_TIME);
     } else {
@@ -139,36 +143,29 @@ void DebugLED::createResetBlinkTask() {
 }
 
 void DebugLED::deleteResetBlinkTask() {
-    if (resetBlinkHandle != NULL) {
-        if (blinkTimeout != NULL) {
-            xTimerDelete(blinkTimeout, portMAX_DELAY);
-            blinkTimeout = NULL;
+    if (msPesetBlinkHandle != NULL) {
+        if (msBlinkTimeout != NULL) {
+            xTimerDelete(msBlinkTimeout, portMAX_DELAY);
+            msBlinkTimeout = NULL;
         }
 
-        vTaskDelete(resetBlinkHandle);
-        resetBlinkHandle = NULL;
+        vTaskDelete(msPesetBlinkHandle);
+        msPesetBlinkHandle = NULL;
         digitalWrite(LED_PIN, LOW);
-    } else {
-        Serial.println("void deleteResetBlinkTask() - Can't delete Reset Blink task -> Reset Blink task not exists");
     }
 }
 
 TaskHandle_t DebugLED::getResetBlinkHandle() {
-    return resetBlinkHandle;
+    return msPesetBlinkHandle;
 }
 
 DebugLED::~DebugLED() {
-    if (connectionBlinkHandle != NULL) {
-        deleteConnectionBlinkTask();
-    }
+    deletePairingBlinkTask();
+    deleteResetBlinkTask();
 
-    if (resetBlinkHandle != NULL) {
-        deleteResetBlinkTask();
-    }
-
-    if (blinkTimeout != NULL) {
-        xTimerDelete(blinkTimeout, portMAX_DELAY);
-        blinkTimeout = NULL;
+    if (msBlinkTimeout != NULL) {
+        xTimerDelete(msBlinkTimeout, portMAX_DELAY);
+        msBlinkTimeout = NULL;
     }
     digitalWrite(LED_PIN, LOW);
 }
