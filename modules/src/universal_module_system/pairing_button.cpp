@@ -2,8 +2,7 @@
 #include "smart_home_config.h"
 
 #define DEBOUNCING_TIME 100
-// #define DEBOUNCING_COUNTER_TO_SECONDS(value) (value * DEBOUNCING_TIME / 1000)
-#define DEBOUNCING_COUNTER_TO_SECONDS(value) (value / 10)
+#define DEBOUNCING_COUNTER_TO_SECONDS(value) (value * DEBOUNCING_TIME / 1000)
 
 DebugLED* PairingButton::mspDebugLED;
 
@@ -28,20 +27,28 @@ void IRAM_ATTR PairingButton::buttonISR() {
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
-// ---- buttonPressTimer ----
+
+// ====================== Button Press Timer ======================
 void PairingButton::buttonPressTimerCallback() {
     if (digitalRead(BUTTON_PIN) == LOW) {
         msButtonPressCounter++;
         msButtonNotPressedCounter = 3;
+        
+        // after pressing button for 10 seconds call createResetBlinkTask()
         if (DEBOUNCING_COUNTER_TO_SECONDS(msButtonPressCounter) >= 10 && msButtonMode != 2) {
             msButtonMode = 2;
             mspDebugLED->createResetBlinkTask();
-        } else if (DEBOUNCING_COUNTER_TO_SECONDS(msButtonPressCounter) >= 3 && msButtonMode == 0) {
+            
+        } 
+        // after pressing button for 3 seconds call createPairingBlinkTask()
+        else if (DEBOUNCING_COUNTER_TO_SECONDS(msButtonPressCounter) >= 3 && msButtonMode == 0) {
             msButtonMode = 1;
             mspDebugLED->createPairingBlinkTask();
         }
     } else {
         msButtonNotPressedCounter--;
+
+        // if button will not be press for 3*DEBOUNCING_TIME timer will stop
         if (msButtonNotPressedCounter <= 0) {
             deleteButtonPressTimer();     
             msButtonMode = 0;
@@ -54,14 +61,18 @@ void PairingButton::buttonPressTimerCallbackHandle(TimerHandle_t xTimer) {
     instance->buttonPressTimerCallback();
 }
 void PairingButton::startButtonPressTimer() {
-    msButtonPressTimer = xTimerCreate(
-        "Button Press Timer",
-        pdMS_TO_TICKS(DEBOUNCING_TIME),
-        pdTRUE,
-        NULL,
-        buttonPressTimerCallbackHandle
-    );
-    xTimerStart(msButtonPressTimer, portMAX_DELAY);
+    if (msButtonPressTimer == NULL) {
+        msButtonPressTimer = xTimerCreate(
+            "Button Press Timer",
+            pdMS_TO_TICKS(DEBOUNCING_TIME),
+            pdTRUE,
+            NULL,
+            buttonPressTimerCallbackHandle
+        );
+    }
+    if (msButtonPressTimer != NULL) {
+        xTimerStart(msButtonPressTimer, portMAX_DELAY);
+    }
 }
 void PairingButton::deleteButtonPressTimer() {
     if (msButtonPressTimer != NULL) {
@@ -71,7 +82,7 @@ void PairingButton::deleteButtonPressTimer() {
     msButtonPressCounter = 0;
     msButtonNotPressedCounter = 3;
 }
-// ---- buttonPressTimer ----
+// ================================================================
 
 
 PairingButton::~PairingButton() {
