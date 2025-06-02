@@ -28,6 +28,7 @@ TaskHandle_t DebugLED::getResetBlinkHandle() {
 // ================================================================
 
 // ====================== Pairing Blink Task ======================
+
 void DebugLED::pairingBlink() {
     for(;;) {
         digitalWrite(LED_PIN, HIGH);
@@ -69,6 +70,7 @@ void DebugLED::deletePairingBlinkTask() {
 // ================================================================
 
 // ======================= Reset Blink Task =======================
+
 void DebugLED::resetBlink() {
     for(;;) {
         digitalWrite(LED_PIN, HIGH);
@@ -110,6 +112,7 @@ void DebugLED::deleteResetBlinkTask() {
 // ================================================================
 
 // ===================== Blink Timeout Timer ======================
+
 void DebugLED::blinkTimeoutCallback() {
     if (msBlinkTimeout != NULL) {
         if (msPairingBlinkHandle != NULL) {

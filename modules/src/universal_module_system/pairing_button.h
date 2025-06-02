@@ -23,15 +23,16 @@ private:
     static void startButtonPressTimer();
 
     /**
-     * @brief Method that deletes the Button Press Timer and resets variables msButtonPressCounter and msButtonNotPressedCounter to default values. 
+     * @brief Method that deletes the Button Press Timer and resets button's variables to default values. 
      * If Button Press Timer doesn't exist, it only reset variables.
+     * @note Button's variables are: msButtonPressCounter, msButtonNotPressedCounter.
      */
     static void deleteButtonPressTimer();
 
     /**
      * @brief Method that makes static cast of PairingButton object.
      * @note This method exists only because is necessary for creating timer inside class in freeRTOS.
-     * @param TimerHandle_t freeRTOS software timer.
+     * @param TimerHandle_t FreeRTOS software timer.
      */
     static void buttonPressTimerCallbackHandle(TimerHandle_t xTimer);
 

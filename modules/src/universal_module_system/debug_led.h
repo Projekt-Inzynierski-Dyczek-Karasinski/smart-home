@@ -17,7 +17,7 @@ private:
     /**
      * @brief Method that makes static cast of DebugLED object.
      * @note This method exists only because is necessary for creating task inside class in freeRTOS.
-     * @param void* freeRTOS task parameters.
+     * @param void* FreeRTOS task parameters.
      */
     static void createPairingBlinkTaskHandle(void *parameters);
 
@@ -29,7 +29,7 @@ private:
     /**
      * @brief Method that makes static cast of DebugLED object.
      * @note This method exists only because is necessary for creating task inside class in freeRTOS.
-     * @param void* freeRTOS task parameters.
+     * @param void* FreeRTOS task parameters.
      */
     static void createResetBlinkTaskHandle(void *parameters);
 
@@ -41,7 +41,7 @@ private:
     /**
      * @brief Method that makes static cast of DebugLED object.
      * @note This method exists only because is necessary for creating timer inside class in freeRTOS.
-     * @param TimerHandle_t freeRTOS software timer.
+     * @param TimerHandle_t FreeRTOS software timer.
      */
     static void startBlinkTimeoutHandle(TimerHandle_t xTimer);
 

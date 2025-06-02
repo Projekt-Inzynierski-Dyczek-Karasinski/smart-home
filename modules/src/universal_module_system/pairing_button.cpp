@@ -29,6 +29,7 @@ void IRAM_ATTR PairingButton::buttonISR() {
 
 
 // ====================== Button Press Timer ======================
+
 void PairingButton::buttonPressTimerCallback() {
     if (digitalRead(BUTTON_PIN) == LOW) {
         msButtonPressCounter++;
@@ -48,7 +49,7 @@ void PairingButton::buttonPressTimerCallback() {
     } else {
         msButtonNotPressedCounter--;
 
-        // if button will not be press for 3*DEBOUNCING_TIME timer will stop
+        // if button will not be press for 3*DEBOUNCING_TIME (0.3 seconds) timer will stop
         if (msButtonNotPressedCounter <= 0) {
             deleteButtonPressTimer();     
             msButtonMode = 0;
