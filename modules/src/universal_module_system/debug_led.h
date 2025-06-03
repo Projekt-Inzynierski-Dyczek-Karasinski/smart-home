@@ -13,7 +13,7 @@
  * 
  * Blinking quickly (0.1s ON, 0.1s OFF) indicates reset process.
  * 
- * @warning This class SHOULD BE initialized only once and destructor of this class SHOULD NEVER BE used. 
+ * @warning This class must be initialized only once and destructor of this class should never be used. 
  * @note This class should be initialized at the very beginning of setup(). Serial.begin() have to be initialized separately before this class to see debug messages.
  * 
  */
@@ -26,7 +26,7 @@ public:
 
     /**
      * @brief Destructor of DebugLED class. Deletes all class's tasks and timers.
-     * @warning Destructor of this class exists only for programming principles. This class SHOULD NEVER BE deleted.
+     * @warning Destructor of this class exists only for programming principles. This class should never be deleted.
      */
     ~DebugLED();
 

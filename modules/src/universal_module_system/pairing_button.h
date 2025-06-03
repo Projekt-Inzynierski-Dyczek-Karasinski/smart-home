@@ -12,7 +12,7 @@
  * Pressing button for 3 seconds initializes a pairing process. 
  * 
  * Pressing button for 10 seconds initializes a reset process. 
- * @warning This class SHOULD BE initialized only once and destructor of this class SHOULD NEVER BE used. 
+ * @warning This class must be initialized only once and destructor of this class should never be used. 
  * @note This class should be initialized at the very beginning of setup() (but after DebugLED class). Serial.begin() have to be initialized separately before this class to see debug messages.
  * 
  */
@@ -26,7 +26,7 @@ public:
     
     /**
      * @brief Destructor of PairingButton class. Detaches interrupt from BUTTON_PIN and deletes Button Press Timer if exists.
-     * @warning Destructor of this class exists only for programming principles. This class SHOULD NEVER BE deleted.
+     * @warning Destructor of this class exists only for programming principles. This class should never be deleted.
      */
     ~PairingButton();
 
