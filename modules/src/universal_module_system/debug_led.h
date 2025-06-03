@@ -3,60 +3,33 @@
 
 #include <Arduino.h>
 
+// TODO change class to singleton
+
+
+/**
+ * @brief Class that controls the LED. 
+ * 
+ * Blinking slowly (0.5s ON, 0.5s OFF) indicates pairing process.
+ * 
+ * Blinking quickly (0.1s ON, 0.1s OFF) indicates reset process.
+ * 
+ * @warning This class SHOULD BE initialized only once and destructor of this class SHOULD NEVER BE used. 
+ * @note This class should be initialized at the very beginning of setup(). Serial.begin() have to be initialized separately before this class to see debug messages.
+ * 
+ */
 class DebugLED {
-private:
-    static TaskHandle_t msPairingBlinkHandle;
-    static TaskHandle_t msResetBlinkHandle;
-    static TimerHandle_t msBlinkTimeout;
-
-    /**
-     * @brief FreeRTOS task that blinks LED signalizing pairing process.
-     */
-    static void pairingBlink();
-
-    /**
-     * @brief Method that makes static cast of DebugLED object.
-     * @note This method exists only because is necessary for creating task inside class in freeRTOS.
-     * @param void* FreeRTOS task parameters.
-     */
-    static void createPairingBlinkTaskHandle(void *parameters);
-
-    /**
-     * @brief FreeRTOS task that blinks LED signalizing reset process.
-     */
-    static void resetBlink();
-
-    /**
-     * @brief Method that makes static cast of DebugLED object.
-     * @note This method exists only because is necessary for creating task inside class in freeRTOS.
-     * @param void* FreeRTOS task parameters.
-     */
-    static void createResetBlinkTaskHandle(void *parameters);
-
-    /**
-     * @brief Method that is called when the Blink Timeout Timer expires. Deletes Timer and Pairing Blink and Reset Blink tasks if exists.
-     */
-    static void blinkTimeoutCallback();
-
-    /**
-     * @brief Method that makes static cast of DebugLED object.
-     * @note This method exists only because is necessary for creating timer inside class in freeRTOS.
-     * @param TimerHandle_t FreeRTOS software timer.
-     */
-    static void startBlinkTimeoutHandle(TimerHandle_t xTimer);
-
-    /**
-     * @brief Creates and starts Blink Timeout Timer. If timer is already started, it will be restarted.
-     * @param uint32_t Time in milliseconds after which the timer will expire.
-     */
-    static void startBlinkTimeout(uint32_t maxBlinkTime);
-
-    /**
-     * @brief Deletes Blink Timeout Timer if exists.
-     */
-    static void deleteBlinkTimeout();
-    
 public:
+/**
+     * @brief Constructor of DebugLED class. Sets LED_PIN to OUTPUT and its state to LOW.
+     */
+    DebugLED();
+
+    /**
+     * @brief Destructor of DebugLED class. Deletes all class's tasks and timers.
+     * @warning Destructor of this class exists only for programming principles. This class SHOULD NEVER BE deleted.
+     */
+    ~DebugLED();
+
     /**
      * @brief Getter returning the value of the handle for the Pairing Blink Task.
      * @return TaskHandle_t Handle to the Reset Blink Task, or NULL if the task is not exist.
@@ -72,39 +45,95 @@ public:
     /**
      * @brief Creates Pairing Blink Task and starts Blink Timeout Timer. If the task is already exist, only starts timer.
      * @warning If Reset Blink Task exist, it will be deleted before creating Pairing, only one of them is allowed at the same time.
-     * @note This method is public.
      */
     static void createPairingBlinkTask();
 
     /**
      * @brief Deletes Pairing Blink Task and deletes Blink Timeout Timer if exists.
-     * @note This method is public.
      */
     static void deletePairingBlinkTask();
     
     /**
      * @brief Creates Reset Blink Task and starts Blink Timeout Timer. If the task is already exist, only starts timer.
      * @warning If Pairing Blink Task exist, it will be deleted before creating Reset, only one of them is allowed at the same time.
-     * @note This method is public.
      */
     static void createResetBlinkTask();
 
     /**
      * @brief Deletes Pairing Blink Task and deletes Blink Timeout Timer if exists.
-     * @note This method is public.
      */
     static void deleteResetBlinkTask();
     
+private:
     /**
-     * @brief Constructor of DebugLED class. Sets LED_PIN to OUTPUT and its state to LOW.
+     * @brief Make LED blink for a given times.
+     * @param uint32_t Time in milliseconds for which the LED will be on.
+     * @param uint32_t Time in milliseconds for which the LED will be off.
+     * @note This method is private.
      */
-    DebugLED();
+    static void blink(uint32_t ledOnDuration, uint32_t ledOffDuration);
 
     /**
-     * @brief Destructor of DebugLED class. Deletes all class's tasks and timers.
-     * @warning Destructor of this class exists only for programming principles. This class SHOULD BE NEVER deleted.
+     * @brief FreeRTOS task that blinks LED signalizing pairing process.
+     * @note This method is private.
      */
-    ~DebugLED();
+    static void pairingBlink();
+
+    /**
+     * @brief Method that makes static cast of DebugLED object.
+     * @note This method exists only because is necessary for creating task inside class in freeRTOS.
+     * 
+     * This method is private.
+     * @param void* FreeRTOS task parameters.
+     */
+    static void createPairingBlinkTaskHandle(void *parameters);
+
+    /**
+     * @brief FreeRTOS task that blinks LED signalizing reset process.
+     * @note This method is private.
+     */
+    static void resetBlink();
+
+    /**
+     * @brief Method that makes static cast of DebugLED object.
+     * @note This method exists only because is necessary for creating task inside class in freeRTOS.
+     * 
+     * This method is private.
+     * @param void* FreeRTOS task parameters.
+     */
+    static void createResetBlinkTaskHandle(void *parameters);
+
+    /**
+     * @brief Method that is called when the Blink Timeout Timer expires. Deletes Timer and Pairing Blink and Reset Blink tasks if exists.
+     * @note This method is private.
+     */
+    static void blinkTimeoutCallback();
+
+    /**
+     * @brief Method that makes static cast of DebugLED object.
+     * @note This method exists only because is necessary for creating timer inside class in freeRTOS.
+     * 
+     * This method is private.
+     * @param TimerHandle_t FreeRTOS software timer.
+     */
+    static void startBlinkTimeoutHandle(TimerHandle_t xTimer);
+
+    /**
+     * @brief Creates and starts Blink Timeout Timer. If timer is already started, it will be restarted.
+     * @note This method is private.
+     * @param uint32_t Time in milliseconds after which the timer will expire.
+     */
+    static void startBlinkTimeout(uint32_t maxBlinkTime);
+
+    /**
+     * @brief Deletes Blink Timeout Timer if exists.
+     * @note This method is private.
+     */
+    static void deleteBlinkTimeout();
+
+    static TaskHandle_t msPairingBlinkHandle;
+    static TaskHandle_t msResetBlinkHandle;
+    static TimerHandle_t msBlinkTimeout;
 };
 
 #endif

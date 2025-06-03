@@ -4,8 +4,9 @@
 #define CONNECTION_BLINK_DELAY 500
 #define RESET_BLINK_DELAY 100
 
-// tmp values
+// TODO assign final value
 #define MAX_CONNECTION_BLINK_TIME 15000
+// TODO assign final value
 #define MAX_RESET_BLINK_TIME 3000
 
 TaskHandle_t DebugLED::msPairingBlinkHandle = NULL;
@@ -18,23 +19,36 @@ DebugLED::DebugLED() {
     digitalWrite(LED_PIN, LOW);
 }
 
+DebugLED::~DebugLED() {
+    deletePairingBlinkTask();
+    deleteResetBlinkTask();
+    deleteBlinkTimeout();
+    digitalWrite(LED_PIN, LOW);
+}
+
 // =========================== Getters ============================
+
 TaskHandle_t DebugLED::getPairingBlinkHandle() {
     return msPairingBlinkHandle;
 }
+
 TaskHandle_t DebugLED::getResetBlinkHandle() {
     return msResetBlinkHandle;
 }
 // ================================================================
 
+void DebugLED::blink(uint32_t ledOnDuration, uint32_t ledOffDuration) {
+    digitalWrite(LED_PIN, HIGH);
+    vTaskDelay(pdMS_TO_TICKS(ledOnDuration));
+    digitalWrite(LED_PIN, LOW);
+    vTaskDelay(pdMS_TO_TICKS(ledOffDuration));
+}
+
 // ====================== Pairing Blink Task ======================
 
 void DebugLED::pairingBlink() {
     for(;;) {
-        digitalWrite(LED_PIN, HIGH);
-        vTaskDelay(pdMS_TO_TICKS(CONNECTION_BLINK_DELAY));
-        digitalWrite(LED_PIN, LOW);
-        vTaskDelay(pdMS_TO_TICKS(CONNECTION_BLINK_DELAY));
+        blink(CONNECTION_BLINK_DELAY, CONNECTION_BLINK_DELAY);
     }
 }
 void DebugLED::createPairingBlinkTaskHandle(void *parameters) {
@@ -73,10 +87,7 @@ void DebugLED::deletePairingBlinkTask() {
 
 void DebugLED::resetBlink() {
     for(;;) {
-        digitalWrite(LED_PIN, HIGH);
-        vTaskDelay(pdMS_TO_TICKS(RESET_BLINK_DELAY));
-        digitalWrite(LED_PIN, LOW);
-        vTaskDelay(pdMS_TO_TICKS(RESET_BLINK_DELAY));
+        blink(RESET_BLINK_DELAY, RESET_BLINK_DELAY);
     }
 }
 void DebugLED::createResetBlinkTaskHandle(void *parameters) {
@@ -156,10 +167,3 @@ void DebugLED::deleteBlinkTimeout() {
     }
 }
 // ================================================================
-
-DebugLED::~DebugLED() {
-    deletePairingBlinkTask();
-    deleteResetBlinkTask();
-    deleteBlinkTimeout();
-    digitalWrite(LED_PIN, LOW);
-}

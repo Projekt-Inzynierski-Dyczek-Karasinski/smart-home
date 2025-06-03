@@ -17,6 +17,11 @@ PairingButton::PairingButton(DebugLED *debugLED) {
     attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
 }
 
+PairingButton::~PairingButton() {
+    detachInterrupt(digitalPinToInterrupt(BUTTON_PIN));
+    deleteButtonPressTimer();
+}
+
 void IRAM_ATTR PairingButton::buttonISR() {
     detachInterrupt(digitalPinToInterrupt(BUTTON_PIN));
     
@@ -84,9 +89,3 @@ void PairingButton::deleteButtonPressTimer() {
     msButtonNotPressedCounter = 3;
 }
 // ================================================================
-
-
-PairingButton::~PairingButton() {
-    detachInterrupt(digitalPinToInterrupt(BUTTON_PIN));
-    deleteButtonPressTimer();
-}
