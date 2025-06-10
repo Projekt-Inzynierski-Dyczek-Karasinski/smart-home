@@ -5,6 +5,9 @@
         #define RX_PIN 6 
         #define TX_PIN 5
         #define SET_PIN 7
+        #define HARDWARE_SERIAL_UART_NR 2
+        
+        #define CENTRAL_UNIT
     #endif
 
     #define LED_PIN 39
