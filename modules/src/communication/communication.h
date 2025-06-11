@@ -9,46 +9,50 @@ class Communication {
 public:
     Communication();
     ~Communication();
+
 private:
-    // TODO remove "testHC12" methods
-    static void testHC12Task();
-    static void createTestHC12TaskHandle(void *parameters);
-    static void createTestHC12Task();
-    static void deleteTestHC12Task();
-    static TaskHandle_t msTestHC12TaskHandle;
+    static void createReceiveMessageQueue();
+    static void deleteReceiveMessageQueue();
+    static void createSendMessageQueue();
+    static void deleteSendMessageQueue();
 
     // TODO remove "sendCustomMessage" methods
     static void sendCustomMessageTask();
     static void createSendCustomMessageTaskHandle(void *parameters);
     static void createSendCustomMessageTask();
     static void deleteSendCustomMessageTask();
-    static TaskHandle_t msSendCustomMessageTaskHandle;
+
+    static void sendMessageTask();
+    static void createSendMessageTaskHandle(void *parameters);
+    static void createSendMessageTask();
+    static void deleteSendMessageTask();
 
     static void receiveMessageTask();
     static void createReceiveMessageTaskHandle(void *parameters);
     static void createReceiveMessageTask();
     static void deleteReceiveMessageTask();
 
+    // TODO remove printMessageTask
     static void printMessageTask();
     static void createPrintMessageTaskHandle(void *parameters);
     static void createPrintMessageTask();
     static void deletePrintMessageTask();
-    static TaskHandle_t msPrintMessageTaskHandle;
-
-    // TODO remove "msReceiveMessageBuffer"
-    // static void createReceiveMessageBuffer();
-    // static void deleteReceiveMessageBuffer();
-
-    static void createReceiveMessageQueue();
-    static void deleteReceiveMessageQueue();
     
-    static TaskHandle_t msReceiveMessageTaskHandle;
-    // TODO remove "msReceiveMessageBuffer"
-    // static MessageBufferHandle_t msReceiveMessageBuffer;
-    static QueueHandle_t msReceiveMessageQueue;
-
+    
+    static char calculateCheckSum(char *message);
+    static bool checkMessage(char *message);
+    
+    static char msMACAddress[7];
     static HardwareSerial *mspSerial;
-    static char msMACAddress[12];
+
+    static TaskHandle_t msPrintMessageTaskHandle;
+    static TaskHandle_t msReceiveMessageTaskHandle;
+    // TODO remove "sendCustomMessage" methods
+    static TaskHandle_t msSendCustomMessageTaskHandle;
+    static TaskHandle_t msSendMessageTaskHandle;
+
+    static QueueHandle_t msReceiveMessageQueue;
+    static QueueHandle_t msSendMessagesQueue;
 };
 
 #endif
