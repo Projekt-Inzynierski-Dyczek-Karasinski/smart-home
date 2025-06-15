@@ -42,7 +42,7 @@ private:
     static char calculateCheckSum(char *message);
     static bool checkMessage(char *message);
     
-    static char msMACAddress[7];
+    static uint8_t msMACAddress[6];
     static HardwareSerial *mspSerial;
 
     static TaskHandle_t msPrintMessageTaskHandle;
@@ -53,6 +53,8 @@ private:
 
     static QueueHandle_t msReceiveMessageQueue;
     static QueueHandle_t msSendMessagesQueue;
+
+    static SemaphoreHandle_t msHC12ReceiveMutex;
 };
 
 #endif

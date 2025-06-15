@@ -2,11 +2,11 @@
 #include "smart_home_config.h"
 #include <HardwareSerial.h>
 
-#define MESSAGE_QUEUE_ITEM_SIZE 64
-#define PROTOCOL_QUEUE_ITEM_SIZE 16
+#define MESSAGE_SIZE 64
+#define PROTOCOL_MESSAGE_SIZE 16
 #define BLANK_CHARACTER ' '
 
-char Communication::msMACAddress[7];
+uint8_t Communication::msMACAddress[6];
 
 HardwareSerial* Communication::mspSerial = nullptr;
 
@@ -20,16 +20,12 @@ TaskHandle_t Communication::msSendCustomMessageTaskHandle = NULL;
 QueueHandle_t Communication::msReceiveMessageQueue = NULL;
 QueueHandle_t Communication::msSendMessagesQueue = NULL;
 
+SemaphoreHandle_t Communication::msHC12ReceiveMutex;
 
 Communication::Communication() {
     // Get MAC address
     #ifdef ESP32_BOARD
-        uint8_t mac[6];
-        esp_read_mac(mac, ESP_MAC_WIFI_STA);
-        for (int i = 0; i < 6; ++i) {
-            msMACAddress[i] = (char)mac[i];
-        }
-        msMACAddress[6] = '\0';
+        esp_read_mac(msMACAddress, ESP_MAC_WIFI_STA);
     #else
         // TODO add function to get MAC address on different boards
         #error "MAC address not implemented!"
@@ -43,7 +39,9 @@ Communication::Communication() {
     // digitalWrite(SET_PIN, LOW);
     // vTaskDelay(pdMS_TO_TICKS(100));
     // digitalWrite(SET_PIN, HIGH);
-    vTaskDelay(pdMS_TO_TICKS(100));
+    // vTaskDelay(pdMS_TO_TICKS(100));
+
+    msHC12ReceiveMutex = xSemaphoreCreateMutex();
     
     mspSerial = new HardwareSerial(HARDWARE_SERIAL_UART_NR);
     mspSerial->begin((unsigned long)BAUD_RATE, SERIAL_8N1, RX_PIN, TX_PIN);
@@ -55,11 +53,11 @@ Communication::Communication() {
     createSendCustomMessageTask();
     createSendMessageTask();
 
+    createReceiveMessageTask();
 
 //     createPrintMessageTask();
-//     createReceiveMessageTask();
 //     createSendCustomMessageTask();
-
+    Serial.println("Communication initialized");
 }
 
 Communication::~Communication() {
@@ -82,7 +80,7 @@ Communication::~Communication() {
 
 void Communication::createReceiveMessageQueue() {
     if (msReceiveMessageQueue == NULL) {
-        msReceiveMessageQueue = xQueueCreate(10, sizeof(char[MESSAGE_QUEUE_ITEM_SIZE]));
+        msReceiveMessageQueue = xQueueCreate(10, sizeof(uint8_t[MESSAGE_SIZE]));
     }
 }
 void Communication::deleteReceiveMessageQueue() {
@@ -93,7 +91,7 @@ void Communication::deleteReceiveMessageQueue() {
 }
 void Communication::createSendMessageQueue() {
     if (msSendMessagesQueue == NULL) {
-        msSendMessagesQueue = xQueueCreate(10, sizeof(char[MESSAGE_QUEUE_ITEM_SIZE]));
+        msSendMessagesQueue = xQueueCreate(10, sizeof(uint8_t[MESSAGE_SIZE]));
     }
 }
 void Communication::deleteSendMessageQueue() {
@@ -107,50 +105,94 @@ void Communication::deleteSendMessageQueue() {
 // ======================= Receive Message ========================
 
 void Communication::receiveMessageTask() {
-    char buffer[MESSAGE_QUEUE_ITEM_SIZE];
-    for (int i = 0; i < sizeof(buffer); i++) {
-        buffer[i] = '\0';
-    }
-    uint8_t i = 0;
-    int intBuffer[MESSAGE_QUEUE_ITEM_SIZE];
-    bool isMessageComplete = false;
-
-    for(;;) {
-        if (mspSerial->available()) {
-            buffer[i] = mspSerial->read();
-            Serial.print("i: ");
-            Serial.println(i);
-            intBuffer[i] = (int)buffer[i];
-            if (i >= 16) {                
-                isMessageComplete = true;
+    uint8_t message;
+    for (;;){
+        if (mspSerial->available()){
+            if (xSemaphoreTake(msHC12ReceiveMutex, 0) == pdTRUE){
+                message = mspSerial->read();
+                xSemaphoreGive(msHC12ReceiveMutex);
+                if (message == 0) {
+                    Serial.println();
+                } else {
+                    Serial.print(message);
+                    Serial.print(' ');
+                }
             }
-            if ((int)buffer[i] != 255) {
-                
-                i++;
-            }
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(1));
         }
-
-        if (isMessageComplete) {
-            isMessageComplete = false;
-            Serial.print("Received: " + String(buffer));
-            // Serial.print("Received (int): ");
-            // vTaskDelay(pdMS_TO_TICKS(100));
-            // mspSerial->write(buffer);
-            // for (int j = 0; j < i; j++) {
-            //     Serial.print(intBuffer[j]);
-            // }
-            // Serial.println("\n-----------");
-            // TODO remove "msReceiveMessageBuffer"
-            // xMessageBufferSend(msReceiveMessageBuffer, &buffer, sizeof(buffer), portMAX_DELAY);
-            xQueueSend(msReceiveMessageQueue, &buffer, portMAX_DELAY);
-
-            for (int j = 0; j <= i; j++) {
-                buffer[j] = '\0';
-            }
-            i = 0;
-        }
-        vTaskDelay(pdMS_TO_TICKS(10));
     }
+
+    // prepare message protocol buffor
+    // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
+    // uint8_t protocolBuffor[11][PROTOCOL_MESSAGE_SIZE];
+    // for (uint8_t i = 0; i < 11; i++){
+    //     for (uint8_t j = 0; j < PROTOCOL_MESSAGE_SIZE; j++) {
+    //         protocolBuffor[i][j] = 0;
+    //     }
+    // }
+
+    // // prepare message to send buffor
+    // uint8_t messageBuffor[MESSAGE_SIZE];
+    // for (uint8_t i = 0; i < MESSAGE_SIZE; i++){
+    //     messageBuffor[i] = 0;
+    // }
+
+    // for (;;) {
+    //     if (mspSerial->available()) {
+
+    //     }
+
+    //     // delay for watchdog
+    //     vTaskDelay(10);
+    // }
+
+
+
+    // TODO remove
+    // uint8_t buffer[MESSAGE_SIZE];
+    // for (uint8_t i = 0; i < MESSAGE_SIZE; i++) {
+    //     buffer[i] = 0;
+    // }
+    // uint8_t i = 0;
+    // bool isMessageComplete = false;
+
+    // for(;;) {
+    //     if (mspSerial->available()) {
+    //         buffer[i] = mspSerial->read();
+    //         Serial.print("i: ");
+    //         Serial.println(i);
+    //         if (i >= 16) {                
+    //             isMessageComplete = true;
+    //         }
+    //         // TODO do something with getting 255 message from hc12
+    //         if ((int)buffer[i] != 255) {
+    //             i++;
+    //         }
+    //     }
+
+    //     if (isMessageComplete) {
+    //         isMessageComplete = false;
+    //         Serial.print("Received: " + String(buffer));
+    //         // Serial.print("Received (int): ");
+    //         // vTaskDelay(pdMS_TO_TICKS(100));
+    //         // mspSerial->write(buffer);
+    //         // for (int j = 0; j < i; j++) {
+    //         //     Serial.print(intBuffer[j]);
+    //         // }
+    //         // Serial.println("\n-----------");
+    //         // TODO remove "msReceiveMessageBuffer"
+    //         // xMessageBufferSend(msReceiveMessageBuffer, &buffer, sizeof(buffer), portMAX_DELAY);
+    //         // xQueueSend(msReceiveMessageQueue, &buffer, portMAX_DELAY);
+
+    //         for (int j = 0; j <= i; j++) {
+    //             buffer[j] = '\0';
+    //         }
+    //         i = 0;
+    //     }
+    //     // watchdog delay
+    //     vTaskDelay(pdMS_TO_TICKS(10));
+    // }
 }
 void Communication::createReceiveMessageTaskHandle(void *parameters) {
     Communication* instance = static_cast<Communication*>(parameters);
@@ -184,9 +226,9 @@ void Communication::deleteReceiveMessageTask() {
 
 void Communication::sendCustomMessageTask() {
     // prepare buffor
-    char buffor[MESSAGE_QUEUE_ITEM_SIZE];
-    for (uint8_t i = 0; i < MESSAGE_QUEUE_ITEM_SIZE; i++){
-        buffor[i] = '\0';
+    uint8_t buffor[MESSAGE_SIZE];
+    for (uint8_t i = 0; i < MESSAGE_SIZE; i++){
+        buffor[i] = 0;
     }
     uint8_t index = 0;
 
@@ -194,26 +236,34 @@ void Communication::sendCustomMessageTask() {
     for(;;) {
         if (Serial.available() > 0) {
             buffor[index] = Serial.read();
-            if ((int)buffor[index] != 13) {
+            if (buffor[index] != 13) {
                 index++;
             }
 
             // send message to Prepare Message To Send (protocol)
-            if (buffor[index - 1] == '\n') {
-                Serial.println("Message Ready!");
-                buffor[index - 1] = '\0';
-                Serial.println(buffor);
-                Serial.flush();
+            if (buffor[index - 1] == (uint8_t)'\n') {
+                buffor[index - 1] = 0;
+                
+                // debug print
+                uint8_t i = 0;
+                Serial.print("Message Ready: ");
+                while (buffor[i] != 0) {
+                    Serial.print(buffor[i]);
+                    i++;
+                }
+                Serial.println();
 
+                // add message to SendMessagesQueue
                 xQueueSend(msSendMessagesQueue, &buffor, portMAX_DELAY);
 
                 // reset buffor
                 for (uint8_t i = 0; i < index; i++){
-                    buffor[i] = '\0';
+                    buffor[i] = 0;
                 }
                 index = 0;
             }
         }
+        // delay for watchdog
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
@@ -248,23 +298,23 @@ void Communication::deleteSendCustomMessageTask() {
 void Communication::sendMessageTask() {
     // prepare message protocol buffor
     // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
-    char protocolBuffor[11][16];
+    uint8_t protocolBuffor[11][PROTOCOL_MESSAGE_SIZE];
     for (uint8_t i = 0; i < 11; i++){
         // TODO change to central unit MAC address
         for (uint8_t j = 0; j < 6; j++){
             protocolBuffor[i][j] = msMACAddress[j];
         }
         // TODO change to IP address
-        protocolBuffor[i][6] = 'I';
-        for (uint8_t j = 7; j < 16; j++) {
-            protocolBuffor[i][j] = '\0';
+        protocolBuffor[i][6] = 255;
+        for (uint8_t j = 7; j < PROTOCOL_MESSAGE_SIZE; j++) {
+            protocolBuffor[i][j] = 0;
         }
     }
 
     // prepare message to send buffor
-    char messageBuffor[MESSAGE_QUEUE_ITEM_SIZE];
-    for (uint8_t i = 0; i < MESSAGE_QUEUE_ITEM_SIZE; i++){
-        messageBuffor[i] = '\0';
+    uint8_t messageBuffor[MESSAGE_SIZE];
+    for (uint8_t i = 0; i < MESSAGE_SIZE; i++){
+        messageBuffor[i] = 0;
     }
     uint8_t messageIndex;
     int8_t messagesQuantity;
@@ -274,17 +324,16 @@ void Communication::sendMessageTask() {
         messageIndex = 0;
         messagesQuantity = 0;
 
+        // TODO change to deleting itself after not receiving message for some time
         // wait until the message appears in the queue and save message in local messageBuffor
         xQueueReceive(msSendMessagesQueue, &messageBuffor, portMAX_DELAY);
 
         // divide and add messages to protocolBuffor
-        while(messageBuffor[messageIndex] != '\0') {
-            
-
+        while(messageBuffor[messageIndex] != 0) {
             Serial.print("message in protocolBuffor: ");
             for (uint8_t i = 0; i < 6; i++){
-                Serial.print(messageBuffor[messageIndex + i]);
-                protocolBuffor[messagesQuantity][i + 8] = messageBuffor[messageIndex + i] != '\0' ? messageBuffor[messageIndex + i] : ' ';
+                Serial.print((char)messageBuffor[messageIndex + i]);
+                protocolBuffor[messagesQuantity][i + 8] = messageBuffor[messageIndex + i];
             }
             Serial.println();
             messagesQuantity++;
@@ -296,31 +345,66 @@ void Communication::sendMessageTask() {
         while (messagesQuantity > 0) {
             messagesQuantity--;
 
-            protocolBuffor[i][7] = (char)messagesQuantity;
+            protocolBuffor[i][7] = messagesQuantity;
 
-            protocolBuffor[i][14] = '\0';
+            protocolBuffor[i][PROTOCOL_MESSAGE_SIZE - 2] = 0;
             uint16_t checkSum = 0;
-            for (uint8_t j = 0; j < 16; j++) {
+            for (uint8_t j = 0; j < PROTOCOL_MESSAGE_SIZE; j++) {
                 checkSum += (uint16_t)protocolBuffor[i][j];
             }
             checkSum = (256 - (checkSum % 256)) % 256;
-            protocolBuffor[i][14] = (char)checkSum;
+            protocolBuffor[i][PROTOCOL_MESSAGE_SIZE - 2] = checkSum;
 
             i++;
         }
-
         // TODO remove TEST
-        // Serial.println("Messages to send:");
-        // for (uint8_t i = 0; i < 11; i++){
-        //     Serial.print("Message ");
-        //     Serial.print(i);
-        //     Serial.print(": ");
-        //     for (uint8_t j = 0; j < 16; j++){
-        //         Serial.print((int)protocolBuffor[i][j]);
-        //         Serial.print("-");
-        //     }
-        //     Serial.println();
-        // }
+        Serial.println("Messages to send:");
+        for (uint8_t i = 0; i < 11; i++){
+            Serial.print("Message ");
+            Serial.print(i);
+            Serial.print(": ");
+            for (uint8_t j = 0; j < 16; j++){
+                Serial.print((int)protocolBuffor[i][j]);
+                Serial.print(" ");
+            }
+            Serial.println();
+        }
+
+        // send message and clean buffor
+        i = 0;
+        do {
+            Serial.println("sending...");
+            xSemaphoreTake(msHC12ReceiveMutex, portMAX_DELAY);
+            mspSerial->write(protocolBuffor[i], PROTOCOL_MESSAGE_SIZE);
+            
+            // wait until hc12 module send confirmation 
+            bool isHC12confirmed = false;
+            while (!isHC12confirmed) {
+                if (mspSerial->available()) {
+                    uint8_t hc12confirmation = mspSerial->read();
+                    xSemaphoreGive(msHC12ReceiveMutex);
+                    if (hc12confirmation != 255) {
+                        Serial.print("SENDING MESSAGE ERROR! In sendMessageTask() -> hc-12 module not confirmed properly. Hc-12 module should send 255 signal but got: ");
+                        Serial.println(hc12confirmation);
+                    }
+                    isHC12confirmed = true;
+                } 
+                
+                vTaskDelay(pdMS_TO_TICKS(1));
+            }
+
+            messagesQuantity = protocolBuffor[i][7];
+            for (uint8_t j = 7; j < PROTOCOL_MESSAGE_SIZE; j++) {
+                protocolBuffor[i][j] = 0;
+            }
+            
+            i++;
+            // this delay is required for HC12 send/receive properly message
+            // TODO increase delay?
+            vTaskDelay(pdMS_TO_TICKS(10));
+        } while (messagesQuantity > 0);
+
+        
     }
 }
 void Communication::createSendMessageTaskHandle(void *parameters) {
@@ -353,7 +437,7 @@ void Communication::deleteSendMessageTask() {
 
 // ============================= test =============================
 void Communication::printMessageTask() {
-    // char receivedData[MESSAGE_QUEUE_ITEM_SIZE];
+    // char receivedData[MESSAGE_SIZE];
     // for(;;) {
     //     if (xQueueReceive(msReceiveMessageQueue, &receivedData, portMAX_DELAY) == pdTRUE) {
     //         Serial.print("xQueueReceive: " + String(receivedData));
