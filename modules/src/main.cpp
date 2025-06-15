@@ -6,33 +6,30 @@
 #include "universal_module_system/pairing_button.h"
 #include "communication/communication.h"
 
+// TODO remove
+// HardwareSerial mspSerial(HARDWARE_SERIAL_UART_NR);
 void setup() {
+    vTaskDelay(pdTICKS_TO_MS(1000));
     Serial.begin(9600);
+    Serial.println(); 
+    Serial.println("---FreeRTOS START---");
     
     DebugLED debugLed;
     PairingButton pairingButton(&debugLed);
     Communication communication;
+    // TODO remove
+    // mspSerial.begin((unsigned long)BAUD_RATE, SERIAL_8N1, RX_PIN, TX_PIN);
 
-    vTaskDelay(pdTICKS_TO_MS(1000));
-    Serial.println(); 
-    Serial.println("---FreeRTOS START---");
-    // uint8_t mac[6];
-    // char mac2[6];
-    // esp_read_mac(mac, ESP_MAC_WIFI_STA);
-
-    // Serial.print("MAC address: ");
-    // for (uint8_t num : mac){
-    //     Serial.print(num);
-    // }
-    // Serial.println();
-    // for (int i=0;i<6;i++){
-    //     mac2[i]=mac[i];
-    // }
-    // Serial.print("MAC addres2: ");
-    // Serial.println(mac2);
-
-
+    Serial.println("---setup() and loop() deleted---");
     vTaskDelete(NULL);
 }
 
-void loop() {}
+void loop() {
+    // TODO remove
+    // while (Serial.available() > 0) {
+    //     mspSerial.write(Serial.read());
+    // }
+    // while (mspSerial.available() > 0) {
+    //     Serial.write(mspSerial.read());
+    // }
+}

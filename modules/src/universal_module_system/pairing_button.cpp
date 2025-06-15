@@ -15,6 +15,7 @@ PairingButton::PairingButton(DebugLED *debugLED) {
     mspDebugLED = debugLED;
     pinMode(BUTTON_PIN, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
+    Serial.println("PairingButton initialized");
 }
 
 PairingButton::~PairingButton() {

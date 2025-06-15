@@ -17,6 +17,7 @@ TimerHandle_t DebugLED::msBlinkTimeout = NULL;
 DebugLED::DebugLED() {
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, LOW);
+    Serial.println("DebugLED initialized");
 }
 
 DebugLED::~DebugLED() {
