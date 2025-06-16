@@ -38,10 +38,30 @@ private:
     static void createPrintMessageTask();
     static void deletePrintMessageTask();
     
+    static void receiveMessageTimeoutTimerCallback();
+    static void receiveMessageTimeoutTimerCallbackHandle(TimerHandle_t xTimer);
+    static void receiveByteTimeoutTimerCallback();
+    static void receiveByteTimeoutTimerCallbackHandle(TimerHandle_t xTimer);
+    static void createReceiveTimers();
+    static void deleteReceiveTimers();
     
+    // TODO remove
     static char calculateCheckSum(char *message);
     static bool checkMessage(char *message);
-    
+
+
+    // enum class TimeoutStatus : uint32_t {
+    //     noTimeout = 0,
+    //     charTimeout = 1,
+    //     messageTimeout = 2
+    // };
+    typedef enum : uint32_t {
+        noTimeout = 0,
+        byteTimeout = 1,
+        messageTimeout = 2
+    } msTimeoutStatus;
+    // typedef Communication::TimeoutStatus TimeoutStatus_t;
+
     static uint8_t msMACAddress[6];
     static HardwareSerial *mspSerial;
 
@@ -55,6 +75,9 @@ private:
     static QueueHandle_t msSendMessagesQueue;
 
     static SemaphoreHandle_t msHC12ReceiveMutex;
+
+    static TimerHandle_t msReceiveMessageTimeoutTimer;
+    static TimerHandle_t msReceiveByteTimeoutTimer;
 };
 
 #endif

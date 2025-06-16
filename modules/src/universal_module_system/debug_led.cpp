@@ -65,7 +65,7 @@ void DebugLED::createPairingBlinkTask() {
             "Pairing Blink",
             1024,
             NULL,
-            0,
+            1,
             &msPairingBlinkHandle
         );
     } else {
@@ -104,7 +104,7 @@ void DebugLED::createResetBlinkTask() {
             "Reset Blink",
             1024,
             NULL,
-            0,
+            1,
             &msResetBlinkHandle
         );
         startBlinkTimeout(MAX_RESET_BLINK_TIME);

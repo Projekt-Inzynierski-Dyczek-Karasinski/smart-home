@@ -5,6 +5,10 @@
 #define MESSAGE_SIZE 64
 #define PROTOCOL_MESSAGE_SIZE 16
 #define BLANK_CHARACTER ' '
+// TODO assign final value
+#define RECEIVE_BYTE_TIMEOUT 50
+// TODO assign final value
+#define RECEIVE_MESSAGE_TIMEOUT 1000
 
 uint8_t Communication::msMACAddress[6];
 
@@ -21,6 +25,9 @@ QueueHandle_t Communication::msReceiveMessageQueue = NULL;
 QueueHandle_t Communication::msSendMessagesQueue = NULL;
 
 SemaphoreHandle_t Communication::msHC12ReceiveMutex;
+
+TimerHandle_t Communication::msReceiveMessageTimeoutTimer = NULL;
+TimerHandle_t Communication::msReceiveByteTimeoutTimer = NULL;
 
 Communication::Communication() {
     // Get MAC address
@@ -73,6 +80,8 @@ Communication::~Communication() {
     deleteReceiveMessageQueue();
     deleteSendMessageQueue();
 
+    deleteReceiveTimers();
+
     digitalWrite(SET_PIN, LOW);
 }
 
@@ -105,107 +114,155 @@ void Communication::deleteSendMessageQueue() {
 // ======================= Receive Message ========================
 
 void Communication::receiveMessageTask() {
-    uint8_t message;
-    for (;;){
-        if (mspSerial->available()){
-            if (xSemaphoreTake(msHC12ReceiveMutex, 0) == pdTRUE){
-                message = mspSerial->read();
-                xSemaphoreGive(msHC12ReceiveMutex);
-                if (message == 0) {
-                    Serial.println();
-                } else {
-                    Serial.print(message);
-                    Serial.print(' ');
-                }
-            }
-        } else {
-            vTaskDelay(pdMS_TO_TICKS(1));
-        }
-    }
+    // timeout status/cause
+    uint32_t timeoutStatus = msTimeoutStatus::noTimeout;
 
     // prepare message protocol buffor
     // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
-    // uint8_t protocolBuffor[11][PROTOCOL_MESSAGE_SIZE];
-    // for (uint8_t i = 0; i < 11; i++){
-    //     for (uint8_t j = 0; j < PROTOCOL_MESSAGE_SIZE; j++) {
-    //         protocolBuffor[i][j] = 0;
-    //     }
-    // }
+    uint8_t protocolBuffor[11][PROTOCOL_MESSAGE_SIZE];
 
-    // // prepare message to send buffor
-    // uint8_t messageBuffor[MESSAGE_SIZE];
-    // for (uint8_t i = 0; i < MESSAGE_SIZE; i++){
-    //     messageBuffor[i] = 0;
-    // }
+    // protocolBufforMessageIndex
+    uint8_t pbMessageIndex = 0;
 
-    // for (;;) {
-    //     if (mspSerial->available()) {
+    // protocolBufforByteIndex
+    uint8_t pbByteIndex = 0;
 
-    //     }
-
-    //     // delay for watchdog
-    //     vTaskDelay(10);
-    // }
+    // lambda function for clearing buffor
+    auto resetProtocolBuffor = [&]() {
+        for (uint8_t i = 0; i < 11; i++){
+            for (uint8_t j = 0; j < PROTOCOL_MESSAGE_SIZE; j++) {
+                protocolBuffor[i][j] = 0;
+            }
+        }
+        pbByteIndex = 0;
+        pbMessageIndex = 0;
+    };
+    resetProtocolBuffor();
 
 
+    // task loop
+    for (;;){
+        // timeouts 
+        if (xTaskNotifyWait(0, ULONG_MAX, &timeoutStatus, pdMS_TO_TICKS(0)) == pdTRUE) {
+            if (timeoutStatus == msTimeoutStatus::byteTimeout) {
+                xTimerStop(msReceiveMessageTimeoutTimer, portMAX_DELAY);
+                
+                Serial.println("Byte timeout");
+            } else {
+                xTimerStop(msReceiveByteTimeoutTimer, portMAX_DELAY);
 
-    // TODO remove
-    // uint8_t buffer[MESSAGE_SIZE];
-    // for (uint8_t i = 0; i < MESSAGE_SIZE; i++) {
-    //     buffer[i] = 0;
-    // }
-    // uint8_t i = 0;
-    // bool isMessageComplete = false;
+                Serial.println("Message timeout");
+            }
+            resetProtocolBuffor();
+            timeoutStatus = msTimeoutStatus::noTimeout;
+        }
 
-    // for(;;) {
-    //     if (mspSerial->available()) {
-    //         buffer[i] = mspSerial->read();
-    //         Serial.print("i: ");
-    //         Serial.println(i);
-    //         if (i >= 16) {                
-    //             isMessageComplete = true;
-    //         }
-    //         // TODO do something with getting 255 message from hc12
-    //         if ((int)buffer[i] != 255) {
-    //             i++;
-    //         }
-    //     }
 
-    //     if (isMessageComplete) {
-    //         isMessageComplete = false;
-    //         Serial.print("Received: " + String(buffer));
-    //         // Serial.print("Received (int): ");
-    //         // vTaskDelay(pdMS_TO_TICKS(100));
-    //         // mspSerial->write(buffer);
-    //         // for (int j = 0; j < i; j++) {
-    //         //     Serial.print(intBuffer[j]);
-    //         // }
-    //         // Serial.println("\n-----------");
-    //         // TODO remove "msReceiveMessageBuffer"
-    //         // xMessageBufferSend(msReceiveMessageBuffer, &buffer, sizeof(buffer), portMAX_DELAY);
-    //         // xQueueSend(msReceiveMessageQueue, &buffer, portMAX_DELAY);
+        // reading message 
+        else if (mspSerial->available() && xSemaphoreTake(msHC12ReceiveMutex, 0) == pdTRUE) {
+            protocolBuffor[pbMessageIndex][pbByteIndex] = mspSerial->read();
+            xSemaphoreGive(msHC12ReceiveMutex);
 
-    //         for (int j = 0; j <= i; j++) {
-    //             buffer[j] = '\0';
-    //         }
-    //         i = 0;
-    //     }
-    //     // watchdog delay
-    //     vTaskDelay(pdMS_TO_TICKS(10));
-    // }
+            if (pbByteIndex == 0 && pbMessageIndex == 0){
+                xTimerStart(msReceiveMessageTimeoutTimer, portMAX_DELAY);
+            }
+        
+            // if protocol message is not complete
+            if (pbByteIndex != PROTOCOL_MESSAGE_SIZE - 1) {
+                pbByteIndex++;
+                xTimerStart(msReceiveByteTimeoutTimer, portMAX_DELAY);
+            } else {
+                xTimerStop(msReceiveByteTimeoutTimer, portMAX_DELAY);
+                pbByteIndex = 0;
+
+                // if message is not end properly
+                if (protocolBuffor[pbMessageIndex][PROTOCOL_MESSAGE_SIZE - 1] != 0) {
+                    xTimerStop(msReceiveMessageTimeoutTimer, portMAX_DELAY);
+                    
+                    // TODO add "repeat last message"
+                    Serial.print("BAD END OF MESSAGE ERROR! In receiveMessageTask() -> message should end with 0 (\\0 char), but got: ");
+                    Serial.println(protocolBuffor[pbMessageIndex][PROTOCOL_MESSAGE_SIZE - 1]);
+
+                    resetProtocolBuffor();
+                }
+                else {
+                    // calculate checksum
+                    uint16_t checksum = 0;
+                    for (uint8_t i = 0; i < PROTOCOL_MESSAGE_SIZE; i++) {
+                        checksum += protocolBuffor[pbMessageIndex][i];
+                    }
+                    
+                    // if checksum is incorrect
+                    if (checksum % 256 != 0) {
+                        xTimerStop(msReceiveMessageTimeoutTimer, portMAX_DELAY);
+                        resetProtocolBuffor();
+                        // TODO add "repeat last message"
+                        Serial.println("BAD CHECKSUM ERROR! In receiveMessageTask() -> checksum incorrect");
+                    }
+                    // if MAC or IP is incorrect 
+                    // TODO add check for MAC and IP addresses
+                    else if (false) {
+                        // TODO add what should happen if MAC or IP is incorrect 
+                    }
+                    // if entire message is not ready (message quantity)
+                    else if (protocolBuffor[pbMessageIndex][7] != 0) {
+                        pbMessageIndex++;
+                    }
+                    // entire message is ready
+                    else {
+                        xTimerStop(msReceiveMessageTimeoutTimer, portMAX_DELAY);
+
+                        // prepare received message buffor
+                        uint8_t messageBuffor[MESSAGE_SIZE];
+                        for (uint8_t i = 0; i < MESSAGE_SIZE; i++){
+                            messageBuffor[i] = 0;
+                        }
+                        uint8_t messageIndex = 0;
+                        uint8_t messagesQuantity;
+                        pbMessageIndex = 0;
+
+                        // decode message
+                        do {
+                            for (uint8_t i = 8; i < PROTOCOL_MESSAGE_SIZE - 2; i++) {
+                                messageBuffor[messageIndex] = protocolBuffor[pbMessageIndex][i];
+                                messageIndex++;
+                            }
+
+                            messagesQuantity = protocolBuffor[pbMessageIndex][7];
+                            pbMessageIndex++;
+                        } while(messagesQuantity != 0);
+
+                        // TODO add message to queue
+                        Serial.print("Received message: ");
+                        Serial.println((char*)messageBuffor);
+
+                        // clean up
+                        resetProtocolBuffor();
+                    }
+                }
+            }
+        } 
+        // idle
+        else {
+            // delay for watchdog
+            vTaskDelay(pdMS_TO_TICKS(1));
+        }
+    }
 }
 void Communication::createReceiveMessageTaskHandle(void *parameters) {
     Communication* instance = static_cast<Communication*>(parameters);
     instance->receiveMessageTask();
 }
 void Communication::createReceiveMessageTask() {
+    createReceiveTimers();
+
     if (msReceiveMessageTaskHandle == NULL) {
         xTaskCreate(
             createReceiveMessageTaskHandle,
             "Receive message",
             2048,
             NULL,
-            0,
+            1,
             &msReceiveMessageTaskHandle
         );
     } else {
@@ -217,6 +274,8 @@ void Communication::deleteReceiveMessageTask() {
         vTaskDelete(msReceiveMessageTaskHandle);
         msReceiveMessageTaskHandle = NULL;
     }
+
+    deleteReceiveTimers();
 }
 // ================================================================
 
@@ -278,7 +337,7 @@ void Communication::createSendCustomMessageTask() {
             "Send custom message",
             2048,
             NULL,
-            1,
+            2,
             &msSendCustomMessageTaskHandle
         );
     } else {
@@ -301,14 +360,23 @@ void Communication::sendMessageTask() {
     uint8_t protocolBuffor[11][PROTOCOL_MESSAGE_SIZE];
     for (uint8_t i = 0; i < 11; i++){
         // TODO change to central unit MAC address
+        // prepare MAC address
         for (uint8_t j = 0; j < 6; j++){
             protocolBuffor[i][j] = msMACAddress[j];
         }
         // TODO change to IP address
+        // prepare IP address
         protocolBuffor[i][6] = 255;
-        for (uint8_t j = 7; j < PROTOCOL_MESSAGE_SIZE; j++) {
-            protocolBuffor[i][j] = 0;
+        // prepare place for message quantity
+        protocolBuffor[i][7] = 0;
+        // prepare place for message
+        for (uint8_t j = 8; j < PROTOCOL_MESSAGE_SIZE - 2; j++) {
+            protocolBuffor[i][j] = BLANK_CHARACTER;
         }
+        // prepare place checksum
+        protocolBuffor[i][PROTOCOL_MESSAGE_SIZE - 2] = 0;
+        // prepare '\0' (end of message)
+        protocolBuffor[i][PROTOCOL_MESSAGE_SIZE - 1] = 0;
     }
 
     // prepare message to send buffor
@@ -394,14 +462,16 @@ void Communication::sendMessageTask() {
             }
 
             messagesQuantity = protocolBuffor[i][7];
-            for (uint8_t j = 7; j < PROTOCOL_MESSAGE_SIZE; j++) {
-                protocolBuffor[i][j] = 0;
+            for (uint8_t j = 8; j < PROTOCOL_MESSAGE_SIZE - 2; j++) {
+                protocolBuffor[i][j] = BLANK_CHARACTER;
             }
+            protocolBuffor[i][PROTOCOL_MESSAGE_SIZE - 2] = 0;
+            protocolBuffor[i][PROTOCOL_MESSAGE_SIZE - 1] = 0;
             
             i++;
             // this delay is required for HC12 send/receive properly message
             // TODO increase delay?
-            vTaskDelay(pdMS_TO_TICKS(10));
+            vTaskDelay(pdMS_TO_TICKS(20));
         } while (messagesQuantity > 0);
 
         
@@ -470,6 +540,8 @@ void Communication::deletePrintMessageTask() {
 }
 // ================================================================
 
+// TODO remove
+
 // ========================== Check Sum ===========================
 
 // char Communication::calculateCheckSum (char *message) {
@@ -493,3 +565,48 @@ void Communication::deletePrintMessageTask() {
 // }
 // ================================================================
 
+// ============================ Timers ============================
+
+void Communication::receiveMessageTimeoutTimerCallback() {
+    xTaskNotify(msReceiveMessageTaskHandle, msTimeoutStatus::messageTimeout, eSetValueWithOverwrite);
+}
+void Communication::receiveMessageTimeoutTimerCallbackHandle(TimerHandle_t xTimer) {
+    Communication* instance = static_cast<Communication*>(pvTimerGetTimerID(xTimer));
+    instance->receiveMessageTimeoutTimerCallback();
+}
+void Communication::receiveByteTimeoutTimerCallback() {
+    xTaskNotify(msReceiveMessageTaskHandle, msTimeoutStatus::byteTimeout, eSetValueWithOverwrite);
+}
+void Communication::receiveByteTimeoutTimerCallbackHandle(TimerHandle_t xTimer) {
+    Communication* instance = static_cast<Communication*>(pvTimerGetTimerID(xTimer));
+    instance->receiveByteTimeoutTimerCallback();
+}
+void Communication::createReceiveTimers() {
+    if (msReceiveMessageTimeoutTimer == NULL) {
+        msReceiveMessageTimeoutTimer = xTimerCreate(
+            "Receive Message Timeout",
+            pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT),
+            pdFALSE,
+            NULL,
+            receiveMessageTimeoutTimerCallbackHandle
+        );
+    }
+    if (msReceiveByteTimeoutTimer == NULL) {
+        msReceiveByteTimeoutTimer = xTimerCreate(
+            "Receive Char Timeout",
+            pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT),
+            pdFALSE,
+            NULL,
+            receiveByteTimeoutTimerCallbackHandle
+        );
+    }
+}
+void Communication::deleteReceiveTimers() {
+    if (msReceiveMessageTimeoutTimer != NULL) {
+        xTimerDelete(msReceiveMessageTaskHandle, portMAX_DELAY);
+    }
+    if (msReceiveByteTimeoutTimer != NULL) {
+        xTimerDelete(msReceiveByteTimeoutTimer, portMAX_DELAY);
+    }
+}
+// ================================================================
