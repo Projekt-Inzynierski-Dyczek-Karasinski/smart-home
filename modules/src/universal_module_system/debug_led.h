@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-// TODO change class to singleton
+// TODO add/update comments about singleton
 
 
 /**
@@ -19,16 +19,12 @@
  */
 class DebugLED {
 public:
-/**
-     * @brief Constructor of DebugLED class. Sets LED_PIN to OUTPUT and its state to LOW.
-     */
-    DebugLED();
-
-    /**
-     * @brief Destructor of DebugLED class. Deletes all class's tasks and timers.
-     * @warning Destructor of this class exists only for programming principles. This class should never be deleted.
-     */
-    ~DebugLED();
+    // Static method declaration
+    static DebugLED* getInstance();
+    
+    // Delete copy constructor and assignment operator
+    DebugLED(const DebugLED&) = delete;
+    DebugLED& operator=(const DebugLED&) = delete;
 
     /**
      * @brief Getter returning the value of the handle for the Pairing Blink Task.
@@ -65,6 +61,17 @@ public:
     static void deleteResetBlinkTask();
     
 private:
+    /**
+     * @brief Constructor of DebugLED class. Sets LED_PIN to OUTPUT and its state to LOW.
+     */
+    DebugLED();
+
+    /**
+     * @brief Destructor of DebugLED class. Deletes all class's tasks and timers.
+     * @warning Destructor of this class exists only for programming principles. This class should never be deleted.
+     */
+    ~DebugLED();
+
     /**
      * @brief Make LED blink for a given times.
      * @param uint32_t Time in milliseconds for which the LED will be on.
@@ -130,6 +137,8 @@ private:
      * @note This method is private.
      */
     static void deleteBlinkTimeout();
+
+    static DebugLED* instance;
 
     static TaskHandle_t msPairingBlinkHandle;
     static TaskHandle_t msResetBlinkHandle;

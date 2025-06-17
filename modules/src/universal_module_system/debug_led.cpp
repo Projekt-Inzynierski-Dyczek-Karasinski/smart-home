@@ -9,9 +9,19 @@
 // TODO assign final value
 #define MAX_RESET_BLINK_TIME 3000
 
+// TODO add/update comments about singleton
+DebugLED* DebugLED::instance = nullptr;
+
 TaskHandle_t DebugLED::msPairingBlinkHandle = NULL;
 TaskHandle_t DebugLED::msResetBlinkHandle = NULL;;
 TimerHandle_t DebugLED::msBlinkTimeout = NULL;
+
+DebugLED* DebugLED::getInstance() {
+    if (instance == nullptr) {
+        instance = new DebugLED();
+    }
+    return instance;
+}
 
 
 DebugLED::DebugLED() {

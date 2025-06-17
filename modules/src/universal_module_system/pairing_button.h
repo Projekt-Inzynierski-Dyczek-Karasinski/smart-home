@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include "debug_led.h"
 
-// TODO change class to singleton
+// TODO add/update comments about singleton
 
 /**
  * @brief Class that controls the Pairing Button by attaching interrupt to it. 
@@ -18,6 +18,14 @@
  */
 class PairingButton {
 public:
+    // Static method declaration
+    static PairingButton* getInstance(DebugLED *debugLED);
+    
+    // Delete copy constructor and assignment operator
+    PairingButton(const PairingButton&) = delete;
+    PairingButton& operator=(const PairingButton&) = delete;
+    
+private:
     /**
      * @brief Constructor of PairingButton class. Sets BUTTON_PIN to INPUT_PULLUP and attaches interrupt to it.
      * @param DebugLED* Pointer to DebugLED object.
@@ -29,8 +37,6 @@ public:
      * @warning Destructor of this class exists only for programming principles. This class should never be deleted.
      */
     ~PairingButton();
-
-private:
     /**
      * @brief Method that is called when the button is pressed (and interrupt is attached) and calls startButtonPressTimer().
      * @note This method detaches interrupt for debouncing reasons. Interrupt is reattached at the end of buttonPressTimerCallback().
@@ -70,6 +76,7 @@ private:
      */
     static void deleteButtonPressTimer();
 
+    static PairingButton* instance;
 
     static DebugLED *mspDebugLED;
     static uint8_t msButtonMode;
