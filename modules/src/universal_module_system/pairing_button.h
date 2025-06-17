@@ -4,8 +4,6 @@
 #include <Arduino.h>
 #include "debug_led.h"
 
-// TODO add/update comments about singleton
-
 /**
  * @brief Class that controls the Pairing Button by attaching interrupt to it. 
  * 
@@ -14,11 +12,16 @@
  * Pressing button for 10 seconds initializes a reset process. 
  * @warning This class must be initialized only once and destructor of this class should never be used. 
  * @note This class should be initialized at the very beginning of setup() (but after DebugLED class). Serial.begin() have to be initialized separately before this class to see debug messages.
+ * This class is a singleton.
  * 
  */
 class PairingButton {
 public:
-    // Static method declaration
+    /**
+     * @brief Method that initialize PairingButton and returns pointer to the instance of PairingButton
+     * @param DebugLED* Pointer to DebugLED object.
+     * @return PairingButton* pointer to the instance of PairingButton.
+     */
     static PairingButton* getInstance(DebugLED *debugLED);
     
     // Delete copy constructor and assignment operator
@@ -29,14 +32,18 @@ private:
     /**
      * @brief Constructor of PairingButton class. Sets BUTTON_PIN to INPUT_PULLUP and attaches interrupt to it.
      * @param DebugLED* Pointer to DebugLED object.
+     * @note Constructor of this class is private, because this class is a singleton.
      */
     PairingButton(DebugLED *debugLED);
     
     /**
      * @brief Destructor of PairingButton class. Detaches interrupt from BUTTON_PIN and deletes Button Press Timer if exists.
      * @warning Destructor of this class exists only for programming principles. This class should never be deleted.
+     * @note Destructor of this class is private, because this class is a singleton.
      */
     ~PairingButton();
+
+
     /**
      * @brief Method that is called when the button is pressed (and interrupt is attached) and calls startButtonPressTimer().
      * @note This method detaches interrupt for debouncing reasons. Interrupt is reattached at the end of buttonPressTimerCallback().
@@ -44,7 +51,6 @@ private:
      * This method is private.
      */
     static void IRAM_ATTR buttonISR();
-
 
     /**
      * @brief Method that is called when the Button Press Timer expires. It debounces a button and controls its logic. 

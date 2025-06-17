@@ -4,7 +4,6 @@
 #define DEBOUNCING_TIME 100
 #define DEBOUNCING_COUNTER_TO_SECONDS(value) (value * DEBOUNCING_TIME / 1000)
 
-// TODO add/update comments about singleton
 PairingButton* PairingButton::instance = nullptr;
 
 DebugLED* PairingButton::mspDebugLED = nullptr;
@@ -13,6 +12,7 @@ uint8_t PairingButton::msButtonMode = 0;
 uint8_t PairingButton::msButtonPressCounter = 0;
 int8_t PairingButton::msButtonNotPressedCounter = 3;
 TimerHandle_t PairingButton::msButtonPressTimer = NULL;
+
 
 PairingButton* PairingButton::getInstance(DebugLED *debugLED) {
     if (instance == nullptr) {

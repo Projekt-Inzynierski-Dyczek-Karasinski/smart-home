@@ -3,9 +3,6 @@
 
 #include <Arduino.h>
 
-// TODO add/update comments about singleton
-
-
 /**
  * @brief Class that controls the LED. 
  * 
@@ -15,11 +12,15 @@
  * 
  * @warning This class must be initialized only once and destructor of this class should never be used. 
  * @note This class should be initialized at the very beginning of setup(). Serial.begin() have to be initialized separately before this class to see debug messages.
+ * This class is a singleton.
  * 
  */
 class DebugLED {
 public:
-    // Static method declaration
+    /**
+     * @brief Method that initialize DebugLED and returns pointer to the instance of DebugLED.
+     * @return DebugLED* pointer to the instance of DebugLED.
+     */
     static DebugLED* getInstance();
     
     // Delete copy constructor and assignment operator
@@ -63,12 +64,14 @@ public:
 private:
     /**
      * @brief Constructor of DebugLED class. Sets LED_PIN to OUTPUT and its state to LOW.
+     * @note Constructor of this class is private, because this class is a singleton.
      */
     DebugLED();
 
     /**
      * @brief Destructor of DebugLED class. Deletes all class's tasks and timers.
      * @warning Destructor of this class exists only for programming principles. This class should never be deleted.
+     * @note Destructor of this class is private, because this class is a singleton.
      */
     ~DebugLED();
 
