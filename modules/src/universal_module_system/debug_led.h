@@ -3,9 +3,6 @@
 
 #include <Arduino.h>
 
-// TODO change class to singleton
-
-
 /**
  * @brief Class that controls the LED. 
  * 
@@ -15,20 +12,20 @@
  * 
  * @warning This class must be initialized only once and destructor of this class should never be used. 
  * @note This class should be initialized at the very beginning of setup(). Serial.begin() have to be initialized separately before this class to see debug messages.
+ * This class is a singleton.
  * 
  */
 class DebugLED {
 public:
-/**
-     * @brief Constructor of DebugLED class. Sets LED_PIN to OUTPUT and its state to LOW.
-     */
-    DebugLED();
-
     /**
-     * @brief Destructor of DebugLED class. Deletes all class's tasks and timers.
-     * @warning Destructor of this class exists only for programming principles. This class should never be deleted.
+     * @brief Method that initializes DebugLED and returns a pointer to the instance of DebugLED.
+     * @return DebugLED* pointer to the instance of DebugLED.
      */
-    ~DebugLED();
+    static DebugLED* getInstance();
+    
+    // Delete copy constructor and assignment operator
+    DebugLED(const DebugLED&) = delete;
+    DebugLED& operator=(const DebugLED&) = delete;
 
     /**
      * @brief Getter returning the value of the handle for the Pairing Blink Task.
@@ -65,6 +62,19 @@ public:
     static void deleteResetBlinkTask();
     
 private:
+    /**
+     * @brief Constructor of DebugLED class. Sets LED_PIN to OUTPUT and its state to LOW.
+     * @note Constructor of this class is private, because this class is a singleton.
+     */
+    DebugLED();
+
+    /**
+     * @brief Destructor of DebugLED class. Deletes all class's tasks and timers.
+     * @warning Destructor of this class exists only for programming principles. This class should never be deleted.
+     * @note Destructor of this class is private, because this class is a singleton.
+     */
+    ~DebugLED();
+
     /**
      * @brief Make LED blink for a given times.
      * @param uint32_t Time in milliseconds for which the LED will be on.
@@ -130,6 +140,8 @@ private:
      * @note This method is private.
      */
     static void deleteBlinkTimeout();
+
+    static DebugLED* mspInstance;
 
     static TaskHandle_t msPairingBlinkHandle;
     static TaskHandle_t msResetBlinkHandle;

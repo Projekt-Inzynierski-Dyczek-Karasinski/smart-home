@@ -7,8 +7,8 @@
 
 void setup() {
     Serial.begin(9600);
-    DebugLED debugLed;
-    PairingButton pairingButton(&debugLed);
+    DebugLED* debugLed = DebugLED::getInstance();
+    PairingButton* pairingButton = PairingButton::getInstance(debugLed);
 
     vTaskDelay(pdTICKS_TO_MS(1000));
     Serial.println(); 
