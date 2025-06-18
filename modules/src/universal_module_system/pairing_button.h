@@ -18,7 +18,7 @@
 class PairingButton {
 public:
     /**
-     * @brief Method that initialize PairingButton and returns pointer to the instance of PairingButton
+     * @brief Method that initializes PairingButton and returns a pointer to the instance of PairingButton
      * @param DebugLED* Pointer to DebugLED object.
      * @return PairingButton* pointer to the instance of PairingButton.
      */
@@ -82,7 +82,7 @@ private:
      */
     static void deleteButtonPressTimer();
 
-    static PairingButton* instance;
+    static PairingButton* mspInstance;
 
     static DebugLED *mspDebugLED;
     static uint8_t msButtonMode;

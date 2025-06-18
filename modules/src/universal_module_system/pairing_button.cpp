@@ -4,7 +4,7 @@
 #define DEBOUNCING_TIME 100
 #define DEBOUNCING_COUNTER_TO_SECONDS(value) (value * DEBOUNCING_TIME / 1000)
 
-PairingButton* PairingButton::instance = nullptr;
+PairingButton* PairingButton::mspInstance = nullptr;
 
 DebugLED* PairingButton::mspDebugLED = nullptr;
 
@@ -15,10 +15,10 @@ TimerHandle_t PairingButton::msButtonPressTimer = NULL;
 
 
 PairingButton* PairingButton::getInstance(DebugLED *debugLED) {
-    if (instance == nullptr) {
-        instance = new PairingButton(debugLED);
+    if (mspInstance == nullptr) {
+        mspInstance = new PairingButton(debugLED);
     }
-    return instance;
+    return mspInstance;
 }
 
 PairingButton::PairingButton(DebugLED *debugLED) {

@@ -18,7 +18,7 @@
 class DebugLED {
 public:
     /**
-     * @brief Method that initialize DebugLED and returns pointer to the instance of DebugLED.
+     * @brief Method that initializes DebugLED and returns a pointer to the instance of DebugLED.
      * @return DebugLED* pointer to the instance of DebugLED.
      */
     static DebugLED* getInstance();
@@ -141,7 +141,7 @@ private:
      */
     static void deleteBlinkTimeout();
 
-    static DebugLED* instance;
+    static DebugLED* mspInstance;
 
     static TaskHandle_t msPairingBlinkHandle;
     static TaskHandle_t msResetBlinkHandle;
