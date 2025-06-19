@@ -6,7 +6,7 @@
 #define PROTOCOL_MESSAGE_SIZE 16
 #define BLANK_CHARACTER ' '
 // TODO assign final value
-#define RECEIVE_BYTE_TIMEOUT 50
+#define RECEIVE_BYTE_TIMEOUT 100
 // TODO assign final value
 #define RECEIVE_MESSAGE_TIMEOUT 1000
 
@@ -14,17 +14,16 @@ uint8_t Communication::msMACAddress[6];
 
 HardwareSerial* Communication::mspSerial = nullptr;
 
-TaskHandle_t Communication::msReceiveMessageTaskHandle = NULL;
 TaskHandle_t Communication::msPrintMessageTaskHandle = NULL;
-TaskHandle_t Communication::msSendMessageTaskHandle = NULL;
-
+TaskHandle_t Communication::msReceiveMessageTaskHandle = NULL;
+TaskHandle_t Communication::msReadHC12HandlerTaskHandle = NULL;
 // TODO remove "sendCustomMessage" methods
 TaskHandle_t Communication::msSendCustomMessageTaskHandle = NULL;
+TaskHandle_t Communication::msSendMessageTaskHandle = NULL;
 
 QueueHandle_t Communication::msReceiveMessageQueue = NULL;
+QueueHandle_t Communication::msReceiveByteQueue = NULL;
 QueueHandle_t Communication::msSendMessagesQueue = NULL;
-
-SemaphoreHandle_t Communication::msHC12ReceiveMutex;
 
 TimerHandle_t Communication::msReceiveMessageTimeoutTimer = NULL;
 TimerHandle_t Communication::msReceiveByteTimeoutTimer = NULL;
@@ -47,15 +46,13 @@ Communication::Communication() {
     // vTaskDelay(pdMS_TO_TICKS(100));
     // digitalWrite(SET_PIN, HIGH);
     // vTaskDelay(pdMS_TO_TICKS(100));
-
-    msHC12ReceiveMutex = xSemaphoreCreateMutex();
     
     mspSerial = new HardwareSerial(HARDWARE_SERIAL_UART_NR);
     mspSerial->begin((unsigned long)BAUD_RATE, SERIAL_8N1, RX_PIN, TX_PIN);
 
-    createReceiveMessageQueue();
-    createSendMessageQueue();
+    createCommunicationQueues();
 
+    createReadHC12HandlerTask();
     // TODO remove "sendCustomMessage" methods
     createSendCustomMessageTask();
     createSendMessageTask();
@@ -68,54 +65,58 @@ Communication::Communication() {
 }
 
 Communication::~Communication() {
-    delete mspSerial;
-    mspSerial = nullptr;
-
     // TODO remove "sendCustomMessage" methods
     deleteSendCustomMessageTask();
     deleteSendMessageTask();
 
+    deleteReadHC12HandlerTask();
     deleteReceiveMessageTask();
+    // deletePrintMessageTask();
 
-    deleteReceiveMessageQueue();
-    deleteSendMessageQueue();
+    deleteCommunicationQueues();
 
     deleteReceiveTimers();
 
+    delete mspSerial;
     digitalWrite(SET_PIN, LOW);
 }
 
 // ============================ Queues ============================
 
-void Communication::createReceiveMessageQueue() {
+void Communication::createCommunicationQueues() {
     if (msReceiveMessageQueue == NULL) {
         msReceiveMessageQueue = xQueueCreate(10, sizeof(uint8_t[MESSAGE_SIZE]));
     }
-}
-void Communication::deleteReceiveMessageQueue() {
-    if (msReceiveMessageQueue != NULL) {
-        vQueueDelete(msReceiveMessageQueue);
-        msReceiveMessageQueue = NULL;
+    if (msReceiveByteQueue == NULL) {
+        // TODO assign propper length of queue 
+        msReceiveByteQueue = xQueueCreate(128, sizeof(uint8_t));
     }
-}
-void Communication::createSendMessageQueue() {
     if (msSendMessagesQueue == NULL) {
         msSendMessagesQueue = xQueueCreate(10, sizeof(uint8_t[MESSAGE_SIZE]));
     }
 }
-void Communication::deleteSendMessageQueue() {
+void Communication::deleteCommunicationQueues() {
+    if (msReceiveMessageQueue != NULL) {
+        vQueueDelete(msReceiveMessageQueue);
+        msReceiveMessageQueue = NULL;
+    }
+    if (msReceiveByteQueue != NULL) {
+        vQueueDelete(msReceiveByteQueue);
+        msReceiveByteQueue = NULL;
+    }
     if (msSendMessagesQueue != NULL) {
         vQueueDelete(msSendMessagesQueue);
         msSendMessagesQueue = NULL;
     }
 }
+
 // ================================================================
 
 // ======================= Receive Message ========================
 
 void Communication::receiveMessageTask() {
     // timeout status/cause
-    uint32_t timeoutStatus = msTimeoutStatus::noTimeout;
+    uint32_t timeoutStatus = mReadHC12NotificationStatus::defaultStatus;
 
     // prepare message protocol buffor
     // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
@@ -139,38 +140,39 @@ void Communication::receiveMessageTask() {
     };
     resetProtocolBuffor();
 
+    uint8_t queueBuffor;
 
     // task loop
     for (;;){
+        xQueueReceive(msReceiveByteQueue, &queueBuffor, portMAX_DELAY);
+        // Serial.println("xQueueReceive");
         // timeouts 
-        if (xTaskNotifyWait(0, ULONG_MAX, &timeoutStatus, pdMS_TO_TICKS(0)) == pdTRUE) {
-            if (timeoutStatus == msTimeoutStatus::byteTimeout) {
+        if (xTaskNotifyWait(0, ULONG_MAX, &timeoutStatus, 0) == pdTRUE) {
+            if (timeoutStatus == mReadHC12NotificationStatus::byteTimeout) {
                 xTimerStop(msReceiveMessageTimeoutTimer, portMAX_DELAY);
-                
                 Serial.println("Byte timeout");
-            } else {
+            } else if (timeoutStatus == mReadHC12NotificationStatus::messageTimeout) {
                 xTimerStop(msReceiveByteTimeoutTimer, portMAX_DELAY);
-
                 Serial.println("Message timeout");
+            } else {
+                Serial.print("STATUS ERROR! In receiveMessageTask() -> got unknow status. Received Status: ");
+                Serial.println(timeoutStatus);
             }
             resetProtocolBuffor();
-            timeoutStatus = msTimeoutStatus::noTimeout;
-        }
-
-
-        // reading message 
-        else if (mspSerial->available() && xSemaphoreTake(msHC12ReceiveMutex, 0) == pdTRUE) {
-            protocolBuffor[pbMessageIndex][pbByteIndex] = mspSerial->read();
-            xSemaphoreGive(msHC12ReceiveMutex);
-
+            xQueueReset(msReceiveByteQueue);
+            timeoutStatus = mReadHC12NotificationStatus::defaultStatus;
+        } 
+        // decoding message
+        else {
+            protocolBuffor[pbMessageIndex][pbByteIndex] = queueBuffor;
+            // if new message start message timeout timer
             if (pbByteIndex == 0 && pbMessageIndex == 0){
                 xTimerStart(msReceiveMessageTimeoutTimer, portMAX_DELAY);
             }
-        
             // if protocol message is not complete
             if (pbByteIndex != PROTOCOL_MESSAGE_SIZE - 1) {
                 pbByteIndex++;
-                xTimerStart(msReceiveByteTimeoutTimer, portMAX_DELAY);
+                // xTimerStart(msReceiveByteTimeoutTimer, portMAX_DELAY);
             } else {
                 xTimerStop(msReceiveByteTimeoutTimer, portMAX_DELAY);
                 pbByteIndex = 0;
@@ -241,12 +243,19 @@ void Communication::receiveMessageTask() {
                     }
                 }
             }
-        } 
-        // idle
-        else {
-            // delay for watchdog
-            vTaskDelay(pdMS_TO_TICKS(1));
         }
+
+        // reading message 
+        // else if (mspSerial->available() && xSemaphoreTake(msHC12ReceiveMutex, 0) == pdTRUE) {
+            
+        
+            
+        // } 
+        // idle
+        // else {
+        //     // delay for watchdog
+        //     vTaskDelay(pdMS_TO_TICKS(1));
+        // }
     }
 }
 void Communication::createReceiveMessageTaskHandle(void *parameters) {
@@ -266,7 +275,7 @@ void Communication::createReceiveMessageTask() {
             &msReceiveMessageTaskHandle
         );
     } else {
-        Serial.println("void createReceiveMessageTask() - Can't create receive message task -> receive message task already exists");
+        Serial.println("TASK CREATION ERROR! In createReceiveMessageTask() -> Can't create receive message task, because task already exists");
     }
 }
 void Communication::deleteReceiveMessageTask() {
@@ -276,6 +285,98 @@ void Communication::deleteReceiveMessageTask() {
     }
 
     deleteReceiveTimers();
+}
+// ================================================================
+
+// ====================== Read HC12 Handler =======================
+
+void Communication::readHC12HandlerTask() {
+    uint32_t status = mReadHC12NotificationStatus::defaultStatus;
+
+    bool isSendingTaskWaiting = false;
+    uint8_t hc12Input;
+    
+    
+    for(;;) {
+        // change status
+        xTaskNotifyWait(0, ULONG_MAX, &status, 0);
+
+        switch (status) {
+            case mReadHC12NotificationStatus::defaultStatus:
+                if (mspSerial->available()) {
+                    // Serial.print("defaultStatus: ");
+                    // Serial.println(isSendingTaskWaiting);
+
+                    if (isSendingTaskWaiting) {
+                        xTimerStop(msReceiveByteTimeoutTimer, portMAX_DELAY);
+                        hc12Input = mspSerial->read();
+                        xTaskNotify(msSendMessageTaskHandle, (uint32_t)hc12Input, eSetValueWithOverwrite);
+                        isSendingTaskWaiting = false;
+                    } else {
+                        hc12Input = mspSerial->read();
+                        xQueueSend(msReceiveByteQueue, &hc12Input, portMAX_DELAY);
+                        xTimerStart(msReceiveByteTimeoutTimer, portMAX_DELAY);
+                    }
+                }
+                break;
+
+            case mReadHC12NotificationStatus::byteTimeout:
+                if (isSendingTaskWaiting) {
+                    // max value that hc12 can send is 255, so notifying Send Message Task with 256 value mean timeout
+                    Serial.println("xTaskNotify");
+                    xTaskNotify(msSendMessageTaskHandle, 256, eSetValueWithOverwrite);
+                    isSendingTaskWaiting = false;
+                    status = mReadHC12NotificationStatus::defaultStatus;
+                } else {
+                    xTaskNotify(msReceiveMessageTaskHandle, mReadHC12NotificationStatus::byteTimeout, eSetValueWithOverwrite);
+                    // Sending queue to "awake" task
+                    xQueueSend(msReceiveByteQueue, &hc12Input, portMAX_DELAY);
+                    status = mReadHC12NotificationStatus::defaultStatus;
+                }
+                break;
+
+            case mReadHC12NotificationStatus::sendingTaskWaiting: 
+                if (!isSendingTaskWaiting) {
+                    isSendingTaskWaiting = true;
+                    xTimerStart(msReceiveByteTimeoutTimer, portMAX_DELAY);
+                    status = mReadHC12NotificationStatus::defaultStatus;
+                }
+                break;
+
+            default:
+                Serial.print("STATUS ERROR! In readHC12HandlerTask() -> got unknow status. Received Status: ");
+                Serial.println(status);
+                isSendingTaskWaiting = false;
+                status = mReadHC12NotificationStatus::defaultStatus;
+        }
+
+        // delay for watchdog
+        vTaskDelay(pdMS_TO_TICKS(1));
+    }
+}
+void Communication::createReadHC12HandlerTaskHandle(void *parameters) {
+    Communication* instance = static_cast<Communication*>(parameters);
+    instance->readHC12HandlerTask();
+}
+void Communication::createReadHC12HandlerTask() {
+    if (msReadHC12HandlerTaskHandle == NULL) {
+        xTaskCreate(
+            createReadHC12HandlerTaskHandle,
+            "Read HC12 Handler",
+            2048,
+            NULL,
+            1,
+            &msReadHC12HandlerTaskHandle
+        );
+    } else {
+        Serial.println("TASK CREATION ERROR! In createReadHC12HandlerTask() -> Can't create Read HC12 Handler task, because task already exists");
+    }
+}
+void Communication::deleteReadHC12HandlerTask() {
+    if (msReadHC12HandlerTaskHandle != NULL) {
+        vTaskDelete(msReadHC12HandlerTaskHandle);
+        msReadHC12HandlerTaskHandle = NULL;
+    }
 }
 // ================================================================
 
@@ -341,7 +442,7 @@ void Communication::createSendCustomMessageTask() {
             &msSendCustomMessageTaskHandle
         );
     } else {
-        Serial.println("void createSendCustomMessageTask() - Can't create send custom message task -> send custom message task already exists");
+        Serial.println("TASK CREATION ERROR! In createSendCustomMessageTask() -> Can't create send custom message task, because task already exists");
     }
 }
 void Communication::deleteSendCustomMessageTask() {
@@ -397,11 +498,12 @@ void Communication::sendMessageTask() {
         xQueueReceive(msSendMessagesQueue, &messageBuffor, portMAX_DELAY);
 
         // divide and add messages to protocolBuffor
-        while(messageBuffor[messageIndex] != 0) {
+        while(messageBuffor[messageIndex] != 0 && messagesQuantity < 11) {
             Serial.print("message in protocolBuffor: ");
             for (uint8_t i = 0; i < 6; i++){
                 Serial.print((char)messageBuffor[messageIndex + i]);
-                protocolBuffor[messagesQuantity][i + 8] = messageBuffor[messageIndex + i];
+
+                protocolBuffor[messagesQuantity][i + 8] = (messageIndex + i < 64) ? messageBuffor[messageIndex + i] : 0;
             }
             Serial.println();
             messagesQuantity++;
@@ -441,24 +543,18 @@ void Communication::sendMessageTask() {
         // send message and clean buffor
         i = 0;
         do {
-            Serial.println("sending...");
-            xSemaphoreTake(msHC12ReceiveMutex, portMAX_DELAY);
+            Serial.println("sending..."); 
+            xTaskNotify(msReadHC12HandlerTaskHandle, mReadHC12NotificationStatus::sendingTaskWaiting, eSetValueWithOverwrite);
             mspSerial->write(protocolBuffor[i], PROTOCOL_MESSAGE_SIZE);
             
-            // wait until hc12 module send confirmation 
-            bool isHC12confirmed = false;
-            while (!isHC12confirmed) {
-                if (mspSerial->available()) {
-                    uint8_t hc12confirmation = mspSerial->read();
-                    xSemaphoreGive(msHC12ReceiveMutex);
-                    if (hc12confirmation != 255) {
-                        Serial.print("SENDING MESSAGE ERROR! In sendMessageTask() -> hc-12 module not confirmed properly. Hc-12 module should send 255 signal but got: ");
-                        Serial.println(hc12confirmation);
-                    }
-                    isHC12confirmed = true;
-                } 
-                
-                vTaskDelay(pdMS_TO_TICKS(1));
+            // wait until hc12 module send confirmation
+            uint32_t hc12Respond;
+            xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, portMAX_DELAY);
+            if (hc12Respond == 256){
+                Serial.println("SENDING MESSAGE ERROR! In sendMessageTask() -> hc12 module is not responding.");
+            } else if (hc12Respond != 255) {
+                Serial.print("SENDING MESSAGE ERROR! In sendMessageTask() -> hc12 module did not confirm properly. Hc-12 module should send 255 signal but got: ");
+                Serial.println(hc12Respond);
             }
 
             messagesQuantity = protocolBuffor[i][7];
@@ -471,10 +567,8 @@ void Communication::sendMessageTask() {
             i++;
             // this delay is required for HC12 send/receive properly message
             // TODO increase delay?
-            vTaskDelay(pdMS_TO_TICKS(20));
+            vTaskDelay(pdMS_TO_TICKS(25));
         } while (messagesQuantity > 0);
-
-        
     }
 }
 void Communication::createSendMessageTaskHandle(void *parameters) {
@@ -492,7 +586,7 @@ void Communication::createSendMessageTask() {
             &msSendMessageTaskHandle
         );
     } else {
-        Serial.println("void createSendMessageTask() - Can't create send message task -> send message task already exists");
+        Serial.println("TASK CREATION ERROR! In createSendMessageTask() -> Can't create send message task, because task already exists");
     }
 }
 void Communication::deleteSendMessageTask() {
@@ -507,12 +601,12 @@ void Communication::deleteSendMessageTask() {
 
 // ============================= test =============================
 void Communication::printMessageTask() {
-    // char receivedData[MESSAGE_SIZE];
-    // for(;;) {
-    //     if (xQueueReceive(msReceiveMessageQueue, &receivedData, portMAX_DELAY) == pdTRUE) {
-    //         Serial.print("xQueueReceive: " + String(receivedData));
-    //     }
-    // }
+    char receivedData[MESSAGE_SIZE];
+    for(;;) {
+        if (xQueueReceive(msReceiveMessageQueue, &receivedData, portMAX_DELAY) == pdTRUE) {
+            Serial.print("xQueueReceive: " + String(receivedData));
+        }
+    }
 }
 void Communication::createPrintMessageTaskHandle(void *parameters) {
     Communication* instance = static_cast<Communication*>(parameters);
@@ -529,14 +623,14 @@ void Communication::createPrintMessageTask() {
             &msPrintMessageTaskHandle
         );
     } else {
-        Serial.println("void createPrintMessageTask() - Can't create print message task -> print message task already exists");
+        Serial.println("TASK CREATION ERROR! In createPrintMessageTask() -> Can't create print message task, because task already exists");
     }
 }
 void Communication::deletePrintMessageTask() {
-    // if (msPrintMessageTaskHandle != NULL) {
-    //     vTaskDelete(msPrintMessageTaskHandle);
-    //     msPrintMessageTaskHandle = NULL;
-    // }
+    if (msPrintMessageTaskHandle != NULL) {
+        vTaskDelete(msPrintMessageTaskHandle);
+        msPrintMessageTaskHandle = NULL;
+    }
 }
 // ================================================================
 
@@ -568,14 +662,17 @@ void Communication::deletePrintMessageTask() {
 // ============================ Timers ============================
 
 void Communication::receiveMessageTimeoutTimerCallback() {
-    xTaskNotify(msReceiveMessageTaskHandle, msTimeoutStatus::messageTimeout, eSetValueWithOverwrite);
+    xTaskNotify(msReceiveMessageTaskHandle, mReadHC12NotificationStatus::messageTimeout, eSetValueWithOverwrite);
+    // Sending 0 to queue to "awake" task
+    uint8_t value = 0;
+    xQueueSend(msReceiveByteQueue, &value, portMAX_DELAY);
 }
 void Communication::receiveMessageTimeoutTimerCallbackHandle(TimerHandle_t xTimer) {
     Communication* instance = static_cast<Communication*>(pvTimerGetTimerID(xTimer));
     instance->receiveMessageTimeoutTimerCallback();
 }
 void Communication::receiveByteTimeoutTimerCallback() {
-    xTaskNotify(msReceiveMessageTaskHandle, msTimeoutStatus::byteTimeout, eSetValueWithOverwrite);
+    xTaskNotify(msReadHC12HandlerTaskHandle, mReadHC12NotificationStatus::byteTimeout, eSetValueWithOverwrite);
 }
 void Communication::receiveByteTimeoutTimerCallbackHandle(TimerHandle_t xTimer) {
     Communication* instance = static_cast<Communication*>(pvTimerGetTimerID(xTimer));
@@ -603,7 +700,7 @@ void Communication::createReceiveTimers() {
 }
 void Communication::deleteReceiveTimers() {
     if (msReceiveMessageTimeoutTimer != NULL) {
-        xTimerDelete(msReceiveMessageTaskHandle, portMAX_DELAY);
+        xTimerDelete(msReceiveMessageTimeoutTimer, portMAX_DELAY);
     }
     if (msReceiveByteTimeoutTimer != NULL) {
         xTimerDelete(msReceiveByteTimeoutTimer, portMAX_DELAY);

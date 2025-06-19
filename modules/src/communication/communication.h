@@ -11,10 +11,8 @@ public:
     ~Communication();
 
 private:
-    static void createReceiveMessageQueue();
-    static void deleteReceiveMessageQueue();
-    static void createSendMessageQueue();
-    static void deleteSendMessageQueue();
+    static void createCommunicationQueues();
+    static void deleteCommunicationQueues();
 
     // TODO remove "sendCustomMessage" methods
     static void sendCustomMessageTask();
@@ -31,6 +29,11 @@ private:
     static void createReceiveMessageTaskHandle(void *parameters);
     static void createReceiveMessageTask();
     static void deleteReceiveMessageTask();
+
+    static void readHC12HandlerTask();
+    static void createReadHC12HandlerTaskHandle(void *parameters);
+    static void createReadHC12HandlerTask();
+    static void deleteReadHC12HandlerTask();
 
     // TODO remove printMessageTask
     static void printMessageTask();
@@ -56,25 +59,26 @@ private:
     //     messageTimeout = 2
     // };
     typedef enum : uint32_t {
-        noTimeout = 0,
-        byteTimeout = 1,
-        messageTimeout = 2
-    } msTimeoutStatus;
+        defaultStatus = 0,
+        sendingTaskWaiting = 1,
+        byteTimeout = 2,
+        messageTimeout = 3
+    } mReadHC12NotificationStatus;
     // typedef Communication::TimeoutStatus TimeoutStatus_t;
+
+    static QueueHandle_t msReceiveMessageQueue;
+    static QueueHandle_t msReceiveByteQueue;
+    static QueueHandle_t msSendMessagesQueue;
 
     static uint8_t msMACAddress[6];
     static HardwareSerial *mspSerial;
 
     static TaskHandle_t msPrintMessageTaskHandle;
     static TaskHandle_t msReceiveMessageTaskHandle;
+    static TaskHandle_t msReadHC12HandlerTaskHandle;
     // TODO remove "sendCustomMessage" methods
     static TaskHandle_t msSendCustomMessageTaskHandle;
     static TaskHandle_t msSendMessageTaskHandle;
-
-    static QueueHandle_t msReceiveMessageQueue;
-    static QueueHandle_t msSendMessagesQueue;
-
-    static SemaphoreHandle_t msHC12ReceiveMutex;
 
     static TimerHandle_t msReceiveMessageTimeoutTimer;
     static TimerHandle_t msReceiveByteTimeoutTimer;
