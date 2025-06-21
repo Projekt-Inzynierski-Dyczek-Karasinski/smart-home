@@ -498,16 +498,22 @@ void Communication::sendMessageTask() {
         xQueueReceive(msSendMessagesQueue, &messageBuffor, portMAX_DELAY);
 
         // divide and add messages to protocolBuffor
-        while(messageBuffor[messageIndex] != 0 && messagesQuantity < 11) {
-            Serial.print("message in protocolBuffor: ");
-            for (uint8_t i = 0; i < 6; i++){
-                Serial.print((char)messageBuffor[messageIndex + i]);
+        while(messageIndex < 64 && messageBuffor[messageIndex] != 0) {
+            protocolBuffor[messagesQuantity][(messageIndex % 6) + 8] = messageBuffor[messageIndex];
+            messageIndex++;
+            if (messageIndex % 6 == 0) {
+                messagesQuantity++;
+            }
+        }
+        messagesQuantity++;
 
-                protocolBuffor[messagesQuantity][i + 8] = (messageIndex + i < 64) ? messageBuffor[messageIndex + i] : 0;
+        // TODO remove 
+        for (uint8_t i = 0; i < 11; i++){
+            Serial.print("message in protocolBuffor: ");
+            for (uint8_t j = 8; j < 14; j++){
+                Serial.print((char)protocolBuffor[i][j]);
             }
             Serial.println();
-            messagesQuantity++;
-            messageIndex += 6;
         }
 
         // add messagesQuantity and checksum to protocolBuffor
