@@ -9,18 +9,24 @@
 #define RECEIVE_BYTE_TIMEOUT 100
 // TODO assign final value
 #define RECEIVE_MESSAGE_TIMEOUT 1000
+// TODO assign final value
+#define ADDRESSING_TIMEOUT 1000
+// TODO assign final value
+#define ADDRESSING_MAX_ATTEMPTS 5
 
 uint8_t Communication::msMACAddress[6];
 HardwareSerial* Communication::mspSerial = nullptr;
 DebugLED* Communication::mspDebugLED = nullptr;
 
 
-TaskHandle_t Communication::msPrintMessageTaskHandle = NULL;
 TaskHandle_t Communication::msReceiveMessageTaskHandle = NULL;
 TaskHandle_t Communication::msReadHC12HandlerTaskHandle = NULL;
 // TODO remove "sendCustomMessage" methods
 TaskHandle_t Communication::msSendCustomMessageTaskHandle = NULL;
 TaskHandle_t Communication::msSendMessageTaskHandle = NULL;
+TaskHandle_t Communication::msAddressingTaskHandle = NULL;
+// TODO remove printMessageTask
+TaskHandle_t Communication::msPrintMessageTaskHandle = NULL;
 
 QueueHandle_t Communication::msReceiveMessageQueue = NULL;
 QueueHandle_t Communication::msReceiveByteQueue = NULL;
@@ -28,6 +34,7 @@ QueueHandle_t Communication::msSendMessagesQueue = NULL;
 
 TimerHandle_t Communication::msReceiveMessageTimeoutTimer = NULL;
 TimerHandle_t Communication::msReceiveByteTimeoutTimer = NULL;
+TimerHandle_t Communication::msAddressingTimeoutTimer = NULL;
 
 Communication::Communication(DebugLED *debugLED) {
     // Get MAC address
@@ -54,9 +61,8 @@ Communication::Communication(DebugLED *debugLED) {
     createSendMessageTask();
 
     createReceiveMessageTask();
-
-//     createPrintMessageTask();
-//     createSendCustomMessageTask();
+    // TODO remove printMessageTask
+    // createPrintMessageTask();
     Serial.println("Communication initialized");
 }
 
@@ -67,11 +73,14 @@ Communication::~Communication() {
 
     deleteReadHC12HandlerTask();
     deleteReceiveMessageTask();
+    deleteAddressingTask();
+    // TODO remove printMessageTask
     // deletePrintMessageTask();
 
     deleteCommunicationQueues();
 
     deleteReceiveTimers();
+    deleteAddresingTimer();
 
     delete mspSerial;
     digitalWrite(SET_PIN, LOW);
@@ -80,6 +89,7 @@ Communication::~Communication() {
 void Communication::startAddresingAlgorithm() {
     Serial.println("startAddresingAlgorithm");
     mspDebugLED->createPairingBlinkTask();
+    createAddressingTask();
 }
 
 // ============================ Queues ============================
@@ -509,13 +519,13 @@ void Communication::sendMessageTask() {
         messagesQuantity++;
 
         // TODO remove 
-        for (uint8_t i = 0; i < 11; i++){
-            Serial.print("message in protocolBuffor: ");
-            for (uint8_t j = 8; j < 14; j++){
-                Serial.print((char)protocolBuffor[i][j]);
-            }
-            Serial.println();
-        }
+        // for (uint8_t i = 0; i < 11; i++){
+        //     Serial.print("message in protocolBuffor: ");
+        //     for (uint8_t j = 8; j < 14; j++){
+        //         Serial.print((char)protocolBuffor[i][j]);
+        //     }
+        //     Serial.println();
+        // }
 
         // add messagesQuantity and checksum to protocolBuffor
         uint8_t i = 0;
@@ -534,23 +544,24 @@ void Communication::sendMessageTask() {
 
             i++;
         }
-        // TODO remove TEST
-        Serial.println("Messages to send:");
-        for (uint8_t i = 0; i < 11; i++){
-            Serial.print("Message ");
-            Serial.print(i);
-            Serial.print(": ");
-            for (uint8_t j = 0; j < 16; j++){
-                Serial.print((int)protocolBuffor[i][j]);
-                Serial.print(" ");
-            }
-            Serial.println();
-        }
+        // TODO remove 
+        // Serial.println("Messages to send:");
+        // for (uint8_t i = 0; i < 11; i++){
+        //     Serial.print("Message ");
+        //     Serial.print(i);
+        //     Serial.print(": ");
+        //     for (uint8_t j = 0; j < 16; j++){
+        //         Serial.print((int)protocolBuffor[i][j]);
+        //         Serial.print(" ");
+        //     }
+        //     Serial.println();
+        // }
 
         // send message and clean buffor
         i = 0;
         do {
-            Serial.println("sending..."); 
+            // TODO remove 
+            // Serial.println("sending..."); 
             xTaskNotify(msReadHC12HandlerTaskHandle, mReadHC12NotificationStatus::sendingTaskWaiting, eSetValueWithOverwrite);
             mspSerial->write(protocolBuffor[i], PROTOCOL_MESSAGE_SIZE);
             
@@ -607,16 +618,66 @@ void Communication::deleteSendMessageTask() {
 // ========================== Addressing ==========================
 
 void Communication::addressingTask() {
+    uint8_t attemptCounter = 0;
+    
+    // prepare buffor
+    uint8_t buffor[MESSAGE_SIZE];
+    for (uint8_t i = 0; i < MESSAGE_SIZE; i++){
+        buffor[i] = 0;
+    }
 
+    buffor[0] = (uint8_t)'n';
+    buffor[1] = (uint8_t)'e';
+    buffor[2] = (uint8_t)'w';
+    buffor[3] = (uint8_t)'c';
+    buffor[4] = (uint8_t)'o';
+    buffor[5] = (uint8_t)'n';
+    
+    xTimerStart(msAddressingTimeoutTimer, portMAX_DELAY);
+    for(;;) {
+        if (attemptCounter > ADDRESSING_MAX_ATTEMPTS) {
+            Serial.println("CONNECTION ERROR! In addressingTask() -> Exceeded max number of connection attempts");
+            // TODO add CONNECTION ERROR DebugLED blink
+            // TODO add sending rf message about aborting 
+            deleteAddressingTask();
+        }
+        
+        xQueueSend(msSendMessagesQueue, &buffor, portMAX_DELAY);
+
+
+
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
 }
 void Communication::createAddressingTaskHandle(void *parameters) {
-
+    Communication* instance = static_cast<Communication*>(parameters);
+    instance->addressingTask();
 }
 void Communication::createAddressingTask() {
-
+    createAddresingTimer();
+    if (msAddressingTaskHandle == NULL) {
+        xTaskCreate(
+            createAddressingTaskHandle,
+            "Addressing Task",
+            2048,
+            NULL,
+            3,
+            &msAddressingTaskHandle
+        );
+    } else {
+        Serial.println("TASK CREATION ERROR! In createAddressingTask() -> Can't create addressing task, because task already exists");
+    }
 }
 void Communication::deleteAddressingTask() {
+    deleteAddresingTimer();
+    Serial.println("deleteAddressingTask()");
+    mspDebugLED->deletePairingBlinkTask();
 
+    if (msAddressingTaskHandle != NULL) {
+        vTaskDelete(msAddressingTaskHandle);
+        msAddressingTaskHandle = NULL;
+    }
 }
 // ================================================================
 
@@ -702,6 +763,32 @@ void Communication::deleteReceiveTimers() {
     }
     if (msReceiveByteTimeoutTimer != NULL) {
         xTimerDelete(msReceiveByteTimeoutTimer, portMAX_DELAY);
+    }
+}
+
+void Communication::addressingTimeoutTimerCallback() {
+    // xTaskNotify(msAddressingTaskHandle, mAddressingNotificationStatus::addressingTimeout, eSetValueWithOverwrite);
+    // TODO add sending rf message about aborting 
+    deleteAddressingTask();
+}
+void Communication::addressingTimeoutTimerCallbackHandle(TimerHandle_t xTimer) {
+    Communication* instance = static_cast<Communication*>(pvTimerGetTimerID(xTimer));
+    instance->addressingTimeoutTimerCallback();
+}
+void Communication::createAddresingTimer() {
+    if (msAddressingTimeoutTimer == NULL) {
+        msAddressingTimeoutTimer = xTimerCreate(
+            "Addressing Timeout",
+            pdMS_TO_TICKS(ADDRESSING_TIMEOUT),
+            pdFALSE,
+            NULL,
+            addressingTimeoutTimerCallbackHandle
+        );
+    }
+}
+void Communication::deleteAddresingTimer() {
+    if (msAddressingTimeoutTimer != NULL) {
+        xTimerDelete(msAddressingTimeoutTimer, portMAX_DELAY);
     }
 }
 // ================================================================

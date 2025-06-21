@@ -57,6 +57,11 @@ private:
     static void receiveByteTimeoutTimerCallbackHandle(TimerHandle_t xTimer);
     static void createReceiveTimers();
     static void deleteReceiveTimers();
+    
+    static void addressingTimeoutTimerCallback();
+    static void addressingTimeoutTimerCallbackHandle(TimerHandle_t xTimer);
+    static void createAddresingTimer();
+    static void deleteAddresingTimer();
 
 
     // enum class TimeoutStatus : uint32_t {
@@ -74,6 +79,11 @@ private:
         byteTimeout = 2,
         messageTimeout = 3
     } mReadHC12NotificationStatus;
+
+    // typedef enum : uint32_t {
+    //     defaultStatus = 0,
+    //     addressingTimeout = 1,
+    // } mAddressingNotificationStatus;
     // typedef Communication::TimeoutStatus TimeoutStatus_t;
 
     static QueueHandle_t msReceiveMessageQueue;
@@ -91,6 +101,7 @@ private:
 
     static TimerHandle_t msReceiveMessageTimeoutTimer;
     static TimerHandle_t msReceiveByteTimeoutTimer;
+    static TimerHandle_t msAddressingTimeoutTimer;
 };
 
 #endif
