@@ -4,15 +4,17 @@
 #define DEBOUNCING_TIME 100
 #define DEBOUNCING_COUNTER_TO_SECONDS(value) (value * DEBOUNCING_TIME / 1000)
 
-DebugLED* PairingButton::mspDebugLED;
+DebugLED* PairingButton::mspDebugLED = nullptr;
+Communication* PairingButton::mspCommunication = nullptr;
 
 uint8_t PairingButton::msButtonMode = 0;
 uint8_t PairingButton::msButtonPressCounter = 0;
 int8_t PairingButton::msButtonNotPressedCounter = 3;
 TimerHandle_t PairingButton::msButtonPressTimer = NULL;
 
-PairingButton::PairingButton(DebugLED *debugLED) {
+PairingButton::PairingButton(DebugLED *debugLED, Communication *communication) {
     mspDebugLED = debugLED;
+    mspCommunication = communication;
     pinMode(BUTTON_PIN, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
     Serial.println("PairingButton initialized");
@@ -50,7 +52,7 @@ void PairingButton::buttonPressTimerCallback() {
         // after pressing button for 3 seconds call createPairingBlinkTask()
         else if (DEBOUNCING_COUNTER_TO_SECONDS(msButtonPressCounter) >= 3 && msButtonMode == 0) {
             msButtonMode = 1;
-            mspDebugLED->createPairingBlinkTask();
+            mspCommunication->startAddresingAlgorithm();
         }
     } else {
         msButtonNotPressedCounter--;

@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include "debug_led.h"
+#include "communication/communication.h"
 
 // TODO change class to singleton
 
@@ -13,7 +14,7 @@
  * 
  * Pressing button for 10 seconds initializes a reset process. 
  * @warning This class must be initialized only once and destructor of this class should never be used. 
- * @note This class should be initialized at the very beginning of setup() (but after DebugLED class). Serial.begin() have to be initialized separately before this class to see debug messages.
+ * @note This class should be initialized at the beginning of setup() (but after DebugLED and Communication classes). Serial.begin() have to be initialized separately before this class to see debug messages.
  * 
  */
 class PairingButton {
@@ -22,7 +23,7 @@ public:
      * @brief Constructor of PairingButton class. Sets BUTTON_PIN to INPUT_PULLUP and attaches interrupt to it.
      * @param DebugLED* Pointer to DebugLED object.
      */
-    PairingButton(DebugLED *debugLED);
+    PairingButton(DebugLED *debugLED, Communication *communication);
     
     /**
      * @brief Destructor of PairingButton class. Detaches interrupt from BUTTON_PIN and deletes Button Press Timer if exists.
@@ -72,6 +73,8 @@ private:
 
 
     static DebugLED *mspDebugLED;
+    static Communication *mspCommunication;
+
     static uint8_t msButtonMode;
     static uint8_t msButtonPressCounter;
     static int8_t msButtonNotPressedCounter;

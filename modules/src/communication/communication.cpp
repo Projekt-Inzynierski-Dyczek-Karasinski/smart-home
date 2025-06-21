@@ -11,8 +11,9 @@
 #define RECEIVE_MESSAGE_TIMEOUT 1000
 
 uint8_t Communication::msMACAddress[6];
-
 HardwareSerial* Communication::mspSerial = nullptr;
+DebugLED* Communication::mspDebugLED = nullptr;
+
 
 TaskHandle_t Communication::msPrintMessageTaskHandle = NULL;
 TaskHandle_t Communication::msReceiveMessageTaskHandle = NULL;
@@ -28,7 +29,7 @@ QueueHandle_t Communication::msSendMessagesQueue = NULL;
 TimerHandle_t Communication::msReceiveMessageTimeoutTimer = NULL;
 TimerHandle_t Communication::msReceiveByteTimeoutTimer = NULL;
 
-Communication::Communication() {
+Communication::Communication(DebugLED *debugLED) {
     // Get MAC address
     #ifdef ESP32_BOARD
         esp_read_mac(msMACAddress, ESP_MAC_WIFI_STA);
@@ -37,15 +38,10 @@ Communication::Communication() {
         #error "MAC address not implemented!"
     #endif 
 
+    mspDebugLED = debugLED;
+
     pinMode(SET_PIN, OUTPUT);
     digitalWrite(SET_PIN, HIGH);
-    // TODO check HC12 print random characters
-    // without this delay HC12 may print random characters if immediately enters "command mode"
-    // vTaskDelay(pdMS_TO_TICKS(100));
-    // digitalWrite(SET_PIN, LOW);
-    // vTaskDelay(pdMS_TO_TICKS(100));
-    // digitalWrite(SET_PIN, HIGH);
-    // vTaskDelay(pdMS_TO_TICKS(100));
     
     mspSerial = new HardwareSerial(HARDWARE_SERIAL_UART_NR);
     mspSerial->begin((unsigned long)BAUD_RATE, SERIAL_8N1, RX_PIN, TX_PIN);
@@ -79,6 +75,11 @@ Communication::~Communication() {
 
     delete mspSerial;
     digitalWrite(SET_PIN, LOW);
+}
+
+void Communication::startAddresingAlgorithm() {
+    Serial.println("startAddresingAlgorithm");
+    mspDebugLED->createPairingBlinkTask();
 }
 
 // ============================ Queues ============================
@@ -603,6 +604,22 @@ void Communication::deleteSendMessageTask() {
 }
 // ================================================================
 
+// ========================== Addressing ==========================
+
+void Communication::addressingTask() {
+
+}
+void Communication::createAddressingTaskHandle(void *parameters) {
+
+}
+void Communication::createAddressingTask() {
+
+}
+void Communication::deleteAddressingTask() {
+
+}
+// ================================================================
+
 // TODO remove printMessageTask
 
 // ============================= test =============================
@@ -638,31 +655,6 @@ void Communication::deletePrintMessageTask() {
         msPrintMessageTaskHandle = NULL;
     }
 }
-// ================================================================
-
-// TODO remove
-
-// ========================== Check Sum ===========================
-
-// char Communication::calculateCheckSum (char *message) {
-//     uint16_t checkSum = 0;
-//     for (uint8_t i = 1; i < strlen(message); i++) {
-//         checkSum += (uint16_t)message[i];
-//     }
-//     Serial.print("\nmessage: ");
-//     Serial.println(message);
-//     Serial.print("calculateCheckSum: ");
-//     Serial.println(checkSum);
-//     return (char)checkSum;
-// }
-// bool Communication::checkMessage(char *message) {
-//     Serial.println("checkMessage");
-//     uint16_t checkSum = 0;
-//     for (uint8_t i = 0; i < strlen(message); i++) {
-//         checkSum += (uint16_t)message[i];
-//     }
-//     return (checkSum % 256 == 0);
-// }
 // ================================================================
 
 // ============================ Timers ============================

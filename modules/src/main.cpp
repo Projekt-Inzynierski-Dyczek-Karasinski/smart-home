@@ -15,8 +15,8 @@ void setup() {
     Serial.println("---FreeRTOS START---");
     
     DebugLED debugLed;
-    PairingButton pairingButton(&debugLed);
-    Communication communication;
+    Communication communication(&debugLed);
+    PairingButton pairingButton(&debugLed, &communication);
     // TODO remove
     // mspSerial.begin((unsigned long)BAUD_RATE, SERIAL_8N1, RX_PIN, TX_PIN);
 

@@ -3,16 +3,30 @@
 
 #include <Arduino.h>
 #include <HardwareSerial.h>
-// #include <freertos/message_buffer.h>
+#include "universal_module_system/debug_led.h"
+
 
 class Communication {
 public:
-    Communication();
+    Communication(DebugLED *debugLED);
     ~Communication();
+
+    static void startAddresingAlgorithm();
 
 private:
     static void createCommunicationQueues();
     static void deleteCommunicationQueues();
+
+
+    static void receiveMessageTask();
+    static void createReceiveMessageTaskHandle(void *parameters);
+    static void createReceiveMessageTask();
+    static void deleteReceiveMessageTask();
+    
+    static void readHC12HandlerTask();
+    static void createReadHC12HandlerTaskHandle(void *parameters);
+    static void createReadHC12HandlerTask();
+    static void deleteReadHC12HandlerTask();
 
     // TODO remove "sendCustomMessage" methods
     static void sendCustomMessageTask();
@@ -25,15 +39,10 @@ private:
     static void createSendMessageTask();
     static void deleteSendMessageTask();
 
-    static void receiveMessageTask();
-    static void createReceiveMessageTaskHandle(void *parameters);
-    static void createReceiveMessageTask();
-    static void deleteReceiveMessageTask();
-
-    static void readHC12HandlerTask();
-    static void createReadHC12HandlerTaskHandle(void *parameters);
-    static void createReadHC12HandlerTask();
-    static void deleteReadHC12HandlerTask();
+    static void addressingTask();
+    static void createAddressingTaskHandle(void *parameters);
+    static void createAddressingTask();
+    static void deleteAddressingTask();
 
     // TODO remove printMessageTask
     static void printMessageTask();
@@ -41,16 +50,13 @@ private:
     static void createPrintMessageTask();
     static void deletePrintMessageTask();
     
+
     static void receiveMessageTimeoutTimerCallback();
     static void receiveMessageTimeoutTimerCallbackHandle(TimerHandle_t xTimer);
     static void receiveByteTimeoutTimerCallback();
     static void receiveByteTimeoutTimerCallbackHandle(TimerHandle_t xTimer);
     static void createReceiveTimers();
     static void deleteReceiveTimers();
-    
-    // TODO remove
-    static char calculateCheckSum(char *message);
-    static bool checkMessage(char *message);
 
 
     // enum class TimeoutStatus : uint32_t {
@@ -58,6 +64,10 @@ private:
     //     charTimeout = 1,
     //     messageTimeout = 2
     // };
+    static uint8_t msMACAddress[6];
+    static HardwareSerial *mspSerial;
+    static DebugLED *mspDebugLED;
+
     typedef enum : uint32_t {
         defaultStatus = 0,
         sendingTaskWaiting = 1,
@@ -70,15 +80,14 @@ private:
     static QueueHandle_t msReceiveByteQueue;
     static QueueHandle_t msSendMessagesQueue;
 
-    static uint8_t msMACAddress[6];
-    static HardwareSerial *mspSerial;
-
-    static TaskHandle_t msPrintMessageTaskHandle;
     static TaskHandle_t msReceiveMessageTaskHandle;
     static TaskHandle_t msReadHC12HandlerTaskHandle;
     // TODO remove "sendCustomMessage" methods
     static TaskHandle_t msSendCustomMessageTaskHandle;
     static TaskHandle_t msSendMessageTaskHandle;
+    static TaskHandle_t msAddressingTaskHandle;
+    // TODO remove printMessageTask
+    static TaskHandle_t msPrintMessageTaskHandle;
 
     static TimerHandle_t msReceiveMessageTimeoutTimer;
     static TimerHandle_t msReceiveByteTimeoutTimer;
