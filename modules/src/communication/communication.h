@@ -63,6 +63,7 @@ private:
     static void createCommunicationTimers();
     static void deleteCommunicationTimers();
     
+    static void abortAddressing();
     static void addressingTimeoutTimerCallback();
     static void addressingTimeoutTimerCallbackHandle(TimerHandle_t xTimer);
     static void createAddresingTimer();

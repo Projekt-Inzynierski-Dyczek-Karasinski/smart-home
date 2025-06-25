@@ -108,7 +108,7 @@ Communication::~Communication() {
 void Communication::startAddresingAlgorithm() {
     Serial.println("startAddresingAlgorithm");
     mspDebugLED->createPairingBlinkTask();
-    createAddressingTask();
+    xTaskNotify(msCommunicationMainTaskHandle, createAddressingTaskNotif, eSetValueWithOverwrite);
 }
 
 // ====================== Communication Main ======================
@@ -556,11 +556,11 @@ void Communication::sendCustomMessageTask() {
             if (buffor[index - 1] == (uint8_t)'\n') {
                 buffor[index - 1] = 0;
                 
-                // debug print
+                // TODO remove debug print
                 uint8_t i = 0;
                 Serial.print("Message Ready: ");
                 while (buffor[i] != 0) {
-                    Serial.print(buffor[i]);
+                    Serial.print((char)buffor[i]);
                     i++;
                 }
                 Serial.println();
@@ -773,7 +773,34 @@ void Communication::deleteSendMessageTask() {
 // ================================================================
 
 // ========================== Addressing ==========================
-void Communication::addressingTask(){}
+
+void Communication::abortAddressing() {
+    uint8_t sendBuffor[MESSAGE_SIZE];
+    sendBuffor[0] = (uint8_t)'a';
+    sendBuffor[1] = (uint8_t)'b';
+    sendBuffor[2] = (uint8_t)'o';
+    sendBuffor[3] = (uint8_t)'r';
+    sendBuffor[4] = (uint8_t)'t';
+    for (uint8_t i = 5; i < MESSAGE_SIZE; i++){
+        sendBuffor[i] = 0;
+    }
+
+    // TODO remove print
+    Serial.println("abortAddressing()");
+    for (uint8_t i = 0; i < 3; i++) {
+        xQueueSend(msSendMessagesQueue, &sendBuffor, portMAX_DELAY);
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
+    xTaskNotify(msCommunicationMainTaskHandle, deleteAddressingTaskNotif, eSetValueWithOverwrite);
+}
+
+void Communication::addressingTask() {
+    vTaskDelay(pdMS_TO_TICKS(3000));
+    abortAddressing();
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(100));
+    }
+}
 // #error "implement void Communication::addressingTask() "
 // #ifdef CENTRAL_UNIT
 // void Communication::addressingTask() {
