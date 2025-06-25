@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <HardwareSerial.h>
+#include "smart_home_config.h"
 #include "universal_module_system/debug_led.h"
 
 
@@ -14,6 +15,12 @@ public:
     static void startAddresingAlgorithm();
 
 private:
+    static void communicationMainTask();
+    static void createCommunicationMainTaskHandle(void *parameters);
+    static void createCommunicationMainTask();
+    static void deleteCommunicationMainTask();
+
+
     static void createCommunicationQueues();
     static void deleteCommunicationQueues();
 
@@ -23,10 +30,6 @@ private:
     static void createReceiveMessageTask();
     static void deleteReceiveMessageTask();
     
-    static void readHC12HandlerTask();
-    static void createReadHC12HandlerTaskHandle(void *parameters);
-    static void createReadHC12HandlerTask();
-    static void deleteReadHC12HandlerTask();
 
     // TODO remove "sendCustomMessage" methods
     static void sendCustomMessageTask();
@@ -43,20 +46,22 @@ private:
     static void createAddressingTaskHandle(void *parameters);
     static void createAddressingTask();
     static void deleteAddressingTask();
-
-    // TODO remove printMessageTask
-    static void printMessageTask();
-    static void createPrintMessageTaskHandle(void *parameters);
-    static void createPrintMessageTask();
-    static void deletePrintMessageTask();
     
 
-    static void receiveMessageTimeoutTimerCallback();
-    static void receiveMessageTimeoutTimerCallbackHandle(TimerHandle_t xTimer);
-    static void receiveByteTimeoutTimerCallback();
-    static void receiveByteTimeoutTimerCallbackHandle(TimerHandle_t xTimer);
-    static void createReceiveTimers();
-    static void deleteReceiveTimers();
+    // static void messageTimeoutTimerCallback();
+    // static void messageTimeoutTimerCallbackHandle(TimerHandle_t xTimer);
+
+    // static void byteTimeoutTimerCallback();
+    // static void byteTimeoutTimerCallbackHandle(TimerHandle_t xTimer);
+
+    // static void suspendReceiveMessageTimerCallback();
+    // static void suspendReceiveMessageTimerCallbackHandle(TimerHandle_t xTimer);
+
+    // static void suspendSendMessageCallback();
+    // static void suspendSendMessageCallbackHandle(TimerHandle_t xTimer);
+    static void communicationTimersCallbacks(TimerHandle_t xTimer);
+    static void createCommunicationTimers();
+    static void deleteCommunicationTimers();
     
     static void addressingTimeoutTimerCallback();
     static void addressingTimeoutTimerCallbackHandle(TimerHandle_t xTimer);
@@ -74,34 +79,53 @@ private:
     static DebugLED *mspDebugLED;
 
     typedef enum : uint32_t {
-        defaultStatus = 0,
-        sendingTaskWaiting = 1,
-        byteTimeout = 2,
-        messageTimeout = 3
-    } mReadHC12NotificationStatus;
+        defaultStatusNotif = 0,
+        sendingTaskWaitingNotif,
+        byteTimeoutNotif,
+        messageTimeoutNotif,
+        readRawMessageNotif,
+        suspendReceiveMessageTaskNotif,
+        suspendSendMessageTaskNotif,
+        createAddressingTaskNotif,
+        deleteAddressingTaskNotif,
+    } mCommunicationMainNotifications;
 
     // typedef enum : uint32_t {
     //     defaultStatus = 0,
     //     addressingTimeout = 1,
     // } mAddressingNotificationStatus;
     // typedef Communication::TimeoutStatus TimeoutStatus_t;
+    static TaskHandle_t msCommunicationMainTaskHandle;
+    
 
     static QueueHandle_t msReceiveMessageQueue;
     static QueueHandle_t msReceiveByteQueue;
     static QueueHandle_t msSendMessagesQueue;
 
     static TaskHandle_t msReceiveMessageTaskHandle;
-    static TaskHandle_t msReadHC12HandlerTaskHandle;
     // TODO remove "sendCustomMessage" methods
     static TaskHandle_t msSendCustomMessageTaskHandle;
     static TaskHandle_t msSendMessageTaskHandle;
     static TaskHandle_t msAddressingTaskHandle;
-    // TODO remove printMessageTask
-    static TaskHandle_t msPrintMessageTaskHandle;
 
     static TimerHandle_t msReceiveMessageTimeoutTimer;
     static TimerHandle_t msReceiveByteTimeoutTimer;
+    static TimerHandle_t msSuspendReceiveMessageTimer;
+    static TimerHandle_t msSuspendSendMessageTimer;
+    
     static TimerHandle_t msAddressingTimeoutTimer;
+
+    #ifdef CENTRAL_UNIT
+        struct Routing {
+            uint8_t MACAddress[6];
+            uint8_t IPAddress;
+            bool isMACReal;
+        };
+        static struct Routing msRoutingTable[255];
+    #else
+        static uint8_t msCentralUnitMACAddress[6];
+        static uint8_t msIPAddress;
+    #endif
 };
 
 #endif

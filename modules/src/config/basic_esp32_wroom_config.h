@@ -6,9 +6,11 @@
         #define TX_PIN 33
         #define SET_PIN 32
         #define HARDWARE_SERIAL_UART_NR 2
+        #define RF_CHANNELS
     #endif
 
     #define LED_PIN 26
     #define BUTTON_PIN 27
     
+    // #define CENTRAL_UNIT
 #endif
