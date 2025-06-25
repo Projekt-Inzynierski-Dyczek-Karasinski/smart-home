@@ -133,7 +133,7 @@ void Communication::communicationMainTask() {
                         // TODO is this essential?
                         vTaskPrioritySet(msCommunicationMainTaskHandle, BACKGROUND_TASK_PRIORITY);
                         // TODO remove print
-                        Serial.println("vTaskPrioritySet(msCommunicationMainTaskHandle, BACKGROUND_TASK_PRIORITY);");
+                        // Serial.println("vTaskPrioritySet(msCommunicationMainTaskHandle, BACKGROUND_TASK_PRIORITY);");
                     } else {
                         xQueueSend(msReceiveByteQueue, &hc12Input, portMAX_DELAY);                       
                     }
@@ -150,7 +150,7 @@ void Communication::communicationMainTask() {
                     vTaskResume(msSendMessageTaskHandle);
                 }
 
-                // delay for watchdog
+                // delay for watchdog 
                 vTaskDelay(pdMS_TO_TICKS(1));
                 break;
 
@@ -158,7 +158,7 @@ void Communication::communicationMainTask() {
                 // TODO is this essential?
                 vTaskPrioritySet(msCommunicationMainTaskHandle, HIGH_TASK_PRIORITY);
                 // TODO remove print
-                Serial.println("vTaskPrioritySet(msCommunicationMainTaskHandle, HIGH_TASK_PRIORITY);");
+                // Serial.println("vTaskPrioritySet(msCommunicationMainTaskHandle, HIGH_TASK_PRIORITY);");
                 isSendingTaskWaiting = true;
                 break;
                 
@@ -167,6 +167,10 @@ void Communication::communicationMainTask() {
                     // max value that hc12 can send is 255, so notifying Send Message Task with 256 value mean timeout
                     xTaskNotify(msSendMessageTaskHandle, (uint32_t)256, eSetValueWithOverwrite);
                     isSendingTaskWaiting = false;
+                    // TODO is this essential?
+                    vTaskPrioritySet(msCommunicationMainTaskHandle, BACKGROUND_TASK_PRIORITY);
+                    // TODO remove print
+                    // Serial.println("vTaskPrioritySet(msCommunicationMainTaskHandle, BACKGROUND_TASK_PRIORITY);");
                 } else {
                     xTaskNotify(msReceiveMessageTaskHandle, byteTimeoutNotif, eSetValueWithoutOverwrite);
                 }
@@ -361,144 +365,141 @@ void Communication::receiveMessageTask() {
 
     // task loop
     for (;;) {
+        // notifications handling 
+        if (xTaskNotifyWait(0, ULONG_MAX, &timeoutStatus, 0) == pdTRUE) {
+            if (timeoutStatus == readRawMessageNotif) {
+                isRawMessage = true;
+                // TODO remove print
+                Serial.println("isRawMessage = true;");
+            } else {
+                if (timeoutStatus == byteTimeoutNotif) {
+                    xTimerStop(msReceiveMessageTimeoutTimer, portMAX_DELAY);
+                    // TODO remove print
+                    Serial.println("Byte timeout");
+                    resetProtocolBuffor();
+                    xQueueReset(msReceiveByteQueue);
+                } else if (timeoutStatus == messageTimeoutNotif) {
+                    xTimerStop(msReceiveByteTimeoutTimer, portMAX_DELAY);
+                    // TODO remove print
+                    Serial.println("Message timeout");
+                    resetProtocolBuffor();
+                    xQueueReset(msReceiveByteQueue);
+                } else {
+                    Serial.print("STATUS ERROR! In receiveMessageTask() -> got unknow status. Received Status: ");
+                    Serial.println(timeoutStatus);
+                }
+            }
+            timeoutStatus = defaultStatusNotif;
+        } 
+        // decoding message
         if (xQueueReceive(msReceiveByteQueue, &queueBuffor, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
             xTimerStop(msSuspendReceiveMessageTimer, portMAX_DELAY);
+            protocolBuffor[pbMessageIndex][pbByteIndex] = queueBuffor;
+            // if new message start message timeout timer
+            if (pbByteIndex == 0 && pbMessageIndex == 0){
+                xTimerStart(msReceiveMessageTimeoutTimer, portMAX_DELAY);
+            }
+            // if protocol message is not complete
+            if (pbByteIndex != PROTOCOL_MESSAGE_SIZE - 1) {
+                pbByteIndex++;
+                xTimerStart(msReceiveByteTimeoutTimer, portMAX_DELAY);
+            } else {
+                xTimerStop(msReceiveByteTimeoutTimer, portMAX_DELAY);
+                pbByteIndex = 0;
 
-            // notifications handling 
-            if (xTaskNotifyWait(0, ULONG_MAX, &timeoutStatus, 0) == pdTRUE) {
-                if (timeoutStatus == readRawMessageNotif) {
-                    isRawMessage = true;
-                    // TODO remove print
-                    Serial.println("isRawMessage = true;");
-                } else {
-                    if (timeoutStatus == byteTimeoutNotif) {
-                        xTimerStop(msReceiveMessageTimeoutTimer, portMAX_DELAY);
-                        // TODO remove print
-                        Serial.println("Byte timeout");
-                        resetProtocolBuffor();
-                        xQueueReset(msReceiveByteQueue);
-                    } else if (timeoutStatus == messageTimeoutNotif) {
-                        xTimerStop(msReceiveByteTimeoutTimer, portMAX_DELAY);
-                        // TODO remove print
-                        Serial.println("Message timeout");
-                        resetProtocolBuffor();
-                        xQueueReset(msReceiveByteQueue);
-                    } else {
-                        Serial.print("STATUS ERROR! In receiveMessageTask() -> got unknow status. Received Status: ");
-                        Serial.println(timeoutStatus);
+                // if message is not end properly
+                if (protocolBuffor[pbMessageIndex][PROTOCOL_MESSAGE_SIZE - 1] != 0) {
+                    xTimerStop(msReceiveMessageTimeoutTimer, portMAX_DELAY);
+                    
+                    // TODO add "repeat last message"
+                    Serial.print("BAD END OF MESSAGE ERROR! In receiveMessageTask() -> message should end with 0 (\\0 char), but got: ");
+                    Serial.println(protocolBuffor[pbMessageIndex][PROTOCOL_MESSAGE_SIZE - 1]);
+
+                    resetProtocolBuffor();
+                }
+                else {
+                    // calculate checksum
+                    uint16_t checksum = 0;
+                    for (uint8_t i = 0; i < PROTOCOL_MESSAGE_SIZE; i++) {
+                        checksum += protocolBuffor[pbMessageIndex][i];
                     }
-                }
-                timeoutStatus = defaultStatusNotif;
-            } 
-            // decoding message
-            else {
-                protocolBuffor[pbMessageIndex][pbByteIndex] = queueBuffor;
-                // if new message start message timeout timer
-                if (pbByteIndex == 0 && pbMessageIndex == 0){
-                    xTimerStart(msReceiveMessageTimeoutTimer, portMAX_DELAY);
-                }
-                // if protocol message is not complete
-                if (pbByteIndex != PROTOCOL_MESSAGE_SIZE - 1) {
-                    pbByteIndex++;
-                    // xTimerStart(msReceiveByteTimeoutTimer, portMAX_DELAY);
-                } else {
-                    xTimerStop(msReceiveByteTimeoutTimer, portMAX_DELAY);
-                    pbByteIndex = 0;
-
-                    // if message is not end properly
-                    if (protocolBuffor[pbMessageIndex][PROTOCOL_MESSAGE_SIZE - 1] != 0) {
+                    
+                    // if checksum is incorrect
+                    if (checksum % 256 != 0) {
                         xTimerStop(msReceiveMessageTimeoutTimer, portMAX_DELAY);
-                        
+                        resetProtocolBuffor();
                         // TODO add "repeat last message"
-                        Serial.print("BAD END OF MESSAGE ERROR! In receiveMessageTask() -> message should end with 0 (\\0 char), but got: ");
-                        Serial.println(protocolBuffor[pbMessageIndex][PROTOCOL_MESSAGE_SIZE - 1]);
-
-                        resetProtocolBuffor();
+                        Serial.println("BAD CHECKSUM ERROR! In receiveMessageTask() -> checksum incorrect");
                     }
+                    // if MAC or IP is incorrect 
+                    // TODO add check for MAC and IP addresses
+                    else if (false) {
+                        // TODO add what should happen if MAC or IP is incorrect 
+                    }
+                    // if entire message is not ready (message quantity)
+                    else if (protocolBuffor[pbMessageIndex][7] != 0) {
+                        pbMessageIndex++;
+                    }
+                    // entire message is ready
                     else {
-                        // calculate checksum
-                        uint16_t checksum = 0;
-                        for (uint8_t i = 0; i < PROTOCOL_MESSAGE_SIZE; i++) {
-                            checksum += protocolBuffor[pbMessageIndex][i];
+                        xTimerStop(msReceiveMessageTimeoutTimer, portMAX_DELAY);
+
+                        // prepare received message buffor
+                        uint8_t messageBuffor[MESSAGE_SIZE];
+                        for (uint8_t i = 0; i < MESSAGE_SIZE; i++){
+                            messageBuffor[i] = 0;
                         }
-                        
-                        // if checksum is incorrect
-                        if (checksum % 256 != 0) {
-                            xTimerStop(msReceiveMessageTimeoutTimer, portMAX_DELAY);
-                            resetProtocolBuffor();
-                            // TODO add "repeat last message"
-                            Serial.println("BAD CHECKSUM ERROR! In receiveMessageTask() -> checksum incorrect");
-                        }
-                        // if MAC or IP is incorrect 
-                        // TODO add check for MAC and IP addresses
-                        else if (false) {
-                            // TODO add what should happen if MAC or IP is incorrect 
-                        }
-                        // if entire message is not ready (message quantity)
-                        else if (protocolBuffor[pbMessageIndex][7] != 0) {
+                        uint8_t messageIndex = 0;
+                        uint8_t messagesQuantity;
+                        pbMessageIndex = 0;
+
+                        // decode message
+                        do {
+                            for (uint8_t i = 8; i < PROTOCOL_MESSAGE_SIZE - 2; i++) {
+                                messageBuffor[messageIndex] = protocolBuffor[pbMessageIndex][i];
+                                messageIndex++;
+                                // protection against buffer overload (62 => 63 max buffer index -1 for \0)
+                                if (messageIndex > 62) {
+                                    // TODO add what to do with longer messages 
+                                    break;
+                                }
+                            }
+
+                            messagesQuantity = protocolBuffor[pbMessageIndex][7];
                             pbMessageIndex++;
-                        }
-                        // entire message is ready
-                        else {
-                            xTimerStop(msReceiveMessageTimeoutTimer, portMAX_DELAY);
+                        } while(messagesQuantity != 0);
 
-                            // prepare received message buffor
-                            uint8_t messageBuffor[MESSAGE_SIZE];
-                            for (uint8_t i = 0; i < MESSAGE_SIZE; i++){
-                                messageBuffor[i] = 0;
+                        Serial.print("Received message: ");
+                        Serial.println((char*)messageBuffor);
+                        // TODO add message to queue
+                        if (msReceiveMessageTaskHandle != NULL) {
+                            if (isRawMessage) {
+                                xQueueSend(msReceiveMessageQueue, protocolBuffor[0], portMAX_DELAY);
+                                isRawMessage = false;
+                            } else {
+                                xQueueSend(msReceiveMessageQueue, messageBuffor, portMAX_DELAY);
                             }
-                            uint8_t messageIndex = 0;
-                            uint8_t messagesQuantity;
-                            pbMessageIndex = 0;
-
-                            // decode message
-                            do {
-                                for (uint8_t i = 8; i < PROTOCOL_MESSAGE_SIZE - 2; i++) {
-                                    messageBuffor[messageIndex] = protocolBuffor[pbMessageIndex][i];
-                                    messageIndex++;
-                                    // protection against buffer overload (62 => 63 max buffer index -1 for \0)
-                                    if (messageIndex > 62) {
-                                        // TODO add what to do with longer messages 
-                                        break;
-                                    }
-                                }
-
-                                messagesQuantity = protocolBuffor[pbMessageIndex][7];
-                                pbMessageIndex++;
-                            } while(messagesQuantity != 0);
-
-                            Serial.print("Received message: ");
-                            Serial.println((char*)messageBuffor);
-                            // TODO add message to queue
-                            if (msReceiveMessageTaskHandle != NULL) {
-                                if (isRawMessage) {
-                                    xQueueSend(msReceiveMessageQueue, protocolBuffor[0], portMAX_DELAY);
-                                    isRawMessage = false;
-                                } else {
-                                    xQueueSend(msReceiveMessageQueue, messageBuffor, portMAX_DELAY);
-                                }
-                            }
-
-                            // clean up
-                            resetProtocolBuffor();
                         }
+
+                        // clean up
+                        resetProtocolBuffor();
                     }
                 }
             }
-
-            // reading message 
-            // else if (mspSerial->available() && xSemaphoreTake(msHC12ReceiveMutex, 0) == pdTRUE) {
-                
-            
-                
-            // } 
-            // idle
-            // else {
-            //     // delay for watchdog
-            //     vTaskDelay(pdMS_TO_TICKS(1));
-            // }
             xTimerStart(msSuspendReceiveMessageTimer, portMAX_DELAY);
         }
+
+        // reading message 
+        // else if (mspSerial->available() && xSemaphoreTake(msHC12ReceiveMutex, 0) == pdTRUE) {
+            
+        
+            
+        // } 
+        // idle
+        // else {
+        //     // delay for watchdog
+        //     vTaskDelay(pdMS_TO_TICKS(1));
+        // } 
     }
 }
 void Communication::createReceiveMessageTaskHandle(void *parameters) {
@@ -706,11 +707,13 @@ void Communication::sendMessageTask() {
             // TODO remove 
             // Serial.println("sending..."); 
             xTaskNotify(msCommunicationMainTaskHandle, sendingTaskWaitingNotif, eSetValueWithOverwrite);
+            xTimerStart(msReceiveByteTimeoutTimer, portMAX_DELAY);
             mspSerial->write(protocolBuffor[i], PROTOCOL_MESSAGE_SIZE);
             
             // wait until hc12 module send confirmation
             uint32_t hc12Respond;
             xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, portMAX_DELAY);
+            xTimerStop(msReceiveByteTimeoutTimer, portMAX_DELAY);
             if (hc12Respond == 256){
                 Serial.println("SENDING MESSAGE ERROR! In sendMessageTask() -> hc12 module is not responding.");
             } else if (hc12Respond != 255) {
@@ -1084,11 +1087,12 @@ void Communication::communicationTimersCallbacks(TimerHandle_t xTimer){
     // Communication* instance = static_cast<Communication*>(pvTimerGetTimerID(xTimer));
     // instance->suspendSendMessageCallback();
     if (xTimer == msReceiveMessageTimeoutTimer) {
-        // TODO change that timer callback
+        // TODO remove print
+        Serial.println("message timeout callback");
         xTaskNotify(msReceiveMessageTaskHandle, messageTimeoutNotif, eSetValueWithOverwrite);
-        uint8_t value = 0;
-        xQueueSend(msReceiveByteQueue, &value, portMAX_DELAY);
     } else if (xTimer == msReceiveByteTimeoutTimer) {
+        // TODO remove print
+        Serial.println("byte timeout callback");
         xTaskNotify(msCommunicationMainTaskHandle, byteTimeoutNotif, eSetValueWithOverwrite);
     } else if (xTimer == msSuspendReceiveMessageTimer) {
         xTaskNotify(msCommunicationMainTaskHandle, suspendReceiveMessageTaskNotif, eSetValueWithOverwrite);
