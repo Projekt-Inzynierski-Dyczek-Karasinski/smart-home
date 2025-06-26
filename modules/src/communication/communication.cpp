@@ -22,6 +22,9 @@ uint8_t Communication::msMACAddress[6];
 HardwareSerial* Communication::mspSerial = nullptr;
 DebugLED* Communication::mspDebugLED = nullptr;
 
+uint8_t Communication::msLastMessage[MESSAGE_SIZE];
+SemaphoreHandle_t Communication::msLastMessageMutex = NULL;
+
 TaskHandle_t Communication::msCommunicationMainTaskHandle = NULL;
 
 TaskHandle_t Communication::msReceiveMessageTaskHandle = NULL;
@@ -62,6 +65,14 @@ Communication::Communication(DebugLED *debugLED) {
             msRoutingTable[i].IPAddress = 0;
         }
     #endif
+
+    msLastMessageMutex = xSemaphoreCreateMutex();
+
+    xSemaphoreTake(msLastMessageMutex, portMAX_DELAY);
+    for (uint8_t i = 0; i < MESSAGE_SIZE; i++) {
+        msLastMessage[i] = 0;
+    }
+    xSemaphoreGive(msLastMessageMutex);
 
     mspDebugLED = debugLED;
 
@@ -193,6 +204,7 @@ void Communication::communicationMainTask() {
             case suspendSendMessageTaskNotif:
                 // TODO remove print
                 Serial.println("vTaskSuspend(msSendMessageTaskHandle);");
+                resetLastMessage();
                 vTaskSuspend(msSendMessageTaskHandle);
                 break;
 
@@ -411,11 +423,12 @@ void Communication::receiveMessageTask() {
                 if (protocolBuffor[pbMessageIndex][PROTOCOL_MESSAGE_SIZE - 1] != 0) {
                     xTimerStop(msReceiveMessageTimeoutTimer, portMAX_DELAY);
                     
-                    // TODO add "repeat last message"
                     Serial.print("BAD END OF MESSAGE ERROR! In receiveMessageTask() -> message should end with 0 (\\0 char), but got: ");
                     Serial.println(protocolBuffor[pbMessageIndex][PROTOCOL_MESSAGE_SIZE - 1]);
 
+                    repeatMessage();
                     resetProtocolBuffor();
+                    xQueueReset(msReceiveByteQueue);
                 }
                 else {
                     // calculate checksum
@@ -427,9 +440,11 @@ void Communication::receiveMessageTask() {
                     // if checksum is incorrect
                     if (checksum % 256 != 0) {
                         xTimerStop(msReceiveMessageTimeoutTimer, portMAX_DELAY);
-                        resetProtocolBuffor();
-                        // TODO add "repeat last message"
                         Serial.println("BAD CHECKSUM ERROR! In receiveMessageTask() -> checksum incorrect");
+
+                        repeatMessage();
+                        resetProtocolBuffor();
+                        xQueueReset(msReceiveByteQueue);
                     }
                     // if MAC or IP is incorrect 
                     // TODO add check for MAC and IP addresses
@@ -471,8 +486,15 @@ void Communication::receiveMessageTask() {
 
                         Serial.print("Received message: ");
                         Serial.println((char*)messageBuffor);
-                        // TODO add message to queue
-                        if (msReceiveMessageTaskHandle != NULL) {
+
+                        // if it is "repeat" message
+                        if (isRepeatMessage(messageBuffor, messageIndex)) {
+                            xSemaphoreTake(msLastMessageMutex, portMAX_DELAY);
+                            xQueueSend(msSendMessagesQueue, msLastMessage, portMAX_DELAY);
+                            xSemaphoreGive(msLastMessageMutex);
+                        }
+                        // if Addressing Task is working
+                        else if (msAddressingTaskHandle != NULL) {
                             if (isRawMessage) {
                                 xQueueSend(msReceiveMessageQueue, protocolBuffor[0], portMAX_DELAY);
                                 isRawMessage = false;
@@ -480,6 +502,8 @@ void Communication::receiveMessageTask() {
                                 xQueueSend(msReceiveMessageQueue, messageBuffor, portMAX_DELAY);
                             }
                         }
+                        // TODO add message to queue
+                        // else
 
                         // clean up
                         resetProtocolBuffor();
@@ -743,6 +767,24 @@ void Communication::sendMessageTask() {
             vTaskDelay(pdMS_TO_TICKS(25));
         } while (messagesQuantity > 0);
 
+        bool isReapeatMessage = true;
+        if (messageIndex != 6) {
+            isReapeatMessage = false;
+        } else {
+            uint8_t repeat[] = {'r', 'e', 'p', 'e', 'a', 't'}; 
+            for (uint8_t j = 0; j < 6; j++){
+                if (messageBuffor[j] != repeat[j]) {
+                    isReapeatMessage = false;
+                    break;
+                }
+            }
+        }
+
+        // messageBuffor is message to send, messageIndex is size of message (in loop is incremented 1 time too many, so now is size not index of array)
+        if (!isRepeatMessage(messageBuffor, messageIndex)) {
+            setLastMessage(messageBuffor, messageIndex);
+        }
+
         xTimerStart(msSuspendSendMessageTimer, portMAX_DELAY);
     }
 }
@@ -801,6 +843,7 @@ void Communication::addressingTask() {
         vTaskDelay(pdMS_TO_TICKS(100));
     }
 }
+
 // #error "implement void Communication::addressingTask() "
 // #ifdef CENTRAL_UNIT
 // void Communication::addressingTask() {
@@ -1205,5 +1248,66 @@ void Communication::deleteAddresingTimer() {
     if (msAddressingTimeoutTimer != NULL) {
         xTimerDelete(msAddressingTimeoutTimer, portMAX_DELAY);
     }
+}
+// ================================================================
+
+// ============================ other =============================
+
+void Communication::repeatMessage() {
+    uint8_t sendBuffor[MESSAGE_SIZE];
+    sendBuffor[0] = (uint8_t)'r';
+    sendBuffor[1] = (uint8_t)'e';
+    sendBuffor[2] = (uint8_t)'p';
+    sendBuffor[3] = (uint8_t)'e';
+    sendBuffor[4] = (uint8_t)'a';
+    sendBuffor[5] = (uint8_t)'t';
+    for (uint8_t i = 6; i < MESSAGE_SIZE; i++){
+        sendBuffor[i] = 0;
+    }
+
+    // TODO remove print
+    Serial.println("repeatMessage()");
+    // TODO add delay before send message?
+    // vTaskDelay(pdMS_TO_TICKS(200));
+    xQueueSend(msSendMessagesQueue, &sendBuffor, portMAX_DELAY);
+}
+
+void Communication::setLastMessage(uint8_t *message, uint8_t size) {
+    xSemaphoreTake(msLastMessageMutex, portMAX_DELAY);
+
+    for (uint8_t i = 0; i < size; i++) {
+        msLastMessage[i] = message[i];
+    }
+
+    uint8_t index = size;
+    while (msLastMessage[index] != 0 && index < MESSAGE_SIZE) {
+        msLastMessage[index] = 0;
+        index++;
+    }
+
+    xSemaphoreGive(msLastMessageMutex);
+}
+
+void Communication::resetLastMessage() {
+    xSemaphoreTake(msLastMessageMutex, portMAX_DELAY);
+
+    uint8_t index = 0;
+    while (msLastMessage[index] != 0 && index < MESSAGE_SIZE) {
+        msLastMessage[index] = 0;
+        index++;
+    }
+
+    xSemaphoreGive(msLastMessageMutex);
+}
+
+bool Communication::isRepeatMessage(uint8_t *message, uint8_t size) {
+    const uint8_t repeat[] = {'r', 'e', 'p', 'e', 'a', 't'}; 
+
+    if (size != 6) return false;
+    for (uint8_t i = 0; i < 6; i++) {
+        if (message[i] != repeat[i]) return false;
+    }
+
+    return true;
 }
 // ================================================================

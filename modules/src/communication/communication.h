@@ -68,7 +68,11 @@ private:
     static void addressingTimeoutTimerCallbackHandle(TimerHandle_t xTimer);
     static void createAddresingTimer();
     static void deleteAddresingTimer();
-
+    
+    static void repeatMessage();
+    static void setLastMessage(uint8_t *message, uint8_t size);
+    static void resetLastMessage();
+    static bool isRepeatMessage(uint8_t *message, uint8_t size);
 
     // enum class TimeoutStatus : uint32_t {
     //     noTimeout = 0,
@@ -78,6 +82,9 @@ private:
     static uint8_t msMACAddress[6];
     static HardwareSerial *mspSerial;
     static DebugLED *mspDebugLED;
+
+    static uint8_t msLastMessage[64]; // MESSAGE_SIZE
+    static SemaphoreHandle_t msLastMessageMutex;
 
     typedef enum : uint32_t {
         defaultStatusNotif = 0,
