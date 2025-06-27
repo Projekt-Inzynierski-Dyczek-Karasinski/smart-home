@@ -68,6 +68,11 @@ private:
     static void addressingTimeoutTimerCallbackHandle(TimerHandle_t xTimer);
     static void createAddresingTimer();
     static void deleteAddresingTimer();
+
+    static void setupHC12Task(void *parameters);
+    // static void createSetupHC12TaskHandle(void *parameters);
+    static void createSetupHC12Task();
+    static void deleteSetupHC12Task();
     
     static void repeatMessage();
     static void setLastMessage(uint8_t *message, uint8_t size);
@@ -96,6 +101,8 @@ private:
         suspendSendMessageTaskNotif,
         createAddressingTaskNotif,
         deleteAddressingTaskNotif,
+        createSetupHC12TaskNotif,
+        deleteSetupHC12TaskNotif,
     } mCommunicationMainNotifications;
 
     // typedef enum : uint32_t {
@@ -115,6 +122,7 @@ private:
     static TaskHandle_t msSendCustomMessageTaskHandle;
     static TaskHandle_t msSendMessageTaskHandle;
     static TaskHandle_t msAddressingTaskHandle;
+    static TaskHandle_t msSetupHC12TaskHandle;
 
     static TimerHandle_t msReceiveMessageTimeoutTimer;
     static TimerHandle_t msReceiveByteTimeoutTimer;

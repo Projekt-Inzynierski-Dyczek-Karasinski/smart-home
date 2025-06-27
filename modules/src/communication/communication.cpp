@@ -32,6 +32,7 @@ TaskHandle_t Communication::msReceiveMessageTaskHandle = NULL;
 TaskHandle_t Communication::msSendCustomMessageTaskHandle = NULL;
 TaskHandle_t Communication::msSendMessageTaskHandle = NULL;
 TaskHandle_t Communication::msAddressingTaskHandle = NULL;
+TaskHandle_t Communication::msSetupHC12TaskHandle = NULL;
 
 QueueHandle_t Communication::msReceiveMessageQueue = NULL;
 QueueHandle_t Communication::msReceiveByteQueue = NULL;
@@ -94,7 +95,11 @@ Communication::Communication(DebugLED *debugLED) {
 
     createCommunicationMainTask();
 
+    
     Serial.println("Communication initialized");
+    // TODO remove
+    // vTaskDelay(pdMS_TO_TICKS(1000));
+    // xTaskNotify(msCommunicationMainTaskHandle, createSetupHC12TaskNotif, eSetValueWithOverwrite);
 }
 
 Communication::~Communication() {
@@ -128,6 +133,7 @@ void Communication::communicationMainTask() {
     uint32_t status = defaultStatusNotif;
 
     bool isSendingTaskWaiting = false;
+    bool isSetupHC12Working = false;
     uint8_t hc12Input;
     
     for (;;) {
@@ -138,28 +144,33 @@ void Communication::communicationMainTask() {
             case defaultStatusNotif:
                 if (mspSerial->available()) {
                     hc12Input = mspSerial->read();
-                    if (isSendingTaskWaiting) {
-                        xTaskNotify(msSendMessageTaskHandle, (uint32_t)hc12Input, eSetValueWithOverwrite);
-                        isSendingTaskWaiting = false;
-                        // TODO is this essential?
-                        vTaskPrioritySet(msCommunicationMainTaskHandle, BACKGROUND_TASK_PRIORITY);
-                        // TODO remove print
-                        // Serial.println("vTaskPrioritySet(msCommunicationMainTaskHandle, BACKGROUND_TASK_PRIORITY);");
+                    if (isSetupHC12Working) {
+                        Serial.println((char)hc12Input);
                     } else {
-                        xQueueSend(msReceiveByteQueue, &hc12Input, portMAX_DELAY);                       
+                        if (isSendingTaskWaiting) {
+                            xTaskNotify(msSendMessageTaskHandle, (uint32_t)hc12Input, eSetValueWithOverwrite);
+                            isSendingTaskWaiting = false;
+                            // TODO is this essential?
+                            vTaskPrioritySet(msCommunicationMainTaskHandle, BACKGROUND_TASK_PRIORITY);
+                            // TODO remove print
+                            // Serial.println("vTaskPrioritySet(msCommunicationMainTaskHandle, BACKGROUND_TASK_PRIORITY);");
+                        } else {
+                            xQueueSend(msReceiveByteQueue, &hc12Input, portMAX_DELAY);                       
+                        }
+                    }    
+                }
+                if (!isSendingTaskWaiting) {
+                    if (eTaskGetState(msReceiveMessageTaskHandle) == eSuspended && uxQueueMessagesWaiting(msReceiveByteQueue) != 0) {
+                        // TODO remove print
+                        Serial.println("vTaskResume(msReceiveMessageTaskHandle);");
+                        vTaskResume(msReceiveMessageTaskHandle);
                     }
-                }
-
-                if (eTaskGetState(msReceiveMessageTaskHandle) == eSuspended && uxQueueMessagesWaiting(msReceiveByteQueue) != 0) {
-                    // TODO remove print
-                    Serial.println("vTaskResume(msReceiveMessageTaskHandle);");
-                    vTaskResume(msReceiveMessageTaskHandle);
-                }
-                if (eTaskGetState(msSendMessageTaskHandle) == eSuspended && uxQueueMessagesWaiting(msSendMessagesQueue) != 0) {
-                    // TODO remove print
-                    Serial.println("vTaskResume(msSendMessageTaskHandle);");
-                    vTaskResume(msSendMessageTaskHandle);
-                }
+                    if (eTaskGetState(msSendMessageTaskHandle) == eSuspended && uxQueueMessagesWaiting(msSendMessagesQueue) != 0) {
+                        // TODO remove print
+                        Serial.println("vTaskResume(msSendMessageTaskHandle);");
+                        vTaskResume(msSendMessageTaskHandle);
+                    }
+                }    
 
                 // delay for watchdog 
                 vTaskDelay(pdMS_TO_TICKS(1));
@@ -218,6 +229,23 @@ void Communication::communicationMainTask() {
                 // TODO remove print
                 Serial.println("deleteAddressingTask();");
                 deleteAddressingTask();
+                break;
+
+            case createSetupHC12TaskNotif:
+                // TODO remove print
+                Serial.println("createSetupHC12Task();");
+
+                isSetupHC12Working = true;
+                xTimerStop(msSuspendSendMessageTimer, portMAX_DELAY);
+                vTaskSuspend(msSendMessageTaskHandle);
+                createSetupHC12Task();
+                break;
+
+            case deleteSetupHC12TaskNotif:
+                // TODO remove print
+                Serial.println("deleteSetupHC12Task();");
+                deleteSetupHC12Task();
+                isSetupHC12Working = false;
                 break;
             
             default:
@@ -1112,6 +1140,43 @@ void Communication::deleteAddressingTask() {
         vTaskDelete(msAddressingTaskHandle);
         msAddressingTaskHandle = NULL;
     }
+}
+// ================================================================
+
+// ========================== setup HC12 ==========================
+
+void Communication::setupHC12Task(void *parameters) {
+    // TODO add changing baud rate of mspSerial if needed
+    vTaskDelay(pdMS_TO_TICKS(50));
+    mspSerial->write("AT");
+    vTaskDelay(pdMS_TO_TICKS(50));
+    xTaskNotify(msCommunicationMainTaskHandle, deleteSetupHC12TaskNotif, eSetValueWithOverwrite);
+
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+void Communication::createSetupHC12Task() {
+    digitalWrite(SET_PIN, LOW);
+    if (msSetupHC12TaskHandle == NULL) {
+        xTaskCreate(
+            setupHC12Task,
+            "Setup HC12 Task",
+            2048,
+            NULL,
+            MEDIUM_TASK_PRIORITY,
+            &msSetupHC12TaskHandle
+        );
+    } else {
+        Serial.println("TASK CREATION ERROR! In createSetupHC12Task() -> Can't create setup HC12 task, because task already exists");
+    }
+}
+void Communication::deleteSetupHC12Task() {
+    if (msSetupHC12TaskHandle != NULL) {
+        vTaskDelete(msSetupHC12TaskHandle);
+        msSetupHC12TaskHandle = NULL;
+    }
+    digitalWrite(SET_PIN, HIGH);
 }
 // ================================================================
 
