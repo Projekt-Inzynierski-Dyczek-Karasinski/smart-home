@@ -122,8 +122,8 @@ Communication::~Communication() {
 }
 
 void Communication::startAddresingAlgorithm() {
+    // TODO remove print
     Serial.println("startAddresingAlgorithm");
-    mspDebugLED->createPairingBlinkTask();
     xTaskNotify(msCommunicationMainTaskHandle, createAddressingTaskNotif, eSetValueWithOverwrite);
 }
 
@@ -159,7 +159,7 @@ void Communication::communicationMainTask() {
                         }
                     }    
                 }
-                if (!isSendingTaskWaiting) {
+                if (!isSetupHC12Working) {
                     if (eTaskGetState(msReceiveMessageTaskHandle) == eSuspended && uxQueueMessagesWaiting(msReceiveByteQueue) != 0) {
                         // TODO remove print
                         Serial.println("vTaskResume(msReceiveMessageTaskHandle);");
@@ -220,15 +220,15 @@ void Communication::communicationMainTask() {
                 break;
 
             case createAddressingTaskNotif:
-                // TODO remove print
-                Serial.println("createAddressingTask();");
                 createAddressingTask();
                 break;
 
             case deleteAddressingTaskNotif:
-                // TODO remove print
-                Serial.println("deleteAddressingTask();");
                 deleteAddressingTask();
+                break;
+
+            case deleteAddressingTaskWithAbortNotif:
+                abortAddressing();
                 break;
 
             case createSetupHC12TaskNotif:
@@ -540,18 +540,6 @@ void Communication::receiveMessageTask() {
             }
             xTimerStart(msSuspendReceiveMessageTimer, portMAX_DELAY);
         }
-
-        // reading message 
-        // else if (mspSerial->available() && xSemaphoreTake(msHC12ReceiveMutex, 0) == pdTRUE) {
-            
-        
-            
-        // } 
-        // idle
-        // else {
-        //     // delay for watchdog
-        //     vTaskDelay(pdMS_TO_TICKS(1));
-        // } 
     }
 }
 void Communication::createReceiveMessageTaskHandle(void *parameters) {
@@ -697,123 +685,106 @@ void Communication::sendMessageTask() {
         messageIndex = 0;
         messagesQuantity = 0;
 
-        // TODO change to deleting itself after not receiving message for some time
         // wait until the message appears in the queue and save message in local messageBuffor
-        xQueueReceive(msSendMessagesQueue, &messageBuffor, portMAX_DELAY);
-        xTimerStop(msSuspendSendMessageTimer, portMAX_DELAY);
+        if (xQueueReceive(msSendMessagesQueue, &messageBuffor, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
+            xTimerStop(msSuspendSendMessageTimer, portMAX_DELAY);
 
-        // divide and add messages to protocolBuffor
-        while(messageIndex < 64 && messageBuffor[messageIndex] != 0) {
-            protocolBuffor[messagesQuantity][(messageIndex % 6) + 8] = messageBuffor[messageIndex];
-            messageIndex++;
-            if (messageIndex % 6 == 0) {
-                messagesQuantity++;
-            }
-        }
-        if (messageIndex % 6 != 0){
-            messagesQuantity++;
-        }   
-        // TODO remove 
-        // for (uint8_t i = 0; i < 11; i++){
-        //     Serial.print("message in protocolBuffor: ");
-        //     for (uint8_t j = 8; j < 14; j++){
-        //         Serial.print((char)protocolBuffor[i][j]);
-        //     }
-        //     Serial.println();
-        // }
-
-        // add messagesQuantity and checksum to protocolBuffor
-        uint8_t i = 0;
-        while (messagesQuantity > 0) {
-            messagesQuantity--;
-
-            protocolBuffor[i][7] = messagesQuantity;
-
-            protocolBuffor[i][PROTOCOL_MESSAGE_SIZE - 2] = 0;
-            uint16_t checkSum = 0;
-            for (uint8_t j = 0; j < PROTOCOL_MESSAGE_SIZE; j++) {
-                checkSum += (uint16_t)protocolBuffor[i][j];
-            }
-            checkSum = (256 - (checkSum % 256)) % 256;
-            protocolBuffor[i][PROTOCOL_MESSAGE_SIZE - 2] = checkSum;
-
-            i++;
-        }
-        // TODO remove 
-        // Serial.println("Messages to send:");
-        // for (uint8_t i = 0; i < 11; i++){
-        //     Serial.print("Message ");
-        //     Serial.print(i);
-        //     Serial.print(": ");
-        //     for (uint8_t j = 0; j < 16; j++){
-        //         Serial.print((int)protocolBuffor[i][j]);
-        //         Serial.print(" ");
-        //     }
-        //     Serial.println();
-        // }
-            Serial.println("all sending...");
-
-        // send message and clean buffor
-        i = 0;
-        do {
-            // TODO remove 
-            // Serial.println("sending..."); 
-            xTaskNotify(msCommunicationMainTaskHandle, sendingTaskWaitingNotif, eSetValueWithOverwrite);
-            xTimerStart(msReceiveByteTimeoutTimer, portMAX_DELAY);
-            mspSerial->write(protocolBuffor[i], PROTOCOL_MESSAGE_SIZE);
-            
-            // wait until hc12 module send confirmation
-            uint32_t hc12Respond;
-            xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, portMAX_DELAY);
-            xTimerStop(msReceiveByteTimeoutTimer, portMAX_DELAY);
-            if (hc12Respond == 256){
-                Serial.println("SENDING MESSAGE ERROR! In sendMessageTask() -> hc12 module is not responding.");
-            } else if (hc12Respond != 255) {
-                Serial.print("SENDING MESSAGE ERROR! In sendMessageTask() -> hc12 module did not confirm properly. Hc-12 module should send 255 signal but got: ");
-                Serial.println(hc12Respond);
-            }
-            // TODO remove 
-            // Serial.print("Message ");
-            // Serial.print(i);
-            // Serial.print(": ");
-            // for (uint8_t j = 0; j < 16; j++){
-            //     Serial.print((int)protocolBuffor[i][j]);
-            //     Serial.print(" ");
-            // }
-            // Serial.println();
-
-            messagesQuantity = protocolBuffor[i][7];
-            for (uint8_t j = 8; j < PROTOCOL_MESSAGE_SIZE - 2; j++) {
-                protocolBuffor[i][j] = BLANK_CHARACTER;
-            }
-            protocolBuffor[i][PROTOCOL_MESSAGE_SIZE - 2] = 0;
-            protocolBuffor[i][PROTOCOL_MESSAGE_SIZE - 1] = 0;
-            
-            i++;
-            // this delay is required for HC12 send/receive properly message
-            // TODO increase delay?
-            vTaskDelay(pdMS_TO_TICKS(25));
-        } while (messagesQuantity > 0);
-
-        bool isReapeatMessage = true;
-        if (messageIndex != 6) {
-            isReapeatMessage = false;
-        } else {
-            uint8_t repeat[] = {'r', 'e', 'p', 'e', 'a', 't'}; 
-            for (uint8_t j = 0; j < 6; j++){
-                if (messageBuffor[j] != repeat[j]) {
-                    isReapeatMessage = false;
-                    break;
+            // divide and add messages to protocolBuffor
+            while(messageIndex < 64 && messageBuffor[messageIndex] != 0) {
+                protocolBuffor[messagesQuantity][(messageIndex % 6) + 8] = messageBuffor[messageIndex];
+                messageIndex++;
+                if (messageIndex % 6 == 0) {
+                    messagesQuantity++;
                 }
             }
-        }
+            if (messageIndex % 6 != 0){
+                messagesQuantity++;
+            }   
 
-        // messageBuffor is message to send, messageIndex is size of message (in loop is incremented 1 time too many, so now is size not index of array)
-        if (!isRepeatMessage(messageBuffor, messageIndex)) {
-            setLastMessage(messageBuffor, messageIndex);
-        }
+            uint8_t i = 0;
+            while (messagesQuantity > 0) {
+                messagesQuantity--;
 
-        xTimerStart(msSuspendSendMessageTimer, portMAX_DELAY);
+                protocolBuffor[i][7] = messagesQuantity;
+
+                protocolBuffor[i][PROTOCOL_MESSAGE_SIZE - 2] = 0;
+                uint16_t checkSum = 0;
+                for (uint8_t j = 0; j < PROTOCOL_MESSAGE_SIZE; j++) {
+                    checkSum += (uint16_t)protocolBuffor[i][j];
+                }
+                checkSum = (256 - (checkSum % 256)) % 256;
+                protocolBuffor[i][PROTOCOL_MESSAGE_SIZE - 2] = checkSum;
+
+                i++;
+            }
+
+            // TODO remove print
+            Serial.println("all sending...");
+
+            // send message and clean buffor
+            i = 0;
+            do {
+                xTaskNotify(msCommunicationMainTaskHandle, sendingTaskWaitingNotif, eSetValueWithOverwrite);
+                xTimerStart(msReceiveByteTimeoutTimer, portMAX_DELAY);
+                mspSerial->write(protocolBuffor[i], PROTOCOL_MESSAGE_SIZE);
+                
+                // wait until hc12 module send confirmation
+                uint32_t hc12Respond;
+                if (xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT * 2)) == pdTRUE) {
+                
+                    xTimerStop(msReceiveByteTimeoutTimer, portMAX_DELAY);
+                    if (hc12Respond == 256){
+                        Serial.println("SENDING MESSAGE ERROR! In sendMessageTask() -> hc12 module is not responding.");
+                    } else if (hc12Respond != 255) {
+                        Serial.print("SENDING MESSAGE ERROR! In sendMessageTask() -> hc12 module did not confirm properly. Hc-12 module should send 255 signal but got: ");
+                        Serial.println(hc12Respond);
+                    }
+                } else {
+                    Serial.println("SENDING MESSAGE ERROR! In sendMessageTask() -> hc12 module is not responding.");
+                }
+                // TODO remove 
+                // Serial.print("Message ");
+                // Serial.print(i);
+                // Serial.print(": ");
+                // for (uint8_t j = 0; j < 16; j++){
+                //     Serial.print((int)protocolBuffor[i][j]);
+                //     Serial.print(" ");
+                // }
+                // Serial.println();
+
+                messagesQuantity = protocolBuffor[i][7];
+                for (uint8_t j = 8; j < PROTOCOL_MESSAGE_SIZE - 2; j++) {
+                    protocolBuffor[i][j] = BLANK_CHARACTER;
+                }
+                protocolBuffor[i][PROTOCOL_MESSAGE_SIZE - 2] = 0;
+                protocolBuffor[i][PROTOCOL_MESSAGE_SIZE - 1] = 0;
+                
+                i++;
+                // this delay is required for HC12 send/receive properly message
+                // TODO increase delay?
+                vTaskDelay(pdMS_TO_TICKS(25));
+            } while (messagesQuantity > 0);
+
+            bool isReapeatMessage = true;
+            if (messageIndex != 6) {
+                isReapeatMessage = false;
+            } else {
+                uint8_t repeat[] = {'r', 'e', 'p', 'e', 'a', 't'}; 
+                for (uint8_t j = 0; j < 6; j++){
+                    if (messageBuffor[j] != repeat[j]) {
+                        isReapeatMessage = false;
+                        break;
+                    }
+                }
+            }
+
+            // messageBuffor is message to send, messageIndex is size of message (in loop is incremented 1 time too many, so now is size not index of array)
+            if (!isRepeatMessage(messageBuffor, messageIndex)) {
+                setLastMessage(messageBuffor, messageIndex);
+            }
+
+            xTimerStart(msSuspendSendMessageTimer, portMAX_DELAY);
+        }
     }
 }
 void Communication::createSendMessageTaskHandle(void *parameters) {
@@ -865,8 +836,9 @@ void Communication::abortAddressing() {
 }
 
 void Communication::addressingTask() {
-    vTaskDelay(pdMS_TO_TICKS(3000));
-    abortAddressing();
+    xTimerStart(msAddressingTimeoutTimer, portMAX_DELAY);
+    vTaskDelay(pdMS_TO_TICKS(6000));
+    xTaskNotify(msCommunicationMainTaskHandle, deleteAddressingTaskNotif, eSetValueWithOverwrite);
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(100));
     }
@@ -1117,6 +1089,8 @@ void Communication::createAddressingTaskHandle(void *parameters) {
 }
 void Communication::createAddressingTask() {
     createAddresingTimer();
+    mspDebugLED->createPairingBlinkTask();
+    // TODO remove print
     Serial.println("createAddressingTask()");
     if (msAddressingTaskHandle == NULL) {
         xTaskCreate(
@@ -1133,6 +1107,7 @@ void Communication::createAddressingTask() {
 }
 void Communication::deleteAddressingTask() {
     deleteAddresingTimer();
+    // TODO remove print
     Serial.println("deleteAddressingTask()");
     mspDebugLED->deletePairingBlinkTask();
 
@@ -1182,45 +1157,7 @@ void Communication::deleteSetupHC12Task() {
 
 // ============================ Timers ============================
 
-// void Communication::messageTimeoutTimerCallback() {
-//     xTaskNotify(msReceiveMessageTaskHandle, messageTimeoutNotif, eSetValueWithOverwrite);
-//     // Sending 0 to queue to "awake" task
-//     uint8_t value = 0;
-//     xQueueSend(msReceiveByteQueue, &value, portMAX_DELAY);
-// }
-// void Communication::messageTimeoutTimerCallbackHandle(TimerHandle_t xTimer) {
-//     Communication* instance = static_cast<Communication*>(pvTimerGetTimerID(xTimer));
-//     instance->messageTimeoutTimerCallback();
-// }
-
-// void Communication::byteTimeoutTimerCallback() {
-//     xTaskNotify(msCommunicationMainTaskHandle, byteTimeoutNotif, eSetValueWithOverwrite);
-// }
-// void Communication::byteTimeoutTimerCallbackHandle(TimerHandle_t xTimer) {
-//     Communication* instance = static_cast<Communication*>(pvTimerGetTimerID(xTimer));
-//     instance->byteTimeoutTimerCallback();
-// }
-
-// void Communication::suspendReceiveMessageTimerCallback() {
-//     xTaskNotify(msCommunicationMainTaskHandle, suspendReceiveMessageTaskNotif, eSetValueWithOverwrite);
-// }
-// void Communication::suspendReceiveMessageTimerCallbackHandle(TimerHandle_t xTimer) {
-//     Communication* instance = static_cast<Communication*>(pvTimerGetTimerID(xTimer));
-//     instance->suspendReceiveMessageTimerCallback();
-// }
-
-// void Communication::suspendSendMessageCallback() {
-//     xTaskNotify(msCommunicationMainTaskHandle, suspendSendMessageTaskNotif, eSetValueWithOverwrite);
-// }
-
-// void Communication::suspendSendMessageCallbackHandle(TimerHandle_t xTimer) {
-//     Communication* instance = static_cast<Communication*>(pvTimerGetTimerID(xTimer));
-//     instance->suspendSendMessageCallback();
-// }
-
 void Communication::communicationTimersCallbacks(TimerHandle_t xTimer){
-    // Communication* instance = static_cast<Communication*>(pvTimerGetTimerID(xTimer));
-    // instance->suspendSendMessageCallback();
     if (xTimer == msReceiveMessageTimeoutTimer) {
         // TODO remove print
         Serial.println("message timeout callback");
@@ -1276,42 +1213,43 @@ void Communication::createCommunicationTimers() {
 void Communication::deleteCommunicationTimers() {
     if (msReceiveMessageTimeoutTimer != NULL) {
         xTimerDelete(msReceiveMessageTimeoutTimer, portMAX_DELAY);
+        msReceiveMessageTimeoutTimer = NULL;
     }
     if (msReceiveByteTimeoutTimer != NULL) {
         xTimerDelete(msReceiveByteTimeoutTimer, portMAX_DELAY);
+        msReceiveByteTimeoutTimer = NULL;
     }
     if (msSuspendReceiveMessageTimer != NULL) {
         xTimerDelete(msSuspendReceiveMessageTimer, portMAX_DELAY);
+        msSuspendReceiveMessageTimer = NULL;
     }
     if (msSuspendSendMessageTimer != NULL) {
         xTimerDelete(msSuspendSendMessageTimer, portMAX_DELAY);
+        msSuspendSendMessageTimer = NULL;
     }
 }
 
-void Communication::addressingTimeoutTimerCallback() {
-    // xTaskNotify(msAddressingTaskHandle, mAddressingNotificationStatus::addressingTimeout, eSetValueWithOverwrite);
-    // TODO add sending rf message about aborting 
-    Serial.println("addressingTimeoutTimerCallback");
-    deleteAddressingTask();
-}
-void Communication::addressingTimeoutTimerCallbackHandle(TimerHandle_t xTimer) {
-    Communication* instance = static_cast<Communication*>(pvTimerGetTimerID(xTimer));
-    instance->addressingTimeoutTimerCallback();
+
+void Communication::addressingTimeoutTimerCallback(TimerHandle_t xTimer) {
+    // TODO remove print
+    Serial.println("Addressing Timeout Callback");
+    xTaskNotify(msCommunicationMainTaskHandle, deleteAddressingTaskWithAbortNotif, eSetValueWithOverwrite);
 }
 void Communication::createAddresingTimer() {
     if (msAddressingTimeoutTimer == NULL) {
         msAddressingTimeoutTimer = xTimerCreate(
             "Addressing Timeout",
-            pdMS_TO_TICKS(ADDRESSING_ABSOLUTE_TIMEOUT),
+            pdMS_TO_TICKS(ADDRESSING_ABSOLUTE_TIMEOUT), 
             pdFALSE,
             NULL,
-            addressingTimeoutTimerCallbackHandle
+            addressingTimeoutTimerCallback
         );
     }
 }
 void Communication::deleteAddresingTimer() {
     if (msAddressingTimeoutTimer != NULL) {
         xTimerDelete(msAddressingTimeoutTimer, portMAX_DELAY);
+        msAddressingTimeoutTimer = NULL;
     }
 }
 // ================================================================

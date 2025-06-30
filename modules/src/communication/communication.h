@@ -42,6 +42,7 @@ private:
     static void createSendMessageTask();
     static void deleteSendMessageTask();
 
+    static void abortAddressing();
     static void addressingTask();
     static void createAddressingTaskHandle(void *parameters);
     static void createAddressingTask();
@@ -63,9 +64,7 @@ private:
     static void createCommunicationTimers();
     static void deleteCommunicationTimers();
     
-    static void abortAddressing();
-    static void addressingTimeoutTimerCallback();
-    static void addressingTimeoutTimerCallbackHandle(TimerHandle_t xTimer);
+    static void addressingTimeoutTimerCallback(TimerHandle_t xTimer);
     static void createAddresingTimer();
     static void deleteAddresingTimer();
 
@@ -101,6 +100,7 @@ private:
         suspendSendMessageTaskNotif,
         createAddressingTaskNotif,
         deleteAddressingTaskNotif,
+        deleteAddressingTaskWithAbortNotif,
         createSetupHC12TaskNotif,
         deleteSetupHC12TaskNotif,
     } mCommunicationMainNotifications;
