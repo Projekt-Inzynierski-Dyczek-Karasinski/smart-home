@@ -22,7 +22,7 @@ message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}")
 message(STATUS "Target Device: ${TARGET_DEVICE}")
 message(STATUS "==============================================================")
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -50,7 +50,12 @@ find_package(Boost 1.74 REQUIRED COMPONENTS
 add_executable(SmartHome
         src/main.cpp
         src/smart_home_core.cpp
+        src/smart_home_tcp_server.cpp
 )
+add_executable(ModuleMediator
+        src/module_mediator.cpp
+)
+
 
 target_link_libraries(SmartHome PRIVATE
         Boost::system
@@ -58,6 +63,12 @@ target_link_libraries(SmartHome PRIVATE
         Boost::filesystem
         Boost::program_options
         Boost::chrono
+        pthread
+)
+
+target_link_libraries(ModuleMediator PRIVATE
+        Boost::system
+        Boost::program_options
         pthread
 )
 
@@ -87,7 +98,6 @@ else ()
     # Additional options for release optimization
     target_compile_options(SmartHome PRIVATE
             -O2
-            -O2
             -DNDEBUG
             -ffunction-sections
             -fdata-sections
@@ -95,4 +105,6 @@ else ()
     target_link_options(SmartHome PRIVATE
             -Wl,--gc-sections
     )
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -s")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s")
 endif ()

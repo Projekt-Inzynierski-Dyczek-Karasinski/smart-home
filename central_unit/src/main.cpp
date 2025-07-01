@@ -1,55 +1,48 @@
 #include "smart_home_core.h"
 
 #include <iostream>
-#include <map>
-#include <string>
+#include <boost/process.hpp>
+#include <boost/program_options.hpp>
 
-enum Options {
-    optionInvalid = 0,
-    help = 1,
-};
-
-Options resolveOption(const std::string &input) {
-    static const std::map<std::string, Options> optionsMap{
-        {"--help", help},
-        {"-h", help}
-    };
-
-    auto itr = optionsMap.find(input);
-    if (itr != optionsMap.end()) {
-        return itr->second;
-    }
-    return optionInvalid;
-}
+namespace bp = boost::process;
+namespace bpo = boost::program_options;
 
 int main(int argc, char *argv[]) {
-    for (int i = 1; i < argc; i++) {
-        std::string arg = argv[i];
+    // Define program options
+    bpo::options_description generic("Generic options");
+    generic.add_options()
+            ("help,h", "produce help message")
+            ("port,p", bpo::value<int>()->default_value(43321), "TCP port");
 
-        switch (resolveOption(arg)) {
-            case 1:
-                std::cout << "HELP" << std::endl;
-                //TODO add print help
-                return 0;
-            default:
-                std::cerr << "Unknown option: " << arg << std::endl;
-                return 1;
-        }
+    //TODO add options
+    //TODO add error handling for unknown options
+
+    bpo::variables_map vm;
+    bpo::store(bpo::parse_command_line(argc, argv, generic), vm);
+    bpo::notify(vm);
+
+    if (vm.contains("help")) {
+        std::cout << generic << std::endl;
+        return 0;
     }
 
-    try {
-        auto &core = SmartHome::Core::Instance();
+    int port = vm["port"].as<int>();
+    // std::cout << port << std::endl;
 
-        if (core.initialize() == false) {
-            std::cerr << "Failed to initialize core" << std::endl;
-            return 1;
-        }
+    auto &core = SmartHome::Core::Instance();
+    //TODO pass port to Core
+    //TODO implement logging system
 
-        core.run();
-    } catch (std::exception &e) {
-        std::cerr << e.what() << std::endl;
+    //TODO read from config if mediator should be run
+    bp::child mediator("/usr/bin/konsole", "-e", "./ModuleMediator");
+
+    if (core.initialize() == false) {
+        std::cerr << "Failed to initialize core" << std::endl;
         return 1;
     }
+
+    core.run();
+    mediator.wait();
 
     return 0;
 }
