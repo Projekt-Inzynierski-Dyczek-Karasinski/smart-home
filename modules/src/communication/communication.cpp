@@ -1,3 +1,4 @@
+// TODO !BEFORE PULL REQUEST! check for "eSetValueWithoutOverwrite"!
 #include <HardwareSerial.h>
 #include "communication/communication.h"
 #include "smart_home_config.h"
@@ -17,6 +18,8 @@
 #define ADDRESSING_MESSAGE_TIMEOUT 1000 
 // TODO assign final value
 #define ADDRESSING_MAX_ATTEMPTS 5
+
+portMUX_TYPE Communication::msCriticalSectionMutex = portMUX_INITIALIZER_UNLOCKED;
 
 uint8_t Communication::msMACAddress[6];
 HardwareSerial* Communication::mspSerial = nullptr;
@@ -43,13 +46,14 @@ TimerHandle_t Communication::msReceiveByteTimeoutTimer = NULL;
 TimerHandle_t Communication::msSuspendReceiveMessageTimer = NULL;
 TimerHandle_t Communication::msSuspendSendMessageTimer = NULL;
 
-TimerHandle_t Communication::msAddressingTimeoutTimer = NULL;
+TimerHandle_t Communication::msAddressingAbsoluteTimeoutTimer = NULL;
 
 #ifdef CENTRAL_UNIT
     Communication::Routing Communication::msRoutingTable[255];
 #else
-    static uint8_t msCentralUnitMACAddress[6];
-    static uint8_t msIPAddress = 0;
+    uint8_t Communication::msCentralUnitMACAddress[6] = {0, 0, 0, 0, 0, 0};
+    uint8_t Communication::msIPAddress = 0;
+    SemaphoreHandle_t Communication::msAddressDataMutex = NULL;
 #endif
 
 Communication::Communication(DebugLED *debugLED) {
@@ -65,6 +69,8 @@ Communication::Communication(DebugLED *debugLED) {
         for (uint8_t i = 0; i < 255; i++) {
             msRoutingTable[i].IPAddress = 0;
         }
+    #else
+        msAddressDataMutex = xSemaphoreCreateMutex();
     #endif
 
     msLastMessageMutex = xSemaphoreCreateMutex();
@@ -115,7 +121,7 @@ Communication::~Communication() {
     deleteCommunicationQueues();
 
     deleteCommunicationTimers();
-    deleteAddresingTimer();
+    deleteAddresingTimers();
 
     delete mspSerial;
     digitalWrite(SET_PIN, LOW);
@@ -194,16 +200,16 @@ void Communication::communicationMainTask() {
                     // TODO remove print
                     // Serial.println("vTaskPrioritySet(msCommunicationMainTaskHandle, BACKGROUND_TASK_PRIORITY);");
                 } else {
-                    xTaskNotify(msReceiveMessageTaskHandle, byteTimeoutNotif, eSetValueWithoutOverwrite);
+                    xTaskNotify(msReceiveMessageTaskHandle, byteTimeoutNotif, eSetValueWithOverwrite);
                 }
                 break;
 
             case messageTimeoutNotif:
-                xTaskNotify(msReceiveMessageTaskHandle, messageTimeoutNotif, eSetValueWithoutOverwrite);
+                xTaskNotify(msReceiveMessageTaskHandle, messageTimeoutNotif, eSetValueWithOverwrite);
                 break;
 
             case readRawMessageNotif:
-                xTaskNotify(msReceiveMessageTaskHandle, readRawMessageNotif, eSetValueWithoutOverwrite);
+                xTaskNotify(msReceiveMessageTaskHandle, readRawMessageNotif, eSetValueWithOverwrite);
                 break;
 
             case suspendReceiveMessageTaskNotif:
@@ -231,6 +237,10 @@ void Communication::communicationMainTask() {
                 abortAddressing();
                 break;
 
+            // case addressingMessageTimeoutNotif:
+            //     xTaskNotify(msAddressingTaskHandle, addressingMessageTimeoutNotif, eSetValueWithOverwrite);
+            //     break;
+
             case createSetupHC12TaskNotif:
                 // TODO remove print
                 Serial.println("createSetupHC12Task();");
@@ -257,62 +267,6 @@ void Communication::communicationMainTask() {
         // reset notifications status 
         status = defaultStatusNotif;
     }
-    
-    // for(;;) {
-    //     // change status
-    //     xTaskNotifyWait(0, ULONG_MAX, &status, 0);
-
-    //     switch (status) {
-    //         case mCommunicationMainNotifications::defaultStatus:
-    //             if (mspSerial->available()) {
-    //                 // Serial.print("defaultStatus: ");
-    //                 // Serial.println(isSendingTaskWaiting);
-
-    //                 if (isSendingTaskWaiting) {
-    //                     xTimerStop(msReceiveByteTimeoutTimer, portMAX_DELAY);
-    //                     hc12Input = mspSerial->read();
-    //                     xTaskNotify(msSendMessageTaskHandle, (uint32_t)hc12Input, eSetValueWithOverwrite);
-    //                     isSendingTaskWaiting = false;
-    //                 } else {
-    //                     hc12Input = mspSerial->read();
-    //                     xQueueSend(msReceiveByteQueue, &hc12Input, portMAX_DELAY);
-    //                     xTimerStart(msReceiveByteTimeoutTimer, portMAX_DELAY);
-    //                 }
-    //             }
-    //             break;
-
-    //         case mCommunicationMainNotifications::byteTimeout:
-    //             if (isSendingTaskWaiting) {
-    //                 // max value that hc12 can send is 255, so notifying Send Message Task with 256 value mean timeout
-    //                 xTaskNotify(msSendMessageTaskHandle, 256, eSetValueWithOverwrite);
-    //                 isSendingTaskWaiting = false;
-    //                 status = mCommunicationMainNotifications::defaultStatus;
-    //             } else {
-    //                 xTaskNotify(msReceiveMessageTaskHandle, mCommunicationMainNotifications::byteTimeout, eSetValueWithOverwrite);
-    //                 // Sending queue to "awake" task
-    //                 xQueueSend(msReceiveByteQueue, &hc12Input, portMAX_DELAY);
-    //                 status = mCommunicationMainNotifications::defaultStatus;
-    //             }
-    //             break;
-
-    //         case mCommunicationMainNotifications::sendingTaskWaiting: 
-    //             if (!isSendingTaskWaiting) {
-    //                 isSendingTaskWaiting = true;
-    //                 xTimerStart(msReceiveByteTimeoutTimer, portMAX_DELAY);
-    //                 status = mCommunicationMainNotifications::defaultStatus;
-    //             }
-    //             break;
-
-    //         default:
-    //             Serial.print("STATUS ERROR! In communicationMainTask() -> got unknow status. Received Status: ");
-    //             Serial.println(status);
-    //             isSendingTaskWaiting = false;
-    //             status = mCommunicationMainNotifications::defaultStatus;
-    //     }
-
-    //     // delay for watchdog
-    //     vTaskDelay(pdMS_TO_TICKS(1));
-    // }
 }
 void Communication::createCommunicationMainTaskHandle(void *parameters) {
     Communication* instance = static_cast<Communication*>(parameters);
@@ -401,6 +355,7 @@ void Communication::receiveMessageTask() {
     };
     resetProtocolBuffor();
 
+    // buffor for byte received from HC12
     uint8_t queueBuffor;
 
     // task loop
@@ -475,7 +430,7 @@ void Communication::receiveMessageTask() {
                         xQueueReset(msReceiveByteQueue);
                     }
                     // if MAC or IP is incorrect 
-                    // TODO add check for MAC and IP addresses
+                    // TODO add check for MAC and IP addresses !!! REMEMBER ABOUT MUTEX - msAddressDataMutex !!!
                     else if (false) {
                         // TODO add what should happen if MAC or IP is incorrect 
                     }
@@ -496,6 +451,16 @@ void Communication::receiveMessageTask() {
                         uint8_t messagesQuantity;
                         pbMessageIndex = 0;
 
+                        // TODO remove print
+                        #ifdef CENTRAL_UNIT
+                            Serial.println("CENTRAL_UNIT received: ");
+                            for (uint8_t i = 0; i < 16; i++) {
+                                Serial.print(protocolBuffor[0][i]);
+                                Serial.print(' ');
+                            }
+                            Serial.println();
+                        #endif
+
                         // decode message
                         do {
                             for (uint8_t i = 8; i < PROTOCOL_MESSAGE_SIZE - 2; i++) {
@@ -512,6 +477,7 @@ void Communication::receiveMessageTask() {
                             pbMessageIndex++;
                         } while(messagesQuantity != 0);
 
+                        // TODO remove print ?
                         Serial.print("Received message: ");
                         Serial.println((char*)messageBuffor);
 
@@ -657,9 +623,28 @@ void Communication::sendMessageTask() {
         for (uint8_t j = 0; j < 6; j++){
             protocolBuffor[i][j] = msMACAddress[j];
         }
-        // TODO change to IP address
-        // prepare IP address
-        protocolBuffor[i][6] = 255;
+
+        // prepare IP and MAC addresses
+        #ifdef CENTRAL_UNIT
+            for (uint8_t j = 0; j < 6; j++){
+                protocolBuffor[i][j] = msMACAddress[j];
+            }
+            protocolBuffor[i][6] = 1;
+        #else
+            xSemaphoreTake(msAddressDataMutex, portMAX_DELAY);
+            protocolBuffor[i][6] = msIPAddress;
+            if (msIPAddress == 0) {
+                for (uint8_t j = 0; j < 6; j++){
+                    protocolBuffor[i][j] = msMACAddress[j];
+                }
+            } else {
+                for (uint8_t j = 0; j < 6; j++){
+                    protocolBuffor[i][j] = msCentralUnitMACAddress[j];
+                }
+            }
+            xSemaphoreGive(msAddressDataMutex);
+        #endif
+
         // prepare place for message quantity
         protocolBuffor[i][7] = 0;
         // prepare place for message
@@ -742,7 +727,7 @@ void Communication::sendMessageTask() {
                 } else {
                     Serial.println("SENDING MESSAGE ERROR! In sendMessageTask() -> hc12 module is not responding.");
                 }
-                // TODO remove 
+                // TODO remove print
                 // Serial.print("Message ");
                 // Serial.print(i);
                 // Serial.print(": ");
@@ -814,8 +799,31 @@ void Communication::deleteSendMessageTask() {
 // ================================================================
 
 // ========================== Addressing ==========================
-
+#ifdef CENTRAL_UNIT
+// TODO add abortAddressing() and addressingTask()
+void Communication::abortAddressing() {}
+void Communication::addressingTask() {
+    for (;;) {
+        vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+}
+#else
 void Communication::abortAddressing() {
+    // TODO add cleanup
+    // cleanup tmp addresing global (class) variables
+    xSemaphoreTake(msAddressDataMutex, portMAX_DELAY);
+    for (uint8_t i = 0; i < 6; i++) {
+        msCentralUnitMACAddress[i] = 0;
+    }
+    msIPAddress = 0;
+    xSemaphoreGive(msAddressDataMutex);
+    // reset sendMessageTask
+    taskENTER_CRITICAL(&msCriticalSectionMutex);
+    deleteSendMessageTask();
+    createSendMessageTask();
+    taskEXIT_CRITICAL(&msCriticalSectionMutex);
+
+    // prepare message to send
     uint8_t sendBuffor[MESSAGE_SIZE];
     sendBuffor[0] = (uint8_t)'a';
     sendBuffor[1] = (uint8_t)'b';
@@ -826,35 +834,208 @@ void Communication::abortAddressing() {
         sendBuffor[i] = 0;
     }
 
+    // send "abort" message 3 times
     // TODO remove print
     Serial.println("abortAddressing()");
     for (uint8_t i = 0; i < 3; i++) {
         xQueueSend(msSendMessagesQueue, &sendBuffor, portMAX_DELAY);
         vTaskDelay(pdMS_TO_TICKS(200));
     }
+    // Notify - delete Addressing Task
     xTaskNotify(msCommunicationMainTaskHandle, deleteAddressingTaskNotif, eSetValueWithOverwrite);
 }
 
 void Communication::addressingTask() {
-    xTimerStart(msAddressingTimeoutTimer, portMAX_DELAY);
-    vTaskDelay(pdMS_TO_TICKS(6000));
-    xTaskNotify(msCommunicationMainTaskHandle, deleteAddressingTaskNotif, eSetValueWithOverwrite);
+    // start absolute timeout timer
+    xTimerStart(msAddressingAbsoluteTimeoutTimer, portMAX_DELAY);
+    // vTaskDelay(pdMS_TO_TICKS(6000));
+    // xTaskNotify(msCommunicationMainTaskHandle, deleteAddressingTaskNotif, eSetValueWithOverwrite);
+
+    enum ADDRESSING_STAGES : uint8_t {
+        newConnectionRequest = 0,
+        changeRadioChannel,
+        waitForPing,
+        summary,
+        waitForDeletion
+    };
+    uint8_t addressingStage = newConnectionRequest;
+
+    // TODO add message for new connection with real MAC address and without it
+    // 0  new connection - request for new connection
+    // 1  ping - ping
+    // 2  reply ping - replay to ping
+    // 3  abort - abort new connection
+    // 4  summary - after this message central unit will send all data about connection for verification 
+    // 5  ok summary - confirmation for data sent in summary
+    // 6  wrong summary - rejection for data sent in summary
+    // 7  ip [number] - reply for "new connection" with new ip for module. WARNING! [number] have to be set separately!!! 
+    // 8  yes rf channels, yes transmission (without) permission - can change rf channels,   want to       transmit without permission
+    // 9  yes rf channels, no  transmission (without) permission - can change rf channels,   don't want to transmit without permission
+    // 10 no  rf channels, yes transmission (without) permission - can't change rf channels, want to       transmit without permission
+    // 11 no  rf channels, no  transmission (without) permission - can't change rf channels, don't want to transmit without permission
+    const uint8_t MESSAGES[][6] = {
+        {'n', 'e', 'w', 'c', 'o', 'n'}, 
+        {'p', 'i', 'n', 'g', '\0', '\0'}, 
+        {'r', 'e', 'p', 'i', 'n', 'g'}, 
+        {'a', 'b', 'o', 'r', 't', '\0'},
+        {'s', 'u', 'm', 'm', 'a', 'r'},
+        {'o', 'k', 's', 'u', 'm', 'm'},
+        {'w', 'r', 's', 'u', 'm', 'm'},
+        {'i', 'p', '\0', '\0', '\0', '\0'},
+        {'y', 'r', 'c', 'y', 't', 'p'}, 
+        {'y', 'r', 'c', 'n', 't', 'p'}, 
+        {'n', 'r', 'c', 'y', 't', 'p'}, 
+        {'n', 'r', 'c', 'n', 't', 'p'}, 
+    };
+
+    // prepare buffors
+    uint8_t receiveBuffor[MESSAGE_SIZE];
+    // lambda function for clearing buffor
+    auto resetReceiveBuffor = [&]() {
+        for (uint8_t i = 0; i < MESSAGE_SIZE; i++){
+            receiveBuffor[i] = 0;
+        }
+    };
+    resetReceiveBuffor();
+
+    uint8_t lastReceivedMessage[6]; 
+    for (uint8_t i = 0; i < 6; i++){
+        lastReceivedMessage[i] = 0;
+    }
+
+    uint8_t sendBuffor[MESSAGE_SIZE];
+    // lambda function for clearing buffor
+    auto resetSendBuffor = [&]() {
+        for (uint8_t i = 0; i < MESSAGE_SIZE; i++){
+            sendBuffor[i] = 0;
+        }
+    };
+    resetSendBuffor();
+
+
+    uint8_t attemptsCounter = 0;
     for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(100));
+        attemptsCounter++;
+        if (attemptsCounter > ADDRESSING_MAX_ATTEMPTS) {
+            xTimerStop(msAddressingAbsoluteTimeoutTimer, portMAX_DELAY);
+            Serial.println("ADDRESSING ERROR! In addressingTask() -> exceeded max number of new connection attempts.");
+            xTaskNotify(msCommunicationMainTaskHandle, deleteAddressingTaskWithAbortNotif, eSetValueWithOverwrite);
+            addressingStage = waitForDeletion;
+        }
+
+        switch (addressingStage) {
+            case newConnectionRequest:
+                // send "newcon" message
+                for (uint8_t i = 0; i < 6; i++) {
+                    // MESSAGES[0] = "newcon"
+                    sendBuffor[i] = MESSAGES[0][i];
+                }
+                xTaskNotify(msCommunicationMainTaskHandle, readRawMessageNotif, eSetValueWithOverwrite);
+                xQueueSend(msSendMessagesQueue, &sendBuffor, portMAX_DELAY);
+                resetSendBuffor();
+
+                // wait for response from central unit
+                if (xQueueReceive(msReceiveMessageQueue, receiveBuffor, pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT)) == pdTRUE) {
+                    // TODO add check is good message
+                    // TODO add saving last received message
+
+                    // set "IP" address and central unit's MAC address
+                    /* raw message: [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}] =>
+                       central unit should respond {mac1}{mac2}{mac3}{mac4}{mac5}{mac6}{'1'}{'0'}{'i'}{'p'}{new "IP" address}... =>
+                       new "IP" - receiveBuffor[10] */
+                    xSemaphoreTake(msAddressDataMutex, portMAX_DELAY);
+                    for (uint8_t i = 0; i < 6; i++) {
+                        msCentralUnitMACAddress[i] = receiveBuffor[i];
+                    }
+                    msIPAddress = receiveBuffor[10];
+                    xSemaphoreGive(msAddressDataMutex);
+
+                    // reset sendMessageTask
+                    taskENTER_CRITICAL(&msCriticalSectionMutex);
+                    deleteSendMessageTask();
+                    createSendMessageTask();
+                    taskEXIT_CRITICAL(&msCriticalSectionMutex);
+
+                    // TODO remove print
+                    Serial.print("respond from central unit: ");
+                    for (uint8_t i = 0; i < 16; i++) {
+                        Serial.print(receiveBuffor[i]);
+                        Serial.print(' ');
+                    }
+                    Serial.println();
+
+                    // go to next stage
+                    #ifdef RF_CHANNELS
+                        addressingStage = changeRadioChannel;
+                    #else
+                        #error "ifndef RF_CHANNELS not implemented!"
+                    #endif
+                    resetReceiveBuffor();
+                    attemptsCounter = 0;
+                } 
+                // TODO remove print
+                else {
+                    Serial.println("NEW CONNECTION ERROR! In addressingTask() -> central unit is not responding.");
+                }
+                break;
+
+            case changeRadioChannel:
+                vTaskDelay(pdMS_TO_TICKS(50));
+                #ifdef TRANSMISSION_WITHOUT_PERMISSION
+                    for (uint8_t i = 0; i < 6; i++) {
+                        // MESSAGES[8] = "yrcytp"
+                        sendBuffor[8] = MESSAGES[8][i];
+                    }
+                #else
+                    for (uint8_t i = 0; i < 6; i++) {
+                        // MESSAGES[9] = "yrcntp"
+                        sendBuffor[9] = MESSAGES[9][i];
+                    }
+                #endif
+                xQueueSend(msSendMessagesQueue, sendBuffor, portMAX_DELAY);
+                resetSendBuffor();
+
+                Serial.println("add changeRadioChannel...");
+                vTaskDelay(pdMS_TO_TICKS(1000));
+                break;
+
+            case waitForDeletion: 
+                for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
+                break;
+
+            default:
+                Serial.print("STATUS ERROR! In communicationMainTask() -> got unknow addressingStage. Received addressingStage: ");
+                Serial.println(addressingStage);
+                break;
+        }
     }
 }
-
-// #error "implement void Communication::addressingTask() "
-// #ifdef CENTRAL_UNIT
-// void Communication::addressingTask() {
-//     enum addresingStageEnum : uint8_t {
-//         newConnection = 0,
-//         newRFChannel = 1,
-//         changeRFChannel = 2,
-//         summation = 3,
-//         oldConfiguration = 4
+#endif
+//     // 0 new connection - request for new connection
+//     // 1 ping - ping
+//     // 2 reply ping - replay to ping
+//     // 3 abort - abort new connection
+//     // 4 summary - after this message central unit will send all data about connection for verification 
+//     // 5 ok summary - confirmation for data sent in summary
+//     // 6 wrong summary - rejection for data sent in summary
+//     // n yes rf channels, yes transition (without) permission - can change rf channels,   want to       transmit without permission
+//     // n yes rf channels, no  transition (without) permission - can change rf channels,   don't want to transmit without permission
+//     // n no  rf channels, yes transition (without) permission - can't change rf channels, want to       transmit without permission
+//     // n no  rf channels, no  transition (without) permission - can't change rf channels, don't want to transmit without permission
+//     const uint8_t MESSAGES[][6] = {
+//         {'n', 'e', 'w', 'c', 'o', 'n'}, 
+//         {'p', 'i', 'n', 'g', '\0', '\0'}, 
+//         {'r', 'e', 'p', 'i', 'n', 'g'}, 
+//         {'a', 'b', 'o', 'r', 't', '\0'},
+//         {'s', 'u', 'm', 'm', 'a', 'r'},
+//         {'o', 'k', 's', 'u', 'm', 'm'},
+//         {'w', 'r', 's', 'u', 'm', 'm'},
+//         {'y', 'r', 'c', 'y', 't', 'p'}, 
+//         {'y', 'r', 'c', 'n', 't', 'p'}, 
+//         {'n', 'r', 'c', 'y', 't', 'p'}, 
+//         {'n', 'r', 'c', 'n', 't', 'p'}, 
 //     };
-//     uint8_t addresingStage = addresingStageEnum::newConnection;
+
 //     // 0 new connection - request for new connection
 //     // 1 ping - ping
 //     // 2 reply ping - replay to ping
@@ -881,214 +1062,12 @@ void Communication::addressingTask() {
 //         {'n', 'r', 'c', 'y', 't', 'p'}, 
 //         {'n', 'r', 'c', 'n', 't', 'p'}, 
 //     };
-//     uint8_t attemptCounter = 0;
-
-//     // prepare receive buffor
-//     uint8_t receiveBuffor[MESSAGE_SIZE];
-//     for (uint8_t i = 0; i < MESSAGE_SIZE; i++){
-//         receiveBuffor[i] = 0;
-//     }
-
-//     // prepare send buffor
-//     uint8_t sendBuffor[MESSAGE_SIZE];
-//     for (uint8_t i = 0; i < MESSAGE_SIZE; i++){
-//         sendBuffor[i] = 0;
-//     }
-//     // // lambda function for setting message in sendBuffor
-//     // auto setSendBuffor = [&](uint8_t* message) {
-//     //     for (uint8_t i = 0; i < 6; i++){
-//     //         sendBuffor[i] = message[i];
-//     //     }
-//     // };
-    
-//     xTimerStart(msAddressingTimeoutTimer, portMAX_DELAY);
-//     for(;;) {
-//         if (attemptCounter > ADDRESSING_MAX_ATTEMPTS) {
-//             Serial.println("CONNECTION ERROR! In addressingTask() -> Exceeded max number of connection attempts");
-//             // TODO add CONNECTION ERROR DebugLED blink
-//             for (uint8_t i = 0; i < 6; i++){
-//                 sendBuffor[i] = MESSAGES[3][i];
-//             }
-//             for (uint8_t i = 0; i < 3; i++) {
-//                 xQueueSend(msSendMessagesQueue, &sendBuffor, portMAX_DELAY);
-//                 vTaskDelay(pdMS_TO_TICKS(300));
-//             }
-//             deleteAddressingTask();
-//         } else {
-//             attemptCounter++;
-
-//             switch (addresingStage) {
-//                 case addresingStageEnum::newConnection:
-//                     for (uint8_t i = 0; i < 6; i++){
-//                         sendBuffor[i] = MESSAGES[0][i];
-//                     }
-//                     xTaskNotify(msReceiveMessageTaskHandle, mCommunicationMainNotifications::readRawMessage, eSetValueWithOverwrite);
-//                     if (xQueueReceive(msReceiveMessageQueue, &receiveBuffor, pdMS_TO_TICKS(ADDRESSING_ABSOLUTE_TIMEOUT)) == pdTRUE) {
-//                         Serial.println("addresingStageEnum::newConnection");
-//                         Serial.print("last rec message: ");
-//                         for (uint8_t i = 0; i < 16; i++) {
-//                             Serial.print(receiveBuffor[i]);
-//                             Serial.print(' ');
-//                         }
-//                         Serial.println();
-//                         for (uint8_t i = 0; i < 6; i++){
-//                             sendBuffor[i] = MESSAGES[7][i];
-//                         }
-//                         sendBuffor[2] = 'T';
-//                         vTaskDelay(pdMS_TO_TICKS(25));
-//                         xQueueSend(msSendMessagesQueue, &sendBuffor, portMAX_DELAY);
-
-//                         // #ifdef RF_CHANNELS
-//                         //     addresingStage = addresingStageEnum::newRFChannel;
-//                         // #else
-//                         //     addresingStage = addresingStageEnum::summation;
-//                         // #endif
-//                         attemptCounter = 0;
-//                     }
-//                     break;
-                
-//                 case addresingStageEnum::newRFChannel:
-//                     vTaskDelay(pdMS_TO_TICKS(5000));
-//                     // Serial.println("addresingStageEnum::newRFChannel");
-//                     // Serial.print("last rec message: ");
-//                     // for (uint8_t i = 0; i < 16; i++) {
-//                     //     if (receiveBuffor[i] == '\0') {
-//                     //         break;
-//                     //     }
-//                     //     Serial.print(receiveBuffor[i]);
-//                     //     Serial.print(' ');
-//                     // }
-//                     // Serial.println();
-//                     attemptCounter = 255;
-//                     break;
-                
-//                 default:
-//                     Serial.print("ADDRESING STAGE ERROR! In addressingTask() -> unknow addresingStage. AddresingStage: ");
-//                     Serial.println(addresingStage);
-//                     break;
-//             }
-//         }
-//     }
-// }
-// #else
-// void Communication::addressingTask() {
-//     enum addresingStageEnum : uint8_t {
-//         newConnection = 0,
-//         newRFChannel = 1,
-//         changeRFChannel = 2,
-//         summation = 3,
-//         oldConfiguration = 4
-//     };
-//     uint8_t addresingStage = addresingStageEnum::newConnection;
-//     // 0 new connection - request for new connection
-//     // 1 ping - ping
-//     // 2 reply ping - replay to ping
-//     // 3 abort - abort new connection
-//     // 4 summary - after this message central unit will send all data about connection for verification 
-//     // 5 ok summary - confirmation for data sent in summary
-//     // 6 wrong summary - rejection for data sent in summary
-//     // n yes rf channels, yes transition (without) permission - can change rf channels,   want to       transmit without permission
-//     // n yes rf channels, no  transition (without) permission - can change rf channels,   don't want to transmit without permission
-//     // n no  rf channels, yes transition (without) permission - can't change rf channels, want to       transmit without permission
-//     // n no  rf channels, no  transition (without) permission - can't change rf channels, don't want to transmit without permission
-//     const uint8_t MESSAGES[][6] = {
-//         {'n', 'e', 'w', 'c', 'o', 'n'}, 
-//         {'p', 'i', 'n', 'g', '\0', '\0'}, 
-//         {'r', 'e', 'p', 'i', 'n', 'g'}, 
-//         {'a', 'b', 'o', 'r', 't', '\0'},
-//         {'s', 'u', 'm', 'm', 'a', 'r'},
-//         {'o', 'k', 's', 'u', 'm', 'm'},
-//         {'w', 'r', 's', 'u', 'm', 'm'},
-//         {'y', 'r', 'c', 'y', 't', 'p'}, 
-//         {'y', 'r', 'c', 'n', 't', 'p'}, 
-//         {'n', 'r', 'c', 'y', 't', 'p'}, 
-//         {'n', 'r', 'c', 'n', 't', 'p'}, 
-//     };
-//     uint8_t attemptCounter = 0;
-
-//     // prepare receive buffor
-//     uint8_t receiveBuffor[MESSAGE_SIZE];
-//     for (uint8_t i = 0; i < MESSAGE_SIZE; i++){
-//         receiveBuffor[i] = 0;
-//     }
-
-//     // prepare send buffor
-//     uint8_t sendBuffor[MESSAGE_SIZE];
-//     for (uint8_t i = 0; i < MESSAGE_SIZE; i++){
-//         sendBuffor[i] = 0;
-//     }
-//     // // lambda function for setting message in sendBuffor
-//     // auto setSendBuffor = [&](uint8_t* message) {
-//     //     for (uint8_t i = 0; i < 6; i++){
-//     //         sendBuffor[i] = message[i];
-//     //     }
-//     // };
-    
-//     xTimerStart(msAddressingTimeoutTimer, portMAX_DELAY);
-//     for(;;) {
-//         if (attemptCounter > ADDRESSING_MAX_ATTEMPTS) {
-//             Serial.println("CONNECTION ERROR! In addressingTask() -> Exceeded max number of connection attempts");
-//             // TODO add CONNECTION ERROR DebugLED blink
-//             for (uint8_t i = 0; i < 6; i++){
-//                 sendBuffor[i] = MESSAGES[3][i];
-//             }
-//             for (uint8_t i = 0; i < 3; i++) {
-//                 xQueueSend(msSendMessagesQueue, &sendBuffor, portMAX_DELAY);
-//                 vTaskDelay(pdMS_TO_TICKS(300));
-//             }
-//             deleteAddresingTimer();
-//             mspDebugLED->deletePairingBlinkTask();
-//             msAddressingTaskHandle = NULL;
-//             vTaskDelay(pdMS_TO_TICKS(100));
-//             vTaskDelete(NULL);
-//         } else {
-//             attemptCounter++;
-
-//             switch (addresingStage) {
-//                 case addresingStageEnum::newConnection:
-//                     for (uint8_t i = 0; i < 6; i++){
-//                         sendBuffor[i] = MESSAGES[0][i];
-//                     }
-//                     xTaskNotify(msReceiveMessageTaskHandle, mCommunicationMainNotifications::readRawMessage, eSetValueWithOverwrite);
-//                     Serial.println("sending newcon");
-//                     xQueueSend(msSendMessagesQueue, &sendBuffor, portMAX_DELAY);
-//                     if (xQueueReceive(msReceiveMessageQueue, &receiveBuffor, pdMS_TO_TICKS(ADDRESSING_MESSAGE_TIMEOUT)) == pdTRUE) {
-//                         Serial.println("xQueueReceive addresingStage");
-//                         #ifdef RF_CHANNELS
-//                             addresingStage = addresingStageEnum::newRFChannel;
-//                         #else
-//                             addresingStage = addresingStageEnum::summation;
-//                         #endif
-//                         attemptCounter = 0;
-//                     }
-//                     break;
-                
-//                 case addresingStageEnum::newRFChannel:
-//                     Serial.println("addresingStageEnum::newRFChannel");
-//                     Serial.print("last rec message: ");
-//                     for (uint8_t i = 0; i < 16; i++) {
-//                         Serial.print(receiveBuffor[i]);
-//                         Serial.print(' ');
-//                     }
-//                     Serial.println();
-//                     attemptCounter = 255;
-//                     break;
-                
-//                 default:
-//                     Serial.print("ADDRESING STAGE ERROR! In addressingTask() -> unknow addresingStage. AddresingStage: ");
-//                     Serial.println(addresingStage);
-//                     break;
-//             }
-//         }
-//     }
-// }
-// #endif
 void Communication::createAddressingTaskHandle(void *parameters) {
     Communication* instance = static_cast<Communication*>(parameters);
     instance->addressingTask();
 }
 void Communication::createAddressingTask() {
-    createAddresingTimer();
+    createAddresingTimers();
     mspDebugLED->createPairingBlinkTask();
     // TODO remove print
     Serial.println("createAddressingTask()");
@@ -1106,7 +1085,7 @@ void Communication::createAddressingTask() {
     }
 }
 void Communication::deleteAddressingTask() {
-    deleteAddresingTimer();
+    deleteAddresingTimers();
     // TODO remove print
     Serial.println("deleteAddressingTask()");
     mspDebugLED->deletePairingBlinkTask();
@@ -1230,27 +1209,43 @@ void Communication::deleteCommunicationTimers() {
 }
 
 
-void Communication::addressingTimeoutTimerCallback(TimerHandle_t xTimer) {
-    // TODO remove print
-    Serial.println("Addressing Timeout Callback");
-    xTaskNotify(msCommunicationMainTaskHandle, deleteAddressingTaskWithAbortNotif, eSetValueWithOverwrite);
+void Communication::addressingTimersCallbacks(TimerHandle_t xTimer) {
+    if (xTimer == msAddressingAbsoluteTimeoutTimer) {
+        xTaskNotify(msCommunicationMainTaskHandle, deleteAddressingTaskWithAbortNotif, eSetValueWithOverwrite);
+    } 
+    // else if (xTimer == msAddressingMessageTimeoutTimer) {
+    //     xTaskNotify(msCommunicationMainTaskHandle, addressingMessageTimeoutNotif, eSetValueWithOverwrite);
+    // }
 }
-void Communication::createAddresingTimer() {
-    if (msAddressingTimeoutTimer == NULL) {
-        msAddressingTimeoutTimer = xTimerCreate(
-            "Addressing Timeout",
+void Communication::createAddresingTimers() {
+    if (msAddressingAbsoluteTimeoutTimer == NULL) {
+        msAddressingAbsoluteTimeoutTimer = xTimerCreate(
+            "Addressing Absolute Timeout",
             pdMS_TO_TICKS(ADDRESSING_ABSOLUTE_TIMEOUT), 
             pdFALSE,
             NULL,
-            addressingTimeoutTimerCallback
+            addressingTimersCallbacks
         );
     }
+    // if (msAddressingMessageTimeoutTimer == NULL) {
+    //     msAddressingMessageTimeoutTimer = xTimerCreate(
+    //         "Addressing Message Timeout",
+    //         pdMS_TO_TICKS(ADDRESSING_ABSOLUTE_TIMEOUT), 
+    //         pdFALSE,
+    //         NULL,
+    //         addressingTimersCallbacks
+    //     );
+    // }
 }
-void Communication::deleteAddresingTimer() {
-    if (msAddressingTimeoutTimer != NULL) {
-        xTimerDelete(msAddressingTimeoutTimer, portMAX_DELAY);
-        msAddressingTimeoutTimer = NULL;
+void Communication::deleteAddresingTimers() {
+    if (msAddressingAbsoluteTimeoutTimer != NULL) {
+        xTimerDelete(msAddressingAbsoluteTimeoutTimer, portMAX_DELAY);
+        msAddressingAbsoluteTimeoutTimer = NULL;
     }
+    // if (msAddressingMessageTimeoutTimer != NULL) {
+    //     xTimerDelete(msAddressingMessageTimeoutTimer, portMAX_DELAY);
+    //     msAddressingMessageTimeoutTimer = NULL;
+    // }
 }
 // ================================================================
 

@@ -64,9 +64,9 @@ private:
     static void createCommunicationTimers();
     static void deleteCommunicationTimers();
     
-    static void addressingTimeoutTimerCallback(TimerHandle_t xTimer);
-    static void createAddresingTimer();
-    static void deleteAddresingTimer();
+    static void addressingTimersCallbacks(TimerHandle_t xTimer);
+    static void createAddresingTimers();
+    static void deleteAddresingTimers();
 
     static void setupHC12Task(void *parameters);
     // static void createSetupHC12TaskHandle(void *parameters);
@@ -78,6 +78,8 @@ private:
     static void resetLastMessage();
     static bool isRepeatMessage(uint8_t *message, uint8_t size);
 
+    static portMUX_TYPE msCriticalSectionMutex;
+
     // enum class TimeoutStatus : uint32_t {
     //     noTimeout = 0,
     //     charTimeout = 1,
@@ -88,6 +90,7 @@ private:
     static DebugLED *mspDebugLED;
 
     static uint8_t msLastMessage[64]; // MESSAGE_SIZE
+
     static SemaphoreHandle_t msLastMessageMutex;
 
     typedef enum : uint32_t {
@@ -101,6 +104,7 @@ private:
         createAddressingTaskNotif,
         deleteAddressingTaskNotif,
         deleteAddressingTaskWithAbortNotif,
+        // addressingMessageTimeoutNotif,
         createSetupHC12TaskNotif,
         deleteSetupHC12TaskNotif,
     } mCommunicationMainNotifications;
@@ -129,8 +133,11 @@ private:
     static TimerHandle_t msSuspendReceiveMessageTimer;
     static TimerHandle_t msSuspendSendMessageTimer;
     
-    static TimerHandle_t msAddressingTimeoutTimer;
+    static TimerHandle_t msAddressingAbsoluteTimeoutTimer;
+    static TimerHandle_t msAddressingMessageTimeoutTimer;
 
+    // IP = 0 unassigned IP
+    // IP = 1 central unit's IP
     #ifdef CENTRAL_UNIT
         struct Routing {
             uint8_t MACAddress[6];
@@ -139,6 +146,7 @@ private:
         };
         static struct Routing msRoutingTable[255];
     #else
+        static SemaphoreHandle_t msAddressDataMutex;
         static uint8_t msCentralUnitMACAddress[6];
         static uint8_t msIPAddress;
     #endif
