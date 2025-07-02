@@ -10,7 +10,7 @@
 namespace ba = boost::asio;
 namespace bip = boost::asio::ip;
 
-namespace SmartHome {
+namespace SmartHome::IPC {
     class TcpServer {
     public:
         static TcpServer &Instance();
@@ -40,23 +40,6 @@ namespace SmartHome {
 
         std::atomic<bool> mTcpServerInitialized{false};
         std::atomic<bool> mTcpServerRunning{false};
-
-    };
-
-
-    class TcpConnection : public std::enable_shared_from_this<TcpConnection>{
-    public:
-        TcpConnection(ba::io_context &ioContext);
-        ~TcpConnection();
-
-        bip::tcp::socket &getSocket();
-
-        void read();
-
-    private:
-
-        bip::tcp::socket mSocket;
-        ba::streambuf mStreamBuf;
     };
 }
 #endif //SMART_HOME_TCP_SERVER_H

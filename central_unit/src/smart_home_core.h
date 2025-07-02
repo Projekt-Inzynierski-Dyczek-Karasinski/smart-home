@@ -8,7 +8,7 @@
 
 #include <boost/asio.hpp>
 
-#include "smart_home_tcp_server.h"
+#include "ipc/smart_home_tcp_server.h"
 
 namespace ba = boost::asio;
 namespace bs = boost::system;

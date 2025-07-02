@@ -1,5 +1,5 @@
 #include "smart_home_core.h"
-#include "smart_home_tcp_server.h"
+#include "ipc/smart_home_tcp_server.h"
 
 #include <chrono>
 #include <iostream>
@@ -54,7 +54,7 @@ namespace SmartHome {
         std::cout << "Tcp threads: " << numTcpServerThreads << std::endl;
         std::cout << "Signal thread" << std::endl;
 
-        TcpServer::Instance();
+        IPC::TcpServer::Instance();
 
         //TODO load config
         //TODO handle config
@@ -85,7 +85,7 @@ namespace SmartHome {
         });
 
         // Start tcp server
-        auto &tcpServer = TcpServer::Instance();
+        auto &tcpServer = IPC::TcpServer::Instance();
         if (tcpServer.startTcpServer(&mTcpServerIoContext) == false) {
             //TODO pass port from config
             std::cerr << "Error tcp server failed to start" << std::endl;
@@ -130,7 +130,7 @@ namespace SmartHome {
 
         // Stop tcp server
         std::cout << "Stopping tcp server" << std::endl;
-        auto &tcpServer = TcpServer::Instance();
+        auto &tcpServer = IPC::TcpServer::Instance();
         if (tcpServer.isRunning()) {
             tcpServer.stopTcpServer();
         }

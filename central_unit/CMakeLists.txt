@@ -50,7 +50,8 @@ find_package(Boost 1.74 REQUIRED COMPONENTS
 add_executable(SmartHome
         src/main.cpp
         src/smart_home_core.cpp
-        src/smart_home_tcp_server.cpp
+        src/ipc/smart_home_tcp_server.cpp
+        src/ipc/smart_home_tcp_connection.cpp
 )
 add_executable(ModuleMediator
         src/module_mediator.cpp
