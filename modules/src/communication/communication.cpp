@@ -430,9 +430,12 @@ void Communication::receiveMessageTask() {
                         xQueueReset(msReceiveByteQueue);
                     }
                     // if MAC or IP is incorrect 
-                    // TODO add check for MAC and IP addresses !!! REMEMBER ABOUT MUTEX - msAddressDataMutex !!!
-                    else if (false) {
-                        // TODO add what should happen if MAC or IP is incorrect 
+                    else if (!isProperMACAndIP(protocolBuffor[pbMessageIndex], protocolBuffor[pbMessageIndex][6])) {
+                        #ifdef CENTRAL_UNIT
+                            Serial.println("CRITICAL ERROR! In receiveMessageTask() -> isProperMACAndIP() must never return false for CENTRAL_UNIT"); 
+                        #else
+                            resetProtocolBuffor();
+                        #endif
                     }
                     // if entire message is not ready (message quantity)
                     else if (protocolBuffor[pbMessageIndex][7] != 0) {
@@ -1308,4 +1311,32 @@ bool Communication::isRepeatMessage(uint8_t *message, uint8_t size) {
 
     return true;
 }
+
+#ifdef CENTRAL_UNIT
+bool Communication::isProperMACAndIP(uint8_t *mac, uint8_t ip) {
+    return true;
+}
+#else
+bool Communication::isProperMACAndIP(uint8_t *mac, uint8_t ip) {
+    bool result = false;
+
+    xSemaphoreTake(msAddressDataMutex, portMAX_DELAY);
+    if (msIPAddress == 0) {
+        result = true;
+    } else if (ip == msIPAddress) {
+        result = true;
+        for (uint8_t i = 0; i < 6; i++) {
+            if (mac[i] != msCentralUnitMACAddress[i]) {
+                result = false;
+                break;
+            }
+        }
+    } else {
+        result = false;
+    }
+    xSemaphoreGive(msAddressDataMutex);
+
+    return result;
+}
+#endif
 // ================================================================

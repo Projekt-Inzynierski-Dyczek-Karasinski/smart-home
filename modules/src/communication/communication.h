@@ -77,6 +77,7 @@ private:
     static void setLastMessage(uint8_t *message, uint8_t size);
     static void resetLastMessage();
     static bool isRepeatMessage(uint8_t *message, uint8_t size);
+    static bool isProperMACAndIP(uint8_t *mac, uint8_t ip);
 
     static portMUX_TYPE msCriticalSectionMutex;
 
