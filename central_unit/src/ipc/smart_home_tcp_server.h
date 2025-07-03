@@ -19,7 +19,7 @@ namespace SmartHome::IPC {
 
         TcpServer &operator=(const TcpServer &) = delete;
 
-        bool startTcpServer(ba::io_context *ioContext, unsigned short port = 43321);
+        bool startTcpServer(ba::io_context *ioContext, const std::string &address, const unsigned short &port);
 
 
         void runTcpServer(ba::io_context *ioContext);
@@ -35,7 +35,11 @@ namespace SmartHome::IPC {
 
         void startAsyncAccept(ba::io_context *ioContext);
 
+
         std::unique_ptr<bip::tcp::acceptor> mpAcceptor;
+
+        std::string mEndpointAddress;
+        int mEndpointPort;
         bip::tcp::endpoint mEndpoint;
 
         std::atomic<bool> mTcpServerInitialized{false};

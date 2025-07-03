@@ -20,12 +20,12 @@ namespace SmartHome::IPC {
         }
     }
 
-    bool TcpServer::startTcpServer(ba::io_context *ioContext, unsigned short port) {
+    bool TcpServer::startTcpServer(ba::io_context *ioContext, const std::string &address, const unsigned short &port) {
         try {
-            mEndpoint = bip::tcp::endpoint(bip::tcp::v4(), port);
+            mEndpoint = bip::tcp::endpoint(bip::make_address(address), port);
             mpAcceptor = std::make_unique<bip::tcp::acceptor>(*ioContext, mEndpoint);
             mTcpServerInitialized.store(true);
-            std::cout << "Server started on port: " << port << std::endl;
+            std::cout << "Server started on " << address << ":" << port << std::endl;
             return true;
         } catch (std::exception &e) {
             std::cerr << "Error during server start: " << e.what() << std::endl;

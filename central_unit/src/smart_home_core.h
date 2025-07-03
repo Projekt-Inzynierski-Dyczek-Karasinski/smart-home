@@ -16,13 +16,20 @@ namespace bs = boost::system;
 namespace SmartHome {
     class Core {
     public:
+        struct Config {
+            bool tcpServerEnabled = true;
+            std::string tcpServerEndpointAddress = "127.0.0.1";
+            int tcpServerEndpointPort = 43321;
+            int tcpServerThreads = -1;
+        };
+
         static Core &Instance();
 
         Core(const Core &) = delete;
 
         Core &operator=(const Core &) = delete;
 
-        bool initialize();
+        bool initialize(const Config &configStruct);
 
         void run();
 
@@ -34,6 +41,8 @@ namespace SmartHome {
         ~Core();
 
         void signalHandler(const bs::error_code &ec, int signal);
+
+        Config mConfig;
 
         ba::io_context mTcpServerIoContext;
         std::optional<ba::thread_pool> mTcpServerThreadPool;

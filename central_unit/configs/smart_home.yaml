@@ -1,0 +1,15 @@
+core:
+  mode: "headless"  #TODO add kiosk gui
+  log_level: "debug" #TODO implement verbose levels
+  ipc:
+    tcp_server:
+      enabled: true
+      address: "127.0.0.1"
+      port: 43321
+      threads: -1 # -1: half CPU cores, 0: all CPU cores, n >= 1: exact thread count
+
+services:
+  mediator:
+    enabled: false
+    config_path: "../../configs/mediator.yaml" #TODO change path to global install
+

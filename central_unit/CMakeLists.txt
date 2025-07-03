@@ -47,14 +47,19 @@ find_package(Boost 1.74 REQUIRED COMPONENTS
         chrono
 )
 
+# Yaml-cpp required
+find_package(yaml-cpp REQUIRED)
+
 add_executable(SmartHome
         src/main.cpp
         src/smart_home_core.cpp
         src/ipc/smart_home_tcp_server.cpp
         src/ipc/smart_home_tcp_connection.cpp
+        src/smart_home_config.cpp
 )
 add_executable(ModuleMediator
         src/module_mediator.cpp
+        src/smart_home_config.cpp
 )
 
 
@@ -64,6 +69,9 @@ target_link_libraries(SmartHome PRIVATE
         Boost::filesystem
         Boost::program_options
         Boost::chrono
+
+        yaml-cpp
+
         pthread
 )
 
