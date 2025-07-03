@@ -42,6 +42,8 @@ private:
     static void createSendMessageTask();
     static void deleteSendMessageTask();
 
+    static bool isAbortAddressing(uint8_t *message);
+    static void sendAbortMessage();
     static void abortAddressing();
     static void addressingTask();
     static void createAddressingTaskHandle(void *parameters);
@@ -79,13 +81,29 @@ private:
     static bool isRepeatMessage(uint8_t *message, uint8_t size);
     static bool isProperMACAndIP(uint8_t *mac, uint8_t ip);
 
+    typedef enum : uint32_t {
+        defaultStatusNotif = 0,
+        // hc12 timeouts
+        byteTimeoutNotif,
+        messageTimeoutNotif,
+        // sending task
+        sendingTaskWaitingNotif,
+        // suspending notifications
+        suspendReceiveMessageTaskNotif,
+        suspendSendMessageTaskNotif,
+        // addressing notifications
+        readRawMessageNotif,
+        createAddressingTaskNotif,
+        deleteAddressingTaskNotif,
+        abortAddressingNotif,
+        abortAddressingWithAbortMessageNotif,
+        createSetupHC12TaskNotif,
+        deleteSetupHC12TaskNotif,
+    } mCommunicationMainNotifications;
+
+
     static portMUX_TYPE msCriticalSectionMutex;
 
-    // enum class TimeoutStatus : uint32_t {
-    //     noTimeout = 0,
-    //     charTimeout = 1,
-    //     messageTimeout = 2
-    // };
     static uint8_t msMACAddress[6];
     static HardwareSerial *mspSerial;
     static DebugLED *mspDebugLED;
@@ -94,34 +112,13 @@ private:
 
     static SemaphoreHandle_t msLastMessageMutex;
 
-    typedef enum : uint32_t {
-        defaultStatusNotif = 0,
-        sendingTaskWaitingNotif,
-        byteTimeoutNotif,
-        messageTimeoutNotif,
-        readRawMessageNotif,
-        suspendReceiveMessageTaskNotif,
-        suspendSendMessageTaskNotif,
-        createAddressingTaskNotif,
-        deleteAddressingTaskNotif,
-        deleteAddressingTaskWithAbortNotif,
-        // addressingMessageTimeoutNotif,
-        createSetupHC12TaskNotif,
-        deleteSetupHC12TaskNotif,
-    } mCommunicationMainNotifications;
 
-    // typedef enum : uint32_t {
-    //     defaultStatus = 0,
-    //     addressingTimeout = 1,
-    // } mAddressingNotificationStatus;
-    // typedef Communication::TimeoutStatus TimeoutStatus_t;
-    static TaskHandle_t msCommunicationMainTaskHandle;
-    
 
     static QueueHandle_t msReceiveMessageQueue;
     static QueueHandle_t msReceiveByteQueue;
     static QueueHandle_t msSendMessagesQueue;
-
+    
+    static TaskHandle_t msCommunicationMainTaskHandle;
     static TaskHandle_t msReceiveMessageTaskHandle;
     // TODO remove "sendCustomMessage" methods
     static TaskHandle_t msSendCustomMessageTaskHandle;
