@@ -2,6 +2,7 @@
 #include "smart_home_config.h"
 
 #include <iostream>
+
 #include <boost/process.hpp>
 #include <boost/program_options.hpp>
 

@@ -1,6 +1,7 @@
 #include "smart_home_config.h"
 
 #include <iostream>
+
 #include <yaml-cpp/yaml.h>
 
 namespace SmartHome::Utils {

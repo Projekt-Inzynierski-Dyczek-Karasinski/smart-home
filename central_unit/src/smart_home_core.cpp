@@ -1,4 +1,5 @@
 #include "smart_home_core.h"
+#include "smart_home_config.h"
 #include "ipc/smart_home_tcp_server.h"
 
 #include <chrono>
@@ -8,7 +9,6 @@
 
 #include <boost/asio.hpp>
 
-#include "smart_home_config.h"
 
 namespace ba = boost::asio;
 namespace bip = boost::asio::ip;

@@ -1,9 +1,10 @@
+#include "smart_home_tcp_connection.h"
+
 #include <cstddef>
 #include <iosfwd>
 #include <iostream>
 #include <string>
 
-#include "smart_home_tcp_connection.h"
 
 namespace bs = boost::system;
 

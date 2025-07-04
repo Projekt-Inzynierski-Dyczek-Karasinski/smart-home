@@ -1,4 +1,7 @@
 #pragma once
+
+#include "ipc/smart_home_tcp_server.h"
+
 #include <atomic>
 #include <memory>
 #include <optional>
@@ -7,7 +10,6 @@
 
 #include <boost/asio.hpp>
 
-#include "ipc/smart_home_tcp_server.h"
 
 namespace ba = boost::asio;
 namespace bs = boost::system;
