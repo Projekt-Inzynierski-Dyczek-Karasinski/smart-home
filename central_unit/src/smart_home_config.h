@@ -10,7 +10,7 @@
 
 namespace SmartHome::Utils {
     /**
-     * @brief YAML configuration manager for smart home system
+     * @brief YAML configuration manager for smart home system.
      *
      * @details Thread-safe singleton allowing type-safe access to
      *          configuration values using dot notation.
@@ -18,12 +18,12 @@ namespace SmartHome::Utils {
     class Config {
     public:
         /**
-         * @brief Get singleton instance of Config
+         * @brief Get singleton instance of Config.
          *
          * @details Thread-safe initialization using static local variable.
          *          Instance is created on first call and reused after.
          *
-         * @return Reference to Config singleton instance
+         * @return Reference to Config singleton instance.
          */
         static Config &Instance();
 
@@ -34,22 +34,22 @@ namespace SmartHome::Utils {
         Config &operator=(const Config &) = delete;
 
         /**
-         * @brief Loads config file from YAML file
+         * @brief Loads config file from YAML file.
          *
-         * @param configPath Path to YAML configuration file
-         * @return true if loaded successfully, false on error
+         * @param configPath Path to YAML configuration file.
+         * @return true if loaded successfully, false on error.
          */
         bool loadConfig(const std::string &configPath);
 
         /**
-         * @brief Get typed value from configuration
+         * @brief Get typed value from configuration.
          *
          * @details Retrieves values using dot notation path.
          *          Creates a copy of config node to avoid modifying original config.
          *
-         * @tparam T Target type (must be YAML compatible)
-         * @param valuePath Dot separated path to value ("root.branch.leaf")
-         * @return Value if found, nullopt otherwise
+         * @tparam T Target type (must be YAML compatible).
+         * @param valuePath Dot separated path to value ("root.branch.leaf").
+         * @return Value if found, nullopt otherwise.
          *
          * @code
          *  auto item = config.getValue<int>("root.branch.leaf");
@@ -85,14 +85,14 @@ namespace SmartHome::Utils {
         }
 
         /**
-        * @brief Get value and store in reference
+        * @brief Get value and store in reference.
         *
-        * @details Overload that modifies parameter only if value exists
+        * @details Overload that modifies parameter only if value exists.
         *          Original value is preserved if path or value not found.
         *
-        * @tparam T Target type (must be YAML compatible)
-        * @param valuePath Dot separated path to value ("root.branch.leaf")
-        * @param value Reference to store result (unchanged if not found)
+        * @tparam T Target type (must be YAML compatible).
+        * @param valuePath Dot separated path to value ("root.branch.leaf").
+        * @param value Reference to store result (unchanged if not found).
         *
         * @code
         *  int port = 43321; //default value
@@ -109,16 +109,16 @@ namespace SmartHome::Utils {
 
     private:
         /**
-         * @brief Private constructor for singleton pattern
+         * @brief Private constructor for singleton pattern.
          */
         Config();
 
         /**
-         * @brief Private destructor for singleton pattern
+         * @brief Private destructor for singleton pattern.
          */
         ~Config();
 
-        YAML::Node mConfigNode; ///< YAML configuration file root node
-        std::atomic<bool> mConfigLoaded{false}; ///< Configuration loaded state
+        YAML::Node mConfigNode; ///< YAML configuration file root node.
+        std::atomic<bool> mConfigLoaded{false}; ///< Configuration loaded state.
     };
 }

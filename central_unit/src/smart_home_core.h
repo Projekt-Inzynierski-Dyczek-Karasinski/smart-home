@@ -16,7 +16,7 @@ namespace bs = boost::system;
 
 namespace SmartHome {
     /**
-     * @brief Core system component managing smart home central unit
+     * @brief Core system component managing smart home central unit.
      *
      * @details Thread-safe singleton class responsible for:
      *          - System initialization and configuration
@@ -28,26 +28,26 @@ namespace SmartHome {
     class Core {
     public:
         /**
-         * @brief Configuration structure for Core initialization
+         * @brief Configuration structure for Core initialization.
          */
         struct Config {
-            /// Enable/disable TCP server for IPC
+            /// Enable/disable TCP server for IPC.
             bool tcpServerEnabled = true;
-            /// TCP server address
+            /// TCP server address.
             std::string tcpServerEndpointAddress = "127.0.0.1";
-            /// TCP server port number
+            /// TCP server port number.
             int tcpServerEndpointPort = 43321;
-            /// Number of TCP server threads (-1: half CPU cores, 0: all CPU cores, n >= 1: exact thread count)
+            /// Number of TCP server threads (-1: half CPU cores, 0: all CPU cores, n >= 1: exact thread count).
             int tcpServerThreads = -1;
         };
 
         /**
-         * @brief Get singleton instance of Core
+         * @brief Get singleton instance of Core.
          *
          * @details Thread-safe initialization using static local variable.
          *          Instance is created on first call and reused after.
          *
-         * @return Reference to Core singleton instance
+         * @return Reference to Core singleton instance.
          */
         static Core &Instance();
 
@@ -58,28 +58,28 @@ namespace SmartHome {
         Core &operator=(const Core &) = delete;
 
         /**
-         * @brief Initialize Core with provided configuration
+         * @brief Initialize Core with provided configuration.
          *
          * @details Sets up thread pools, IO contexts and IPC based on config.
          *          Must be called before run(). Can only be initialized once.
          *
-         * @param configStruct Configuration parameters
-         * @return true if successful, false on error
+         * @param configStruct Configuration parameters.
+         * @return true if successful, false on error.
          */
         bool initialize(const Config &configStruct);
 
         /**
-         * @brief Starts Core subsystems and runs main loop
+         * @brief Starts Core subsystems and runs main loop.
          *
          * @details Begins signal handling, starts IPC and enters main loop.
          *          Must be called after initialize(). Block until shutdown() is called.
          *
-         * @pre initialize() must be successfully called first
+         * @pre initialize() must be successfully called first.
          */
         void run();
 
         /**
-         * @brief Request graceful shutdown
+         * @brief Request graceful shutdown.
          *
          * @details Stops main loop, signal handlers, IPC and waits for running threads to finish.
          */
@@ -87,20 +87,20 @@ namespace SmartHome {
 
     private:
         /**
-         * @brief Private constructor for singleton pattern
+         * @brief Private constructor for singleton pattern.
          */
         Core();
 
         /**
-         * @brief Private destructor for singleton pattern, starts graceful shutdown
+         * @brief Private destructor for singleton pattern, starts graceful shutdown.
          */
         ~Core();
 
         /**
-         * @brief Handle system signals
+         * @brief Handle system signals.
          *
-         * @param ec Error code from signal handler
-         * @param signal Signal number
+         * @param ec Error code from signal handler.
+         * @param signal Signal number.
          */
         void signalHandler(const bs::error_code &ec, int signal);
 
@@ -119,7 +119,7 @@ namespace SmartHome {
         std::optional<ba::executor_work_guard<ba::io_context::executor_type> > mSignalGuard;
 
         // State flags
-        std::atomic<bool> mInitialized{false}; ///< Core initialization state
-        std::atomic<bool> mRunning{false}; ///< Main loop running state
+        std::atomic<bool> mInitialized{false}; ///< Core initialization state.
+        std::atomic<bool> mRunning{false}; ///< Main loop running state.
     };
 }
