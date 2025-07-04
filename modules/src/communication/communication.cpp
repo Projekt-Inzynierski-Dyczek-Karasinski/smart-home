@@ -823,7 +823,6 @@ void Communication::abortAddressing() {
 void Communication::addressingTask() {
      enum ADDRESSING_STAGES : uint8_t {
         newConnectionRequest = 0,
-        nextM,
         changeRadioChannel,
         waitForPing,
         summary,
@@ -891,23 +890,28 @@ void Communication::addressingTask() {
 
     for (;;) {
         if (xQueueReceive(msReceiveMessageQueue, receiveBuffor, pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT)) == pdTRUE) {
+            bool isMessageRepeat = true;
+            // check if the received message is a "abort" message
             if (isAbortAddressing(receiveBuffor)) {
                 abortAddressing();
                 addressingStage = waitForDeletion;
+            } else {
+                // check if the received message is a repeat of the last received message
+                if (lastReceivedMessage[0] == 0) {
+                    isMessageRepeat = false;
+                } else {
+                    for (uint8_t i = 0; i < 6; i++){
+                        if (lastReceivedMessage[i] != 0 && lastReceivedMessage[i] != receiveBuffor[i]) {
+                            isMessageRepeat = false;
+                            break;
+                        }
+                    }
+                }
             }
-            
-            // TODO add check repeat of the last received message
-            // // check if the received message is a repeat of the last received message
-            // bool isMessageRepeat = true;
-            // if (lastReceivedMessage[0] == 0) {
-            //     isMessageRepeat = false;
-            // } else {
-            //     for (uint8_t i = 0; i < 6; i++){
-            //         if (lastReceivedMessage[i] != 0 && lastReceivedMessage[i] != receiveBuffor[i]) {
-            //             isMessageRepeat = false;
-            //             break;
-            //         }
-            //     }
+
+            // TODO add logic for isMessageRepeat = true
+            // if (isMessageRepeat && addressingStage != newConnectionRequest)  {
+
             // }
 
             // TODO remove print
@@ -923,12 +927,20 @@ void Communication::addressingTask() {
                     }
 
                     if (isMessageCorrect) {
-                        // TODO remove print
-                        for (uint8_t i = 0; i < 16; i++) {
-                            Serial.print(receiveBuffor[i]);
-                            Serial.print(' ');
+                        // TODO add saving module's MAC address
+
+                        // saveing that lastReceivedMessage is "newcon" 
+                        for (uint8_t i = 0; i < 6; i++) {
+                            // MESSAGES[0] = "newcon"
+                            lastReceivedMessage[i] = MESSAGES[0][i];
                         }
-                        Serial.println();
+                        
+                        // TODO remove print
+                        // for (uint8_t i = 0; i < 16; i++) {
+                        //     Serial.print(receiveBuffor[i]);
+                        //     Serial.print(' ');
+                        // }
+                        // Serial.println();
                         resetReceiveBuffor();
                         
                         // send "ip[number]" message
@@ -941,19 +953,16 @@ void Communication::addressingTask() {
                         // TODO assign final value
                         // wait before sending message
                         // TODO remove print
-                        Serial.println("addressing sending ip");
+                        // Serial.println("addressing sending ip");
                         vTaskDelay(pdMS_TO_TICKS(50));
                         xQueueSend(msSendMessagesQueue, &sendBuffor, portMAX_DELAY);
-                        // TODO assign final value
-                        // wait after sending message
-                        vTaskDelay(pdMS_TO_TICKS(100));
                         resetSendBuffor();
-                        addressingStage = nextM;
+                        addressingStage = changeRadioChannel;
                     }
                     break;
 
                 // TODO change name of var
-                case nextM:
+                case changeRadioChannel:
                     // TODO remove print
                     for (uint8_t i = 0; i < 6; i++) {
                         Serial.print((char)receiveBuffor[i]);
@@ -1138,6 +1147,7 @@ void Communication::addressingTask() {
                     }
                 }
             }
+            // check if the received message is a "abort" message
             if (isAbortAddressing(receiveBuffor)) {
                 abortAddressing();
                 addressingStage = waitForDeletion;
