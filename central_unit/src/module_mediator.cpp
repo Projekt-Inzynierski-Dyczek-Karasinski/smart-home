@@ -8,6 +8,7 @@ namespace ba = boost::asio;
 namespace bip = boost::asio::ip;
 namespace bpo = boost::program_options;
 
+// TODO this is placeholder version for testing implement working mediator
 int main(int argc, char *argv[]) {
     // Define program options
     bpo::options_description generic("Generic options");

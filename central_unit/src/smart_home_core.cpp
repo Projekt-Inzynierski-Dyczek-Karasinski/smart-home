@@ -44,28 +44,33 @@ namespace SmartHome {
             mSignalIoContext.run();
         });
 
-        // Set tcp server thread count
-        uint tcpServerThreads = std::thread::hardware_concurrency();
-        if (mConfig.tcpServerThreads == -1) {
-            tcpServerThreads /= 2;
-        } else if (mConfig.tcpServerThreads >= 1) {
-            tcpServerThreads = mConfig.tcpServerThreads;
+        // TCP server initialization if enabled in config
+        if (mConfig.tcpServerEnabled) {
+            // Set tcp server thread count
+            uint tcpServerThreads = std::thread::hardware_concurrency();
+            if (mConfig.tcpServerThreads == -1) {
+                tcpServerThreads /= 2;
+            } else if (mConfig.tcpServerThreads >= 1) {
+                tcpServerThreads = mConfig.tcpServerThreads;
+            }
+            // Check for value errors
+            if (tcpServerThreads < 1) {
+                std::cerr << "Tcp server threads value invalid: " << tcpServerThreads << std::endl <<
+                        "Changing value to 1"
+                        << std::endl;
+                tcpServerThreads = 1;
+            }
+
+            //Create tcp server threads with io context
+            mTcpServerThreadPool.emplace(tcpServerThreads);
+            mTcpServerGuard.emplace(ba::make_work_guard(mTcpServerIoContext));
+            for (size_t i = 0; i < tcpServerThreads; i++) {
+                ba::post(*mTcpServerThreadPool, [this]() {
+                    mTcpServerIoContext.run();
+                });
+            }
+            IPC::TcpServer::Instance();
         }
-        // Check for value errors
-        if (tcpServerThreads < 1) {
-            std::cerr << "Tcp server threads value invalid: " << tcpServerThreads << std::endl << "Changing value to 1"
-                    << std::endl;
-            tcpServerThreads = 1;
-        }
-        //Create tcp server threads with io context
-        mTcpServerThreadPool.emplace(tcpServerThreads);
-        mTcpServerGuard.emplace(ba::make_work_guard(mTcpServerIoContext));
-        for (size_t i = 0; i < tcpServerThreads; i++) {
-            ba::post(*mTcpServerThreadPool, [this]() {
-                mTcpServerIoContext.run();
-            });
-        }
-        IPC::TcpServer::Instance();
 
         mInitialized.store(true);
         std::cout << "Initialization complete" << std::endl;
@@ -92,15 +97,17 @@ namespace SmartHome {
             signalHandler(ec, sig);
         });
 
-        // Start tcp server
-        auto &tcpServer = IPC::TcpServer::Instance();
-        if (tcpServer.startTcpServer(&mTcpServerIoContext, mConfig.tcpServerEndpointAddress,
-                                     mConfig.tcpServerEndpointPort) == false) {
-            std::cerr << "Error tcp server failed to start" << std::endl;
-            shutdown();
-            return;
+        // Start tcp server if enabled in config
+        if (mConfig.tcpServerEnabled) {
+            auto &tcpServer = IPC::TcpServer::Instance();
+            if (tcpServer.startTcpServer(&mTcpServerIoContext, mConfig.tcpServerEndpointAddress,
+                                         mConfig.tcpServerEndpointPort) == false) {
+                std::cerr << "Error tcp server failed to start" << std::endl;
+                shutdown();
+                return;
+            }
+            tcpServer.runTcpServer(&mTcpServerIoContext);
         }
-        tcpServer.runTcpServer(&mTcpServerIoContext);
 
         // Main loop
         while (mRunning.load() == true) {
@@ -137,18 +144,20 @@ namespace SmartHome {
         mSignalIoContext.stop();
 
         // Stop tcp server
-        std::cout << "Stopping tcp server" << std::endl;
-        auto &tcpServer = IPC::TcpServer::Instance();
-        if (tcpServer.isRunning()) {
-            tcpServer.stopTcpServer();
-        }
+        if (mConfig.tcpServerEnabled) {
+            std::cout << "Stopping tcp server" << std::endl;
+            auto &tcpServer = IPC::TcpServer::Instance();
+            if (tcpServer.isRunning()) {
+                tcpServer.stopTcpServer();
+            }
 
-        // Stop handling queued tcp server tasks
-        mTcpServerGuard.reset();
+            // Stop handling queued tcp server tasks
+            mTcpServerGuard.reset();
 
-        std::cout << "Waiting for threads to finish" << std::endl;
-        while (mTcpServerThreadPool.has_value()) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            std::cout << "Waiting for threads to finish" << std::endl;
+            while (mTcpServerThreadPool.has_value()) {
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
         }
 
         std::cout << "Shutdown complete" << std::endl;
@@ -156,6 +165,7 @@ namespace SmartHome {
 
     void Core::signalHandler(const boost::system::error_code &ec, const int signal) {
         if (!ec) {
+            // Handle signal
             switch (signal) {
                 case SIGINT:
                     Core::Instance().shutdown();
@@ -172,6 +182,7 @@ namespace SmartHome {
                     break;
             }
         } else {
+            // Handle signal error
             std::cerr << "Signal handler error: " << ec.value() << std::endl;
         }
     }

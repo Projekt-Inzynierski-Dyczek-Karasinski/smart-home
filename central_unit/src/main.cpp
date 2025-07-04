@@ -33,7 +33,9 @@ int main(int argc, char *argv[]) {
     }
 
     // Load smart home config
-    const std::string configPath = vm.contains("config") ? vm["config"].as<std::string>() : "../../configs/smart_home.yaml";
+    const std::string configPath = vm.contains("config")
+                                       ? vm["config"].as<std::string>()
+                                       : "../../configs/smart_home.yaml";
     //TODO change path to global install
 
     auto &config = SmartHome::Utils::Config::Instance();

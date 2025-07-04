@@ -13,7 +13,9 @@ namespace SmartHome::IPC {
 
     TcpConnection::~TcpConnection() {
         std::cout << "Connection destroyed." << std::endl;
+        // Check if socket is still open
         if (mSocket.is_open()) {
+            // Close socket ending communication
             bs::error_code ec;
             mSocket.close(ec);
             if (ec) {
@@ -27,8 +29,10 @@ namespace SmartHome::IPC {
     }
 
     void TcpConnection::read() {
-        auto self = shared_from_this();
+        // Define shared pointer for this connection
+        auto self = shared_from_this(); //TODO consider making this private class variable
 
+        //Start asynchronously reading incoming data
         ba::async_read_until(mSocket, mStreamBuf, "\n", [this, self](bs::error_code ec, std::size_t bytes_transferred) {
             if (!ec) {
                 std::istream is(&mStreamBuf);
@@ -38,6 +42,7 @@ namespace SmartHome::IPC {
                 std::cout << "Received: " << message << std::endl;
                 read();
             } else {
+                //TODO add different handling for end of file error
                 std::cerr << "Error during read: " << ec.message() << std::endl;
             }
         });
