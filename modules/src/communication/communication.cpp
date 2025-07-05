@@ -1331,19 +1331,11 @@ void Communication::setupHC12Task(void *parameters) {
     while (attemptCounter < 10) {
         if (xQueueReceive(msReceiveMessageQueue, commandBuffor, pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT)) == pdFALSE) {
             attemptCounter = 10;
-            Serial.println("not found!");
             break;
         } else {
             if (commandBuffor[0] == (uint8_t)'H' && commandBuffor[1] == (uint8_t)'C') {
-                Serial.println("found!");
                 break;
             } else {
-
-                Serial.print("bad: ");
-                for (uint8_t i = 0; i < MESSAGE_SIZE; i++) {
-                    Serial.print((char)commandBuffor[i]);
-                }
-                Serial.println();
                 xQueueSend(msReceiveMessageQueue, &commandBuffor, portMAX_DELAY);
             }
         }
@@ -1352,7 +1344,6 @@ void Communication::setupHC12Task(void *parameters) {
 
     // if found HC12 command
     if (attemptCounter < 10) {
-        Serial.println("attemptCounter < 10");
         // TODO add changing baud rate of mspSerial if needed
 
         commandBuffor[0] = (uint8_t)'A';
@@ -1361,8 +1352,6 @@ void Communication::setupHC12Task(void *parameters) {
         while (commandBuffor[lenOfCommand] != 0 && commandBuffor[lenOfCommand] != (uint8_t)BLANK_CHARACTER) {
             lenOfCommand++;
         }
-        Serial.print("len: ");
-        Serial.println(lenOfCommand);
         
         vTaskDelay(pdMS_TO_TICKS(50));
         mspSerial->write(commandBuffor, lenOfCommand);
