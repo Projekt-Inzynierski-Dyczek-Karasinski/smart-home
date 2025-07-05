@@ -71,7 +71,6 @@ private:
     static void deleteAddresingTimers();
 
     static void setupHC12Task(void *parameters);
-    // static void createSetupHC12TaskHandle(void *parameters);
     static void createSetupHC12Task();
     static void deleteSetupHC12Task();
     
@@ -97,10 +96,10 @@ private:
         deleteAddressingTaskNotif,
         abortAddressingNotif,
         abortAddressingWithAbortMessageNotif,
+        // setup HC12 notifications
         createSetupHC12TaskNotif,
         deleteSetupHC12TaskNotif,
     } mCommunicationMainNotifications;
-
 
     static portMUX_TYPE msCriticalSectionMutex;
 

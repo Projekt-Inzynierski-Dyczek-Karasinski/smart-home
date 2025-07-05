@@ -104,6 +104,8 @@ Communication::Communication(DebugLED *debugLED) {
     
     Serial.println("Communication initialized");
     // TODO remove
+    // Serial.println("Communication setup hc12 testing!!!");
+    // TODO remove
     // vTaskDelay(pdMS_TO_TICKS(1000));
     // xTaskNotify(msCommunicationMainTaskHandle, createSetupHC12TaskNotif, eSetValueWithOverwrite);
 }
@@ -256,6 +258,8 @@ void Communication::communicationMainTask() {
                 Serial.println("deleteSetupHC12Task();");
                 deleteSetupHC12Task();
                 isSetupHC12Working = false;
+                xTimerStart(msSuspendSendMessageTimer, portMAX_DELAY);
+                vTaskResume(msSendMessageTaskHandle);
                 break;
             
             default:
@@ -479,6 +483,11 @@ void Communication::receiveMessageTask() {
                             xSemaphoreTake(msLastMessageMutex, portMAX_DELAY);
                             xQueueSend(msSendMessagesQueue, msLastMessage, portMAX_DELAY);
                             xSemaphoreGive(msLastMessageMutex);
+                        } 
+                        // if it is HC12 command
+                        else if (messageBuffor[0] == (uint8_t)'H' && messageBuffor[1] == (uint8_t)'C') {
+                            xTaskNotify(msCommunicationMainTaskHandle, createSetupHC12TaskNotif, eSetValueWithOverwrite);
+                            xQueueSend(msReceiveMessageQueue, messageBuffor, portMAX_DELAY);
                         }
                         // if Addressing Task is working
                         else if (msAddressingTaskHandle != NULL) {
@@ -564,8 +573,21 @@ void Communication::sendCustomMessageTask() {
                 }
                 Serial.println();
 
+                // check if is HC12 command
+                #ifdef HC12
+                if (buffor[0] == 'A' && buffor[1] == 'T') {
+                    xTaskNotify(msCommunicationMainTaskHandle, createSetupHC12TaskNotif, eSetValueWithOverwrite);
+                    buffor[0] = 'H';
+                    buffor[1] = 'C';
+                    xQueueSend(msReceiveMessageQueue, &buffor, portMAX_DELAY);
+                } else {
+                    // add message to SendMessagesQueue
+                    xQueueSend(msSendMessagesQueue, &buffor, portMAX_DELAY);
+                }
+                #else
                 // add message to SendMessagesQueue
                 xQueueSend(msSendMessagesQueue, &buffor, portMAX_DELAY);
+                #endif
 
                 // reset buffor
                 for (uint8_t i = 0; i < index; i++){
@@ -1263,14 +1285,93 @@ void Communication::deleteAddressingTask() {
 // ================================================================
 
 // ========================== setup HC12 ==========================
+// TODO implement all #ifdef directives needed if #ifndef HC12
+#ifdef HC12
 
 void Communication::setupHC12Task(void *parameters) {
-    // TODO add changing baud rate of mspSerial if needed
-    vTaskDelay(pdMS_TO_TICKS(50));
-    mspSerial->write("AT");
-    vTaskDelay(pdMS_TO_TICKS(50));
+    /*
+    char 'x' (and next chars if needed) must be changed before sending command to hc12
+    0  - "AT"
+    1  - "AT+RB"
+    2  - "AT+RC"
+    3  - "AT+RF"
+    4  - "AT+RP"
+    5  - "AT+RX"
+    6  - "AT+SLEEP"
+    7  - "AT+DEFAULT"
+    8  - "AT+Bx"
+    9  - "AT+Cx"
+    10 - "AT+FUx"
+    11 - "AT+Px"
+    */
+    const uint8_t COMMANDS[][10] = {
+        {'A', 'T', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0'},
+        {'A', 'T', '+', 'R', 'B', '\0', '\0', '\0', '\0', '\0'},
+        {'A', 'T', '+', 'R', 'C', '\0', '\0', '\0', '\0', '\0'},
+        {'A', 'T', '+', 'R', 'F', '\0', '\0', '\0', '\0', '\0'},
+        {'A', 'T', '+', 'R', 'P', '\0', '\0', '\0', '\0', '\0'},
+        {'A', 'T', '+', 'R', 'X', '\0', '\0', '\0', '\0', '\0'},
+        {'A', 'T', '+', 'S', 'L', 'E', 'E', 'P', '\0', '\0'},
+        {'A', 'T', '+', 'D', 'E', 'F', 'A', 'U', 'L', 'T'},
+        {'A', 'T', '+', 'B', 'x', '\0', '\0', '\0', '\0', '\0'},
+        {'A', 'T', '+', 'C', 'x', '\0', '\0', '\0', '\0', '\0'},
+        {'A', 'T', '+', 'F', 'U', 'x', '\0', '\0', '\0', '\0'},
+        {'A', 'T', '+', 'P', 'x', '\0', '\0', '\0', '\0', '\0'},
+    };
+
+    // prepare commandBuffor
+    uint8_t commandBuffor[MESSAGE_SIZE];
+    for (uint8_t i = 0; i < MESSAGE_SIZE; i++) {
+        commandBuffor[i] = 0;
+    }
+
+    // look for HC12 command in queue
+    // if there is no HC12 command in queue delete setupHC12Task
+    uint8_t attemptCounter = 0;
+    while (attemptCounter < 10) {
+        if (xQueueReceive(msReceiveMessageQueue, commandBuffor, pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT)) == pdFALSE) {
+            attemptCounter = 10;
+            Serial.println("not found!");
+            break;
+        } else {
+            if (commandBuffor[0] == (uint8_t)'H' && commandBuffor[1] == (uint8_t)'C') {
+                Serial.println("found!");
+                break;
+            } else {
+
+                Serial.print("bad: ");
+                for (uint8_t i = 0; i < MESSAGE_SIZE; i++) {
+                    Serial.print((char)commandBuffor[i]);
+                }
+                Serial.println();
+                xQueueSend(msReceiveMessageQueue, &commandBuffor, portMAX_DELAY);
+            }
+        }
+        attemptCounter++;
+    }
+
+    // if found HC12 command
+    if (attemptCounter < 10) {
+        Serial.println("attemptCounter < 10");
+        // TODO add changing baud rate of mspSerial if needed
+
+        commandBuffor[0] = (uint8_t)'A';
+        commandBuffor[1] = (uint8_t)'T';
+        size_t lenOfCommand = 0;
+        while (commandBuffor[lenOfCommand] != 0 && commandBuffor[lenOfCommand] != (uint8_t)BLANK_CHARACTER) {
+            lenOfCommand++;
+        }
+        Serial.print("len: ");
+        Serial.println(lenOfCommand);
+        
+        vTaskDelay(pdMS_TO_TICKS(50));
+        mspSerial->write(commandBuffor, lenOfCommand);
+        vTaskDelay(pdMS_TO_TICKS(200));
+    }
+
     xTaskNotify(msCommunicationMainTaskHandle, deleteSetupHC12TaskNotif, eSetValueWithOverwrite);
 
+    // wait for deletion
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(1000));
     }
@@ -1283,7 +1384,7 @@ void Communication::createSetupHC12Task() {
             "Setup HC12 Task",
             2048,
             NULL,
-            MEDIUM_TASK_PRIORITY,
+            HIGH_TASK_PRIORITY,
             &msSetupHC12TaskHandle
         );
     } else {
@@ -1297,6 +1398,7 @@ void Communication::deleteSetupHC12Task() {
     }
     digitalWrite(SET_PIN, HIGH);
 }
+#endif
 // ================================================================
 
 // ============================ Timers ============================
