@@ -1,4 +1,4 @@
-#include "smart_home_config.h"
+#include "config.h"
 
 #include <iostream>
 

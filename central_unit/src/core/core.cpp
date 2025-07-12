@@ -1,11 +1,9 @@
-#include "smart_home_core.h"
-#include "smart_home_config.h"
-#include "ipc/smart_home_tcp_server.h"
+#include "core.h"
+#include "config.h"
+#include "tcp/tcp_server.h"
 
 #include <chrono>
 #include <iostream>
-#include <thread>
-#include <utility>
 
 #include <boost/asio.hpp>
 

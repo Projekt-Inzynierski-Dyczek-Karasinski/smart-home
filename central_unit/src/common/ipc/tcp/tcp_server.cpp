@@ -1,6 +1,5 @@
-#include "smart_home_tcp_server.h"
-#include "../smart_home_core.h"
-#include "smart_home_tcp_connection.h"
+#include "tcp_server.h"
+#include "tcp_connection.h"
 
 #include <iostream>
 

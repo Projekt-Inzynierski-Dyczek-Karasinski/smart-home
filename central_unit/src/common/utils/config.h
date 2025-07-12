@@ -56,6 +56,7 @@ namespace SmartHome::Utils {
          * @endcode
          */
         template<typename T>
+        //TODO move definition to .tpp file
         std::optional<T> getValue(const std::string &valuePath) {
             if (mConfigLoaded.load() == true) {
                 // Prepare keys from string

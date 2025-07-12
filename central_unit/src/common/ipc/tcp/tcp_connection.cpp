@@ -1,4 +1,4 @@
-#include "smart_home_tcp_connection.h"
+#include "tcp_connection.h"
 
 #include <cstddef>
 #include <iosfwd>

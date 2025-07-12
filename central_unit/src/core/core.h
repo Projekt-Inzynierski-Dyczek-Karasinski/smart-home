@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ipc/smart_home_tcp_server.h"
+#include "tcp/tcp_server.h"
 
 #include <atomic>
 #include <memory>

@@ -1,5 +1,5 @@
-#include "smart_home_core.h"
-#include "smart_home_config.h"
+#include "core.h"
+#include "config.h"
 
 #include <iostream>
 
