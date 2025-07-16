@@ -21,13 +21,13 @@ namespace SmartHome {
     Core::Core() = default;
 
     Core::~Core() {
-        if (mRunning.load() == true) {
+        if (mIsRunning.load()) {
             shutdown();
         }
     }
 
     bool Core::initialize(const Config &configStruct) {
-        if (mInitialized.load() == true) {
+        if (mIsInitialized.load()) {
             std::cerr << "Core already initialized" << std::endl;
             return false;
         }
@@ -43,7 +43,7 @@ namespace SmartHome {
         });
 
         // TCP server initialization if enabled in config
-        if (mConfig.tcpServerEnabled) {
+        if (mConfig.isTcpServerEnabled) {
             // Set tcp server thread count
             uint tcpServerThreads = std::thread::hardware_concurrency();
             if (mConfig.tcpServerThreads == -1) {
@@ -70,23 +70,24 @@ namespace SmartHome {
             IPC::TcpServer::Instance();
         }
 
-        mInitialized.store(true);
+        mIsInitialized.store(true);
         std::cout << "Initialization complete" << std::endl;
 
         return true;
     }
 
     void Core::run() {
-        if (mInitialized.load() == false) {
+        if (!mIsInitialized.load()) {
             std::cerr << "Core not initialized" << std::endl;
             return;
-        } else if (mRunning.load() == true) {
+        }
+        if (mIsRunning.load()) {
             std::cerr << "Core already running" << std::endl;
             return;
         }
 
         // Begin core
-        mRunning.store(true);
+        mIsRunning.store(true);
         std::cout << "Running core" << std::endl;
 
         // Start signal handling
@@ -96,10 +97,10 @@ namespace SmartHome {
         });
 
         // Start tcp server if enabled in config
-        if (mConfig.tcpServerEnabled) {
+        if (mConfig.isTcpServerEnabled) {
             auto &tcpServer = IPC::TcpServer::Instance();
-            if (tcpServer.startTcpServer(&mTcpServerIoContext, mConfig.tcpServerEndpointAddress,
-                                         mConfig.tcpServerEndpointPort) == false) {
+            if (!tcpServer.startTcpServer(&mTcpServerIoContext, mConfig.tcpServerEndpointAddress,
+                                          mConfig.tcpServerEndpointPort)) {
                 std::cerr << "Error tcp server failed to start" << std::endl;
                 shutdown();
                 return;
@@ -108,7 +109,7 @@ namespace SmartHome {
         }
 
         // Main loop
-        while (mRunning.load() == true) {
+        while (mIsRunning.load()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
@@ -131,7 +132,7 @@ namespace SmartHome {
         std::cout << "Shutting down core" << std::endl;
 
         // Stop core main loop
-        mRunning.store(false);
+        mIsRunning.store(false);
 
         // Stop handling signals
         if (mSignals.has_value()) {
@@ -142,7 +143,7 @@ namespace SmartHome {
         mSignalIoContext.stop();
 
         // Stop tcp server
-        if (mConfig.tcpServerEnabled) {
+        if (mConfig.isTcpServerEnabled) {
             std::cout << "Stopping tcp server" << std::endl;
             auto &tcpServer = IPC::TcpServer::Instance();
             if (tcpServer.isRunning()) {

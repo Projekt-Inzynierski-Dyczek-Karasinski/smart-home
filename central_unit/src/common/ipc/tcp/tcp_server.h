@@ -99,7 +99,7 @@ namespace SmartHome::IPC {
         bip::tcp::endpoint mEndpoint; ///< Server endpoint.
 
         // State flags
-        std::atomic<bool> mTcpServerInitialized{false}; ///< Server initialized state.
-        std::atomic<bool> mTcpServerRunning{false}; ///< Server running state.
+        std::atomic<bool> mIsTcpServerInitialized{false}; ///< Server initialized state.
+        std::atomic<bool> mIsTcpServerRunning{false}; ///< Server running state.
     };
 }

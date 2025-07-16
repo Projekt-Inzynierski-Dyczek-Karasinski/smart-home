@@ -58,7 +58,7 @@ namespace SmartHome::Utils {
         template<typename T>
         //TODO move definition to .tpp file
         std::optional<T> getValue(const std::string &valuePath) {
-            if (mConfigLoaded.load() == true) {
+            if (mIsConfigLoaded.load()) {
                 // Prepare keys from string
                 std::vector<std::string> keys = {};
                 boost::split(keys, valuePath, boost::is_any_of("."));
@@ -70,9 +70,9 @@ namespace SmartHome::Utils {
                     currentValuePath += key + ".";
                     currentNode = currentNode[key];
 
-                    if (currentNode.IsDefined() == false) {
+                    if (!currentNode.IsDefined()) {
                         // Handle invalid path
-                        if (currentValuePath != "") currentValuePath.pop_back();
+                        if (!currentValuePath.empty()) currentValuePath.pop_back();
                         std::cerr << "Config get value error: value path \"" << currentValuePath << "\" is not defined"
                                 << std::endl;
                         return std::nullopt;
@@ -120,6 +120,6 @@ namespace SmartHome::Utils {
         ~Config();
 
         YAML::Node mConfigNode; ///< YAML configuration file root node.
-        std::atomic<bool> mConfigLoaded{false}; ///< Configuration loaded state.
+        std::atomic<bool> mIsConfigLoaded{false}; ///< Configuration loaded state.
     };
 }

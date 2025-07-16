@@ -119,7 +119,7 @@ namespace SmartHome {
         std::optional<ba::executor_work_guard<ba::io_context::executor_type> > mSignalGuard;
 
         // State flags
-        std::atomic<bool> mInitialized{false}; ///< Core initialization state.
-        std::atomic<bool> mRunning{false}; ///< Main loop running state.
+        std::atomic<bool> mIsInitialized{false}; ///< Core initialization state.
+        std::atomic<bool> mIsRunning{false}; ///< Main loop running state.
     };
 }

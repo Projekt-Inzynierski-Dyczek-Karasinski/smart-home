@@ -14,7 +14,7 @@ namespace SmartHome::IPC {
     TcpServer::TcpServer() = default;
 
     TcpServer::~TcpServer() {
-        if (mTcpServerInitialized.load() == true) {
+        if (mIsTcpServerInitialized.load()) {
             stopTcpServer();
         }
     }
@@ -25,7 +25,7 @@ namespace SmartHome::IPC {
             mEndpoint = bip::tcp::endpoint(bip::make_address(address), port);
             mpAcceptor = std::make_unique<bip::tcp::acceptor>(*ioContext, mEndpoint);
 
-            mTcpServerInitialized.store(true);
+            mIsTcpServerInitialized.store(true);
             std::cout << "Server started on " << address << ":" << port << std::endl;
             return true;
         } catch (std::exception &e) {
@@ -42,7 +42,7 @@ namespace SmartHome::IPC {
         mpAcceptor->async_accept(newTcpConnection->getSocket(),
                                  [this, newTcpConnection, ioContext](const bs::error_code ec) {
                                      // Check for error codes and if TCP server is currently running
-                                     if (!ec && mTcpServerRunning.load() == true) {
+                                     if (!ec && mIsTcpServerRunning.load()) {
                                          std::cout << "Connection accepted from: " << newTcpConnection->getSocket().
                                                  remote_endpoint() << std::endl;
                                          // Start reading incoming messages
@@ -57,8 +57,8 @@ namespace SmartHome::IPC {
 
     void TcpServer::runTcpServer(ba::io_context *ioContext) {
         // Start accepting connections if TCP server is initialized
-        if (mTcpServerInitialized.load() == true) {
-            mTcpServerRunning.store(true);
+        if (mIsTcpServerInitialized.load()) {
+            mIsTcpServerRunning.store(true);
             startAsyncAccept(ioContext);
         } else {
             std::cerr << "Tcp server run error: server not initialized" << std::endl;
@@ -66,7 +66,7 @@ namespace SmartHome::IPC {
     }
 
     bool TcpServer::stopTcpServer() {
-        mTcpServerRunning.store(false);
+        mIsTcpServerRunning.store(false);
 
         // Close acceptor
         if (mpAcceptor != nullptr) {
@@ -83,6 +83,6 @@ namespace SmartHome::IPC {
     }
 
     bool TcpServer::isRunning() const {
-        return mTcpServerRunning.load();
+        return mIsTcpServerRunning.load();
     }
 }

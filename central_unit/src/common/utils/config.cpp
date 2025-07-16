@@ -18,7 +18,7 @@ namespace SmartHome::Utils {
         try {
             // Try to load config file
             mConfigNode = YAML::LoadFile(configPath);
-            mConfigLoaded.store(true);
+            mIsConfigLoaded.store(true);
             return true;
         } catch (YAML::Exception &e) {
             // Handle loading error

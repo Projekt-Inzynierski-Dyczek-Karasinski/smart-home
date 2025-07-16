@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
     SmartHome::Core::Config coreConfig; //Load default values
 
     //Overwrite default core config with smart home config
-    config.getValue("core.ipc.tcp_server.enabled", coreConfig.tcpServerEnabled);
+    config.getValue("core.ipc.tcp_server.enabled", coreConfig.isTcpServerEnabled);
     config.getValue("core.ipc.tcp_server.address", coreConfig.tcpServerEndpointAddress);
     config.getValue("core.ipc.tcp_server.port", coreConfig.tcpServerEndpointPort);
     config.getValue("core.ipc.tcp_server.threads", coreConfig.tcpServerThreads);
