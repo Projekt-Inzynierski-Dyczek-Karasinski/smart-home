@@ -63,7 +63,7 @@ namespace SmartHome::Utils {
                 std::vector<std::string> keys = {};
                 boost::split(keys, valuePath, boost::is_any_of("."));
 
-                std::string currentValuePath = "";
+                std::string currentValuePath;
                 YAML::Node currentNode = YAML::Clone(mConfigNode);
                 // Iterate on keys, check if they are defined
                 for (auto &key: keys) {
@@ -73,15 +73,23 @@ namespace SmartHome::Utils {
                     if (!currentNode.IsDefined()) {
                         // Handle invalid path
                         if (!currentValuePath.empty()) currentValuePath.pop_back();
-                        std::cerr << "Config get value error: value path \"" << currentValuePath << "\" is not defined"
+                        std::cerr << "Config getValue() error: value path \"" << currentValuePath << "\" is not defined"
                                 << std::endl;
                         return std::nullopt;
                     }
                 }
-                return currentNode.as<T>();
+                // Catch value conversion errors
+                try {
+                    return currentNode.as<T>();
+                } catch (const std::exception &e) {
+                    currentValuePath.pop_back();
+                    std::cerr << "Config getValue() error: bad conversion on " << currentValuePath << ": " <<
+                            currentNode << std::endl;
+                    return std::nullopt;
+                }
             }
             // Handle config not loaded
-            std::cerr << "Config get value error: config not loaded" << std::endl;
+            std::cerr << "Config getValue() error: config not loaded" << std::endl;
             return std::nullopt;
         }
 
