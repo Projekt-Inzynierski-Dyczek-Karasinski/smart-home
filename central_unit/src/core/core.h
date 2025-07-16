@@ -31,14 +31,19 @@ namespace SmartHome {
          * @brief Configuration structure for Core initialization.
          */
         struct Config {
+            enum tcpServerThreadCount : int {
+                HALF_CPU_CORES = -1,
+                ALL_CPU_CORES = 0,
+            };
+
             /// Enable/disable TCP server for IPC.
-            bool tcpServerEnabled = true;
+            bool isTcpServerEnabled = true;
             /// TCP server address.
             std::string tcpServerEndpointAddress = "127.0.0.1";
             /// TCP server port number.
             int tcpServerEndpointPort = 43321;
             /// Number of TCP server threads (-1: half CPU cores, 0: all CPU cores, n >= 1: exact thread count).
-            int tcpServerThreads = -1;
+            int tcpServerThreads = HALF_CPU_CORES;
         };
 
         /**

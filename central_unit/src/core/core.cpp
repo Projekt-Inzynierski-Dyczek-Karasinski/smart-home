@@ -3,10 +3,10 @@
 #include "tcp/tcp_server.h"
 
 #include <chrono>
+#include <cmath>
 #include <iostream>
 
 #include <boost/asio.hpp>
-
 
 namespace ba = boost::asio;
 namespace bip = boost::asio::ip;
@@ -45,24 +45,33 @@ namespace SmartHome {
         // TCP server initialization if enabled in config
         if (mConfig.isTcpServerEnabled) {
             // Set tcp server thread count
-            uint tcpServerThreads = std::thread::hardware_concurrency();
-            if (mConfig.tcpServerThreads == -1) {
-                tcpServerThreads /= 2;
-            } else if (mConfig.tcpServerThreads >= 1) {
-                tcpServerThreads = mConfig.tcpServerThreads;
-            }
-            // Check for value errors
-            if (tcpServerThreads < 1) {
-                std::cerr << "Tcp server threads value invalid: " << tcpServerThreads << std::endl <<
-                        "Changing value to 1"
-                        << std::endl;
-                tcpServerThreads = 1;
+            uint threadCount;
+
+            switch (mConfig.tcpServerThreads) {
+                case Config::HALF_CPU_CORES:
+                    threadCount = std::ceil(std::thread::hardware_concurrency() / 2);
+                    break;
+                case Config::ALL_CPU_CORES:
+                    threadCount = std::thread::hardware_concurrency();
+                    break;
+                default:
+                    if (mConfig.tcpServerThreads > 128) {
+                        std::cerr << "Core init warning: TCP server possible excessive thread count (" <<
+                                mConfig.tcpServerThreads << " threads)" << std::endl;
+                    }
+                    threadCount = mConfig.tcpServerThreads;
+                    break;
             }
 
-            //Create tcp server threads with io context
-            mTcpServerThreadPool.emplace(tcpServerThreads);
+            if (threadCount < 1) {
+                std::cerr << "Core init error: TCP server thread count less than 1, setting value to 1" << std::endl;
+                threadCount = 1;
+            }
+
+            //Create TCP server threads with io context
+            mTcpServerThreadPool.emplace(threadCount);
             mTcpServerGuard.emplace(ba::make_work_guard(mTcpServerIoContext));
-            for (size_t i = 0; i < tcpServerThreads; i++) {
+            for (size_t i = 0; i < threadCount; i++) {
                 ba::post(*mTcpServerThreadPool, [this]() {
                     mTcpServerIoContext.run();
                 });

@@ -1,3 +1,9 @@
+preset_values:
+  tcp_server_thread_count:
+    half_cpu_cores: &half_cpu_cores -1
+    all_cpu_cores: &all_cpu_cores 0
+
+
 core:
   mode: "headless"  #TODO add kiosk gui
   log_level: "debug" #TODO implement verbose levels
@@ -6,7 +12,7 @@ core:
       enabled: true
       address: "127.0.0.1"
       port: 43321
-      threads: -1 # -1: half CPU cores, 0: all CPU cores, n >= 1: exact thread count
+      threads: *half_cpu_cores # Exact thread count if value > 0, possible preset values: *all_cpu_cores, *half_cpu_cores
 
 services:
   mediator:
