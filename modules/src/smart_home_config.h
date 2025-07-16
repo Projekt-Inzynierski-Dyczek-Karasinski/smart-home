@@ -6,7 +6,7 @@
     #define HIGH_TASK_PRIORITY 4
     #define CRITICAL_TASK_PRIORITY 5
 
-    #define HC12
+    #define HC12_MODULE
 
     #ifdef ESP32_WROOM_BOARD_TYPE
         #include "config/basic_esp32_wroom_config.h"
@@ -15,6 +15,4 @@
         #include "config/basic_esp32_s3_wroom_config.h"
     #endif
 
-    // TODO remove
-    // #define TRANSMISSION_WITHOUT_PERMISSION
 #endif
