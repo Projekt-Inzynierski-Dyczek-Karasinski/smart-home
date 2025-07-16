@@ -10,14 +10,9 @@ add_executable(smarthome-mediator
 
 )
 
-target_include_directories(smarthome-mediator PRIVATE
-        smarthome_ipc
-)
-
-
 
 target_link_libraries(smarthome-mediator PRIVATE
-        smarthome_ipc
+        smarthome::ipc
         Boost::program_options
 )
 

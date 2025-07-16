@@ -11,6 +11,8 @@ add_library(smarthome_ipc STATIC
         ipc/tcp/tcp_connection.cpp
 )
 
+add_library(smarthome::ipc ALIAS smarthome_ipc)
+
 target_include_directories(smarthome_ipc PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ipc>
 
@@ -26,6 +28,8 @@ add_library(smarthome_utility STATIC
         utils/config.cpp
 )
 
+add_library(smarthome::utility ALIAS smarthome_utility)
+
 
 target_include_directories(smarthome_utility PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
@@ -33,7 +37,7 @@ target_include_directories(smarthome_utility PUBLIC
 )
 
 
-target_link_libraries(smarthome_ipc PRIVATE
+target_link_libraries(smarthome_utility PRIVATE
         yaml-cpp
 
 )
