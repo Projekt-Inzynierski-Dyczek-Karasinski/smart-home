@@ -22,6 +22,9 @@ namespace SmartHome::Utils {
                     return std::nullopt;
                 }
             }
+            //Return nullopt on null yaml value
+            if (currentNode.IsNull()) return std::nullopt;
+
             // Catch value conversion errors
             try {
                 return currentNode.as<T>();
