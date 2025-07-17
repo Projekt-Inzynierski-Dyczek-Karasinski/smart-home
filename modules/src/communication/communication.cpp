@@ -8,19 +8,18 @@
 #include "smart_home_config.h"
 #include "config/communication_config.h"
 
+#include "communication/uint8_array_handlers.h"
 #include "universal_module_system/debug_led.h"
+
 #ifdef HC12_MODULE
     #include "communication/hc12.h"
+#else
+    #error "Not implemented" 
 #endif
 
+namespace uah = uint8ArrayHandlers;
+
 DebugLED* Communication::mspDebugLED = nullptr;
-
-// #ifdef HC12_MODULE
-//     HC12* Communication::mRfModule = nullptr;
-// #else
-//     #error "Not implemented"
-// #endif
-
 
 // ============================ Public ============================
 
@@ -34,9 +33,7 @@ void Communication::startAddresingAlgorithm() {
     Serial.println("startAddresingAlgorithm() not implemented");
 }
 // ================================================================
-void Communication::test() {
-    Serial.println("Print from Communication class");
-}
+
 // ================== Constructor and Destructor ==================
 
 Communication::Communication(DebugLED *debugLED) : 
@@ -62,7 +59,7 @@ Communication::~Communication() {
 // ===================== Send Custom Message ======================
 
 void Communication::sendCustomMessageTask(void *parameters) {
-    auto &c = Communication::getInstance(mspDebugLED);
+    auto &com = Communication::getInstance(mspDebugLED);
 
     // prepare buffor
     uint8_t buffor[MESSAGE_SIZE];
@@ -84,20 +81,15 @@ void Communication::sendCustomMessageTask(void *parameters) {
                 buffor[index - 1] = 0;
                 
                 // TODO remove debug print
-                uint8_t i = 0;
                 Serial.print("Message Ready: ");
-                while (buffor[i] != 0) {
-                    Serial.print((char)buffor[i]);
-                    i++;
-                }
-                Serial.println();
+                uah::printArray(buffor, MESSAGE_SIZE);
 
                 // check if is HC_12 command
                 #ifdef HC12_MODULE
                 if (buffor[0] == 'A' && buffor[1] == 'T') {
                     buffor[0] = 'H';
                     buffor[1] = 'C';
-                    c.mRfModule->setupHC12(buffor);
+                    com.mRfModule->setupHC12(buffor);
                 } else {
                     // TODO add message to SendMessagesQueue
                     // xQueueSend(msSendMessagesQueue, &buffor, portMAX_DELAY);

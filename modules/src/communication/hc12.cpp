@@ -6,7 +6,10 @@
 #include "smart_home_config.h"
 #include "config/communication_config.h"
 
+#include "communication/uint8_array_handlers.h"
 #include "communication/communication.h"
+
+namespace uah = uint8ArrayHandlers;
 
 HC12* HC12::mspHC12 = nullptr;
 
@@ -31,7 +34,7 @@ void HC12::setupHC12(const uint8_t *COMMANDS) {
                     Serial.println(SETUP_MAX_NUM_OF_COMMANDS);
                     break;
                 }
-                prepareCommandBuffor(commandBuffor, &COMMANDS[commandStartIndex], (commandEndIndex - commandStartIndex));
+                uah::prepareBuffor(commandBuffor, &COMMANDS[commandStartIndex], (commandEndIndex - commandStartIndex), SETUP_COMMAND_SIZE);
 
                 xQueueSend(mSetupHC12CommandsQueue, commandBuffor, portMAX_DELAY);
                 commandStartIndex = commandEndIndex + 1;
@@ -46,7 +49,7 @@ void HC12::setupHC12(const uint8_t *COMMANDS) {
                 Serial.print("HC12 COMMANDS ERROR! In setupHC12() -> passed too many commands. Number of commands must be lower or equal than ");
                 Serial.println(SETUP_MAX_NUM_OF_COMMANDS);
             } else {
-                prepareCommandBuffor(commandBuffor, &COMMANDS[commandStartIndex], (commandEndIndex - commandStartIndex));
+                uah::prepareBuffor(commandBuffor, &COMMANDS[commandStartIndex], (commandEndIndex - commandStartIndex), SETUP_COMMAND_SIZE);
                 xQueueSend(mSetupHC12CommandsQueue, commandBuffor, portMAX_DELAY);
             }
         }
@@ -227,12 +230,12 @@ void HC12::setupHC12Task(void *parameters) {
     for (;;) {
         if (xQueueReceive(hc12->mSetupHC12CommandsQueue, commandBuffor, 0) == pdTRUE) {
             Serial.print("setupHC12Task received command: ");
-            hc12->printUint8Array(commandBuffor, SETUP_COMMAND_SIZE);
+            uah::printArray(commandBuffor, SETUP_COMMAND_SIZE);
 
             if (!(commandBuffor[0] == (uint8_t)'H' && commandBuffor[1] == (uint8_t)'C')) {
                 Serial.println("HC12 COMMAND ERROR! In setupHC12Task() -> received array is not hc12 command.");
             } else {
-                uint8_t lenOfCommand = hc12->calcLenOfUint8Array(commandBuffor, SETUP_COMMAND_SIZE);
+                uint8_t lenOfCommand = uah::calcLenOfDataInArray(commandBuffor, SETUP_COMMAND_SIZE);
                 commandBuffor[0] = (uint8_t)'A';
                 commandBuffor[1] = (uint8_t)'T';
                 
@@ -300,32 +303,5 @@ void HC12::deleteSetupHC12Task() {
 // ================================================================
 
 // ============================ other =============================
-void HC12::prepareCommandBuffor(uint8_t *buffor, const uint8_t *value, uint8_t len) {
-    if (len > SETUP_COMMAND_SIZE) {
-        len = SETUP_COMMAND_SIZE;
-        Serial.print("VALUE ERROR! In prepareMessageBuffor() -> len must not be larger than ");
-        Serial.println(SETUP_COMMAND_SIZE);
-    }
-
-    for (uint8_t i = 0; i < len; i++) {
-        buffor[i] = value[i];
-    }
-    for (uint8_t i = len; i < SETUP_COMMAND_SIZE; i++) {
-        buffor[i] = 0;
-    }
-}
-void HC12::printUint8Array(const uint8_t *array, const uint8_t len) {
-    for (uint8_t i = 0; i < len; i++) {
-        Serial.print((char)array[i]);
-    }
-    Serial.println();
-}
-
-uint8_t HC12::calcLenOfUint8Array(const uint8_t *array, const uint8_t maxLen) {
-    for (uint8_t i = 0; i < maxLen; i++) {
-        if (array[i] == 0) return i; 
-    }
-    return maxLen;
-}
 
 // ================================================================

@@ -1,7 +1,4 @@
-// #ifndef HC12_H
-// #define HC12_H
 #pragma once
-
 
 #include <Arduino.h>
 #include <HardwareSerial.h>
@@ -34,10 +31,6 @@ private:
     void createSetupHC12Task();
     void deleteSetupHC12Task();
 
-    void prepareCommandBuffor(uint8_t *buffor, const uint8_t *value, uint8_t len);
-    void printUint8Array(const uint8_t *array, const uint8_t len);
-    uint8_t calcLenOfUint8Array(const uint8_t *array, const uint8_t maxLen);
-
     static HC12 *mspHC12;
     Communication *mpCommunication;
     HardwareSerial *mpSerial;
@@ -57,5 +50,3 @@ private:
     TaskHandle_t mHC12MainTaskHandle = NULL;
     TaskHandle_t mSetupHC12TaskHandle = NULL;
 };
-
-// #endif

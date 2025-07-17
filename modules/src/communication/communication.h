@@ -1,5 +1,3 @@
-// #ifndef COMMUNICATION_H
-// #define COMMUNICATION_H
 #pragma once
 
 #include <Arduino.h>
@@ -52,4 +50,3 @@ private:
     TaskHandle_t mCommunicationMainTaskHandle = NULL;
     TaskHandle_t mSendCustomMessageTaskHandle = NULL;
 };
-// #endif
