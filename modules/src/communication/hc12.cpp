@@ -6,13 +6,12 @@
 #include "smart_home_config.h"
 #include "config/communication_config.h"
 
+#include "communication/communication.h"
+
+HC12* HC12::mspHC12 = nullptr;
+
 // ============================ Public ============================
 
-HC12& HC12::getInstance() {
-    static HC12 instance;
-    return instance;
-}
- 
 void HC12::setupHC12(const uint8_t *COMMANDS) {
     if (!(COMMANDS[0] == 'H' && COMMANDS[1] == 'C')) {
         Serial.println("HC12 COMMAND ERROR! In setupHC12() -> passed argument does not include hc12 command.");
@@ -59,7 +58,10 @@ void HC12::setupHC12(const uint8_t *COMMANDS) {
 
 // ================== Constructor and Destructor ==================
 
-HC12::HC12() {
+HC12::HC12(Communication *communication) {
+    mpCommunication = communication;
+    mspHC12 = this;
+
     pinMode(SET_PIN, OUTPUT);
     digitalWrite(SET_PIN, HIGH);
     // 80ms - from HC12 documentation 
@@ -133,7 +135,7 @@ void HC12::deleteSetupHC12Queues() {
 // ========================== HC12 Main ===========================
 
 void HC12::HC12MainTask(void *parameters) {
-    auto &hc12 = HC12::getInstance();
+    auto &hc12 = *mspHC12;
 
     uint32_t status = defaultStatusNotif;
     bool isSetupHC12Working = false;
@@ -208,38 +210,7 @@ void HC12::deleteHC12MainTask() {
 // ========================== setup HC12 ==========================
 
 void HC12::setupHC12Task(void *parameters) {
-    auto &hc12 = HC12::getInstance();
-
-    // TODO remove ?
-    /*
-    char 'x' (and next chars if needed) must be changed before sending command to hc12
-    0  - "AT"
-    1  - "AT+RB"
-    2  - "AT+RC"
-    3  - "AT+RF"
-    4  - "AT+RP"
-    5  - "AT+RX"
-    6  - "AT+SLEEP"
-    7  - "AT+DEFAULT"
-    8  - "AT+Bx"
-    9  - "AT+Cx"
-    10 - "AT+FUx"
-    11 - "AT+Px"
-    */
-    // const uint8_t COMMANDS[][10] = {
-    //     {'A', 'T', '\0', '\0', '\0', '\0', '\0', '\0', '\0', '\0'},
-    //     {'A', 'T', '+', 'R', 'B', '\0', '\0', '\0', '\0', '\0'},
-    //     {'A', 'T', '+', 'R', 'C', '\0', '\0', '\0', '\0', '\0'},
-    //     {'A', 'T', '+', 'R', 'F', '\0', '\0', '\0', '\0', '\0'},
-    //     {'A', 'T', '+', 'R', 'P', '\0', '\0', '\0', '\0', '\0'},
-    //     {'A', 'T', '+', 'R', 'X', '\0', '\0', '\0', '\0', '\0'},
-    //     {'A', 'T', '+', 'S', 'L', 'E', 'E', 'P', '\0', '\0'},
-    //     {'A', 'T', '+', 'D', 'E', 'F', 'A', 'U', 'L', 'T'},
-    //     {'A', 'T', '+', 'B', 'x', '\0', '\0', '\0', '\0', '\0'},
-    //     {'A', 'T', '+', 'C', 'x', '\0', '\0', '\0', '\0', '\0'},
-    //     {'A', 'T', '+', 'F', 'U', 'x', '\0', '\0', '\0', '\0'},
-    //     {'A', 'T', '+', 'P', 'x', '\0', '\0', '\0', '\0', '\0'},
-    // };
+    auto hc12 = mspHC12;
 
     // prepare commandBuffor
     uint8_t commandBuffor[SETUP_COMMAND_SIZE];
@@ -254,23 +225,23 @@ void HC12::setupHC12Task(void *parameters) {
     }
 
     for (;;) {
-        if (xQueueReceive(hc12.mSetupHC12CommandsQueue, commandBuffor, 0) == pdTRUE) {
+        if (xQueueReceive(hc12->mSetupHC12CommandsQueue, commandBuffor, 0) == pdTRUE) {
             Serial.print("setupHC12Task received command: ");
-            hc12.printUint8Array(commandBuffor, SETUP_COMMAND_SIZE);
+            hc12->printUint8Array(commandBuffor, SETUP_COMMAND_SIZE);
 
             if (!(commandBuffor[0] == (uint8_t)'H' && commandBuffor[1] == (uint8_t)'C')) {
                 Serial.println("HC12 COMMAND ERROR! In setupHC12Task() -> received array is not hc12 command.");
             } else {
-                uint8_t lenOfCommand = hc12.calcLenOfUint8Array(commandBuffor, SETUP_COMMAND_SIZE);
+                uint8_t lenOfCommand = hc12->calcLenOfUint8Array(commandBuffor, SETUP_COMMAND_SIZE);
                 commandBuffor[0] = (uint8_t)'A';
                 commandBuffor[1] = (uint8_t)'T';
                 
-                hc12.mpSerial->write(commandBuffor, lenOfCommand);
+                hc12->mpSerial->write(commandBuffor, lenOfCommand);
 
                 bool hasHC12Responded = false;
                 uint8_t hc12Response;
                 for (;;) {
-                    if (xQueueReceive(hc12.mSetupHC12ReceiveQueue, &hc12Response, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
+                    if (xQueueReceive(hc12->mSetupHC12ReceiveQueue, &hc12Response, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
                         Serial.print((char)hc12Response);
                         hasHC12Responded = true;
                     } else {
@@ -283,7 +254,7 @@ void HC12::setupHC12Task(void *parameters) {
                 }
             }
         } else {
-            xTaskNotify(hc12.mHC12MainTaskHandle, deleteSetupHC12TaskNotif, eSetValueWithOverwrite);
+            xTaskNotify(hc12->mHC12MainTaskHandle, deleteSetupHC12TaskNotif, eSetValueWithOverwrite);
             for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
         }
     }
@@ -356,14 +327,5 @@ uint8_t HC12::calcLenOfUint8Array(const uint8_t *array, const uint8_t maxLen) {
     }
     return maxLen;
 }
-
-// bool Communication::areArraysEqual(const uint8_t *array1, const uint8_t *array2, uint8_t len) {
-//     for (uint8_t i = 0; i < len; i++){
-//         if (array1[i] != array2[i]) {
-//             return false;
-//         }
-//     }
-//     return true;
-// }
 
 // ================================================================

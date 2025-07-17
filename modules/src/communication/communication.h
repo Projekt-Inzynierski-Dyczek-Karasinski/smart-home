@@ -1,9 +1,11 @@
-#ifndef COMMUNICATION_H
-#define COMMUNICATION_H
+// #ifndef COMMUNICATION_H
+// #define COMMUNICATION_H
+#pragma once
 
-// #include <memory>
 #include <Arduino.h>
 #include <HardwareSerial.h>
+
+#include <memory>
 
 #include "smart_home_config.h"
 #include "config/communication_config.h"
@@ -24,6 +26,8 @@ public:
 
     static void startAddresingAlgorithm();
 
+    void test();
+
 private:
     Communication(DebugLED *debugLED);
     ~Communication();
@@ -39,7 +43,8 @@ private:
     static DebugLED *mspDebugLED;
 
     #ifdef HC12_MODULE
-        static HC12 *mRfModule;
+        // static HC12 *mRfModule;
+        std::unique_ptr<HC12> mRfModule;
     #else
         #error "Not implemented"
     #endif
@@ -47,4 +52,4 @@ private:
     TaskHandle_t mCommunicationMainTaskHandle = NULL;
     TaskHandle_t mSendCustomMessageTaskHandle = NULL;
 };
-#endif
+// #endif

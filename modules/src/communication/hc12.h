@@ -1,5 +1,6 @@
-#ifndef HC12_H
-#define HC12_H
+// #ifndef HC12_H
+// #define HC12_H
+#pragma once
 
 
 #include <Arduino.h>
@@ -8,21 +9,18 @@
 #include "smart_home_config.h"
 #include "config/communication_config.h"
 
+class Communication; 
+
 class HC12 {
 public:
-    static HC12& getInstance();
-    
-    // Delete copy constructor and assignment operator
-    HC12(const HC12&) = delete;
-    HC12& operator = (const HC12&) = delete;
+    explicit HC12(Communication *communication);
+    ~HC12();
 
     void send(const uint8_t *MESSAGE);
     void setupHC12(const uint8_t *COMMAND);
+    
 
 private:
-    HC12();
-    ~HC12();
-
     // void createQueues();
     // void deleteQueues();
     void createSetupHC12Queues();
@@ -40,6 +38,8 @@ private:
     void printUint8Array(const uint8_t *array, const uint8_t len);
     uint8_t calcLenOfUint8Array(const uint8_t *array, const uint8_t maxLen);
 
+    static HC12 *mspHC12;
+    Communication *mpCommunication;
     HardwareSerial *mpSerial;
     unsigned long mBaudRate;
 
@@ -57,4 +57,5 @@ private:
     TaskHandle_t mHC12MainTaskHandle = NULL;
     TaskHandle_t mSetupHC12TaskHandle = NULL;
 };
-#endif
+
+// #endif

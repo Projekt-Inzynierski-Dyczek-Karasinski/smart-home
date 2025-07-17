@@ -15,11 +15,11 @@
 
 DebugLED* Communication::mspDebugLED = nullptr;
 
-#ifdef HC12_MODULE
-    HC12* Communication::mRfModule = nullptr;
-#else
-    #error "Not implemented"
-#endif
+// #ifdef HC12_MODULE
+//     HC12* Communication::mRfModule = nullptr;
+// #else
+//     #error "Not implemented"
+// #endif
 
 
 // ============================ Public ============================
@@ -34,17 +34,20 @@ void Communication::startAddresingAlgorithm() {
     Serial.println("startAddresingAlgorithm() not implemented");
 }
 // ================================================================
-
+void Communication::test() {
+    Serial.println("Print from Communication class");
+}
 // ================== Constructor and Destructor ==================
 
-Communication::Communication(DebugLED *debugLED) {
-    mspDebugLED = debugLED;
+Communication::Communication(DebugLED *debugLED) : 
     #ifdef HC12_MODULE
-        mRfModule = &HC12::getInstance();
+        mRfModule(new HC12(this)) 
     #else
         #error "Not implemented" 
     #endif
-    // mRfModule = rfModule;
+{
+    mspDebugLED = debugLED;
+    
 
     createSendCustomMessageTask();
     Serial.println("Communication initialized");
@@ -53,20 +56,14 @@ Communication::Communication(DebugLED *debugLED) {
 Communication::~Communication() {
     deleteSendCustomMessageTask();
 }
-// ================================================================
 
-// TODO ????
-// #ifdef HC12_MODULE
-//     void Communication::setRfModule(HC12* rfModule) {
-//         mRfModule = rfModule;
-//     }
-// #else
-//     #error "Not implemented"
-// #endif
+// ================================================================
 
 // ===================== Send Custom Message ======================
 
 void Communication::sendCustomMessageTask(void *parameters) {
+    auto &c = Communication::getInstance(mspDebugLED);
+
     // prepare buffor
     uint8_t buffor[MESSAGE_SIZE];
     for (uint8_t i = 0; i < MESSAGE_SIZE; i++){
@@ -100,7 +97,7 @@ void Communication::sendCustomMessageTask(void *parameters) {
                 if (buffor[0] == 'A' && buffor[1] == 'T') {
                     buffor[0] = 'H';
                     buffor[1] = 'C';
-                    mRfModule->setupHC12(buffor);
+                    c.mRfModule->setupHC12(buffor);
                 } else {
                     // TODO add message to SendMessagesQueue
                     // xQueueSend(msSendMessagesQueue, &buffor, portMAX_DELAY);
