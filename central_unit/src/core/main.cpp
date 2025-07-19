@@ -1,7 +1,9 @@
+#include "main.h"
 #include "core.h"
 #include "config_manager.h"
 
 #include <iostream>
+#include <filesystem>
 
 #include <boost/process.hpp>
 #include <boost/program_options.hpp>
@@ -9,7 +11,29 @@
 namespace bp = boost::process;
 namespace bpo = boost::program_options;
 
-//TODO implement logging system
+namespace SmartHome {
+    //TODO implement logging system
+    void loadConfigValues(Utils::ConfigManager &configManager, Core::Config *coreConfig,
+                          MediatorConfig *mediatorConfig) {
+        // Mediator config
+        std::string prefix = "services.mediator";
+        configManager.getValue(prefix + ".enabled", mediatorConfig->isEnabled);
+        mediatorConfig->serviceType = Utils::resolveServiceType(
+            configManager.getValue<std::string>(prefix + ".service_type").value());
+        configManager.getValue(prefix + ".exec_path", mediatorConfig->execPath);
+        configManager.getValue(prefix + ".config_path", mediatorConfig->configPath);
+
+        // Core config
+        prefix = "core.ipc.tcp_server";
+        configManager.getValue(prefix + ".enabled", coreConfig->isTcpServerEnabled);
+        configManager.getValue(prefix + ".address", coreConfig->tcpServerEndpointAddress);
+        configManager.getValue(prefix + ".port", coreConfig->tcpServerEndpointPort);
+        configManager.getValue(prefix + ".threads", coreConfig->tcpServerThreads);
+    }
+}
+
+using namespace SmartHome;
+
 int main(int argc, char *argv[]) {
     // Define program options
     bpo::options_description generic("Generic options");
@@ -33,53 +57,67 @@ int main(int argc, char *argv[]) {
         return 0;
     }
 
-    // Load smart home config
-    const std::string configPath = vm.contains("config")
-                                       ? vm["config"].as<std::string>()
-                                       : "../../configs/smart_home.yaml";
-    //TODO change path to global install
+    // Load default values
+    auto &core = Core::Instance();
+    Core::Config coreConfig;
 
-    auto &config = SmartHome::Utils::Config::Instance();
-    if (config.loadConfig(configPath) == false) {
-        std::cerr << "Failed to load smart home config" << std::endl;
-        return 1;
-    };
-
-    // Enable mediator if set in config
     bp::child mediator;
-    if (config.getValue<bool>("services.mediator.enabled").value_or(false))
-        mediator = bp::child("/usr/bin/konsole", "-e", "./ModuleMediator");
+    MediatorConfig mediatorConfig;
 
-    // Configure core
-    auto &core = SmartHome::Core::Instance();
-    SmartHome::Core::ConfigManager coreConfig; //Load default values
+    // Initialize YAML config manager
+    auto &configManager = Utils::ConfigManager::Instance();
+    const std::string configPath = vm.contains("config") ? vm["config"].as<std::string>() : defaultConfigPath;
 
-    //Overwrite default core config with smart home config
-    config.getValue("core.ipc.tcp_server.enabled", coreConfig.isTcpServerEnabled);
-    config.getValue("core.ipc.tcp_server.address", coreConfig.tcpServerEndpointAddress);
-    config.getValue("core.ipc.tcp_server.port", coreConfig.tcpServerEndpointPort);
-    config.getValue("core.ipc.tcp_server.threads", coreConfig.tcpServerThreads);
-
-    // Overwrite core config with cmd options
-    if (vm.contains("port")) {
-        coreConfig.tcpServerEndpointPort = vm["port"].as<int>();
+    //Load YAML config values
+    if (configManager.loadConfig(configPath)) {
+        loadConfigValues(configManager, &coreConfig, &mediatorConfig);
+    } else {
+        std::cerr << "Could not load YAML config" << std::endl;
     }
 
-    if (vm.contains("ipv4")) {
-        coreConfig.tcpServerEndpointAddress = vm["ipv4"].as<std::string>();
-    }
+    // Overwrite YAML config with cmd options
+    if (vm.contains("port")) coreConfig.tcpServerEndpointPort = vm["port"].as<int>();
+    if (vm.contains("ipv4"))coreConfig.tcpServerEndpointAddress = vm["ipv4"].as<std::string>();
+
 
     //Initialize Core
-    if (core.initialize(coreConfig) == false) {
+    if (!core.initialize(coreConfig)) {
         std::cerr << "Failed to initialize core" << std::endl;
         return 1;
     }
 
+    // Launch mediator if enabled
+    if (mediatorConfig.isEnabled) {
+        switch (mediatorConfig.serviceType) {
+            default:
+            case Utils::ServiceType::AUTO:
+            case Utils::ServiceType::STANDALONE:
+                if (std::filesystem::exists(mediatorConfig.execPath)) {
+                    mediator = bp::child(mediatorConfig.execPath);
+                } else {
+                    std::cerr << "Could not find mediator executable" << std::endl;
+                }
+                break;
+            case Utils::ServiceType::SYSTEMD:
+                //TODO implement
+                break;
+        }
+    }
+
     // Run core
     core.run();
+
     // Wait for mediator to exit if enabled
-    if (mediator)
-        mediator.wait();
+    if (mediatorConfig.isEnabled && mediator) {
+        if (mediatorConfig.serviceType == Utils::ServiceType::STANDALONE) {
+            mediator.terminate(); //SIGTERM
+            if (!mediator.wait_for(std::chrono::seconds(15))) {
+                mediator.terminate(); // SIGKILL
+            }
+        } else if (mediatorConfig.serviceType == Utils::ServiceType::SYSTEMD) {
+            //TODO implement
+        }
+    }
 
     return 0;
 }
