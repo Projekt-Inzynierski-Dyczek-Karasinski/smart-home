@@ -15,23 +15,23 @@ namespace SmartHome::Utils {
      * @details Thread-safe singleton allowing type-safe access to
      *          configuration values using dot notation.
      */
-    class Config {
+    class ConfigManager {
     public:
         /**
-         * @brief Get singleton instance of Config.
+         * @brief Get singleton instance of ConfigManager.
          *
          * @details Thread-safe initialization using static local variable.
          *          Instance is created on first call and reused after.
          *
          * @return Reference to Config singleton instance.
          */
-        static Config &Instance();
+        static ConfigManager &Instance();
 
         // Prevent copying
-        Config(const Config &) = delete;
+        ConfigManager(const ConfigManager &) = delete;
 
         // Prevent assignment
-        Config &operator=(const Config &) = delete;
+        ConfigManager &operator=(const ConfigManager &) = delete;
 
         /**
          * @brief Loads config file from YAML file.
@@ -56,33 +56,7 @@ namespace SmartHome::Utils {
          * @endcode
          */
         template<typename T>
-        std::optional<T> getValue(const std::string &valuePath) {
-            if (mConfigLoaded.load() == true) {
-                // Prepare keys from string
-                std::vector<std::string> keys = {};
-                boost::split(keys, valuePath, boost::is_any_of("."));
-
-                std::string currentValuePath = "";
-                YAML::Node currentNode = YAML::Clone(mConfigNode);
-                // Iterate on keys, check if they are defined
-                for (auto &key: keys) {
-                    currentValuePath += key + ".";
-                    currentNode = currentNode[key];
-
-                    if (currentNode.IsDefined() == false) {
-                        // Handle invalid path
-                        if (currentValuePath != "") currentValuePath.pop_back();
-                        std::cerr << "Config get value error: value path \"" << currentValuePath << "\" is not defined"
-                                << std::endl;
-                        return std::nullopt;
-                    }
-                }
-                return currentNode.as<T>();
-            }
-            // Handle config not loaded
-            std::cerr << "Config get value error: config not loaded" << std::endl;
-            return std::nullopt;
-        }
+        std::optional<T> getValue(const std::string &valuePath);
 
         /**
         * @brief Get value and store in reference.
@@ -100,25 +74,22 @@ namespace SmartHome::Utils {
         * @endcode
         */
         template<typename T>
-        void getValue(const std::string &valuePath, T &value) {
-            auto result = getValue<T>(valuePath);
-            if (result.has_value()) {
-                value = result.value();
-            }
-        }
+        void getValue(const std::string &valuePath, T &value);
 
     private:
         /**
          * @brief Private constructor for singleton pattern.
          */
-        Config();
+        ConfigManager();
 
         /**
          * @brief Private destructor for singleton pattern.
          */
-        ~Config();
+        ~ConfigManager();
 
         YAML::Node mConfigNode; ///< YAML configuration file root node.
-        std::atomic<bool> mConfigLoaded{false}; ///< Configuration loaded state.
+        std::atomic<bool> mIsConfigLoaded{false}; ///< Configuration loaded state.
     };
 }
+
+#include "config_manager.tpp"

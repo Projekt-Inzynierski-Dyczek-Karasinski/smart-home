@@ -1,6 +1,7 @@
 #pragma once
 
-#include "ipc/smart_home_tcp_server.h"
+#include "tcp/tcp_server.h"
+#include "service/service_manager.h"
 
 #include <atomic>
 #include <memory>
@@ -9,7 +10,6 @@
 #include <utility>
 
 #include <boost/asio.hpp>
-
 
 namespace ba = boost::asio;
 namespace bs = boost::system;
@@ -31,14 +31,19 @@ namespace SmartHome {
          * @brief Configuration structure for Core initialization.
          */
         struct Config {
+            enum tcpServerThreadCount : int {
+                HALF_CPU_CORES = -1,
+                ALL_CPU_CORES = 0,
+            };
+
             /// Enable/disable TCP server for IPC.
-            bool tcpServerEnabled = true;
+            bool isTcpServerEnabled = true;
             /// TCP server address.
             std::string tcpServerEndpointAddress = "127.0.0.1";
             /// TCP server port number.
             int tcpServerEndpointPort = 43321;
             /// Number of TCP server threads (-1: half CPU cores, 0: all CPU cores, n >= 1: exact thread count).
-            int tcpServerThreads = -1;
+            int tcpServerThreads = HALF_CPU_CORES;
         };
 
         /**
@@ -85,6 +90,20 @@ namespace SmartHome {
          */
         void shutdown();
 
+        /**
+         * @brief Check if core is currently running.
+         *
+         * @return true if core is running, false otherwise.
+         */
+        bool isRunning() const;
+
+        /**
+         * @brief Core IO context getter
+         *
+         * @return core IO context
+         */
+        ba::io_context &getCoreIoContext();
+
     private:
         /**
          * @brief Private constructor for singleton pattern.
@@ -107,19 +126,22 @@ namespace SmartHome {
         // Configuration
         Config mConfig;
 
+        std::unique_ptr<Service::ServiceManager> mpService;
+
         // TCP server resources
         ba::io_context mTcpServerIoContext;
         std::optional<ba::thread_pool> mTcpServerThreadPool;
         std::optional<ba::executor_work_guard<ba::io_context::executor_type> > mTcpServerGuard;
+        static constexpr uint mHighThreadCountLimit = 128; ///< Limit for high thread count warning
 
         // Signal handling resources
-        ba::io_context mSignalIoContext;
-        std::optional<std::thread> mSignalThread;
+        ba::io_context mCoreIoContext;
+        std::optional<std::thread> mCoreThread;
         std::optional<ba::signal_set> mSignals;
-        std::optional<ba::executor_work_guard<ba::io_context::executor_type> > mSignalGuard;
+        std::optional<ba::executor_work_guard<ba::io_context::executor_type> > mCoreGuard;
 
         // State flags
-        std::atomic<bool> mInitialized{false}; ///< Core initialization state.
-        std::atomic<bool> mRunning{false}; ///< Main loop running state.
+        std::atomic<bool> mIsInitialized{false}; ///< Core initialization state.
+        std::atomic<bool> mIsRunning{false}; ///< Main loop running state.
     };
 }

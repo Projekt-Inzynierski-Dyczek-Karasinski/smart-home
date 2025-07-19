@@ -1,24 +1,24 @@
-#include "smart_home_config.h"
+#include "config_manager.h"
 
 #include <iostream>
 
 #include <yaml-cpp/yaml.h>
 
 namespace SmartHome::Utils {
-    Config &Config::Instance() {
-        static Config ConfigInstance;
+    ConfigManager &ConfigManager::Instance() {
+        static ConfigManager ConfigInstance;
         return ConfigInstance;
     }
 
-    Config::Config() = default;
+    ConfigManager::ConfigManager() = default;
 
-    Config::~Config() = default;
+    ConfigManager::~ConfigManager() = default;
 
-    bool Config::loadConfig(const std::string &configPath) {
+    bool ConfigManager::loadConfig(const std::string &configPath) {
         try {
             // Try to load config file
             mConfigNode = YAML::LoadFile(configPath);
-            mConfigLoaded.store(true);
+            mIsConfigLoaded.store(true);
             return true;
         } catch (YAML::Exception &e) {
             // Handle loading error
@@ -26,6 +26,4 @@ namespace SmartHome::Utils {
             return false;
         }
     };
-
-
 }
