@@ -1,0 +1,11 @@
+[Unit]
+Description=Smart Home central unit core daemon
+
+[Service]
+ExecStart=/usr/local/bin/smarthomed
+Type=notify
+NotifyAccess=main
+WatchdogSec=30s
+
+[Install]
+WantedBy=multi-user.target
