@@ -17,5 +17,7 @@ core:
 services:
   mediator:
     enabled: false
-    config_path: "../../configs/mediator.yaml" #TODO change path to global install
+    service_type: "Standalone" # TODO implement systemd service along proper mediator implementation
+    exec_path: ~ #For standalone mode - Default: /usr/local/bin/
+    config_path: ~ # Default: "/etc/smarthome/mediator.yaml"
 
