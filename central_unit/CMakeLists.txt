@@ -18,7 +18,9 @@ set(TARGET_DEVICE "NATIVE" CACHE STRING "Target device type")
 set_property(CACHE TARGET_DEVICE PROPERTY STRINGS "NATIVE" "RPI_ZERO_2W")
 
 # Build options
+option(ENABLE_SYSTEMD "Enables systemd integration for core" ON)
 option(BUILD_CORE "Build SmartHome daemon" ON)
+
 option(BUILD_MEDIATOR "Build module mediator" ON)
 
 # Boost config
