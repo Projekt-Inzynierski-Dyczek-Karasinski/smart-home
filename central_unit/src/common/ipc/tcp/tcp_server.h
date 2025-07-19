@@ -64,8 +64,6 @@ namespace SmartHome::IPC {
 
         /**
          * @brief Stops accepting new connections and close acceptor.
-         *
-         * @return true if stopped successfully, false on error or not running.
           */
         void stopTcpServer();
 

@@ -7,7 +7,7 @@
 
 namespace SmartHome::Service {
     /**
-     * @brief Standalone servie implementation.
+     * @brief Standalone service implementation.
      *
      * @details Ensures single instance via exclusive file lock. Lock is automatically released on service stop or crash.
      */
