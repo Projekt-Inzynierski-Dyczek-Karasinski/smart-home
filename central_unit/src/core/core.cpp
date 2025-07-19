@@ -1,6 +1,7 @@
 #include "core.h"
-#include "config.h"
+#include "config_manager.h"
 #include "tcp/tcp_server.h"
+#include "service/service_manager.h"
 
 #include <chrono>
 #include <cmath>
@@ -32,14 +33,20 @@ namespace SmartHome {
             return false;
         }
 
+        mpService = Service::ServiceManager::create();
+        if (!mpService->onInitialize()) {
+            std::cerr << "Failed to initialize service" << std::endl;
+            return false;
+        }
+
         std::cout << "Initializing core" << std::endl;
         // Save config
         mConfig = configStruct;
 
-        // Create thread running io context for signal handling
-        mSignalGuard.emplace(ba::make_work_guard(mSignalIoContext));
-        mSignalThread = std::thread([this]() {
-            mSignalIoContext.run();
+        // Create thread running io context for signal handling and service manager
+        mCoreGuard.emplace(ba::make_work_guard(mCoreIoContext));
+        mCoreThread = std::thread([this]() {
+            mCoreIoContext.run();
         });
 
         // TCP server initialization if enabled in config
@@ -55,7 +62,7 @@ namespace SmartHome {
                     threadCount = std::thread::hardware_concurrency();
                     break;
                 default:
-                    if (mConfig.tcpServerThreads > 128) {
+                    if (mConfig.tcpServerThreads > mHighThreadCountLimit) {
                         std::cerr << "Core init warning: TCP server possible excessive thread count (" <<
                                 mConfig.tcpServerThreads << " threads)" << std::endl;
                     }
@@ -99,8 +106,10 @@ namespace SmartHome {
         mIsRunning.store(true);
         std::cout << "Running core" << std::endl;
 
+        mpService->onStart();
+
         // Start signal handling
-        mSignals.emplace(mSignalIoContext, SIGINT, SIGTERM); //TODO add more signals
+        mSignals.emplace(mCoreIoContext, SIGINT, SIGTERM); //TODO add more signals
         mSignals->async_wait([this](const bs::error_code &ec, const int sig) {
             signalHandler(ec, sig);
         });
@@ -121,20 +130,16 @@ namespace SmartHome {
         while (mIsRunning.load()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
-
-        // Waiting for tcp server threads to finish
-        if (mTcpServerThreadPool.has_value()) {
-            mTcpServerThreadPool->join();
-            mTcpServerThreadPool.reset();
-        }
+        std::cout << "Core finished running" << std::endl;
 
         // Stopping signal thread
-        if (mSignalThread.has_value()) {
-            mSignalThread->join();
-            mSignalThread.reset();
+        if (mCoreThread.has_value()) {
+            mCoreGuard.reset();
+            mCoreIoContext.stop();
+            mCoreThread->join();
+            mCoreThread.reset();
         }
-
-        std::cout << "Core finished" << std::endl;
+        std::cout << "Core cleanup complete" << std::endl;
     }
 
     void Core::shutdown() {
@@ -143,43 +148,50 @@ namespace SmartHome {
         // Stop core main loop
         mIsRunning.store(false);
 
-        // Stop handling signals
-        if (mSignals.has_value()) {
-            mSignals->cancel();
-            mSignals.reset();
-        }
-        mSignalGuard.reset();
-        mSignalIoContext.stop();
+        mpService->onStop();
 
-        // Stop tcp server
+        // Stop TCP server
         if (mConfig.isTcpServerEnabled) {
             std::cout << "Stopping tcp server" << std::endl;
             auto &tcpServer = IPC::TcpServer::Instance();
             if (tcpServer.isRunning()) {
                 tcpServer.stopTcpServer();
             }
+        }
 
-            // Stop handling queued tcp server tasks
+        // Waiting for tcp server threads to finish
+        if (mTcpServerThreadPool.has_value()) {
             mTcpServerGuard.reset();
+            mTcpServerThreadPool->stop();
+            mTcpServerThreadPool->join();
+            mTcpServerThreadPool.reset();
+        }
 
-            std::cout << "Waiting for threads to finish" << std::endl;
-            while (mTcpServerThreadPool.has_value()) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            }
+        // Stop handling signals
+        if (mSignals.has_value()) {
+            mSignals->cancel();
+            mSignals.reset();
         }
 
         std::cout << "Shutdown complete" << std::endl;
     }
+
+    bool Core::isRunning() const {
+        return mIsRunning.load();
+    }
+
+    ba::io_context &Core::getCoreIoContext() {
+        return mCoreIoContext;
+    }
+
 
     void Core::signalHandler(const boost::system::error_code &ec, const int signal) {
         if (!ec) {
             // Handle signal
             switch (signal) {
                 case SIGINT:
-                    Core::Instance().shutdown();
-                    break;
                 case SIGTERM:
-                    Core::Instance().shutdown();
+                    shutdown();
                     break;
                 case SIGHUP:
                     std::cout << "HUP - not implemented" << std::endl;

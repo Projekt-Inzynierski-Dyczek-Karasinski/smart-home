@@ -1,6 +1,7 @@
 #pragma once
 
 #include "tcp/tcp_server.h"
+#include "service/service_manager.h"
 
 #include <atomic>
 #include <memory>
@@ -9,7 +10,6 @@
 #include <utility>
 
 #include <boost/asio.hpp>
-
 
 namespace ba = boost::asio;
 namespace bs = boost::system;
@@ -90,6 +90,20 @@ namespace SmartHome {
          */
         void shutdown();
 
+        /**
+         * @brief Check if core is currently running.
+         *
+         * @return true if core is running, false otherwise.
+         */
+        bool isRunning() const;
+
+        /**
+         * @brief Core IO context getter
+         *
+         * @return core IO context
+         */
+        ba::io_context &getCoreIoContext();
+
     private:
         /**
          * @brief Private constructor for singleton pattern.
@@ -112,16 +126,19 @@ namespace SmartHome {
         // Configuration
         Config mConfig;
 
+        std::unique_ptr<Service::ServiceManager> mpService;
+
         // TCP server resources
         ba::io_context mTcpServerIoContext;
         std::optional<ba::thread_pool> mTcpServerThreadPool;
         std::optional<ba::executor_work_guard<ba::io_context::executor_type> > mTcpServerGuard;
+        static constexpr uint mHighThreadCountLimit = 128; ///< Limit for high thread count warning
 
         // Signal handling resources
-        ba::io_context mSignalIoContext;
-        std::optional<std::thread> mSignalThread;
+        ba::io_context mCoreIoContext;
+        std::optional<std::thread> mCoreThread;
         std::optional<ba::signal_set> mSignals;
-        std::optional<ba::executor_work_guard<ba::io_context::executor_type> > mSignalGuard;
+        std::optional<ba::executor_work_guard<ba::io_context::executor_type> > mCoreGuard;
 
         // State flags
         std::atomic<bool> mIsInitialized{false}; ///< Core initialization state.
