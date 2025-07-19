@@ -15,23 +15,23 @@ namespace SmartHome::Utils {
      * @details Thread-safe singleton allowing type-safe access to
      *          configuration values using dot notation.
      */
-    class Config {
+    class ConfigManager {
     public:
         /**
-         * @brief Get singleton instance of Config.
+         * @brief Get singleton instance of ConfigManager.
          *
          * @details Thread-safe initialization using static local variable.
          *          Instance is created on first call and reused after.
          *
          * @return Reference to Config singleton instance.
          */
-        static Config &Instance();
+        static ConfigManager &Instance();
 
         // Prevent copying
-        Config(const Config &) = delete;
+        ConfigManager(const ConfigManager &) = delete;
 
         // Prevent assignment
-        Config &operator=(const Config &) = delete;
+        ConfigManager &operator=(const ConfigManager &) = delete;
 
         /**
          * @brief Loads config file from YAML file.
@@ -80,16 +80,16 @@ namespace SmartHome::Utils {
         /**
          * @brief Private constructor for singleton pattern.
          */
-        Config();
+        ConfigManager();
 
         /**
          * @brief Private destructor for singleton pattern.
          */
-        ~Config();
+        ~ConfigManager();
 
         YAML::Node mConfigNode; ///< YAML configuration file root node.
         std::atomic<bool> mIsConfigLoaded{false}; ///< Configuration loaded state.
     };
 }
 
-#include "config.tpp"
+#include "config_manager.tpp"

@@ -25,7 +25,7 @@ target_link_libraries(smarthome_ipc PUBLIC
 
 
 add_library(smarthome_utility STATIC
-        utils/config.cpp
+        utils/config_manager.cpp
 )
 
 add_library(smarthome::utility ALIAS smarthome_utility)

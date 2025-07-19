@@ -1,7 +1,7 @@
 #pragma once
 namespace SmartHome::Utils {
     template<typename T>
-    std::optional<T> Config::getValue(const std::string &valuePath) {
+    std::optional<T> ConfigManager::getValue(const std::string &valuePath) {
         if (mIsConfigLoaded.load()) {
             // Prepare keys from string
             std::vector<std::string> keys = {};
@@ -41,7 +41,7 @@ namespace SmartHome::Utils {
     }
 
     template<typename T>
-       void Config::getValue(const std::string &valuePath, T &value) {
+    void ConfigManager::getValue(const std::string &valuePath, T &value) {
         auto result = getValue<T>(valuePath);
         if (result.has_value()) {
             value = result.value();

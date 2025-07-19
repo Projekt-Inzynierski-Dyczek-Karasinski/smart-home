@@ -1,5 +1,5 @@
 #include "core.h"
-#include "config.h"
+#include "config_manager.h"
 
 #include <iostream>
 
@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
 
     // Configure core
     auto &core = SmartHome::Core::Instance();
-    SmartHome::Core::Config coreConfig; //Load default values
+    SmartHome::Core::ConfigManager coreConfig; //Load default values
 
     //Overwrite default core config with smart home config
     config.getValue("core.ipc.tcp_server.enabled", coreConfig.isTcpServerEnabled);
