@@ -10,7 +10,7 @@ namespace bs = boost::system;
 
 namespace SmartHome::IPC {
     TcpConnection::TcpConnection(ba::io_context &ioContext) : mSocket(ioContext) {
-    };
+    }
 
     TcpConnection::~TcpConnection() {
         std::cout << "Connection destroyed." << std::endl;
@@ -35,7 +35,7 @@ namespace SmartHome::IPC {
         auto self = shared_from_this(); //TODO consider making this private class variable
 
         //Start asynchronously reading incoming data
-        ba::async_read_until(mSocket, mStreamBuf, "\n", [this, self](bs::error_code ec, std::size_t bytes_transferred) {
+        ba::async_read_until(mSocket, mStreamBuf, "\n", [this, self](const bs::error_code ec, std::size_t) {
             if (!ec && !mIsShuttingDown.load()) {
                 std::istream is(&mStreamBuf);
                 std::string message;

@@ -1,9 +1,11 @@
 #include "utils.h"
+
 #include <fcntl.h>
 #include <stdexcept>
+
+#include <sys/file.h>
 #include <boost/asio/detail/descriptor_ops.hpp>
 #include <boost/process/io.hpp>
-#include <sys/file.h>
 
 namespace SmartHome::Utils {
     ServiceType resolveServiceType(const std::string &typeStr) {
@@ -41,7 +43,7 @@ namespace SmartHome::Utils {
         if (ftruncate(mLockFd, 0) != 0) {
             return false;
         }
-        std::string pidStr = std::to_string(getpid()) + "\n";
+        const std::string pidStr = std::to_string(getpid()) + "\n";
         return write(mLockFd, pidStr.c_str(), pidStr.length()) == pidStr.length();
     }
 }

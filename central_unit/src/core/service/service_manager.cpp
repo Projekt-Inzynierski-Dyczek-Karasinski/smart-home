@@ -21,5 +21,5 @@ namespace SmartHome::Service {
             case Utils::ServiceType::STANDALONE:
                 return std::make_unique<StandaloneService>();
         }
-    };
+    }
 }

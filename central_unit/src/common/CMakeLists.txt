@@ -20,7 +20,6 @@ target_include_directories(smarthome_ipc PUBLIC
 
 target_link_libraries(smarthome_ipc PUBLIC
         Boost::system
-
 )
 
 

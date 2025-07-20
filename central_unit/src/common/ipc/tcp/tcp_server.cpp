@@ -74,7 +74,7 @@ namespace SmartHome::IPC {
 
         // Save new connection to active connections map
         {
-            std::lock_guard<std::mutex> lock(mActiveConnectionsMutex);
+            std::lock_guard lock(mActiveConnectionsMutex);
             mActiveConnections[connectionId] = connection;
         }
 
@@ -89,7 +89,7 @@ namespace SmartHome::IPC {
 
 
     uint32_t TcpServer::getNextConnectionId() {
-        std::lock_guard<std::mutex> lock(mActiveConnectionsMutex);
+        std::lock_guard lock(mActiveConnectionsMutex);
 
         for (uint32_t id = 0; id < std::numeric_limits<uint32_t>::max(); ++id) {
             if (!mActiveConnections.contains(id)) {
@@ -101,7 +101,7 @@ namespace SmartHome::IPC {
     }
 
     void TcpServer::removeActiveConnection(const uint32_t connectionId) {
-        std::lock_guard<std::mutex> lock(mActiveConnectionsMutex);
+        std::lock_guard lock(mActiveConnectionsMutex);
         mActiveConnections.erase(connectionId);
     }
 
@@ -134,7 +134,7 @@ namespace SmartHome::IPC {
         std::vector<std::shared_ptr<TcpConnection> > connectionsToClose;
         // Close all active connections
         {
-            std::lock_guard<std::mutex> lock(mActiveConnectionsMutex);
+            std::lock_guard lock(mActiveConnectionsMutex);
 
             for (auto &weakConnection: mActiveConnections | std::views::values) {
                 if (auto connection = weakConnection.lock()) {

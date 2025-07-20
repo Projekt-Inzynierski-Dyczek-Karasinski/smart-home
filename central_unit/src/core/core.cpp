@@ -45,7 +45,7 @@ namespace SmartHome {
 
         // Create thread running io context for signal handling and service manager
         mCoreGuard.emplace(ba::make_work_guard(mCoreIoContext));
-        mCoreThread = std::thread([this]() {
+        mCoreThread = std::thread([this] {
             mCoreIoContext.run();
         });
 
@@ -79,7 +79,7 @@ namespace SmartHome {
             mTcpServerThreadPool.emplace(threadCount);
             mTcpServerGuard.emplace(ba::make_work_guard(mTcpServerIoContext));
             for (size_t i = 0; i < threadCount; i++) {
-                ba::post(*mTcpServerThreadPool, [this]() {
+                ba::post(*mTcpServerThreadPool, [this] {
                     mTcpServerIoContext.run();
                 });
             }

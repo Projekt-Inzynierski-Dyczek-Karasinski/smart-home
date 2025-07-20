@@ -26,7 +26,7 @@ namespace SmartHome::IPC {
          *
          * @param ioContext boost.asio IO context for async operations.
          */
-        TcpConnection(ba::io_context &ioContext);
+        explicit TcpConnection(ba::io_context &ioContext);
 
         /**
          * @brief Destructor handles closing socket.

@@ -2,7 +2,6 @@
 
 #include <string>
 
-
 namespace SmartHome::Utils {
     /**
      * @brief Service management type enum.
@@ -29,7 +28,7 @@ namespace SmartHome::Utils {
     /**
      * @brief RAII wrapper for exclusive file locking.
      *
-     * @details Acquires exclusive lock on specifed file using flock(). Lock is automatically released on destuction.
+     * @details Acquires exclusive lock on specified file using flock(). Lock is automatically released on destruction.
      */
     class FileLock {
     public:
