@@ -13,9 +13,8 @@ public:
     explicit HC12(Communication *communication);
     ~HC12();
 
-    void addMessageToTransmit(const uint8_t *MESSAGE); // TODO consider returning bool for informing about success/failure
+    void addMessageToTransmit(const uint8_t *MESSAGE);
     void setupHC12(const uint8_t *COMMAND); 
-    
 
 private:
     void createQueues();

@@ -33,7 +33,7 @@ void Communication::startAddresingAlgorithm() {
 
 void Communication::addByteToDecode(const uint8_t DATA) {
     xQueueSend(mReceiveByteQueue, &DATA, portMAX_DELAY);
-    vTaskResume(mReceiveMessageTaskHandle);
+    vTaskResume(mDecodeMessageTaskHandle);
 }
 // ================================================================
 
@@ -59,8 +59,8 @@ Communication::Communication(DebugLED *debugLED) :
     createCommunicationTimers();
     
     createSendCustomMessageTask();
-    createReceiveMessageTask();
-    createSendMessageTask();
+    createDecodeMessageTask();
+    createEncodeMessageTask();
     createCommunicationMainTask();
 
     Serial.println("Communication initialized"); 
@@ -68,8 +68,8 @@ Communication::Communication(DebugLED *debugLED) :
 
 Communication::~Communication() {
     deleteSendCustomMessageTask();
-    deleteSendMessageTask();
-    deleteReceiveMessageTask();
+    deleteEncodeMessageTask();
+    deleteDecodeMessageTask();
     deleteCommunicationMainTask();
 
     deleteCommunicationQueues();
@@ -117,7 +117,6 @@ void Communication::communicationMainTask(void* parameters) {
 
     uint32_t status = defaultStatusNotif;
 
-    bool isSendingTaskWaiting = false;
     
     for (;;) {
         // change status
@@ -128,12 +127,12 @@ void Communication::communicationMainTask(void* parameters) {
                 if (uxQueueMessagesWaiting(com.mReceiveByteQueue) != 0) {
                     // TODO remove print
                     Serial.println("vTaskResume(msReceiveMessageTaskHandle);");
-                    vTaskResume(com.mReceiveMessageTaskHandle);
+                    vTaskResume(com.mDecodeMessageTaskHandle);
                 }
                 if (uxQueueMessagesWaiting(com.mSendMessagesQueue) != 0) {
                     // TODO remove print
                     Serial.println("vTaskResume(msSendMessageTaskHandle);");
-                    vTaskResume(com.mSendMessageTaskHandle);
+                    vTaskResume(com.mEncodeMessageTaskHandle);
                 }
 
                 // delay for watchdog
@@ -141,11 +140,11 @@ void Communication::communicationMainTask(void* parameters) {
                 break;
                 
             case byteTimeoutNotif:
-                xTaskNotify(com.mReceiveMessageTaskHandle, byteTimeoutNotif, eSetValueWithOverwrite);
+                xTaskNotify(com.mDecodeMessageTaskHandle, byteTimeoutNotif, eSetValueWithOverwrite);
                 break;
 
             case messageTimeoutNotif:
-                xTaskNotify(com.mReceiveMessageTaskHandle, messageTimeoutNotif, eSetValueWithOverwrite);
+                xTaskNotify(com.mDecodeMessageTaskHandle, messageTimeoutNotif, eSetValueWithOverwrite);
                 break;
 
             // case readRawMessageNotif:
@@ -153,18 +152,18 @@ void Communication::communicationMainTask(void* parameters) {
             //     xTaskNotify(msReceiveMessageTaskHandle, readRawMessageNotif, eSetValueWithOverwrite);
             //     break;
 
-            case suspendReceiveMessageTaskNotif:
+            case suspendDecodeMessageTaskNotif:
                 // TODO remove print
-                Serial.println("vTaskSuspend(msReceiveMessageTaskHandle)");
-                vTaskSuspend(com.mReceiveMessageTaskHandle);
+                Serial.println("vTaskSuspend(mDecodeMessageTaskHandle)");
+                vTaskSuspend(com.mDecodeMessageTaskHandle);
                 break;
             
-            case suspendSendMessageTaskNotif:
+            case suspendEndcodeMessageTaskNotif:
                 // TODO remove print
-                Serial.println("vTaskSuspend(msSendMessageTaskHandle);");
+                Serial.println("vTaskSuspend(mEncodeMessageTaskHandle);");
                 // TODO implement
                 // resetLastMessage();
-                vTaskSuspend(com.mSendMessageTaskHandle);
+                vTaskSuspend(com.mEncodeMessageTaskHandle);
                 break;
 
             default:
@@ -200,14 +199,14 @@ void Communication::deleteCommunicationMainTask() {
 }
 // ================================================================
 
-// ======================= Receive Message ========================
+// ======================== Decode Message ========================
 
-void Communication::receiveMessageTask(void *parameters) {
+void Communication::decodeMessageTask(void *parameters) {
     auto &com = Communication::getInstance(Communication::mspDebugLED);
 
     // timeout status/cause
     uint32_t timeoutStatus = defaultStatusNotif;
-    // if true receiveMessageTask() will put in xQueueSend() protocolBuffor[0] insted messageBuffor
+    // if true decodeMessageTask() will put in xQueueSend() protocolBuffor[0] insted messageBuffor
     bool isRawMessage = false;
 
     // prepare message protocol buffor
@@ -259,7 +258,7 @@ void Communication::receiveMessageTask(void *parameters) {
                     resetProtocolBuffor();
                     xQueueReset(com.mReceiveByteQueue);
                 } else {
-                    Serial.print("STATUS ERROR! In receiveMessageTask() -> got unknow status. Received Status: ");
+                    Serial.print("STATUS ERROR! In decodeMessageTask() -> got unknow status. Received Status: ");
                     Serial.println(timeoutStatus);
                 }
             }
@@ -267,8 +266,7 @@ void Communication::receiveMessageTask(void *parameters) {
         } 
 
         // decoding message
-        if (xQueueReceive(com.mReceiveByteQueue, &queueBuffor, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
-            xTimerStop(com.mSuspendReceiveMessageTimer, portMAX_DELAY);
+        if (xQueueReceive(com.mReceiveByteQueue, &queueBuffor, pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG)) == pdTRUE) {
             protocolBuffor[pbMessageIndex][pbByteIndex] = queueBuffor;
             // if new message start message timeout timer
             if (pbByteIndex == 0 && pbMessageIndex == 0){
@@ -286,7 +284,7 @@ void Communication::receiveMessageTask(void *parameters) {
                 if (protocolBuffor[pbMessageIndex][PROTOCOL_MESSAGE_SIZE - 1] != 0) {
                     xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
                     
-                    Serial.print("BAD END OF MESSAGE ERROR! In receiveMessageTask() -> message should end with 0 (\\0 char), but got: ");
+                    Serial.print("BAD END OF MESSAGE ERROR! In decodeMessageTask() -> message should end with 0 (\\0 char), but got: ");
                     Serial.println(protocolBuffor[pbMessageIndex][PROTOCOL_MESSAGE_SIZE - 1]);
 
                     // TODO implement repeatMessage()
@@ -303,7 +301,7 @@ void Communication::receiveMessageTask(void *parameters) {
                     // if checksum is incorrect
                     if (checksum % 256 != 0) {
                         xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
-                        Serial.println("BAD CHECKSUM ERROR! In receiveMessageTask() -> checksum incorrect");
+                        Serial.println("BAD CHECKSUM ERROR! In decodeMessageTask() -> checksum incorrect");
 
                         // TODO implement repeatMessage()
                         // repeatMessage();
@@ -315,7 +313,7 @@ void Communication::receiveMessageTask(void *parameters) {
                     // else if (!isProperMACAndIP(protocolBuffor[pbMessageIndex], protocolBuffor[pbMessageIndex][6])) {
                     else if (false) {
                         #ifdef CENTRAL_UNIT
-                            Serial.println("CRITICAL ERROR! In receiveMessageTask() -> isProperMACAndIP() must never return false for CENTRAL_UNIT"); 
+                            Serial.println("CRITICAL ERROR! In decodeMessageTask() -> isProperMACAndIP() must never return false for CENTRAL_UNIT"); 
                         #else
                             xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
                             resetProtocolBuffor();
@@ -388,36 +386,37 @@ void Communication::receiveMessageTask(void *parameters) {
                     }
                 }
             }
-            xTimerStart(com.mSuspendReceiveMessageTimer, portMAX_DELAY);
+        } else {
+            xTaskNotify(com.mCommunicationMainTaskHandle, suspendDecodeMessageTaskNotif, eSetValueWithOverwrite);
         }
     }
 }
 
-void Communication::createReceiveMessageTask() {
-    if (mReceiveMessageTaskHandle == NULL) {
+void Communication::createDecodeMessageTask() {
+    if (mDecodeMessageTaskHandle == NULL) {
         xTaskCreate(
-            receiveMessageTask,
-            "Receive message",
+            decodeMessageTask,
+            "Decode message",
             2048,
             NULL,
             LOW_TASK_PRIORITY,
-            &mReceiveMessageTaskHandle
+            &mDecodeMessageTaskHandle
         );
     } else {
-        Serial.println("TASK CREATION ERROR! In createReceiveMessageTask() -> Can't create receive message task, because task already exists");
+        Serial.println("TASK CREATION ERROR! In createDecodeMessageTask() -> Can't create decode message task, because task already exists");
     }
 }
-void Communication::deleteReceiveMessageTask() {
-    if (mReceiveMessageTaskHandle != NULL) {
-        vTaskDelete(mReceiveMessageTaskHandle);
-        mReceiveMessageTaskHandle = NULL;
+void Communication::deleteDecodeMessageTask() {
+    if (mDecodeMessageTaskHandle != NULL) {
+        vTaskDelete(mDecodeMessageTaskHandle);
+        mDecodeMessageTaskHandle = NULL;
     }
 }
 // ================================================================
 
-// ========================= Send Message =========================
+// ======================== Encode Message ========================
 
-void Communication::sendMessageTask(void *parameters) {
+void Communication::encodeMessageTask(void *parameters) {
     auto &com = Communication::getInstance(Communication::mspDebugLED);
 
     // TODO change 2D protocolBuffor array for 1D array[PROTOCOL_MESSAGE_SIZE] and append ready protocol message to send queue in hc12 class
@@ -476,9 +475,7 @@ void Communication::sendMessageTask(void *parameters) {
         messagesQuantity = 0;
 
         // wait until the message appears in the queue and save message in local messageBuffor
-        if (xQueueReceive(com.mSendMessagesQueue, &messageBuffor, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
-            xTimerStop(com.mSuspendSendMessageTimer, portMAX_DELAY);
-
+        if (xQueueReceive(com.mSendMessagesQueue, &messageBuffor, pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG)) == pdTRUE) {
             // divide and add messages to protocolBuffor
             while(messageIndex < 64 && messageBuffor[messageIndex] != 0) {
                 protocolBuffor[messagesQuantity][(messageIndex % 6) + 8] = messageBuffor[messageIndex];
@@ -525,13 +522,13 @@ void Communication::sendMessageTask(void *parameters) {
                 // if (xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT * 2)) == pdTRUE) {
                 //     xTimerStop(com.mReceiveByteTimeoutTimer, portMAX_DELAY);
                 //     if (hc12Respond == 256){
-                //         Serial.println("SENDING MESSAGE ERROR! In sendMessageTask() -> hc12 module is not responding.");
+                //         Serial.println("SENDING MESSAGE ERROR! In encodeMessageTask() -> hc12 module is not responding.");
                 //     } else if (hc12Respond != 255) {
-                //         Serial.print("SENDING MESSAGE ERROR! In sendMessageTask() -> hc12 module did not confirm properly. Hc-12 module should send 255 signal but got: ");
+                //         Serial.print("SENDING MESSAGE ERROR! In encodeMessageTask() -> hc12 module did not confirm properly. Hc-12 module should send 255 signal but got: ");
                 //         Serial.println(hc12Respond);
                 //     }
                 // } else {
-                //     Serial.println("SENDING MESSAGE ERROR! In sendMessageTask() -> hc12 module is not responding.");
+                //     Serial.println("SENDING MESSAGE ERROR! In encodeMessageTask() -> hc12 module is not responding.");
                 // }
 
                 messagesQuantity = protocolBuffor[index][7];
@@ -549,31 +546,31 @@ void Communication::sendMessageTask(void *parameters) {
             // if (!isRepeatMessage(messageBuffor, messageIndex)) {
             //     setLastMessage(messageBuffor, messageIndex);
             // }
-
-            xTimerStart(com.mSuspendSendMessageTimer, portMAX_DELAY);
+        } else {
+            xTaskNotify(com.mCommunicationMainTaskHandle, suspendEndcodeMessageTaskNotif, eSetValueWithOverwrite);
         }
     }
 }
 
-void Communication::createSendMessageTask() {
-    if (mSendMessageTaskHandle == NULL) {
+void Communication::createEncodeMessageTask() {
+    if (mEncodeMessageTaskHandle == NULL) {
         xTaskCreate(
-            sendMessageTask,
-            "Send Message",
+            encodeMessageTask,
+            "Encode Message",
             2048,
             NULL,
             MEDIUM_TASK_PRIORITY,
-            &mSendMessageTaskHandle
+            &mEncodeMessageTaskHandle
         );
     } else {
-        Serial.println("TASK CREATION ERROR! In createSendMessageTask() -> Can't create send message task, because task already exists");
+        Serial.println("TASK CREATION ERROR! In createEncodeMessageTask() -> Can't create encode message task, because task already exists");
     }
 }
 
-void Communication::deleteSendMessageTask() {
-    if (mSendMessageTaskHandle != NULL) {
-        vTaskDelete(mSendMessageTaskHandle);
-        mSendMessageTaskHandle = NULL;
+void Communication::deleteEncodeMessageTask() {
+    if (mEncodeMessageTaskHandle != NULL) {
+        vTaskDelete(mEncodeMessageTaskHandle);
+        mEncodeMessageTaskHandle = NULL;
     }
 }
 // ================================================================
@@ -664,10 +661,6 @@ void Communication::communicationTimersCallbacks(TimerHandle_t xTimer){
         // TODO remove print
         Serial.println("byte timeout callback");
         xTaskNotify(com.mCommunicationMainTaskHandle, byteTimeoutNotif, eSetValueWithOverwrite);
-    } else if (xTimer == com.mSuspendReceiveMessageTimer) {
-        xTaskNotify(com.mCommunicationMainTaskHandle, suspendReceiveMessageTaskNotif, eSetValueWithOverwrite);
-    } else if (xTimer == com.mSuspendSendMessageTimer) {
-        xTaskNotify(com.mCommunicationMainTaskHandle, suspendSendMessageTaskNotif, eSetValueWithOverwrite);
     }
 }
 
@@ -690,24 +683,6 @@ void Communication::createCommunicationTimers() {
             communicationTimersCallbacks
         );
     }
-    if (mSuspendReceiveMessageTimer == NULL) {
-        mSuspendReceiveMessageTimer = xTimerCreate(
-            "Suspend Receive Message",
-            pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG),
-            pdFALSE,
-            NULL,
-            communicationTimersCallbacks
-        );
-    }
-    if (mSuspendSendMessageTimer == NULL) {
-        mSuspendSendMessageTimer = xTimerCreate(
-            "Suspend Send Message",
-            pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG),
-            pdFALSE,
-            NULL,
-            communicationTimersCallbacks
-        );
-    }
 }
 
 void Communication::deleteCommunicationTimers() {
@@ -718,14 +693,6 @@ void Communication::deleteCommunicationTimers() {
     if (mReceiveByteTimeoutTimer != NULL) {
         xTimerDelete(mReceiveByteTimeoutTimer, portMAX_DELAY);
         mReceiveByteTimeoutTimer = NULL;
-    }
-    if (mSuspendReceiveMessageTimer != NULL) {
-        xTimerDelete(mSuspendReceiveMessageTimer, portMAX_DELAY);
-        mSuspendReceiveMessageTimer = NULL;
-    }
-    if (mSuspendSendMessageTimer != NULL) {
-        xTimerDelete(mSuspendSendMessageTimer, portMAX_DELAY);
-        mSuspendSendMessageTimer = NULL;
     }
 }
 // ================================================================

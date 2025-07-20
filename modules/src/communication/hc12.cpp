@@ -72,8 +72,7 @@ HC12::HC12(Communication *communication) {
 
     pinMode(SET_PIN, OUTPUT);
     digitalWrite(SET_PIN, HIGH);
-    // 80ms - from HC12 documentation 
-    vTaskDelay(pdMS_TO_TICKS(80));
+    vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_HIGH));
 
     createQueues();
     
@@ -264,25 +263,28 @@ void HC12::transmitTask(void *parameters) {
     
     for (;;) {
         if (xQueueReceive(hc12.mTransmitQueue, transmitBuffor, pdMS_TO_TICKS(SUSPEND_TASK_TIME_SHORT)) == pdTRUE) {
-            uint32_t hc12Respond;
-            // clearing old notification (if exist)
-            // xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, 0);
-
+            // TODO remove?
+            // uint32_t hc12Respond;
+            // // clearing old notification (if exist)
+            // // xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, 0);
+            // // transmiting data
+            // xTaskNotify(hc12.mHC12MainTaskHandle, waitingForSendConfirmationNotif, eSetValueWithOverwrite);
+            
             // transmiting data
-            xTaskNotify(hc12.mHC12MainTaskHandle, waitingForSendConfirmationNotif, eSetValueWithOverwrite);
             hc12.mpSerial->write(transmitBuffor, PROTOCOL_MESSAGE_SIZE);
 
-            // wait for confirmation from HC12
-            if (xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
-                if (hc12Respond != 255) {
-                    Serial.print("TRANSMITING ERROR! In transmitTask() -> hc12 module did not confirm properly. HC12 module should send 255 signal but got: ");
-                    Serial.println(hc12Respond);
-                }
-            } else {
-                xTaskNotify(hc12.mHC12MainTaskHandle, cancelWaitingForSendConfirmationNotif, eSetValueWithOverwrite);
-                Serial.println("TRANSMITING ERROR! In transmitTask() -> hc12 module is not responding.");
-                Serial.println(hc12Respond);
-            }
+            // TODO remove?
+            // // wait for confirmation from HC12
+            // if (xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
+            //     if (hc12Respond != 255) {
+            //         Serial.print("TRANSMITING ERROR! In transmitTask() -> hc12 module did not confirm properly. HC12 module should send 255 signal but got: ");
+            //         Serial.println(hc12Respond);
+            //     }
+            // } else {
+            //     xTaskNotify(hc12.mHC12MainTaskHandle, cancelWaitingForSendConfirmationNotif, eSetValueWithOverwrite);
+            //     Serial.println("TRANSMITING ERROR! In transmitTask() -> hc12 module is not responding.");
+            //     Serial.println(hc12Respond);
+            // }
 
             // this delay is required for HC12 transmit/receive message properly
             vTaskDelay(pdMS_TO_TICKS(DELAY_BETWEEN_MESSAGES));
@@ -371,8 +373,8 @@ void HC12::setupHC12Task(void *parameters) {
 
 void HC12::createSetupHC12Task() {
     digitalWrite(SET_PIN, LOW);
-    // wait after setting set pin to low 40ms - from HC12 documentation 
-    vTaskDelay(pdMS_TO_TICKS(40));
+    vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_LOW));
+
     // TODO !BEFORE PULL REQUEST! check is it working properly!
     if (mBaudRate != 9600) {
         mpSerial->updateBaudRate(9600);
@@ -404,8 +406,7 @@ void HC12::deleteSetupHC12Task() {
     deleteSetupHC12Queues();
 
     digitalWrite(SET_PIN, HIGH);
-    // wait after setting set pin to high 80ms - from HC12 documentation 
-    vTaskDelay(pdMS_TO_TICKS(80));
+    vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_HIGH));
 }
 // ================================================================
 

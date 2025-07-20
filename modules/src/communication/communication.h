@@ -34,14 +34,14 @@ private:
     void deleteCommunicationMainTask();
 
     // TODO change name for task (decode?)
-    static void receiveMessageTask(void *parameters);
-    void createReceiveMessageTask();
-    void deleteReceiveMessageTask();
+    static void decodeMessageTask(void *parameters);
+    void createDecodeMessageTask();
+    void deleteDecodeMessageTask();
 
     // TODO change name for task (encode?)
-    static void sendMessageTask(void *parameters);
-    void createSendMessageTask();
-    void deleteSendMessageTask();
+    static void encodeMessageTask(void *parameters);
+    void createEncodeMessageTask();
+    void deleteEncodeMessageTask();
 
     static void sendCustomMessageTask(void *parameters);
     void createSendCustomMessageTask();
@@ -67,8 +67,8 @@ private:
         // sending task
         sendingTaskWaitingNotif,
         // suspending notifications
-        suspendReceiveMessageTaskNotif,
-        suspendSendMessageTaskNotif,
+        suspendDecodeMessageTaskNotif,
+        suspendEndcodeMessageTaskNotif,
 
         readRawMessageNotif,
     } mCommunicationMainNotifications;
@@ -81,12 +81,10 @@ private:
     QueueHandle_t mSendMessagesQueue = NULL;
 
     TaskHandle_t mCommunicationMainTaskHandle = NULL;
-    TaskHandle_t mReceiveMessageTaskHandle = NULL;
-    TaskHandle_t mSendMessageTaskHandle = NULL;
+    TaskHandle_t mDecodeMessageTaskHandle = NULL;
+    TaskHandle_t mEncodeMessageTaskHandle = NULL;
     TaskHandle_t mSendCustomMessageTaskHandle = NULL;
 
     TimerHandle_t mReceiveMessageTimeoutTimer = NULL;
     TimerHandle_t mReceiveByteTimeoutTimer = NULL;
-    TimerHandle_t mSuspendReceiveMessageTimer = NULL;
-    TimerHandle_t mSuspendSendMessageTimer = NULL;
 };
