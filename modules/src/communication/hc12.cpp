@@ -15,6 +15,11 @@ HC12* HC12::mspHC12 = nullptr;
 
 // ============================ Public ============================
 
+void HC12::addMessageToTransmit(const uint8_t *MESSAGE) {
+    xQueueSend(mTransmitQueue, MESSAGE, portMAX_DELAY);
+    vTaskResume(mTransmitTaskHandle);
+}
+
 void HC12::setupHC12(const uint8_t *COMMANDS) {
     if (!(COMMANDS[0] == 'H' && COMMANDS[1] == 'C')) {
         Serial.println("HC12 COMMAND ERROR! In setupHC12() -> passed argument does not include hc12 command.");
@@ -70,13 +75,14 @@ HC12::HC12(Communication *communication) {
     // 80ms - from HC12 documentation 
     vTaskDelay(pdMS_TO_TICKS(80));
 
-    // createQueues();
+    createQueues();
     
     mBaudRate = (unsigned long)BAUD_RATE;
     mpSerial = new HardwareSerial(HARDWARE_SERIAL_UART_NR);
     mpSerial->begin(mBaudRate, SERIAL_8N1, RX_PIN, TX_PIN);
     // vTaskDelay(pdMS_TO_TICKS(1000));
     
+    createTransmitTask();
     createHC12MainTask();
     Serial.println("HC12 initialized");
 }
@@ -84,9 +90,10 @@ HC12::HC12(Communication *communication) {
 
 HC12::~HC12() {
     deleteHC12MainTask();
+    deleteTransmitTask();
     deleteSetupHC12Task();
 
-    // deleteQueues();
+    deleteQueues();
     deleteSetupHC12Queues();
 
     digitalWrite(SET_PIN, LOW);
@@ -97,19 +104,18 @@ HC12::~HC12() {
 
 // ============================ Queues ============================
 
-// void HC12::createQueues() {
-//     // TODO assign propper length of queue 
-//     if (mSetupHC12Queue == NULL) {
-//         mSetupHC12Queue = xQueueCreate(5, sizeof(uint8_t[SETUP_COMMAND_SIZE]));
-//     }
-// }
+void HC12::createQueues() { 
+    if (mTransmitQueue == NULL) {
+        mTransmitQueue = xQueueCreate(PROTOCOL_MESSAGE_MAX_NUM, sizeof(uint8_t[PROTOCOL_MESSAGE_SIZE]));
+    }
+}
 
-// void HC12::deleteQueues() {
-//     if (mSetupHC12Queue != NULL) {
-//         vQueueDelete(mSetupHC12Queue);
-//         mSetupHC12Queue = NULL;
-//     }
-// }
+void HC12::deleteQueues() {
+    if (mTransmitQueue != NULL) {
+        vQueueDelete(mTransmitQueue);
+        mTransmitQueue = NULL;
+    }
+}
 
 void HC12::createSetupHC12Queues() {
     if (mSetupHC12CommandsQueue == NULL) {
@@ -142,24 +148,64 @@ void HC12::HC12MainTask(void *parameters) {
 
     uint32_t status = defaultStatusNotif;
     bool isSetupHC12Working = false;
+    bool isWaitingForSendConfirmation = false;
 
     for (;;) {
         // change status
         xTaskNotifyWait(0, ULONG_MAX, &status, 0);
         
-        uint8_t hc12Input;
+        uint8_t hc12Output;
         switch (status) {
             case defaultStatusNotif:
                 if (hc12.mpSerial->available() > 0) {
-                    hc12Input = hc12.mpSerial->read();
+                    // TODO add guards for setupHC12 ?
+                    hc12Output = hc12.mpSerial->read();
 
-                    if (isSetupHC12Working) {
-                        xQueueSend(hc12.mSetupHC12ReceiveQueue, &hc12Input, portMAX_DELAY);
-                    }
+                    // TODO remove print 
+                    // Serial.println("hc12.mpSerial->available() > 0");
+                    if (isWaitingForSendConfirmation) {
+                        // TODO remove print 
+                        Serial.println("sending confirmation");
+                        xTaskNotify(hc12.mTransmitTaskHandle, (uint32_t)hc12Output, eSetValueWithOverwrite);
+                    } else if (isSetupHC12Working) {
+                        xQueueSend(hc12.mSetupHC12ReceiveQueue, &hc12Output, portMAX_DELAY);
+                    } else {
+                        hc12.mpCommunication->addByteToDecode(hc12Output);
+                    } 
+                } else {
+                    // delay for watchdog 
+                    vTaskDelay(pdMS_TO_TICKS(1));
                 }
 
-                // delay for watchdog 
-                vTaskDelay(pdMS_TO_TICKS(1));
+                // TODO change coment if there are no more queues
+                // extra protection if somehow queues are not empty and corresponding task is suspended 
+                if (uxQueueMessagesWaiting(hc12.mTransmitQueue) != 0) {
+                    vTaskResume(hc12.mTransmitTaskHandle);
+                }
+                break;
+
+            case waitingForSendConfirmationNotif:
+                // TODO remove print 
+                Serial.println("waitingForSendConfirmationNotif");
+                isWaitingForSendConfirmation = true;
+                break;
+
+            case cancelWaitingForSendConfirmationNotif:
+                // TODO remove print 
+                Serial.println("cancelWaitingForSendConfirmationNotif");
+                isWaitingForSendConfirmation = false;
+                break;
+
+            case resumeSendTaskNotif:
+                // TODO remove print
+                Serial.println("vTaskResume(hc12.mTransmitTaskHandle);");
+                vTaskResume(hc12.mTransmitTaskHandle);
+                break;
+
+            case suspendTransmitTaskNotif:
+                // TODO remove print
+                Serial.println("vTaskSuspend(hc12.mTransmitTaskHandle);");
+                vTaskSuspend(hc12.mTransmitTaskHandle);
                 break;
 
             case createSetupHC12TaskNotif:
@@ -174,7 +220,6 @@ void HC12::HC12MainTask(void *parameters) {
                 Serial.println("deleteSetupHC12TaskNotif");
                 isSetupHC12Working = false;
                 hc12.deleteSetupHC12Task();
-                hc12.deleteSetupHC12Queues();
                 break;
 
             default:
@@ -210,7 +255,67 @@ void HC12::deleteHC12MainTask() {
 }
 // ================================================================
 
-// ========================== setup HC12 ==========================
+// ========================== Send Task ===========================
+
+void HC12::transmitTask(void *parameters) {
+    auto &hc12 = *mspHC12;
+
+    uint8_t transmitBuffor[PROTOCOL_MESSAGE_SIZE];
+    
+    for (;;) {
+        if (xQueueReceive(hc12.mTransmitQueue, transmitBuffor, pdMS_TO_TICKS(SUSPEND_TASK_TIME_SHORT)) == pdTRUE) {
+            uint32_t hc12Respond;
+            // clearing old notification (if exist)
+            // xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, 0);
+
+            // transmiting data
+            xTaskNotify(hc12.mHC12MainTaskHandle, waitingForSendConfirmationNotif, eSetValueWithOverwrite);
+            hc12.mpSerial->write(transmitBuffor, PROTOCOL_MESSAGE_SIZE);
+
+            // wait for confirmation from HC12
+            if (xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
+                if (hc12Respond != 255) {
+                    Serial.print("TRANSMITING ERROR! In transmitTask() -> hc12 module did not confirm properly. HC12 module should send 255 signal but got: ");
+                    Serial.println(hc12Respond);
+                }
+            } else {
+                xTaskNotify(hc12.mHC12MainTaskHandle, cancelWaitingForSendConfirmationNotif, eSetValueWithOverwrite);
+                Serial.println("TRANSMITING ERROR! In transmitTask() -> hc12 module is not responding.");
+                Serial.println(hc12Respond);
+            }
+
+            // this delay is required for HC12 transmit/receive message properly
+            vTaskDelay(pdMS_TO_TICKS(DELAY_BETWEEN_MESSAGES));
+        } else {
+            xTaskNotify(hc12.mHC12MainTaskHandle, suspendTransmitTaskNotif, eSetValueWithOverwrite);
+        }
+    }
+}
+
+void HC12::createTransmitTask() {
+    if (mTransmitTaskHandle == NULL) {
+        xTaskCreate(
+            transmitTask,
+            "HC12 Transmit Task",
+            2048,
+            NULL,
+            HIGH_TASK_PRIORITY,
+            &mTransmitTaskHandle
+        );
+    } else {
+        Serial.println("TASK CREATION ERROR! In createSetupHC12Task() -> Can't create setup HC12 task, because task already exists");
+    }
+}
+
+void HC12::deleteTransmitTask() {
+    if (mTransmitTaskHandle != NULL) {
+        vTaskDelete(mTransmitTaskHandle);
+        mTransmitTaskHandle = NULL;
+    }
+}
+// ================================================================
+
+// ========================== Setup HC12 ==========================
 
 void HC12::setupHC12Task(void *parameters) {
     auto hc12 = mspHC12;
@@ -266,7 +371,7 @@ void HC12::setupHC12Task(void *parameters) {
 
 void HC12::createSetupHC12Task() {
     digitalWrite(SET_PIN, LOW);
-    // 40ms - from HC12 documentation 
+    // wait after setting set pin to low 40ms - from HC12 documentation 
     vTaskDelay(pdMS_TO_TICKS(40));
     // TODO !BEFORE PULL REQUEST! check is it working properly!
     if (mBaudRate != 9600) {
@@ -276,7 +381,7 @@ void HC12::createSetupHC12Task() {
     if (mSetupHC12TaskHandle == NULL) {
         xTaskCreate(
             setupHC12Task,
-            "Setup HC12 Task",
+            "HC12 Setup Task",
             2048,
             NULL,
             HIGH_TASK_PRIORITY,
@@ -296,8 +401,10 @@ void HC12::deleteSetupHC12Task() {
         mpSerial->updateBaudRate(mBaudRate);
     }
 
+    deleteSetupHC12Queues();
+
     digitalWrite(SET_PIN, HIGH);
-    // 80ms - from HC12 documentation 
+    // wait after setting set pin to high 80ms - from HC12 documentation 
     vTaskDelay(pdMS_TO_TICKS(80));
 }
 // ================================================================
