@@ -1,6 +1,7 @@
 #include "utils.h"
 
 #include <fcntl.h>
+#include <iostream>
 #include <stdexcept>
 
 #include <sys/file.h>
@@ -29,7 +30,9 @@ namespace SmartHome::Utils {
             close(mLockFd);
             throw std::runtime_error("Failed to lock file (" + lockFilePath + ")");
         }
-        writePidToFile();
+        if (!writePidToFile()) {
+            std::cerr << "Failed to write pid to file (" + lockFilePath + ")" << std::endl;
+        }
     }
 
     FileLock::~FileLock() {
