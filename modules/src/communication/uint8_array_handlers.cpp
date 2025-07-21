@@ -28,11 +28,11 @@ namespace uint8ArrayHandlers {
         }
     } 
 
-    uint8_t calcLenOfDataInArray(const uint8_t *array, const uint8_t len) {
-        for (uint8_t i = 0; i < len; i++) {
+    uint8_t calcLenOfDataInArray(const uint8_t *array, const uint8_t maxLen) {
+        for (uint8_t i = 0; i < maxLen; i++) {
             if (array[i] == 0) return i; 
         }
-        return len;
+        return maxLen;
     }
 
     bool areArraysEqual(const uint8_t *array1, const uint8_t *array2, uint8_t len) {

@@ -51,6 +51,11 @@ private:
     void createCommunicationTimers();
     void deleteCommunicationTimers();
 
+    void setLastTransmittedMessage();
+    void setLastTransmittedMessage(const uint8_t MESSAGE[MESSAGE_SIZE]);
+    void repeatLastTransmittedMessage();
+    void transmitRepeatMessage();
+
     static DebugLED *mspDebugLED;
 
     #ifdef HC12_MODULE
@@ -75,6 +80,10 @@ private:
 
     uint8_t mMACAddress[6];
     bool mIsMacAddressReal;
+
+    uint8_t mLastTransmittedMessage[MESSAGE_SIZE];
+
+    SemaphoreHandle_t mLastTransmittedMessageMutex = NULL;
 
     QueueHandle_t mReceiveMessageQueue = NULL;
     QueueHandle_t mReceiveByteQueue = NULL;

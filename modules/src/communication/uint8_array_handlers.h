@@ -44,15 +44,15 @@ namespace uint8ArrayHandlers {
     void prepareBuffor(uint8_t *buffor, const uint8_t *value, uint8_t len, const uint8_t maxLen);
 
     /**
-     * @brief Calculates length of data in given uint8_t array.
+     * @brief Calculates length of data in given uint8_t array (assuming that first occur of 0 is end of data).
      * 
      * @param array uint8_t array to be calculated.
-     * @param len length of the array.
+     * @param maxLen length of the array.
      * 
-     * @return length of the array until first occurrence of 0 or len if no 0 was found.
+     * @return length of the array until first occur of 0 or maxLen if no 0 was found.
      * 
      */
-    uint8_t calcLenOfDataInArray(const uint8_t *array, const uint8_t len);
+    uint8_t calcLenOfDataInArray(const uint8_t *array, const uint8_t maxLen);
 
     /**
      * @brief Compares two uint8_t arrays of given length.
