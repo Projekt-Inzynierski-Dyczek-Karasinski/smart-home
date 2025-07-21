@@ -105,7 +105,7 @@ HC12::~HC12() {
 
 void HC12::createQueues() { 
     if (mTransmitQueue == NULL) {
-        mTransmitQueue = xQueueCreate(PROTOCOL_MESSAGE_MAX_NUM, sizeof(uint8_t[PROTOCOL_MESSAGE_SIZE]));
+        mTransmitQueue = xQueueCreate(PROTOCOL_MESSAGE_MAX_NUM, sizeof(uint8_t[PROTOCOL_SIZE]));
     }
 }
 
@@ -259,7 +259,7 @@ void HC12::deleteHC12MainTask() {
 void HC12::transmitTask(void *parameters) {
     auto &hc12 = *mspHC12;
 
-    uint8_t transmitBuffor[PROTOCOL_MESSAGE_SIZE];
+    uint8_t transmitBuffor[PROTOCOL_SIZE];
     
     for (;;) {
         if (xQueueReceive(hc12.mTransmitQueue, transmitBuffor, pdMS_TO_TICKS(SUSPEND_TASK_TIME_SHORT)) == pdTRUE) {
@@ -271,7 +271,7 @@ void HC12::transmitTask(void *parameters) {
             // xTaskNotify(hc12.mHC12MainTaskHandle, waitingForSendConfirmationNotif, eSetValueWithOverwrite);
             
             // transmiting data
-            hc12.mpSerial->write(transmitBuffor, PROTOCOL_MESSAGE_SIZE);
+            hc12.mpSerial->write(transmitBuffor, PROTOCOL_SIZE);
 
             // TODO remove?
             // // wait for confirmation from HC12
@@ -339,6 +339,7 @@ void HC12::setupHC12Task(void *parameters) {
             Serial.print("setupHC12Task received command: ");
             uah::printArray(commandBuffor, SETUP_COMMAND_SIZE);
 
+            // TODO add better protection against bad commands
             if (!(commandBuffor[0] == (uint8_t)'H' && commandBuffor[1] == (uint8_t)'C')) {
                 Serial.println("HC12 COMMAND ERROR! In setupHC12Task() -> received array is not hc12 command.");
             } else {
@@ -375,11 +376,6 @@ void HC12::createSetupHC12Task() {
     digitalWrite(SET_PIN, LOW);
     vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_LOW));
 
-    // TODO !BEFORE PULL REQUEST! check is it working properly!
-    if (mBaudRate != 9600) {
-        mpSerial->updateBaudRate(9600);
-    }
-
     if (mSetupHC12TaskHandle == NULL) {
         xTaskCreate(
             setupHC12Task,
@@ -397,10 +393,6 @@ void HC12::deleteSetupHC12Task() {
     if (mSetupHC12TaskHandle != NULL) {
         vTaskDelete(mSetupHC12TaskHandle);
         mSetupHC12TaskHandle = NULL;
-    }
-    // TODO !BEFORE PULL REQUEST! check is it working properly!
-    if (mBaudRate != 9600) {
-        mpSerial->updateBaudRate(mBaudRate);
     }
 
     deleteSetupHC12Queues();

@@ -33,12 +33,10 @@ private:
     void createCommunicationMainTask();
     void deleteCommunicationMainTask();
 
-    // TODO change name for task (decode?)
     static void decodeMessageTask(void *parameters);
     void createDecodeMessageTask();
     void deleteDecodeMessageTask();
 
-    // TODO change name for task (encode?)
     static void encodeMessageTask(void *parameters);
     void createEncodeMessageTask();
     void deleteEncodeMessageTask();

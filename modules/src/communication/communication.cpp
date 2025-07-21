@@ -89,9 +89,7 @@ void Communication::createCommunicationQueues() {
         mReceiveMessageQueue = xQueueCreate(MESSAGE_QUEUE_LEN, sizeof(uint8_t[MESSAGE_SIZE]));
     }
     if (mReceiveByteQueue == NULL) {
-        // TODO assign propper length of queue
-        // TODO remove this "magic number" 
-        mReceiveByteQueue = xQueueCreate(128, sizeof(uint8_t));
+        mReceiveByteQueue = xQueueCreate(RECEIVE_BYTE_QUEUE_LEN, sizeof(uint8_t));
     }
     if (mSendMessagesQueue == NULL) {
         mSendMessagesQueue = xQueueCreate(MESSAGE_QUEUE_LEN, sizeof(uint8_t[MESSAGE_SIZE]));
@@ -165,8 +163,7 @@ void Communication::communicationMainTask(void* parameters) {
             case suspendEndcodeMessageTaskNotif:
                 // TODO remove print
                 Serial.println("vTaskSuspend(mEncodeMessageTaskHandle);");
-                // TODO implement
-                // resetLastMessage();
+                com.setLastTransmittedMessage();
                 vTaskSuspend(com.mEncodeMessageTaskHandle);
                 break;
 
@@ -215,13 +212,18 @@ void Communication::decodeMessageTask(void *parameters) {
 
     // prepare message protocol buffor
     // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
-    uint8_t protocolBuffor[PROTOCOL_MESSAGE_MAX_NUM][PROTOCOL_MESSAGE_SIZE];
+    uint8_t protocolBuffor[PROTOCOL_MESSAGE_MAX_NUM][PROTOCOL_SIZE];
+    const uint8_t MAC_ADDRESS_LENGTH = 6;
+    const uint8_t IP_INDEX = 6;
+    const uint8_t MESSAGES_QUANTITY_INDEX = 7;
+    const uint8_t PROTOCOL_MESSAGE_START_INDEX = 8;
+    const uint8_t PROTOCOL_MESSAGE_LENGTH = 6;
     uint8_t pbMessageIndex = 0;
     uint8_t pbByteIndex = 0;
 
     auto resetProtocolBuffor = [&]() {
         for (uint8_t i = 0; i < PROTOCOL_MESSAGE_MAX_NUM; i++){
-            for (uint8_t j = 0; j < PROTOCOL_MESSAGE_SIZE; j++) {
+            for (uint8_t j = 0; j < PROTOCOL_SIZE; j++) {
                 protocolBuffor[i][j] = 0;
             }
         }
@@ -253,7 +255,7 @@ void Communication::decodeMessageTask(void *parameters) {
                     // TODO remove print
                     Serial.println("Message timeout");
                     for (uint8_t i = 0; i < PROTOCOL_MESSAGE_MAX_NUM; i++){
-                        for (uint8_t j = 0; j < PROTOCOL_MESSAGE_SIZE; j++) {
+                        for (uint8_t j = 0; j < PROTOCOL_SIZE; j++) {
                             Serial.print(protocolBuffor[i][j]);
                             Serial.print(' ');
                         }
@@ -269,15 +271,15 @@ void Communication::decodeMessageTask(void *parameters) {
             timeoutStatus = defaultStatusNotif;
         } 
 
-        // decoding message
-        if (xQueueReceive(com.mReceiveByteQueue, &queueBuffor, pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG)) == pdTRUE) {
+        // decoding message ,                                                time + offset for propper suspending task
+        if (xQueueReceive(com.mReceiveByteQueue, &queueBuffor, pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG + 100)) == pdTRUE) {
             protocolBuffor[pbMessageIndex][pbByteIndex] = queueBuffor;
             // if new message start message timeout timer
             if (pbByteIndex == 0 && pbMessageIndex == 0){
                 xTimerStart(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
             }
             // if protocol message is not complete
-            if (pbByteIndex != PROTOCOL_MESSAGE_SIZE - 1) {
+            if (pbByteIndex != PROTOCOL_SIZE - 1) {
                 pbByteIndex++;
                 xTimerStart(com.mReceiveByteTimeoutTimer, portMAX_DELAY);
             } else {
@@ -285,20 +287,22 @@ void Communication::decodeMessageTask(void *parameters) {
                 pbByteIndex = 0;
 
                 // if message is not end properly
-                if (protocolBuffor[pbMessageIndex][PROTOCOL_MESSAGE_SIZE - 1] != 0) {
+                if (protocolBuffor[pbMessageIndex][PROTOCOL_SIZE - 1] != 0) {
                     xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
                     
                     Serial.print("BAD END OF MESSAGE ERROR! In decodeMessageTask() -> message should end with 0 (\\0 char), but got: ");
-                    Serial.println(protocolBuffor[pbMessageIndex][PROTOCOL_MESSAGE_SIZE - 1]);
+                    Serial.println(protocolBuffor[pbMessageIndex][PROTOCOL_SIZE - 1]);
 
-                    // TODO implement repeatMessage()
-                    // repeatMessage();
+                    // TODO assign final value
+                    // wait for possible rest of the message and send "repeat"
+                    vTaskDelay(RECEIVE_MESSAGE_TIMEOUT);
                     resetProtocolBuffor();
                     xQueueReset(com.mReceiveByteQueue);
+                    com.transmitRepeatMessage();
                 } else {
                     // calculate checksum
                     uint16_t checksum = 0;
-                    for (uint8_t i = 0; i < PROTOCOL_MESSAGE_SIZE; i++) {
+                    for (uint8_t i = 0; i < PROTOCOL_SIZE; i++) {
                         checksum += protocolBuffor[pbMessageIndex][i];
                     }
                     
@@ -326,7 +330,7 @@ void Communication::decodeMessageTask(void *parameters) {
                         #endif
                     }
                     // if entire message is not ready (message quantity)
-                    else if (protocolBuffor[pbMessageIndex][7] != 0) {
+                    else if (protocolBuffor[pbMessageIndex][MESSAGES_QUANTITY_INDEX] != 0) {
                         pbMessageIndex++;
                     }
                     // entire message is ready
@@ -342,7 +346,7 @@ void Communication::decodeMessageTask(void *parameters) {
 
                         // decode message
                         do {
-                            for (uint8_t i = 8; i < PROTOCOL_MESSAGE_SIZE - 2; i++) {
+                            for (uint8_t i = PROTOCOL_MESSAGE_START_INDEX; i < (PROTOCOL_MESSAGE_START_INDEX + PROTOCOL_MESSAGE_LENGTH); i++) {
                                 messageBuffor[messageIndex] = protocolBuffor[pbMessageIndex][i];
                                 messageIndex++;
                                 // protection against buffer overload (62 => 63 max buffer index -1 for \0)
@@ -352,7 +356,7 @@ void Communication::decodeMessageTask(void *parameters) {
                                 }
                             }
 
-                            messagesQuantity = protocolBuffor[pbMessageIndex][7];
+                            messagesQuantity = protocolBuffor[pbMessageIndex][MESSAGES_QUANTITY_INDEX];
                             pbMessageIndex++;
                         } while(messagesQuantity != 0);
 
@@ -363,14 +367,9 @@ void Communication::decodeMessageTask(void *parameters) {
                         // if it is "repeat" message
                         if (uah::areArraysEqual(messageBuffor, (uint8_t*)"repeat", 6)) {
                             com.repeatLastTransmittedMessage();
-                        }
-                        // if (isRepeatMessage(messageBuffor, messageIndex)) {
-                        //     xSemaphoreTake(msLastMessageMutex, portMAX_DELAY);
-                        //     xQueueSend(msSendMessagesQueue, msLastMessage, portMAX_DELAY);
-                        //     xSemaphoreGive(msLastMessageMutex);
-                        // } 
-                        // if it is HC_12 command
+                        } 
                         #ifdef HC12_MODULE
+                        // if it is HC_12 command
                         else if (messageBuffor[0] == (uint8_t)'H' && messageBuffor[1] == (uint8_t)'C') {
                             com.mRfModule->setupHC12(messageBuffor);
                         }
@@ -428,7 +427,7 @@ void Communication::encodeMessageTask(void *parameters) {
 
     // prepare protocol buffor
     // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
-    uint8_t protocolBuffor[PROTOCOL_MESSAGE_SIZE];
+    uint8_t protocolBuffor[PROTOCOL_SIZE];
 
     const uint8_t MAC_ADDRESS_LENGTH = 6;
     const uint8_t IP_INDEX = 6;
@@ -439,7 +438,7 @@ void Communication::encodeMessageTask(void *parameters) {
 
     // TODO change for propper MAC and IP addresses
     // prepare MAC address in protocol buffor and clear rest of buffor
-    uah::prepareBuffor(protocolBuffor, com.mMACAddress, MAC_ADDRESS_LENGTH, PROTOCOL_MESSAGE_SIZE);
+    uah::prepareBuffor(protocolBuffor, com.mMACAddress, MAC_ADDRESS_LENGTH, PROTOCOL_SIZE);
     // prepare place for IP address
     protocolBuffor[IP_INDEX] = 0;
 
@@ -499,7 +498,7 @@ void Communication::encodeMessageTask(void *parameters) {
                 // calculate and set checksum
                 protocolBuffor[CHECKSUM_INDEX] = 0;
                 uint16_t checkSum = 0;
-                for (uint8_t i = 0; i < PROTOCOL_MESSAGE_SIZE; i++) {
+                for (uint8_t i = 0; i < PROTOCOL_SIZE; i++) {
                     checkSum += (uint16_t)protocolBuffor[i];
                 }
                 checkSum = (256 - (checkSum % 256)) % 256;
@@ -510,7 +509,7 @@ void Communication::encodeMessageTask(void *parameters) {
                 // TODO remove print 
                 // WARNING: long message with uncommented print may cause message timeout
                 // Serial.print("protocolBuffor: ");
-                // for (int i = 0; i < PROTOCOL_MESSAGE_SIZE; i++){
+                // for (int i = 0; i < PROTOCOL_SIZE; i++){
                 //     Serial.print(protocolBuffor[i]);
                 //     Serial.print(' ');
                 // }
@@ -689,7 +688,9 @@ void Communication::setLastTransmittedMessage(const uint8_t MESSAGE[MESSAGE_SIZE
 
 void Communication::repeatLastTransmittedMessage() {
     xSemaphoreTake(mLastTransmittedMessageMutex, portMAX_DELAY);
-    xQueueSend(mSendMessagesQueue, mLastTransmittedMessage, portMAX_DELAY);
+    if (mLastTransmittedMessage[0] != 0) {
+        xQueueSend(mSendMessagesQueue, mLastTransmittedMessage, portMAX_DELAY);
+    }
     xSemaphoreGive(mLastTransmittedMessageMutex);
 }
 

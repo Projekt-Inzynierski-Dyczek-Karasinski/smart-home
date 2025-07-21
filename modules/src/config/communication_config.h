@@ -2,8 +2,10 @@
 
 #define MESSAGE_QUEUE_LEN 10
 #define MESSAGE_SIZE 64
-#define PROTOCOL_MESSAGE_SIZE 16
+#define PROTOCOL_SIZE 16
 #define PROTOCOL_MESSAGE_MAX_NUM 11
+// TODO assign final value
+#define RECEIVE_BYTE_QUEUE_LEN 128
 #define BLANK_CHARACTER ' '
 // TODO assign final value
 #define SUSPEND_TASK_TIME_SHORT 1000 // 1s
