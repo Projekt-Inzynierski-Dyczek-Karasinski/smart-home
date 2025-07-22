@@ -12,4 +12,4 @@
 #define LED_PIN 26
 #define BUTTON_PIN 27
 
-// #define CENTRAL_UNIT
+#define CENTRAL_UNIT

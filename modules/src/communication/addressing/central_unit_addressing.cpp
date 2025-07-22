@@ -12,58 +12,26 @@ CentralUnitAddressing* CentralUnitAddressing::mspAddressing = nullptr;
 
 // ============================ Public ============================
 
-CentralUnitAddressing::CentralUnitAddressing(Communication *communication) {
-    mpCommunication = communication;
+CentralUnitAddressing::CentralUnitAddressing(Communication *communication) 
+    : Addressing(communication) {
     mspAddressing = this;
-    #ifdef ESP32_BOARD
-        esp_read_mac(mProtocolMACAddress, ESP_MAC_WIFI_STA);
-    #else
-        // TODO add function to get MAC address on different boards
-        #error "MAC address not implemented!"
-    #endif
+    mIPAddress = 1; // 1 - central unit's IP
 
     Serial.println("CentralUnitAddressing initialized");
+    Serial.println(mIPAddress);
+    for (int i = 0; i <6 ; i++){
+        Serial.print(mMACAddress[i]);
+        Serial.print(' ');
+    }
+    Serial.println();
 }
 
 CentralUnitAddressing::~CentralUnitAddressing() {
     deleteAddressingTask();
     deleteAddressingQueues();
+    // deleteAddressingTimers();
 }
 
-const uint8_t (&CentralUnitAddressing::getProtocolMACAddress() const)[6] {
-    return mProtocolMACAddress;
-}
-
-const uint8_t CentralUnitAddressing::getIPAddress() {
-    return mIPAddress;
-}
-
-void CentralUnitAddressing::startAddressing() {
-    createAddressingQueues();
-    createAddressingTask();
-}
-
-void CentralUnitAddressing::stopAddressing() {
-    deleteAddressingTask();
-    deleteAddressingQueues();
-}
-// ================================================================
-
-
-// ============================ Queues ============================
-
-void CentralUnitAddressing::createAddressingQueues() {
-    if (mAddressingQueue == NULL) {
-        mAddressingQueue = xQueueCreate(MESSAGE_QUEUE_LEN, sizeof(uint8_t[MESSAGE_SIZE]));
-    }
-}
-
-void CentralUnitAddressing::deleteAddressingQueues() {
-    if (mAddressingQueue != NULL) {
-        vQueueDelete(mAddressingQueue);
-        mAddressingQueue = NULL;
-    }
-}
 // ================================================================
 
 // ===================== Addressing Algorithm =====================

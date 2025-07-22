@@ -1,0 +1,61 @@
+#include "communication/addressing/addressing.h"
+
+#include <Arduino.h>
+
+#include "smart_home_config.h"
+#include "config/communication_config.h"
+#include "communication/uint8_array_handlers.h"
+
+namespace uah = uint8ArrayHandlers;
+
+// ============================ Public ============================
+
+Addressing::Addressing(Communication *communication) 
+    : mpCommunication(communication) {
+    #ifdef ESP32_BOARD
+        esp_read_mac(mMACAddress, ESP_MAC_WIFI_STA);
+        esp_read_mac(mProtocolMACAddress, ESP_MAC_WIFI_STA);
+    #else
+        // TODO add function to get MAC address on different boards
+        #error "MAC address not implemented!"
+    #endif
+}
+
+Addressing::~Addressing() = default;
+
+const uint8_t (&Addressing::getProtocolMACAddress() const)[6] {
+    return mProtocolMACAddress;
+}
+
+const uint8_t Addressing::getIPAddress() {
+    return mIPAddress;
+}
+
+void Addressing::startAddressing() {
+    // createAddressingTimers();
+    createAddressingQueues();
+    createAddressingTask();
+}
+
+void Addressing::stopAddressing() {
+    deleteAddressingTask();
+    deleteAddressingQueues();
+    // deleteAddressingTimers();
+}
+// ================================================================
+
+// ============================ Queues ============================
+
+void Addressing::createAddressingQueues() {
+    if (mAddressingQueue == NULL) {
+        mAddressingQueue = xQueueCreate(MESSAGE_QUEUE_LEN, sizeof(uint8_t[MESSAGE_SIZE]));
+    }
+}
+
+void Addressing::deleteAddressingQueues() {
+    if (mAddressingQueue != NULL) {
+        vQueueDelete(mAddressingQueue);
+        mAddressingQueue = NULL;
+    }
+}
+// ================================================================

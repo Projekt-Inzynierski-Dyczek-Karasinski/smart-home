@@ -12,58 +12,24 @@ ModuleAddressing* ModuleAddressing::mspAddressing = nullptr;
 
 // ============================ Public ============================
 
-ModuleAddressing::ModuleAddressing(Communication *communication) {
-    mpCommunication = communication;
+ModuleAddressing::ModuleAddressing(Communication *communication)
+    : Addressing(communication) {
     mspAddressing = this;
-    #ifdef ESP32_BOARD
-        esp_read_mac(mMACAddress, ESP_MAC_WIFI_STA);
-        esp_read_mac(mProtocolMACAddress, ESP_MAC_WIFI_STA);
-    #else
-        // TODO add function to get MAC address on different boards
-        #error "MAC address not implemented!"
-    #endif
-
+    mIPAddress = 0; // 0 - NULL
+    
     Serial.println("ModuleAddressing initialized");
+    Serial.println(mIPAddress);
+    for (int i = 0; i <6 ; i++){
+        Serial.print(mMACAddress[i]);
+        Serial.print(' ');
+    }
+    Serial.println();
 }
 
 ModuleAddressing::~ModuleAddressing() {
     deleteAddressingTask();
     deleteAddressingQueues();
-}
-
-const uint8_t (&ModuleAddressing::getProtocolMACAddress() const)[6] {
-    return mProtocolMACAddress;
-}
-
-const uint8_t ModuleAddressing::getIPAddress() {
-    return mIPAddress;
-}
-
-void ModuleAddressing::startAddressing() {
-    createAddressingQueues();
-    createAddressingTask();
-}
-
-void ModuleAddressing::stopAddressing() {
-    deleteAddressingTask();
-    deleteAddressingQueues();
-}
-// ================================================================
-
-
-// ============================ Queues ============================
-
-void ModuleAddressing::createAddressingQueues() {
-    if (mAddressingQueue == NULL) {
-        mAddressingQueue = xQueueCreate(MESSAGE_QUEUE_LEN, sizeof(uint8_t[MESSAGE_SIZE]));
-    }
-}
-
-void ModuleAddressing::deleteAddressingQueues() {
-    if (mAddressingQueue != NULL) {
-        vQueueDelete(mAddressingQueue);
-        mAddressingQueue = NULL;
-    }
+    // deleteAddressingTimers();
 }
 // ================================================================
 
@@ -97,3 +63,38 @@ void ModuleAddressing::deleteAddressingTask() {
     }
 }
 // ================================================================
+
+// // ============================ Timers ============================
+
+// void ModuleAddressing::addressingTimersCallbacks(TimerHandle_t xTimer){
+//     auto &ad = *mspAddressing;
+
+//     if (xTimer == ad.mAddressingTimeoutTimer) {
+//         // TODO implement
+//         // TODO remove print
+//         Serial.println("mAddressingTimeoutTimer");
+//         // xTaskNotify(com.mCommunicationMainTaskHandle, messageTimeoutNotif, eSetValueWithOverwrite);
+//     }
+// }
+
+// void ModuleAddressing::createAddressingTimers() {
+//     if (mAddressingTimeoutTimer == NULL) {
+//         mAddressingTimeoutTimer = xTimerCreate(
+//             "Addressing Absolute Timeout",
+//             // TODO change tmp
+//             pdMS_TO_TICKS(5000),
+//             // pdMS_TO_TICKS(ADDRESSING_ABSOLUTE_TIMEOUT),
+//             pdFALSE,
+//             NULL,
+//             addressingTimersCallbacks
+//         );
+//     }
+// }
+
+// void ModuleAddressing::deleteAddressingTimers() {
+//     if (mAddressingTimeoutTimer != NULL) {
+//         xTimerDelete(mAddressingTimeoutTimer, portMAX_DELAY);
+//         mAddressingTimeoutTimer = NULL;
+//     }
+// }
+// // ================================================================

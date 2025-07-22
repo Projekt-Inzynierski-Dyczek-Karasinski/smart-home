@@ -5,41 +5,19 @@
 // #include "smart_home_config.h"
 // #include "config/communication_config.h"
 
+#include "communication/addressing/addressing.h"
+
 class Communication; 
 
-class CentralUnitAddressing {
+class CentralUnitAddressing final : public Addressing{
 public:
     explicit CentralUnitAddressing(Communication *communication);
     ~CentralUnitAddressing();
-    
-    // TODO consider changing this methods to voids that will set variable which pointer will be passed as param (to protect data with mutex)
-    const uint8_t (&getProtocolMACAddress() const)[6];
-    const uint8_t getIPAddress();
-
-    void startAddressing();
-    void stopAddressing();
 
 private:
-    void createAddressingQueues();
-    void deleteAddressingQueues();
-
     static void addressingTask(void* parameters);
-    void createAddressingTask();
-    void deleteAddressingTask();
+    void createAddressingTask() override;
+    void deleteAddressingTask() override;
 
     static CentralUnitAddressing *mspAddressing;
-    Communication *mpCommunication;
-
-    uint8_t mProtocolMACAddress[6]; // central unit's MAC address 
-    uint8_t mIPAddress = 0; // 0 is NULL, 1 is central unit's IP
-    #ifdef ESP32_BOARD
-        const bool M_IS_MAC_ADDRESS_REAL = true;
-    #else
-        #error "MAC address not implemented!"
-    #endif
-    
-    QueueHandle_t mAddressingQueue = NULL;
-
-    TaskHandle_t mAddressingTaskHandle = NULL;
-
 };
