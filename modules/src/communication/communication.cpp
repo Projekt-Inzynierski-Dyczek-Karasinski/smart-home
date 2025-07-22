@@ -1,5 +1,4 @@
 // TODO !BEFORE PULL REQUEST! check for "eSetValueWithoutOverwrite"!
-// TODO !BEFORE PULL REQUEST! change setting buffors "by hand" to using method prepareMessageBuffor()
 #include "communication/communication.h"
 
 #include <Arduino.h>
@@ -9,10 +8,17 @@
 #include "config/communication_config.h"
 #include "communication/uint8_array_handlers.h"
 #include "universal_module_system/debug_led.h"
+
 #ifdef HC12_MODULE
     #include "communication/hc12.h"
 #else
     #error "Not implemented" 
+#endif
+
+#ifdef CENTRAL_UNIT 
+    #include "communication/addressing/central_unit_addressing.h"
+#else
+    #include "communication/addressing/module_addressing.h"
 #endif
 
 namespace uah = uint8ArrayHandlers;
@@ -26,9 +32,9 @@ Communication& Communication::getInstance(DebugLED *debugLED) {
     return instance;
 }
 
-// TODO implement
 void Communication::startAddresingAlgorithm() {
-    Serial.println("startAddresingAlgorithm() not implemented");
+    mspDebugLED->createPairingBlinkTask();
+    mpAddressing->startAddressing();
 }
 
 void Communication::addByteToDecode(const uint8_t DATA) {
@@ -41,20 +47,17 @@ void Communication::addByteToDecode(const uint8_t DATA) {
 
 Communication::Communication(DebugLED *debugLED) : 
     #ifdef HC12_MODULE
-        mRfModule(new HC12(this)) 
+        mpRfModule(new HC12(this)),
     #else
         #error "Not implemented" 
     #endif
+    #ifdef CENTRAL_UNIT 
+        mpAddressing(new CentralUnitAddressing(this))
+    #else
+        mpAddressing(new ModuleAddressing(this))
+    #endif
 {
     mspDebugLED = debugLED;
-    #ifdef ESP32_BOARD
-        esp_read_mac(mMACAddress, ESP_MAC_WIFI_STA);
-        mIsMacAddressReal = true;
-    #else
-        // TODO add function to get MAC address on different boards
-        #error "MAC address not implemented!"
-    #endif
-
 
     mLastTransmittedMessageMutex = xSemaphoreCreateMutex();
     setLastTransmittedMessage();
@@ -371,7 +374,7 @@ void Communication::decodeMessageTask(void *parameters) {
                         #ifdef HC12_MODULE
                         // if it is HC_12 command
                         else if (messageBuffor[0] == (uint8_t)'H' && messageBuffor[1] == (uint8_t)'C') {
-                            com.mRfModule->setupHC12(messageBuffor);
+                            com.mpRfModule->setupHC12(messageBuffor);
                         }
                         #endif
                         // TODO implement
@@ -436,11 +439,10 @@ void Communication::encodeMessageTask(void *parameters) {
     const uint8_t PROTOCOL_MESSAGE_LENGTH = 6;
     const uint8_t CHECKSUM_INDEX = 14;
 
-    // TODO change for propper MAC and IP addresses
     // prepare MAC address in protocol buffor and clear rest of buffor
-    uah::prepareBuffor(protocolBuffor, com.mMACAddress, MAC_ADDRESS_LENGTH, PROTOCOL_SIZE);
+    uah::prepareBuffor(protocolBuffor, com.mpAddressing->getProtocolMACAddress(), MAC_ADDRESS_LENGTH, PROTOCOL_SIZE);
     // prepare place for IP address
-    protocolBuffor[IP_INDEX] = 0;
+    protocolBuffor[IP_INDEX] = com.mpAddressing->getIPAddress();;
 
     // TODO remove old
     // prepare IP and MAC addresses
@@ -504,7 +506,7 @@ void Communication::encodeMessageTask(void *parameters) {
                 checkSum = (256 - (checkSum % 256)) % 256;
                 protocolBuffor[CHECKSUM_INDEX] = checkSum;
                 
-                com.mRfModule->addMessageToTransmit(protocolBuffor);
+                com.mpRfModule->addMessageToTransmit(protocolBuffor);
 
                 // TODO remove print 
                 // WARNING: long message with uncommented print may cause message timeout
@@ -583,7 +585,7 @@ void Communication::sendCustomMessageTask(void *parameters) {
                     if (buffor[0] == 'A' && buffor[1] == 'T') {
                         buffor[0] = 'H';
                         buffor[1] = 'C';
-                        com.mRfModule->setupHC12(buffor);
+                        com.mpRfModule->setupHC12(buffor);
                     } else {
                         xQueueSend(com.mSendMessagesQueue, &buffor, portMAX_DELAY);
                     }

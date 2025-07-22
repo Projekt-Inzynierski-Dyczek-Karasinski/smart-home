@@ -7,7 +7,7 @@
 #include "config/communication_config.h"
 
 class Communication; 
-// TODO consider change this class to singleton
+
 class HC12 {
 public:
     explicit HC12(Communication *communication);
@@ -44,7 +44,6 @@ private:
         waitingForSendConfirmationNotif,
         cancelWaitingForSendConfirmationNotif,
         // byteTimeoutNotif,
-        resumeSendTaskNotif,
         suspendTransmitTaskNotif,
         // setup HC_12 notifications
         createSetupHC12TaskNotif,

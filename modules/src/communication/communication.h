@@ -10,6 +10,11 @@
 #ifdef HC12_MODULE
     #include "communication/hc12.h"
 #endif
+#ifdef CENTRAL_UNIT 
+    #include "communication/addressing/central_unit_addressing.h"
+#else
+    #include "communication/addressing/module_addressing.h"
+#endif
 
 class Communication {
 public:
@@ -19,7 +24,7 @@ public:
     Communication(const Communication&) = delete;
     Communication& operator = (const Communication&) = delete;
 
-    static void startAddresingAlgorithm();
+    void startAddresingAlgorithm();
     void addByteToDecode(const uint8_t DATA);
 
 private:
@@ -54,13 +59,21 @@ private:
     void repeatLastTransmittedMessage();
     void transmitRepeatMessage();
 
+    // TODO change this to nonstatic
     static DebugLED *mspDebugLED;
 
     #ifdef HC12_MODULE
-        std::unique_ptr<HC12> mRfModule;
+        std::unique_ptr<HC12> mpRfModule;
     #else
         #error "Not implemented"
     #endif
+    #ifdef CENTRAL_UNIT
+        std::unique_ptr<CentralUnitAddressing> mpAddressing;
+    #else
+        std::unique_ptr<ModuleAddressing> mpAddressing;
+    #endif
+
+    
 
     typedef enum : uint32_t {
         defaultStatusNotif = 0,
@@ -75,9 +88,6 @@ private:
 
         readRawMessageNotif,
     } mCommunicationMainNotifications;
-
-    uint8_t mMACAddress[6];
-    bool mIsMacAddressReal;
 
     uint8_t mLastTransmittedMessage[MESSAGE_SIZE];
 

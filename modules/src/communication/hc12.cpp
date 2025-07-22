@@ -15,6 +15,40 @@ HC12* HC12::mspHC12 = nullptr;
 
 // ============================ Public ============================
 
+HC12::HC12(Communication *communication) {
+    mpCommunication = communication;
+    mspHC12 = this;
+
+    pinMode(SET_PIN, OUTPUT);
+    digitalWrite(SET_PIN, HIGH);
+    vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_HIGH));
+
+    createQueues();
+    
+    mBaudRate = (unsigned long)BAUD_RATE;
+    mpSerial = new HardwareSerial(HARDWARE_SERIAL_UART_NR);
+    mpSerial->begin(mBaudRate, SERIAL_8N1, RX_PIN, TX_PIN);
+    // vTaskDelay(pdMS_TO_TICKS(1000));
+    
+    createTransmitTask();
+    createHC12MainTask();
+    Serial.println("HC12 initialized");
+}
+
+
+HC12::~HC12() {
+    deleteHC12MainTask();
+    deleteTransmitTask();
+    deleteSetupHC12Task();
+
+    deleteQueues();
+    deleteSetupHC12Queues();
+
+    digitalWrite(SET_PIN, LOW);
+
+    delete mpSerial;
+}
+
 void HC12::addMessageToTransmit(const uint8_t *MESSAGE) {
     xQueueSend(mTransmitQueue, MESSAGE, portMAX_DELAY);
     vTaskResume(mTransmitTaskHandle);
@@ -61,43 +95,6 @@ void HC12::setupHC12(const uint8_t *COMMANDS) {
 
         xTaskNotify(mHC12MainTaskHandle, createSetupHC12TaskNotif, eSetValueWithOverwrite);
     }
-}
-// ================================================================
-
-// ================== Constructor and Destructor ==================
-
-HC12::HC12(Communication *communication) {
-    mpCommunication = communication;
-    mspHC12 = this;
-
-    pinMode(SET_PIN, OUTPUT);
-    digitalWrite(SET_PIN, HIGH);
-    vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_HIGH));
-
-    createQueues();
-    
-    mBaudRate = (unsigned long)BAUD_RATE;
-    mpSerial = new HardwareSerial(HARDWARE_SERIAL_UART_NR);
-    mpSerial->begin(mBaudRate, SERIAL_8N1, RX_PIN, TX_PIN);
-    // vTaskDelay(pdMS_TO_TICKS(1000));
-    
-    createTransmitTask();
-    createHC12MainTask();
-    Serial.println("HC12 initialized");
-}
-
-
-HC12::~HC12() {
-    deleteHC12MainTask();
-    deleteTransmitTask();
-    deleteSetupHC12Task();
-
-    deleteQueues();
-    deleteSetupHC12Queues();
-
-    digitalWrite(SET_PIN, LOW);
-
-    delete mpSerial;
 }
 // ================================================================
 
@@ -193,12 +190,6 @@ void HC12::HC12MainTask(void *parameters) {
                 // TODO remove print 
                 Serial.println("cancelWaitingForSendConfirmationNotif");
                 isWaitingForSendConfirmation = false;
-                break;
-
-            case resumeSendTaskNotif:
-                // TODO remove print
-                Serial.println("vTaskResume(hc12.mTransmitTaskHandle);");
-                vTaskResume(hc12.mTransmitTaskHandle);
                 break;
 
             case suspendTransmitTaskNotif:
