@@ -32,5 +32,5 @@ namespace SmartHome {
                           MediatorConfig *mediatorConfig);
 
     /// Default path for smarthome YAML config
-    static constexpr const char *defaultConfigPath = "/etc/smarthome/smart_home.yaml";
+    static constexpr const char *sDefaultConfigPath = "/etc/smarthome/smart_home.yaml";
 }

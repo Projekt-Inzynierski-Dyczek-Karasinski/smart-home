@@ -10,7 +10,7 @@
 #include <boost/asio.hpp>
 
 namespace ba = boost::asio;
-namespace bip = boost::asio::ip;
+namespace bai = boost::asio::ip;
 namespace bs = boost::system;
 
 namespace SmartHome {

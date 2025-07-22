@@ -6,7 +6,7 @@
 #include <boost/program_options.hpp>
 
 namespace ba = boost::asio;
-namespace bip = boost::asio::ip;
+namespace bai = boost::asio::ip;
 namespace bpo = boost::program_options;
 
 // TODO this is placeholder version for testing implement working mediator
@@ -38,8 +38,8 @@ int main(int argc, char *argv[]) {
     std::cout << "Trying connecting with: " << ip << ":" << port << std::endl;
 
     ba::io_context ioContext;
-    bip::tcp::resolver resolver(ioContext);
-    bip::tcp::socket socket(ioContext);
+    bai::tcp::resolver resolver(ioContext);
+    bai::tcp::socket socket(ioContext);
 
     try {
         ba::connect(socket, resolver.resolve(ip, std::to_string(port)));
