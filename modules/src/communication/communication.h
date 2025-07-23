@@ -26,6 +26,7 @@ public:
 
     void startAddresingAlgorithm();
     void addByteToDecode(const uint8_t DATA);
+    void sendMessage(const uint8_t MESSAGE[MESSAGE_SIZE]);
 
 private:
     Communication(DebugLED *debugLED);
@@ -34,6 +35,8 @@ private:
     void createCommunicationQueues();
     void deleteCommunicationQueues();
 
+    // TODO change name
+    void receivedMessageDecider();
     static void communicationMainTask(void* parameters);
     void createCommunicationMainTask();
     void deleteCommunicationMainTask();

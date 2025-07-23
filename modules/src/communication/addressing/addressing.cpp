@@ -32,7 +32,7 @@ const uint8_t Addressing::getIPAddress() {
 }
 
 void Addressing::startAddressing() {
-    // createAddressingTimers();
+    createAddressingTimers();
     createAddressingQueues();
     createAddressingTask();
 }
@@ -40,7 +40,15 @@ void Addressing::startAddressing() {
 void Addressing::stopAddressing() {
     deleteAddressingTask();
     deleteAddressingQueues();
-    // deleteAddressingTimers();
+    deleteAddressingTimers();
+}
+
+void Addressing::addMessage(const uint8_t MESSAGE[MESSAGE_SIZE]) {
+    if (mAddressingQueue != NULL) {
+        xQueueSend(mAddressingQueue, MESSAGE, portMAX_DELAY);
+    } else {
+        Serial.println("ADDRESSING ERROR! In addMessage() -> can't add message to queue, because queue doesn't exists");
+    }
 }
 // ================================================================
 
@@ -56,6 +64,22 @@ void Addressing::deleteAddressingQueues() {
     if (mAddressingQueue != NULL) {
         vQueueDelete(mAddressingQueue);
         mAddressingQueue = NULL;
+    }
+}
+// ================================================================
+
+// ============================ Deletes ============================
+
+void Addressing::deleteAddressingTask() {
+    if (mAddressingTaskHandle != NULL) {
+        vTaskDelete(mAddressingTaskHandle);
+        mAddressingTaskHandle = NULL;
+    }
+}
+void Addressing::deleteAddressingTimers() {
+    if (mAddressingTimeoutTimer != NULL) {
+        xTimerDelete(mAddressingTimeoutTimer, portMAX_DELAY);
+        mAddressingTimeoutTimer = NULL;
     }
 }
 // ================================================================

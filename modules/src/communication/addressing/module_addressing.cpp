@@ -5,6 +5,7 @@
 #include "smart_home_config.h"
 #include "config/communication_config.h"
 #include "communication/uint8_array_handlers.h"
+#include "communication/communication.h"
 
 namespace uah = uint8ArrayHandlers;
 
@@ -18,27 +19,30 @@ ModuleAddressing::ModuleAddressing(Communication *communication)
     mIPAddress = 0; // 0 - NULL
     
     Serial.println("ModuleAddressing initialized");
-    Serial.println(mIPAddress);
-    for (int i = 0; i <6 ; i++){
-        Serial.print(mMACAddress[i]);
-        Serial.print(' ');
-    }
-    Serial.println();
+    // Serial.println(mIPAddress);
+    // for (int i = 0; i <6 ; i++){
+    //     Serial.print(mMACAddress[i]);
+    //     Serial.print(' ');
+    // }
+    // Serial.println();
 }
 
 ModuleAddressing::~ModuleAddressing() {
     deleteAddressingTask();
     deleteAddressingQueues();
-    // deleteAddressingTimers();
+    deleteAddressingTimers();
 }
 // ================================================================
 
 // ===================== Addressing Algorithm =====================
 
 void ModuleAddressing::addressingTask(void* parameters) {
+    auto &ad = *mspAddressing;
+
+    xTimerStart(ad.mAddressingTimeoutTimer, portMAX_DELAY);
     for (;;) {
-        Serial.println("ModuleAddressing::addressingTask");
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        ad.mpCommunication->sendMessage((uint8_t*)"AD 123");
+        vTaskDelay(pdMS_TO_TICKS(3000));
     }
 }
 
@@ -56,45 +60,35 @@ void ModuleAddressing::createAddressingTask() {
         Serial.println("TASK CREATION ERROR! In createAddressingTask() -> Can't create addressing task, because task already exists");
     }
 }
-void ModuleAddressing::deleteAddressingTask() {
-    if (mAddressingTaskHandle != NULL) {
-        vTaskDelete(mAddressingTaskHandle);
-        mAddressingTaskHandle = NULL;
+// ================================================================
+
+// ============================ Timers ============================
+
+void ModuleAddressing::addressingTimersCallbacks(TimerHandle_t xTimer){
+    auto &ad = *mspAddressing;
+
+    if (xTimer == ad.mAddressingTimeoutTimer) {
+        // TODO implement
+        // TODO remove print
+        Serial.println("mAddressingTimeoutTimer");
+        // TODO change
+        ad.deleteAddressingTask();
+        ad.deleteAddressingQueues();
+        // xTaskNotify(com.mCommunicationMainTaskHandle, messageTimeoutNotif, eSetValueWithOverwrite);
+    }
+}
+
+void ModuleAddressing::createAddressingTimers() {
+    if (mAddressingTimeoutTimer == NULL) {
+        mAddressingTimeoutTimer = xTimerCreate(
+            "Addressing Absolute Timeout",
+            // TODO change tmp
+            pdMS_TO_TICKS(5000),
+            // pdMS_TO_TICKS(ADDRESSING_ABSOLUTE_TIMEOUT),
+            pdFALSE,
+            NULL,
+            addressingTimersCallbacks
+        );
     }
 }
 // ================================================================
-
-// // ============================ Timers ============================
-
-// void ModuleAddressing::addressingTimersCallbacks(TimerHandle_t xTimer){
-//     auto &ad = *mspAddressing;
-
-//     if (xTimer == ad.mAddressingTimeoutTimer) {
-//         // TODO implement
-//         // TODO remove print
-//         Serial.println("mAddressingTimeoutTimer");
-//         // xTaskNotify(com.mCommunicationMainTaskHandle, messageTimeoutNotif, eSetValueWithOverwrite);
-//     }
-// }
-
-// void ModuleAddressing::createAddressingTimers() {
-//     if (mAddressingTimeoutTimer == NULL) {
-//         mAddressingTimeoutTimer = xTimerCreate(
-//             "Addressing Absolute Timeout",
-//             // TODO change tmp
-//             pdMS_TO_TICKS(5000),
-//             // pdMS_TO_TICKS(ADDRESSING_ABSOLUTE_TIMEOUT),
-//             pdFALSE,
-//             NULL,
-//             addressingTimersCallbacks
-//         );
-//     }
-// }
-
-// void ModuleAddressing::deleteAddressingTimers() {
-//     if (mAddressingTimeoutTimer != NULL) {
-//         xTimerDelete(mAddressingTimeoutTimer, portMAX_DELAY);
-//         mAddressingTimeoutTimer = NULL;
-//     }
-// }
-// // ================================================================

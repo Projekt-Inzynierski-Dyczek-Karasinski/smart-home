@@ -28,7 +28,6 @@ HC12::HC12(Communication *communication) {
     mBaudRate = (unsigned long)BAUD_RATE;
     mpSerial = new HardwareSerial(HARDWARE_SERIAL_UART_NR);
     mpSerial->begin(mBaudRate, SERIAL_8N1, RX_PIN, TX_PIN);
-    // vTaskDelay(pdMS_TO_TICKS(1000));
     
     createTransmitTask();
     createHC12MainTask();
@@ -157,11 +156,8 @@ void HC12::HC12MainTask(void *parameters) {
                     // TODO add guards for setupHC12 ?
                     hc12Output = hc12.mpSerial->read();
 
-                    // TODO remove print 
-                    // Serial.println("hc12.mpSerial->available() > 0");
                     if (isWaitingForSendConfirmation) {
-                        // TODO remove print 
-                        Serial.println("sending confirmation");
+                        isWaitingForSendConfirmation = false;
                         xTaskNotify(hc12.mTransmitTaskHandle, (uint32_t)hc12Output, eSetValueWithOverwrite);
                     } else if (isSetupHC12Working) {
                         xQueueSend(hc12.mSetupHC12ReceiveQueue, &hc12Output, portMAX_DELAY);
@@ -181,14 +177,10 @@ void HC12::HC12MainTask(void *parameters) {
                 break;
 
             case waitingForSendConfirmationNotif:
-                // TODO remove print 
-                Serial.println("waitingForSendConfirmationNotif");
                 isWaitingForSendConfirmation = true;
                 break;
 
             case cancelWaitingForSendConfirmationNotif:
-                // TODO remove print 
-                Serial.println("cancelWaitingForSendConfirmationNotif");
                 isWaitingForSendConfirmation = false;
                 break;
 
@@ -255,27 +247,28 @@ void HC12::transmitTask(void *parameters) {
     for (;;) {
         if (xQueueReceive(hc12.mTransmitQueue, transmitBuffor, pdMS_TO_TICKS(SUSPEND_TASK_TIME_SHORT)) == pdTRUE) {
             // TODO remove?
-            // uint32_t hc12Respond;
-            // // clearing old notification (if exist)
-            // // xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, 0);
+            uint32_t hc12Respond;
+            // clearing old notification (if exist)
+            xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, 0);
             // // transmiting data
-            // xTaskNotify(hc12.mHC12MainTaskHandle, waitingForSendConfirmationNotif, eSetValueWithOverwrite);
+            xTaskNotify(hc12.mHC12MainTaskHandle, waitingForSendConfirmationNotif, eSetValueWithOverwrite);
             
             // transmiting data
             hc12.mpSerial->write(transmitBuffor, PROTOCOL_SIZE);
 
             // TODO remove?
-            // // wait for confirmation from HC12
-            // if (xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
-            //     if (hc12Respond != 255) {
-            //         Serial.print("TRANSMITING ERROR! In transmitTask() -> hc12 module did not confirm properly. HC12 module should send 255 signal but got: ");
-            //         Serial.println(hc12Respond);
-            //     }
-            // } else {
-            //     xTaskNotify(hc12.mHC12MainTaskHandle, cancelWaitingForSendConfirmationNotif, eSetValueWithOverwrite);
-            //     Serial.println("TRANSMITING ERROR! In transmitTask() -> hc12 module is not responding.");
-            //     Serial.println(hc12Respond);
-            // }
+            // wait for confirmation from HC12
+            if (xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
+                if (hc12Respond != 255) {
+                    Serial.print("TRANSMITING ERROR! In transmitTask() -> hc12 module did not confirm properly. HC12 module should send 255 signal but got: ");
+                    Serial.println(hc12Respond);
+                }
+            } else {
+                xTaskNotify(hc12.mHC12MainTaskHandle, cancelWaitingForSendConfirmationNotif, eSetValueWithOverwrite);
+                // TODO change
+                // Serial.println("TRANSMITING ERROR! In transmitTask() -> hc12 module is not responding.");
+                Serial.println("HC12 NT");
+            }
 
             // this delay is required for HC12 transmit/receive message properly
             vTaskDelay(pdMS_TO_TICKS(DELAY_BETWEEN_MESSAGES));

@@ -2,6 +2,8 @@
 
 #include <Arduino.h>
 
+#include "config/communication_config.h"
+
 class Communication; 
 
 class Addressing {
@@ -16,17 +18,17 @@ public:
     void startAddressing();
     void stopAddressing();
 
+    void addMessage(const uint8_t MESSAGE[MESSAGE_SIZE]);
+
 protected:
     void createAddressingQueues();
     void deleteAddressingQueues();
 
-    // static void addressingTask(void* parameters);
     virtual void createAddressingTask() = 0;
-    virtual void deleteAddressingTask() = 0;
+    void deleteAddressingTask();
 
-    // static void addressingTimersCallbacks(TimerHandle_t xTimer);
-    // virtual void createAddressingTimers();
-    // virtual void deleteAddressingTimers();
+    virtual void createAddressingTimers() = 0;
+    void deleteAddressingTimers();
 
 
     Communication *mpCommunication;

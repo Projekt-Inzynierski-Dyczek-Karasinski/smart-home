@@ -17,7 +17,9 @@ public:
 private:
     static void addressingTask(void* parameters);
     void createAddressingTask() override;
-    void deleteAddressingTask() override;
 
+    static void addressingTimersCallbacks(TimerHandle_t xTimer);
+    void createAddressingTimers() override;
+    
     static CentralUnitAddressing *mspAddressing;
 };

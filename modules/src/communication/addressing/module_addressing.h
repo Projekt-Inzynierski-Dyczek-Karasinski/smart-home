@@ -16,12 +16,10 @@ public:
 
 private:
     static void addressingTask(void* parameters);
-    void createAddressingTask() override;
-    void deleteAddressingTask() override;
+    void createAddressingTask();
 
-    // static void addressingTimersCallbacks(TimerHandle_t xTimer);
-    // void createAddressingTimers() override;
-    // void deleteAddressingTimers() override;
+    static void addressingTimersCallbacks(TimerHandle_t xTimer);
+    void createAddressingTimers() override;
  
     static ModuleAddressing *mspAddressing;
     

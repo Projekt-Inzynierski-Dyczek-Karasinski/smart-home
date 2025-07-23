@@ -41,6 +41,11 @@ void Communication::addByteToDecode(const uint8_t DATA) {
     xQueueSend(mReceiveByteQueue, &DATA, portMAX_DELAY);
     vTaskResume(mDecodeMessageTaskHandle);
 }
+
+void Communication::sendMessage(const uint8_t MESSAGE[MESSAGE_SIZE]) {
+    xQueueSend(mSendMessagesQueue, MESSAGE, portMAX_DELAY);
+    vTaskResume(mEncodeMessageTaskHandle);
+} 
 // ================================================================
 
 // ================== Constructor and Destructor ==================
@@ -117,6 +122,31 @@ void Communication::deleteCommunicationQueues() {
 
 // ====================== Communication Main ======================
 
+void Communication::receivedMessageDecider() {
+    uint8_t buffor[MESSAGE_SIZE];
+    if (xQueueReceive(mReceiveMessageQueue, buffor, 0) == pdTRUE) {
+        // if it is "repeat" message repeat last transmitted message
+        if (uah::areArraysEqual(buffor, (uint8_t*)"repeat", 6)) {
+            repeatLastTransmittedMessage();
+        } 
+        // if is addressing message
+        else if (buffor[0] == (uint8_t)'A' && buffor[1] == (uint8_t)'D') {
+            mpAddressing->addMessage(buffor);
+        }
+        // if is HC12 command
+        #ifdef HC12_MODULE
+        else if (buffor[0] == (uint8_t)'H' && buffor[1] == (uint8_t)'C') {
+            mpRfModule->setupHC12(buffor);
+        }
+        #endif
+        else {
+            Serial.println("COMMUNICATION WARNING! In receivedMessageDecider() -> decider doesn't know what to do with received message");
+            Serial.print("Ignored message: ");
+            uah::printArray(buffor, MESSAGE_SIZE);
+        }
+    }
+}
+
 void Communication::communicationMainTask(void* parameters) {
     auto &com = Communication::getInstance(Communication::mspDebugLED);
 
@@ -130,15 +160,14 @@ void Communication::communicationMainTask(void* parameters) {
             case defaultStatusNotif:
                 // if queue is not empty resume corresponding task
                 if (uxQueueMessagesWaiting(com.mReceiveByteQueue) != 0) {
-                    // TODO remove print
-                    Serial.println("vTaskResume(msReceiveMessageTaskHandle);");
                     vTaskResume(com.mDecodeMessageTaskHandle);
                 }
                 if (uxQueueMessagesWaiting(com.mSendMessagesQueue) != 0) {
-                    // TODO remove print
-                    Serial.println("vTaskResume(msSendMessageTaskHandle);");
                     vTaskResume(com.mEncodeMessageTaskHandle);
                 }
+
+                // monitor incoming rf messages
+                com.receivedMessageDecider();
 
                 // delay for watchdog
                 vTaskDelay(pdMS_TO_TICKS(1));
@@ -159,13 +188,13 @@ void Communication::communicationMainTask(void* parameters) {
 
             case suspendDecodeMessageTaskNotif:
                 // TODO remove print
-                Serial.println("vTaskSuspend(mDecodeMessageTaskHandle)");
+                // Serial.println("vTaskSuspend(mDecodeMessageTaskHandle)");
                 vTaskSuspend(com.mDecodeMessageTaskHandle);
                 break;
             
             case suspendEndcodeMessageTaskNotif:
                 // TODO remove print
-                Serial.println("vTaskSuspend(mEncodeMessageTaskHandle);");
+                // Serial.println("vTaskSuspend(mEncodeMessageTaskHandle);");
                 com.setLastTransmittedMessage();
                 vTaskSuspend(com.mEncodeMessageTaskHandle);
                 break;
@@ -367,16 +396,19 @@ void Communication::decodeMessageTask(void *parameters) {
                         Serial.print("Received message: ");
                         uah::printArray(messageBuffor, MESSAGE_SIZE);
 
-                        // if it is "repeat" message
-                        if (uah::areArraysEqual(messageBuffor, (uint8_t*)"repeat", 6)) {
-                            com.repeatLastTransmittedMessage();
-                        } 
-                        #ifdef HC12_MODULE
-                        // if it is HC_12 command
-                        else if (messageBuffor[0] == (uint8_t)'H' && messageBuffor[1] == (uint8_t)'C') {
-                            com.mpRfModule->setupHC12(messageBuffor);
-                        }
-                        #endif
+                        xQueueSend(com.mReceiveMessageQueue, messageBuffor, portMAX_DELAY);
+
+                        // TODO remove
+                        // // if it is "repeat" message
+                        // if (uah::areArraysEqual(messageBuffor, (uint8_t*)"repeat", 6)) {
+                        //     com.repeatLastTransmittedMessage();
+                        // } 
+                        // #ifdef HC12_MODULE
+                        // // if it is HC_12 command
+                        // else if (messageBuffor[0] == (uint8_t)'H' && messageBuffor[1] == (uint8_t)'C') {
+                        //     com.mpRfModule->setupHC12(messageBuffor);
+                        // }
+                        // #endif
                         // TODO implement
                         // if Addressing Task is working
                         // else if (msAddressingTaskHandle != NULL) {
@@ -432,12 +464,12 @@ void Communication::encodeMessageTask(void *parameters) {
     // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
     uint8_t protocolBuffor[PROTOCOL_SIZE];
 
-    const uint8_t MAC_ADDRESS_LENGTH = 6;
-    const uint8_t IP_INDEX = 6;
-    const uint8_t MESSAGES_QUANTITY_INDEX = 7;
-    const uint8_t PROTOCOL_MESSAGE_START_INDEX = 8;
-    const uint8_t PROTOCOL_MESSAGE_LENGTH = 6;
-    const uint8_t CHECKSUM_INDEX = 14;
+    static constexpr uint8_t MAC_ADDRESS_LENGTH = 6;
+    static constexpr uint8_t IP_INDEX = 6;
+    static constexpr uint8_t MESSAGES_QUANTITY_INDEX = 7;
+    static constexpr uint8_t PROTOCOL_MESSAGE_START_INDEX = 8;
+    static constexpr uint8_t PROTOCOL_MESSAGE_LENGTH = 6;
+    static constexpr uint8_t CHECKSUM_INDEX = 14;
 
     // prepare MAC address in protocol buffor and clear rest of buffor
     uah::prepareBuffor(protocolBuffor, com.mpAddressing->getProtocolMACAddress(), MAC_ADDRESS_LENGTH, PROTOCOL_SIZE);
@@ -465,7 +497,7 @@ void Communication::encodeMessageTask(void *parameters) {
     //     }
     //     xSemaphoreGive(msAddressDataMutex);
     // #endif
-
+    
     // prepare place for message
     for (uint8_t i = PROTOCOL_MESSAGE_START_INDEX; i < (PROTOCOL_MESSAGE_START_INDEX + PROTOCOL_MESSAGE_LENGTH); i++) {
         protocolBuffor[i] = BLANK_CHARACTER;
@@ -585,7 +617,7 @@ void Communication::sendCustomMessageTask(void *parameters) {
                     if (buffor[0] == 'A' && buffor[1] == 'T') {
                         buffor[0] = 'H';
                         buffor[1] = 'C';
-                        com.mpRfModule->setupHC12(buffor);
+                        xQueueSend(com.mReceiveMessageQueue, &buffor, portMAX_DELAY);
                     } else {
                         xQueueSend(com.mSendMessagesQueue, &buffor, portMAX_DELAY);
                     }
@@ -637,6 +669,7 @@ void Communication::communicationTimersCallbacks(TimerHandle_t xTimer){
     } else if (xTimer == com.mReceiveByteTimeoutTimer) {
         // TODO remove print
         Serial.println("byte timeout callback");
+        xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
         xTaskNotify(com.mCommunicationMainTaskHandle, byteTimeoutNotif, eSetValueWithOverwrite);
     }
 }
@@ -694,6 +727,8 @@ void Communication::repeatLastTransmittedMessage() {
         xQueueSend(mSendMessagesQueue, mLastTransmittedMessage, portMAX_DELAY);
     }
     xSemaphoreGive(mLastTransmittedMessageMutex);
+    // TODO add a few attempts
+    setLastTransmittedMessage();
 }
 
 void Communication::transmitRepeatMessage() {
