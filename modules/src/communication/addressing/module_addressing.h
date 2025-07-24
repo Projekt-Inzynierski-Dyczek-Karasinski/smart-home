@@ -21,6 +21,7 @@ private:
     static void addressingTimersCallbacks(TimerHandle_t xTimer);
     void createAddressingTimers() override;
 
+    void updateAddresingData(const uint8_t *newMAC, const uint8_t newIP);
     void abortAddresing() override;
  
     static ModuleAddressing *mspAddressing;

@@ -40,8 +40,8 @@ private:
     void deleteCommunicationQueues();
 
     // TODO change name
-    void receivedMessageDecider();
-    static void communicationMainTask(void* parameters);
+    void receivedMessageDecider(bool *isReadingRawMessage);
+    static void communicationMainTask(void *parameters);
     void createCommunicationMainTask();
     void deleteCommunicationMainTask();
 
@@ -92,11 +92,10 @@ private:
         // suspending notifications
         suspendDecodeMessageTaskNotif,
         suspendEndcodeMessageTaskNotif,
-
         // ping notifications
         startPingingNotif,
         sendPingNotif,
-        
+        // addressing notifications
         readRawMessageNotif,
         stopAddresingAlgorithmNotif,
     } mCommunicationMainNotifications;

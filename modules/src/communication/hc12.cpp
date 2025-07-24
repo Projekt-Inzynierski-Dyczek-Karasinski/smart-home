@@ -186,20 +186,20 @@ void HC12::HC12MainTask(void *parameters) {
 
             case suspendTransmitTaskNotif:
                 // TODO remove print
-                Serial.println("vTaskSuspend(hc12.mTransmitTaskHandle);");
+                // Serial.println("vTaskSuspend(hc12.mTransmitTaskHandle);");
                 vTaskSuspend(hc12.mTransmitTaskHandle);
                 break;
 
             case createSetupHC12TaskNotif:
                 // TODO remove print
-                Serial.println("createSetupHC12TaskNotif");
+                // Serial.println("createSetupHC12TaskNotif");
                 isSetupHC12Working = true;
                 hc12.createSetupHC12Task();
                 break;
 
             case deleteSetupHC12TaskNotif:
                 // TODO remove print
-                Serial.println("deleteSetupHC12TaskNotif");
+                // Serial.println("deleteSetupHC12TaskNotif");
                 isSetupHC12Working = false;
                 hc12.deleteSetupHC12Task();
                 break;

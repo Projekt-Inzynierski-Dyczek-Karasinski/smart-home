@@ -83,12 +83,15 @@ void ModuleAddressing::createAddressingTimers() {
 
 // ============================ Other =============================
 
-void ModuleAddressing::abortAddresing() {
+void ModuleAddressing::updateAddresingData(const uint8_t *newMAC, const uint8_t newIP) {
     // TODO consider protecting data with mutex
-    uah::prepareBuffor(mProtocolMACAddress, mMACAddress, 6, 6);
-    mIPAddress = 0;
-
+    uah::prepareBuffor(mProtocolMACAddress, newMAC, 6, 6);
+    mIPAddress = newIP;
     mpCommunication->resetEncodeMessageTask();
+}
+
+void ModuleAddressing::abortAddresing() {
+    updateAddresingData(mMACAddress, 0);
     mpCommunication->sendInternalMessage((uint8_t*)"HC+DEFAULT");
     mpCommunication->stopAddresingAlgorithm();
 }

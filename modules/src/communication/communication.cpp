@@ -136,7 +136,7 @@ void Communication::deleteCommunicationQueues() {
 
 // ====================== Communication Main ======================
 
-void Communication::receivedMessageDecider() {
+void Communication::receivedMessageDecider(bool *isReadingRawMessage) {
     uint8_t buffor[MESSAGE_SIZE];
     if (xQueueReceive(mReceiveMessageQueue, buffor, 0) == pdTRUE) {
         // if it is "repeat" message repeat last transmitted message
@@ -153,7 +153,8 @@ void Communication::receivedMessageDecider() {
             Serial.println("Ping Success");
         }
         // if is addressing message
-        else if (buffor[0] == (uint8_t)'A' && buffor[1] == (uint8_t)'D') {
+        else if ((buffor[0] == (uint8_t)'A' && buffor[1] == (uint8_t)'D') || *isReadingRawMessage) {
+            *isReadingRawMessage = false;
             mpAddressing->addMessage(buffor);
         }
         // if is HC12 command
@@ -176,8 +177,8 @@ void Communication::communicationMainTask(void* parameters) {
     uint32_t status = defaultStatusNotif;
 
     uint8_t pingAttempts = 0;
+    bool isReadingRawMessage = false;
 
-    
     for (;;) {
         // change status
         xTaskNotifyWait(0, ULONG_MAX, &status, 0);
@@ -192,7 +193,7 @@ void Communication::communicationMainTask(void* parameters) {
                 }
 
                 // monitor incoming rf messages
-                com.receivedMessageDecider();
+                com.receivedMessageDecider(&isReadingRawMessage);
 
                 // delay for watchdog
                 vTaskDelay(pdMS_TO_TICKS(1));
@@ -238,12 +239,13 @@ void Communication::communicationMainTask(void* parameters) {
                 }
                 break;
 
-            // case readRawMessageNotif:
-                //     // TODO implement
-                //     xTaskNotify(msReceiveMessageTaskHandle, readRawMessageNotif, eSetValueWithOverwrite);
-                //     break;
+            case readRawMessageNotif:
+                isReadingRawMessage = true;
+                xTaskNotify(com.mDecodeMessageTaskHandle, readRawMessageNotif, eSetValueWithOverwrite);
+                break;
 
             case stopAddresingAlgorithmNotif:
+                isReadingRawMessage = false;
                 mspDebugLED->deletePairingBlinkTask();
                 com.mpAddressing->stopAddressing();
                 break;
@@ -445,7 +447,12 @@ void Communication::decodeMessageTask(void *parameters) {
                         Serial.print("Received message: ");
                         uah::printArray(messageBuffor, MESSAGE_SIZE);
 
-                        xQueueSend(com.mReceiveMessageQueue, messageBuffor, portMAX_DELAY);
+                        if (isRawMessage) {
+                            isRawMessage = false;
+                            xQueueSend(com.mReceiveMessageQueue, protocolBuffor[0], portMAX_DELAY);
+                        } else {
+                            xQueueSend(com.mReceiveMessageQueue, messageBuffor, portMAX_DELAY);
+                        }
 
                         // TODO remove
                         // // if it is "repeat" message
@@ -663,9 +670,14 @@ void Communication::sendCustomMessageTask(void *parameters) {
                 Serial.print("Message Ready: ");
                 uah::printArray(buffor, MESSAGE_SIZE);
 
+                // special debug commands
                 if (uah::areArraysEqual(buffor, (uint8_t*)"startping", 9)) {
                     xTaskNotify(com.mCommunicationMainTaskHandle, startPingingNotif, eSetValueWithOverwrite);
-                } else {
+                } else if (uah::areArraysEqual(buffor, (uint8_t*)"readraw", 7)) {
+                    xTaskNotify(com.mCommunicationMainTaskHandle, readRawMessageNotif, eSetValueWithOverwrite);
+                } 
+                // rest
+                else {
                     // check if is HC_12 command
                     #ifdef HC12_MODULE
                         if (buffor[0] == 'A' && buffor[1] == 'T') {
