@@ -25,8 +25,12 @@ public:
     Communication& operator = (const Communication&) = delete;
 
     void startAddresingAlgorithm();
+    void stopAddresingAlgorithm();
+    void resetEncodeMessageTask();
+
     void addByteToDecode(const uint8_t DATA);
     void sendMessage(const uint8_t MESSAGE[MESSAGE_SIZE]);
+    void sendInternalMessage(const uint8_t MESSAGE[MESSAGE_SIZE]);
 
 private:
     Communication(DebugLED *debugLED);
@@ -61,6 +65,8 @@ private:
     void setLastTransmittedMessage(const uint8_t MESSAGE[MESSAGE_SIZE]);
     void repeatLastTransmittedMessage();
     void transmitRepeatMessage();
+    void transmitPing();
+    void replyToPing();
 
     // TODO change this to nonstatic
     static DebugLED *mspDebugLED;
@@ -83,16 +89,22 @@ private:
         // rf communication timeouts
         byteTimeoutNotif,
         messageTimeoutNotif,
-        // sending task
-        sendingTaskWaitingNotif,
         // suspending notifications
         suspendDecodeMessageTaskNotif,
         suspendEndcodeMessageTaskNotif,
 
+        // ping notifications
+        startPingingNotif,
+        sendPingNotif,
+        
         readRawMessageNotif,
+        stopAddresingAlgorithmNotif,
     } mCommunicationMainNotifications;
 
     uint8_t mLastTransmittedMessage[MESSAGE_SIZE];
+    uint8_t mLastTransmittedMessageAttempts = 0;
+
+    portMUX_TYPE mCriticalSectionMutex = portMUX_INITIALIZER_UNLOCKED;
 
     SemaphoreHandle_t mLastTransmittedMessageMutex = NULL;
 
@@ -107,4 +119,5 @@ private:
 
     TimerHandle_t mReceiveMessageTimeoutTimer = NULL;
     TimerHandle_t mReceiveByteTimeoutTimer = NULL;
+    TimerHandle_t mPingTimeoutTimer = NULL;
 };

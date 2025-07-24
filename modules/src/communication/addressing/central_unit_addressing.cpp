@@ -4,7 +4,10 @@
 
 #include "smart_home_config.h"
 #include "config/communication_config.h"
+#include "config/addressing_config.h"
+
 #include "communication/uint8_array_handlers.h"
+#include "communication/communication.h"
 
 namespace uah = uint8ArrayHandlers;
 
@@ -18,18 +21,12 @@ CentralUnitAddressing::CentralUnitAddressing(Communication *communication)
     mIPAddress = 1; // 1 - central unit's IP
 
     Serial.println("CentralUnitAddressing initialized");
-    Serial.println(mIPAddress);
-    for (int i = 0; i <6 ; i++){
-        Serial.print(mMACAddress[i]);
-        Serial.print(' ');
-    }
-    Serial.println();
 }
 
 CentralUnitAddressing::~CentralUnitAddressing() {
     deleteAddressingTask();
     deleteAddressingQueues();
-    // deleteAddressingTimers();
+    deleteAddressingTimers();
 }
 
 // ================================================================
@@ -40,6 +37,7 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
     auto &ad = *mspAddressing;
 
     uint8_t buffor[MESSAGE_SIZE];
+    xTimerStart(ad.mAddressingTimeoutTimer, portMAX_DELAY);
     for (;;) {
         if (xQueueReceive(ad.mAddressingQueue, buffor, 0) == pdTRUE) {
             uah::printArray(buffor, MESSAGE_SIZE);
@@ -77,10 +75,7 @@ void CentralUnitAddressing::addressingTimersCallbacks(TimerHandle_t xTimer){
     auto &ad = *mspAddressing;
 
     if (xTimer == ad.mAddressingTimeoutTimer) {
-        // TODO implement
-        // TODO remove print
-        Serial.println("mAddressingTimeoutTimer");
-        // xTaskNotify(com.mCommunicationMainTaskHandle, messageTimeoutNotif, eSetValueWithOverwrite);
+        ad.abortAddressingWithAbortMessage();
     }
 }
 
@@ -88,20 +83,19 @@ void CentralUnitAddressing::createAddressingTimers() {
     if (mAddressingTimeoutTimer == NULL) {
         mAddressingTimeoutTimer = xTimerCreate(
             "Addressing Absolute Timeout",
-            // TODO change tmp
-            pdMS_TO_TICKS(5000),
-            // pdMS_TO_TICKS(ADDRESSING_ABSOLUTE_TIMEOUT),
+            pdMS_TO_TICKS(ADDRESSING_ABSOLUTE_TIMEOUT),
             pdFALSE,
             NULL,
             addressingTimersCallbacks
         );
     }
 }
+// ================================================================
 
-// void ModuleAddressing::deleteAddressingTimers() {
-//     if (mAddressingTimeoutTimer != NULL) {
-//         xTimerDelete(mAddressingTimeoutTimer, portMAX_DELAY);
-//         mAddressingTimeoutTimer = NULL;
-//     }
-// }
+// ============================ Other =============================
+
+void CentralUnitAddressing::abortAddresing() {
+    mpCommunication->sendInternalMessage((uint8_t*)"HC+DEFAULT");
+    mpCommunication->stopAddresingAlgorithm();
+}
 // ================================================================

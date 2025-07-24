@@ -16,8 +16,8 @@
 // TODO assign final value
 #define RECEIVE_MESSAGE_TIMEOUT 1000 // 1s
 // TODO assign final value
-#define ADDRESSING_ABSOLUTE_TIMEOUT 60000 // 60s
+#define REPEAT_LAST_MESSAGE_MAX_ATTEMPTS 3
 // TODO assign final value
-#define ADDRESSING_MESSAGE_TIMEOUT 1000 // 1s
-// TODO assign final value
-#define ADDRESSING_MAX_ATTEMPTS 5
+#define PING_MAX_ATTEMPTS 3
+// TODO increase delay ?
+#define DELAY_BETWEEN_MESSAGES 40

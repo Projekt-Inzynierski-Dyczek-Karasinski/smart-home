@@ -30,6 +30,8 @@ protected:
     virtual void createAddressingTimers() = 0;
     void deleteAddressingTimers();
 
+    virtual void abortAddresing() = 0;
+    void abortAddressingWithAbortMessage();
 
     Communication *mpCommunication;
 

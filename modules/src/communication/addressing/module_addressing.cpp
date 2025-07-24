@@ -4,6 +4,8 @@
 
 #include "smart_home_config.h"
 #include "config/communication_config.h"
+#include "config/addressing_config.h"
+
 #include "communication/uint8_array_handlers.h"
 #include "communication/communication.h"
 
@@ -19,12 +21,6 @@ ModuleAddressing::ModuleAddressing(Communication *communication)
     mIPAddress = 0; // 0 - NULL
     
     Serial.println("ModuleAddressing initialized");
-    // Serial.println(mIPAddress);
-    // for (int i = 0; i <6 ; i++){
-    //     Serial.print(mMACAddress[i]);
-    //     Serial.print(' ');
-    // }
-    // Serial.println();
 }
 
 ModuleAddressing::~ModuleAddressing() {
@@ -68,13 +64,7 @@ void ModuleAddressing::addressingTimersCallbacks(TimerHandle_t xTimer){
     auto &ad = *mspAddressing;
 
     if (xTimer == ad.mAddressingTimeoutTimer) {
-        // TODO implement
-        // TODO remove print
-        Serial.println("mAddressingTimeoutTimer");
-        // TODO change
-        ad.deleteAddressingTask();
-        ad.deleteAddressingQueues();
-        // xTaskNotify(com.mCommunicationMainTaskHandle, messageTimeoutNotif, eSetValueWithOverwrite);
+        ad.abortAddressingWithAbortMessage();
     }
 }
 
@@ -82,13 +72,25 @@ void ModuleAddressing::createAddressingTimers() {
     if (mAddressingTimeoutTimer == NULL) {
         mAddressingTimeoutTimer = xTimerCreate(
             "Addressing Absolute Timeout",
-            // TODO change tmp
-            pdMS_TO_TICKS(5000),
-            // pdMS_TO_TICKS(ADDRESSING_ABSOLUTE_TIMEOUT),
+            pdMS_TO_TICKS(ADDRESSING_ABSOLUTE_TIMEOUT),
             pdFALSE,
             NULL,
             addressingTimersCallbacks
         );
     }
 }
+// ================================================================
+
+// ============================ Other =============================
+
+void ModuleAddressing::abortAddresing() {
+    // TODO consider protecting data with mutex
+    uah::prepareBuffor(mProtocolMACAddress, mMACAddress, 6, 6);
+    mIPAddress = 0;
+
+    mpCommunication->resetEncodeMessageTask();
+    mpCommunication->sendInternalMessage((uint8_t*)"HC+DEFAULT");
+    mpCommunication->stopAddresingAlgorithm();
+}
+
 // ================================================================

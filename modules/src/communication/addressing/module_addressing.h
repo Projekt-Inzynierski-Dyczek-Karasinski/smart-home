@@ -20,7 +20,8 @@ private:
 
     static void addressingTimersCallbacks(TimerHandle_t xTimer);
     void createAddressingTimers() override;
+
+    void abortAddresing() override;
  
     static ModuleAddressing *mspAddressing;
-    
 };

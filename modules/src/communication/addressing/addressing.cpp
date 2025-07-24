@@ -4,7 +4,9 @@
 
 #include "smart_home_config.h"
 #include "config/communication_config.h"
+#include "config/addressing_config.h"
 #include "communication/uint8_array_handlers.h"
+#include "communication/communication.h"
 
 namespace uah = uint8ArrayHandlers;
 
@@ -66,7 +68,7 @@ void Addressing::deleteAddressingQueues() {
         mAddressingQueue = NULL;
     }
 }
-// ================================================================
+// =================================================================
 
 // ============================ Deletes ============================
 
@@ -81,5 +83,16 @@ void Addressing::deleteAddressingTimers() {
         xTimerDelete(mAddressingTimeoutTimer, portMAX_DELAY);
         mAddressingTimeoutTimer = NULL;
     }
+}
+// ================================================================
+
+// ============================ Other =============================
+
+void Addressing::abortAddressingWithAbortMessage() {
+    for (uint8_t i = 0; i < ADDRESSING_NUM_OF_ABORT_MESSAGES; i++) {
+        mpCommunication->sendMessage((uint8_t*)ADDRESSING_ABORT);
+        vTaskDelay(pdMS_TO_TICKS(ADDRESSING_DELAY_BETWEEN_ABORT_MESSAGES));
+    }
+    abortAddresing();
 }
 // ================================================================

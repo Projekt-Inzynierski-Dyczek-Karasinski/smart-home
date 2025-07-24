@@ -36,6 +36,16 @@ void Communication::startAddresingAlgorithm() {
     mspDebugLED->createPairingBlinkTask();
     mpAddressing->startAddressing();
 }
+void Communication::stopAddresingAlgorithm() {
+    xTaskNotify(mCommunicationMainTaskHandle, stopAddresingAlgorithmNotif, eSetValueWithOverwrite);
+}
+
+void Communication::resetEncodeMessageTask() {
+    taskENTER_CRITICAL(&mCriticalSectionMutex);
+    deleteEncodeMessageTask();
+    createEncodeMessageTask();
+    taskEXIT_CRITICAL(&mCriticalSectionMutex);
+}
 
 void Communication::addByteToDecode(const uint8_t DATA) {
     xQueueSend(mReceiveByteQueue, &DATA, portMAX_DELAY);
@@ -46,6 +56,10 @@ void Communication::sendMessage(const uint8_t MESSAGE[MESSAGE_SIZE]) {
     xQueueSend(mSendMessagesQueue, MESSAGE, portMAX_DELAY);
     vTaskResume(mEncodeMessageTaskHandle);
 } 
+
+void Communication::sendInternalMessage(const uint8_t MESSAGE[MESSAGE_SIZE]) {
+    xQueueSend(mReceiveMessageQueue, MESSAGE, portMAX_DELAY);
+}
 // ================================================================
 
 // ================== Constructor and Destructor ==================
@@ -129,6 +143,15 @@ void Communication::receivedMessageDecider() {
         if (uah::areArraysEqual(buffor, (uint8_t*)"repeat", 6)) {
             repeatLastTransmittedMessage();
         } 
+        // if it is "ping", reply to ping
+        else if (uah::areArraysEqual(buffor, (uint8_t*)"ping", 4)) {
+            replyToPing();
+        }
+        // if it is "reping", reply to ping
+        else if (uah::areArraysEqual(buffor, (uint8_t*)"reping", 6)) {
+            xTimerStop(mPingTimeoutTimer, portMAX_DELAY);
+            Serial.println("Ping Success");
+        }
         // if is addressing message
         else if (buffor[0] == (uint8_t)'A' && buffor[1] == (uint8_t)'D') {
             mpAddressing->addMessage(buffor);
@@ -151,6 +174,8 @@ void Communication::communicationMainTask(void* parameters) {
     auto &com = Communication::getInstance(Communication::mspDebugLED);
 
     uint32_t status = defaultStatusNotif;
+
+    uint8_t pingAttempts = 0;
 
     
     for (;;) {
@@ -181,11 +206,6 @@ void Communication::communicationMainTask(void* parameters) {
                 xTaskNotify(com.mDecodeMessageTaskHandle, messageTimeoutNotif, eSetValueWithOverwrite);
                 break;
 
-            // case readRawMessageNotif:
-            //     // TODO implement
-            //     xTaskNotify(msReceiveMessageTaskHandle, readRawMessageNotif, eSetValueWithOverwrite);
-            //     break;
-
             case suspendDecodeMessageTaskNotif:
                 // TODO remove print
                 // Serial.println("vTaskSuspend(mDecodeMessageTaskHandle)");
@@ -197,6 +217,35 @@ void Communication::communicationMainTask(void* parameters) {
                 // Serial.println("vTaskSuspend(mEncodeMessageTaskHandle);");
                 com.setLastTransmittedMessage();
                 vTaskSuspend(com.mEncodeMessageTaskHandle);
+                break;  
+            
+            case startPingingNotif:
+                pingAttempts = 1;
+                com.transmitPing();
+                xTimerStart(com.mPingTimeoutTimer, portMAX_DELAY);
+                break;
+
+            case sendPingNotif:
+                Serial.println("Ping Timeout");
+                pingAttempts++;
+
+                if (pingAttempts > PING_MAX_ATTEMPTS) {
+                    xTimerStop(com.mPingTimeoutTimer, portMAX_DELAY);
+                    pingAttempts = 0;
+                    Serial.println("PING ERROR! In communicationMainTask() -> no response to ping.");
+                } else {
+                    com.transmitPing();
+                }
+                break;
+
+            // case readRawMessageNotif:
+                //     // TODO implement
+                //     xTaskNotify(msReceiveMessageTaskHandle, readRawMessageNotif, eSetValueWithOverwrite);
+                //     break;
+
+            case stopAddresingAlgorithmNotif:
+                mspDebugLED->deletePairingBlinkTask();
+                com.mpAddressing->stopAddressing();
                 break;
 
             default:
@@ -584,6 +633,8 @@ void Communication::deleteEncodeMessageTask() {
 }
 // ================================================================
 
+// TODO consider implementation #ifdef DEBUG_MODE for below section
+
 // ===================== Send Custom Message ======================
 
 void Communication::sendCustomMessageTask(void *parameters) {
@@ -612,18 +663,22 @@ void Communication::sendCustomMessageTask(void *parameters) {
                 Serial.print("Message Ready: ");
                 uah::printArray(buffor, MESSAGE_SIZE);
 
-                // check if is HC_12 command
-                #ifdef HC12_MODULE
-                    if (buffor[0] == 'A' && buffor[1] == 'T') {
-                        buffor[0] = 'H';
-                        buffor[1] = 'C';
-                        xQueueSend(com.mReceiveMessageQueue, &buffor, portMAX_DELAY);
-                    } else {
-                        xQueueSend(com.mSendMessagesQueue, &buffor, portMAX_DELAY);
-                    }
-                #else
-                    #error "not implemented"
-                #endif
+                if (uah::areArraysEqual(buffor, (uint8_t*)"startping", 9)) {
+                    xTaskNotify(com.mCommunicationMainTaskHandle, startPingingNotif, eSetValueWithOverwrite);
+                } else {
+                    // check if is HC_12 command
+                    #ifdef HC12_MODULE
+                        if (buffor[0] == 'A' && buffor[1] == 'T') {
+                            buffor[0] = 'H';
+                            buffor[1] = 'C';
+                            xQueueSend(com.mReceiveMessageQueue, &buffor, portMAX_DELAY);
+                        } else {
+                            xQueueSend(com.mSendMessagesQueue, &buffor, portMAX_DELAY);
+                        }
+                    #else
+                        #error "not implemented"
+                    #endif
+                }
 
                 // reset buffor
                 uah::prepareBuffor(buffor, index);
@@ -671,6 +726,8 @@ void Communication::communicationTimersCallbacks(TimerHandle_t xTimer){
         Serial.println("byte timeout callback");
         xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
         xTaskNotify(com.mCommunicationMainTaskHandle, byteTimeoutNotif, eSetValueWithOverwrite);
+    } else if (xTimer == com.mPingTimeoutTimer) {
+        xTaskNotify(com.mCommunicationMainTaskHandle, sendPingNotif, eSetValueWithOverwrite);
     }
 }
 
@@ -693,6 +750,15 @@ void Communication::createCommunicationTimers() {
             communicationTimersCallbacks
         );
     }
+    if (mPingTimeoutTimer == NULL) {
+        mPingTimeoutTimer = xTimerCreate(
+            "Ping Timeout",
+            pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT),
+            pdTRUE,
+            NULL,
+            communicationTimersCallbacks
+        );
+    }
 }
 
 void Communication::deleteCommunicationTimers() {
@@ -707,33 +773,52 @@ void Communication::deleteCommunicationTimers() {
 }
 // ================================================================
 
-// ============================ other =============================
+// ============================ Other =============================
 
 void Communication::setLastTransmittedMessage() {
     xSemaphoreTake(mLastTransmittedMessageMutex, portMAX_DELAY);
     uah::prepareBuffor(mLastTransmittedMessage, MESSAGE_SIZE);
+    mLastTransmittedMessageAttempts = 0;
     xSemaphoreGive(mLastTransmittedMessageMutex);
 }
 
 void Communication::setLastTransmittedMessage(const uint8_t MESSAGE[MESSAGE_SIZE]) {
     xSemaphoreTake(mLastTransmittedMessageMutex, portMAX_DELAY);
     uah::prepareBuffor(mLastTransmittedMessage, MESSAGE, MESSAGE_SIZE, MESSAGE_SIZE);
+    mLastTransmittedMessageAttempts = 0;
     xSemaphoreGive(mLastTransmittedMessageMutex);
 }
 
 void Communication::repeatLastTransmittedMessage() {
+    bool isMaxAttemptsExceeded = false;
     xSemaphoreTake(mLastTransmittedMessageMutex, portMAX_DELAY);
     if (mLastTransmittedMessage[0] != 0) {
         xQueueSend(mSendMessagesQueue, mLastTransmittedMessage, portMAX_DELAY);
     }
+    mLastTransmittedMessageAttempts++;
     xSemaphoreGive(mLastTransmittedMessageMutex);
-    // TODO add a few attempts
-    setLastTransmittedMessage();
+    
+    if (mLastTransmittedMessageAttempts > REPEAT_LAST_MESSAGE_MAX_ATTEMPTS) {
+        setLastTransmittedMessage();
+    }
 }
 
 void Communication::transmitRepeatMessage() {
     uint8_t buffor[MESSAGE_SIZE];
     uah::prepareBuffor(buffor, (uint8_t*)"repeat", 6, MESSAGE_SIZE);
+    xQueueSend(mSendMessagesQueue, buffor, portMAX_DELAY);
+}
+
+void Communication::transmitPing() {
+    uint8_t buffor[MESSAGE_SIZE];
+    uah::prepareBuffor(buffor, (uint8_t*)"ping", 4, MESSAGE_SIZE);
+    xQueueSend(mSendMessagesQueue, buffor, portMAX_DELAY);
+}
+
+void Communication::replyToPing() {
+    uint8_t buffor[MESSAGE_SIZE];
+    uah::prepareBuffor(buffor, (uint8_t*)"reping", 6, MESSAGE_SIZE);
+    vTaskDelay(DELAY_BETWEEN_MESSAGES);
     xQueueSend(mSendMessagesQueue, buffor, portMAX_DELAY);
 }
 // ================================================================
