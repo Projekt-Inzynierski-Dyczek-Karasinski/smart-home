@@ -12,7 +12,6 @@ namespace SmartHome::IPC {
     const boost::regex SocketConnection::msDelimiterRegex(SocketConnection::msMessageDelimiter);
 
     std::string SocketConnection::read() {
-        //TODO add is busy
         if (isOpen()) {
             size_t bytesTransferred = 0;
             try {
