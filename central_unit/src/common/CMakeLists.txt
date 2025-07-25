@@ -3,12 +3,15 @@ find_package(yaml-cpp REQUIRED)
 # Boost required
 find_package(Boost 1.74 REQUIRED COMPONENTS
         system
+        regex
 )
 
 
 add_library(smarthome_ipc STATIC
-        ipc/tcp/tcp_server.cpp
-        ipc/tcp/tcp_connection.cpp
+        ipc/socket_connection.cpp
+        ipc/socket_server_connection.cpp
+        ipc/socket_server.cpp
+
 )
 
 add_library(smarthome::ipc ALIAS smarthome_ipc)
@@ -20,6 +23,7 @@ target_include_directories(smarthome_ipc PUBLIC
 
 target_link_libraries(smarthome_ipc PUBLIC
         Boost::system
+        Boost::regex
 )
 
 

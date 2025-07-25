@@ -57,7 +57,7 @@ int main(int argc, char *argv[]) {
     while (std::getline(std::cin, message)) {
         if (message == "exit") break;
 
-        message += "\n";
+        message += "\r\n";
         ba::write(socket, ba::buffer(message));
     }
 

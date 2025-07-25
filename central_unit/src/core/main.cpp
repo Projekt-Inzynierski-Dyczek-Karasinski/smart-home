@@ -16,19 +16,25 @@ namespace SmartHome {
     void loadConfigValues(Utils::ConfigManager &configManager, Core::Config *coreConfig,
                           MediatorConfig *mediatorConfig) {
         // Mediator config
-        std::string prefix = "services.mediator";
-        configManager.getValue(prefix + ".enabled", mediatorConfig->isEnabled);
+        std::string root = "services.mediator";
+        configManager.getValue(root + ".enabled", mediatorConfig->isEnabled);
         mediatorConfig->serviceType = Utils::resolveServiceType(
-            configManager.getValue<std::string>(prefix + ".service_type").value());
-        configManager.getValue(prefix + ".exec_path", mediatorConfig->execPath);
-        configManager.getValue(prefix + ".config_path", mediatorConfig->configPath);
+            configManager.getValue<std::string>(root + ".service_type").value());
+        configManager.getValue(root + ".exec_path", mediatorConfig->execPath);
+        configManager.getValue(root + ".config_path", mediatorConfig->configPath);
 
         // Core config
-        prefix = "core.ipc.tcp_server";
-        configManager.getValue(prefix + ".enabled", coreConfig->isTcpServerEnabled);
-        configManager.getValue(prefix + ".address", coreConfig->tcpServerEndpointAddress);
-        configManager.getValue(prefix + ".port", coreConfig->tcpServerEndpointPort);
-        configManager.getValue(prefix + ".threads", coreConfig->tcpServerThreads);
+        root = "core.ipc";
+        configManager.getValue(root + ".threads", coreConfig->ipcServerThreads);
+
+        root = "core.ipc.tcp";
+        configManager.getValue(root + ".enabled", coreConfig->tcp.isEnabled);
+        configManager.getValue(root + ".address", coreConfig->tcp.endpointAddress);
+        configManager.getValue(root + ".port", coreConfig->tcp.endpointPort);
+
+        root = "core.ipc.uds";
+        configManager.getValue(root + ".enabled", coreConfig->uds.isEnabled);
+        configManager.getValue(root + ".socket_path", coreConfig->uds.endpointPath);
     }
 }
 
@@ -76,11 +82,12 @@ int main(int argc, char *argv[]) {
     }
 
     // Overwrite YAML config with cmd options
-    if (vm.contains("port")) coreConfig.tcpServerEndpointPort = vm["port"].as<int>();
-    if (vm.contains("ipv4"))coreConfig.tcpServerEndpointAddress = vm["ipv4"].as<std::string>();
+    if (vm.contains("port")) coreConfig.tcp.endpointPort = vm["port"].as<int>();
+    if (vm.contains("ipv4")) coreConfig.tcp.endpointAddress = vm["ipv4"].as<std::string>();
 
 
     //Initialize Core
+    std::cout << coreConfig.uds.endpointPath << std::endl;
     if (!core.initialize(coreConfig)) {
         std::cerr << "Failed to initialize core" << std::endl;
         return 1;
