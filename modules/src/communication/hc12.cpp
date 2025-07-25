@@ -145,6 +145,12 @@ void HC12::HC12MainTask(void *parameters) {
     bool isSetupHC12Working = false;
     bool isWaitingForSendConfirmation = false;
 
+    // clear random hc12 output after powering on
+    vTaskDelay(DELAY_AFTER_SET_PIN_HIGH);
+    while (hc12.mpSerial->available() > 0) {
+        hc12.mpSerial->read();
+    }
+
     for (;;) {
         // change status
         xTaskNotifyWait(0, ULONG_MAX, &status, 0);
@@ -246,6 +252,10 @@ void HC12::transmitTask(void *parameters) {
     
     for (;;) {
         if (xQueueReceive(hc12.mTransmitQueue, transmitBuffor, pdMS_TO_TICKS(SUSPEND_TASK_TIME_SHORT)) == pdTRUE) {
+            // TODO consider making this delay more "inteligent" (eg. by cooldown timer)
+            // this delay is required for HC12 transmit/receive message properly
+            vTaskDelay(pdMS_TO_TICKS(DELAY_BETWEEN_MESSAGES));
+
             // TODO remove?
             uint32_t hc12Respond;
             // clearing old notification (if exist)
@@ -269,9 +279,6 @@ void HC12::transmitTask(void *parameters) {
                 // Serial.println("TRANSMITING ERROR! In transmitTask() -> hc12 module is not responding.");
                 Serial.println("HC12 NT");
             }
-
-            // this delay is required for HC12 transmit/receive message properly
-            vTaskDelay(pdMS_TO_TICKS(DELAY_BETWEEN_MESSAGES));
         } else {
             xTaskNotify(hc12.mHC12MainTaskHandle, suspendTransmitTaskNotif, eSetValueWithOverwrite);
         }
@@ -321,7 +328,7 @@ void HC12::setupHC12Task(void *parameters) {
     for (;;) {
         if (xQueueReceive(hc12->mSetupHC12CommandsQueue, commandBuffor, 0) == pdTRUE) {
             Serial.print("setupHC12Task received command: ");
-            uah::printArray(commandBuffor, SETUP_COMMAND_SIZE);
+            uah::printArrayAsChar(commandBuffor, SETUP_COMMAND_SIZE);
 
             // TODO add better protection against bad commands
             if (!(commandBuffor[0] == (uint8_t)'H' && commandBuffor[1] == (uint8_t)'C')) {

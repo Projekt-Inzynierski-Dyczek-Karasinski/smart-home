@@ -26,6 +26,7 @@ public:
 
     void startAddresingAlgorithm();
     void stopAddresingAlgorithm();
+    void needRawMessage();
     void resetEncodeMessageTask();
 
     void addByteToDecode(const uint8_t DATA);

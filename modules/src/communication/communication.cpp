@@ -36,8 +36,13 @@ void Communication::startAddresingAlgorithm() {
     mspDebugLED->createPairingBlinkTask();
     mpAddressing->startAddressing();
 }
+
 void Communication::stopAddresingAlgorithm() {
     xTaskNotify(mCommunicationMainTaskHandle, stopAddresingAlgorithmNotif, eSetValueWithOverwrite);
+}
+
+void Communication::needRawMessage() {
+    xTaskNotify(mCommunicationMainTaskHandle, readRawMessageNotif, eSetValueWithOverwrite);
 }
 
 void Communication::resetEncodeMessageTask() {
@@ -164,10 +169,11 @@ void Communication::receivedMessageDecider(bool *isReadingRawMessage) {
         }
         #endif
         else {
-            Serial.println("COMMUNICATION WARNING! In receivedMessageDecider() -> decider doesn't know what to do with received message");
-            Serial.print("Ignored message: ");
-            uah::printArray(buffor, MESSAGE_SIZE);
+            // Serial.println("COMMUNICATION WARNING! In receivedMessageDecider() -> decider doesn't know what to do with received message");
+            // Serial.print("Ignored message: ");
+            uah::printArrayAsChar(buffor, MESSAGE_SIZE);
         }
+        *isReadingRawMessage = false;
     }
 }
 
@@ -180,6 +186,7 @@ void Communication::communicationMainTask(void* parameters) {
     bool isReadingRawMessage = false;
 
     for (;;) {
+        // TODO !BEFORE PULL REQUEST! change there and in other main tasks notifications to queues (race conditions)
         // change status
         xTaskNotifyWait(0, ULONG_MAX, &status, 0);
         switch (status) {
@@ -296,7 +303,6 @@ void Communication::decodeMessageTask(void *parameters) {
     // prepare message protocol buffor
     // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
     uint8_t protocolBuffor[PROTOCOL_MESSAGE_MAX_NUM][PROTOCOL_SIZE];
-    const uint8_t MAC_ADDRESS_LENGTH = 6;
     const uint8_t IP_INDEX = 6;
     const uint8_t MESSAGES_QUANTITY_INDEX = 7;
     const uint8_t PROTOCOL_MESSAGE_START_INDEX = 8;
@@ -352,10 +358,11 @@ void Communication::decodeMessageTask(void *parameters) {
                 }
             }
             timeoutStatus = defaultStatusNotif;
+            isRawMessage = false;
         } 
 
-        // decoding message ,                                                time + offset for propper suspending task
-        if (xQueueReceive(com.mReceiveByteQueue, &queueBuffor, pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG + 100)) == pdTRUE) {
+        // decoding message
+        if (xQueueReceive(com.mReceiveByteQueue, &queueBuffor, pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG)) == pdTRUE) {
             protocolBuffor[pbMessageIndex][pbByteIndex] = queueBuffor;
             // if new message start message timeout timer
             if (pbByteIndex == 0 && pbMessageIndex == 0){
@@ -381,7 +388,9 @@ void Communication::decodeMessageTask(void *parameters) {
                     vTaskDelay(RECEIVE_MESSAGE_TIMEOUT);
                     resetProtocolBuffor();
                     xQueueReset(com.mReceiveByteQueue);
-                    com.transmitRepeatMessage();
+                    if (!isRawMessage) {
+                        com.transmitRepeatMessage();                        
+                    }
                 } else {
                     // calculate checksum
                     uint16_t checksum = 0;
@@ -399,7 +408,9 @@ void Communication::decodeMessageTask(void *parameters) {
                         vTaskDelay(RECEIVE_MESSAGE_TIMEOUT);
                         resetProtocolBuffor();
                         xQueueReset(com.mReceiveByteQueue);
-                        com.transmitRepeatMessage();
+                        if (!isRawMessage) {
+                            com.transmitRepeatMessage();                            
+                        }
                     }
                     // if MAC or IP is incorrect 
                     // TODO uncomment
@@ -445,7 +456,7 @@ void Communication::decodeMessageTask(void *parameters) {
 
                         // TODO remove print ?
                         Serial.print("Received message: ");
-                        uah::printArray(messageBuffor, MESSAGE_SIZE);
+                        uah::printArrayAsChar(messageBuffor, MESSAGE_SIZE);
 
                         if (isRawMessage) {
                             isRawMessage = false;
@@ -519,8 +530,7 @@ void Communication::encodeMessageTask(void *parameters) {
     // prepare protocol buffor
     // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
     uint8_t protocolBuffor[PROTOCOL_SIZE];
-
-    static constexpr uint8_t MAC_ADDRESS_LENGTH = 6;
+    
     static constexpr uint8_t IP_INDEX = 6;
     static constexpr uint8_t MESSAGES_QUANTITY_INDEX = 7;
     static constexpr uint8_t PROTOCOL_MESSAGE_START_INDEX = 8;
@@ -605,7 +615,7 @@ void Communication::encodeMessageTask(void *parameters) {
                 // }
                 // Serial.println();
                 // Serial.print("protocolBuffor message: ");
-                // uah::printArray(&protocolBuffor[PROTOCOL_MESSAGE_START_INDEX], PROTOCOL_MESSAGE_LENGTH);
+                // uah::printArrayAsChar(&protocolBuffor[PROTOCOL_MESSAGE_START_INDEX], PROTOCOL_MESSAGE_LENGTH);
             }
 
             if (!uah::areArraysEqual(messageBuffor, (uint8_t*)"repeat", 6)) {
@@ -668,7 +678,7 @@ void Communication::sendCustomMessageTask(void *parameters) {
                 
                 // TODO remove debug print
                 Serial.print("Message Ready: ");
-                uah::printArray(buffor, MESSAGE_SIZE);
+                uah::printArrayAsChar(buffor, MESSAGE_SIZE);
 
                 // special debug commands
                 if (uah::areArraysEqual(buffor, (uint8_t*)"startping", 9)) {
@@ -830,7 +840,6 @@ void Communication::transmitPing() {
 void Communication::replyToPing() {
     uint8_t buffor[MESSAGE_SIZE];
     uah::prepareBuffor(buffor, (uint8_t*)"reping", 6, MESSAGE_SIZE);
-    vTaskDelay(DELAY_BETWEEN_MESSAGES);
     xQueueSend(mSendMessagesQueue, buffor, portMAX_DELAY);
 }
 // ================================================================

@@ -25,7 +25,7 @@ Addressing::Addressing(Communication *communication)
 
 Addressing::~Addressing() = default;
 
-const uint8_t (&Addressing::getProtocolMACAddress() const)[6] {
+const uint8_t (&Addressing::getProtocolMACAddress() const)[MAC_ADDRESS_LENGTH] {
     return mProtocolMACAddress;
 }
 

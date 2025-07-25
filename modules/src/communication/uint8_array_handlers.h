@@ -5,7 +5,7 @@
  * @brief Namespace containing utility functions for uint8_t arrays.
  * @note Available functions:
  * 
- * void printArray()
+ * void printArrayAsChar()
  * 
  * void prepareBuffor()
  * 
@@ -16,13 +16,22 @@
  */
 namespace uint8ArrayHandlers {
     /**
-     * @brief Prints given uint8_t array as a string.
+     * @brief Prints given uint8_t array as a char array.
      * 
      * @param array uint8_t array to be printed.
      * @param len length of the array.
      * 
      */
-    void printArray(const uint8_t *array, const uint8_t len);
+    void printArrayAsChar(const uint8_t *array, const uint8_t len);
+
+    /**
+     * @brief Prints given uint8_t array as a int array.
+     * 
+     * @param array uint8_t array to be printed.
+     * @param len length of the array.
+     * 
+     */
+    void printArrayAsInt(const uint8_t *array, const uint8_t len);
 
     /**
      * @brief Fills given uint8_t array with 0.

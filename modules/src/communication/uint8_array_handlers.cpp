@@ -1,9 +1,16 @@
 #include "communication/uint8_array_handlers.h"
 
 namespace uint8ArrayHandlers {
-    void printArray(const uint8_t *array, const uint8_t len) {
+    void printArrayAsChar(const uint8_t *array, const uint8_t len) {
         for (uint8_t i = 0; i < len; i++) {
             Serial.print((char)array[i]);
+        }
+        Serial.println();
+    } 
+    
+    void printArrayAsInt(const uint8_t *array, const uint8_t len) {
+        for (uint8_t i = 0; i < len; i++) {
+            Serial.print((int)array[i]);
         }
         Serial.println();
     } 
