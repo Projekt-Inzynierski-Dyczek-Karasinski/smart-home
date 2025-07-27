@@ -20,7 +20,7 @@ namespace SmartHome::IPC {
      *          Accepts incoming connections and manages their lifecycle.
      *          Supports multiple concurrent connections with unique IDs.
      *
-     * @note Singleton pattern ensures single server instance
+     * @note Singleton pattern ensures single server instance.
      */
     class SocketServer {
     public:
@@ -65,12 +65,12 @@ namespace SmartHome::IPC {
         /**
          * @brief Initialize server with configuration.
          *
-         * @param ioContext Boost::Asio IO context for async operations
-         * @param config Server configuration
+         * @param ioContext Boost::Asio IO context for async operations.
+         * @param config Server configuration.
          *
-         * @return true if at least one protocol initialized successfully
+         * @return true if at least one protocol initialized successfully.
          *
-         * @post To start accepting connections, call runSocketServer()
+         * @post To start accepting connections, call runSocketServer().
          */
         bool initializeSocketServer(ba::io_context *ioContext, const Config &config);
 
@@ -80,9 +80,9 @@ namespace SmartHome::IPC {
          * @details Begins asynchronous accept loops for enabled protocols.
          *          Must be called after successful initialization.
          *
-         * @param ioContext Boost::Asio IO context for async operations
+         * @param ioContext Boost::Asio IO context for async operations.
          *
-         * @pre initializeSocketServer() must be called successfully
+         * @pre initializeSocketServer() must be called successfully.
          */
         void runSocketServer(ba::io_context *ioContext);
 
@@ -97,7 +97,7 @@ namespace SmartHome::IPC {
         /**
          * @brief Check if server is running.
          *
-         * @return true if actively accepting connections
+         * @return true if actively accepting connections.
          */
         bool isRunning() const;
 
@@ -126,7 +126,7 @@ namespace SmartHome::IPC {
         /**
          * @brief Start asynchronous TCP accept loop.
          *
-         * @param ioContext Boost::Asio IO context for async operations
+         * @param ioContext Boost::Asio IO context for async operations.
          *
          */
         void startTcpAcceptor(ba::io_context *ioContext);
@@ -135,7 +135,7 @@ namespace SmartHome::IPC {
         /**
          * @brief Start asynchronous UDS accept loop.
          *
-         * @param ioContext Boost::Asio IO context for async operations
+         * @param ioContext Boost::Asio IO context for async operations.
          *
          */
         void startUdsAcceptor(ba::io_context *ioContext);
@@ -147,7 +147,7 @@ namespace SmartHome::IPC {
          *          Schedules next accept operation to continue accepting new connections.
          *
          * @param connection Newly accepted connection.
-         * @param ioContext Boost::Asio IO context for async operations
+         * @param ioContext Boost::Asio IO context for async operations.
          *
          * @note Called from async_accept completion handler (acceptorHandler).
          */

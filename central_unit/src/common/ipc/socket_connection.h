@@ -38,10 +38,10 @@ namespace SmartHome::IPC {
         /**
         * @brief Construct a new socket connection.
         *
-        * @param ioContext Boost::Asio IO context for async operations
-        * @param socketType Type of socket to create
+        * @param ioContext Boost::Asio IO context for async operations.
+        * @param socketType Type of socket to create.
         *
-        * @throw std::invalid_argument if socketType is invalid
+        * @throw std::invalid_argument if socketType is invalid.
         */
         explicit SocketConnection(ba::io_context &ioContext, Type socketType);
 
@@ -56,37 +56,37 @@ namespace SmartHome::IPC {
         * @details Blocks until complete message (ending with \r\n) is received.
         *          Returns empty string on error or if connection is closed.
         *
-        * @return Received message without delimiter, empty string on error
+        * @return Received message without delimiter, empty string on error.
         *
-        * @note Thread-safety: Not safe for concurrent reads
+        * @note Thread-safety: Not safe for concurrent reads.
         */
         std::string read();
 
         /**
         * @brief Asynchronously read a message from socket.
         *
-        * @param onReadCompletion Callback invoked with received message
+        * @param onReadCompletion Callback invoked with received message.
         *
-        * @warning Only one async read operation allowed at a time
+        * @warning Only one async read operation allowed at a time.
         */
         void readAsync(const std::function<void(const std::string &message)> &onReadCompletion);
 
         /**
         * @brief Synchronously write a message to socket.
         *
-        * @param message Message to send (delimiter added automatically)
+        * @param message Message to send (delimiter added automatically).
         *
-        * @note Thread-safety: Not safe for concurrent writes
+        * @note Thread-safety: Not safe for concurrent writes.
         */
         void write(const std::string &message);
 
         /**
         * @brief Asynchronously write a message to socket.
         *
-        * @param message Message to send (delimiter added automatically)
-        * @param onWriteCompletion Optional callback invoked after successful write
+        * @param message Message to send (delimiter added automatically).
+        * @param onWriteCompletion Optional callback invoked after successful write.
         *
-        * @warning Only one async write operation allowed at a time
+        * @warning Only one async write operation allowed at a time.
         */
         void writeAsync(const std::string &message, const std::function<void()> &onWriteCompletion = nullptr);
 
@@ -101,7 +101,7 @@ namespace SmartHome::IPC {
         /**
         * @brief Check if socket is open.
         *
-        * @return true if socket is open and not closing, false otherwise
+        * @return true if socket is open and not closing, false otherwise.
         */
         bool isOpen() const;
 
@@ -123,17 +123,17 @@ namespace SmartHome::IPC {
         /**
         * @brief Handle socket errors.
         *
-        * @param ec Error code from Boost::Asio operation
+        * @param ec Error code from Boost::Asio operation.
         *
-        * @note May close connection on fatal errors
+        * @note May close connection on fatal errors.
         */
         void handleError(const bs::error_code &ec);
 
         /**
         * @brief Extract message from stream buffer.
         *
-        * @param bytesTransferred Number of bytes read including delimiter
-        * @return Message without delimiter
+        * @param bytesTransferred Number of bytes read including delimiter.
+        * @return Message without delimiter.
         */
         std::string getMessageFromBuffer(const size_t &bytesTransferred);
 

@@ -56,9 +56,9 @@ namespace SmartHome::Utils {
 
     private:
         /**
-         * @brief Writes PID to lock file
+         * @brief Writes PID to lock file.
          *
-         * @return true if write operation was successful, false otherwise
+         * @return true if write operation was successful, false otherwise.
          */
         bool writePidToFile() const;
 

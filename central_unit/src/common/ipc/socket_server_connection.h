@@ -12,7 +12,7 @@ namespace SmartHome::IPC {
     *          - Close callbacks for cleanup
     *          - Shared ownership via enable_shared_from_this
     *
-    * @note Must be created and stored as shared_ptr
+    * @note Must be created and stored as shared_ptr.
     */
     class SocketServerConnection final : public SocketConnection,
                                          public std::enable_shared_from_this<SocketServerConnection> {
@@ -27,13 +27,13 @@ namespace SmartHome::IPC {
         /**
         * @brief Start asynchronous read loop for continuous message reception.
         *
-        * @param handleMessage Callback invoked for each received message
+        * @param handleMessage Callback invoked for each received message.
         *
         * @details Automatically restarts read operation after each message.
         *          Loop continues until connection is closed or error occurs.
         *
-        * @warning Must be called on shared_ptr instance
-        * @note Thread-safe with internal synchronization
+        * @warning Must be called on shared_ptr instance.
+        * @note Thread-safe with internal synchronization.
         */
         void asyncReadLoop(const std::function<void(const std::string &message)> &handleMessage);
 
@@ -48,23 +48,23 @@ namespace SmartHome::IPC {
         /**
         * @brief Set connection identifier.
         *
-        * @param connectionId Unique connection ID assigned by server
+        * @param connectionId Unique connection ID assigned by server.
         */
         void setId(const uint32_t &connectionId);
 
         /**
         * @brief Get connection identifier.
         *
-        * @return Current connection ID
+        * @return Current connection ID.
         */
         uint32_t getId() const;
 
         /**
         * @brief Set callback to be invoked when connection closes.
         *
-        * @param callback Function called with connection ID on close
+        * @param callback Function called with connection ID on close.
         *
-        * @note Callback is invoked exactly once, even if close() called multiple times
+        * @note Callback is invoked exactly once, even if close() called multiple times.
         */
         void setCloseCallback(std::function<void(uint32_t)> callback);
 

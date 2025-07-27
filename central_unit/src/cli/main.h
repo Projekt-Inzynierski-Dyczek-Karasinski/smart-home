@@ -27,8 +27,8 @@ namespace SmartHomeCLI {
      * @brief Tries connecting with IPC server TCP endpoint.
      *
      * @param connection A connection instance reference.
-     * @param tcpEndpointAddress IP address for TCP connection
-     * @param tcpEndpointPort Port for TCP connection
+     * @param tcpEndpointAddress IP address for TCP connection.
+     * @param tcpEndpointPort Port for TCP connection.
      * @return true if successfully, false otherwise.
      */
     bool attemptTcpConnection(SmartHome::IPC::SocketConnection &connection, const std::string &tcpEndpointAddress,
@@ -36,7 +36,6 @@ namespace SmartHomeCLI {
 
     /**
      * @brief Begins write/read loop, sending stdin to server and printing response to stdout.
-     *
      *
      * @param connection A connection instance reference.
      */
