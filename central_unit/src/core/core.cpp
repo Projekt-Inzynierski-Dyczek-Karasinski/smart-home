@@ -1,6 +1,5 @@
 #include "core.h"
 #include "config_manager.h"
-#include "tcp/tcp_server.h"
 #include "service/service_manager.h"
 
 #include <chrono>
@@ -10,7 +9,7 @@
 #include <boost/asio.hpp>
 
 namespace ba = boost::asio;
-namespace bip = boost::asio::ip;
+namespace bai = boost::asio::ip;
 namespace bs = boost::system;
 
 namespace SmartHome {
@@ -45,46 +44,45 @@ namespace SmartHome {
 
         // Create thread running io context for signal handling and service manager
         mCoreGuard.emplace(ba::make_work_guard(mCoreIoContext));
-        mCoreThread = std::thread([this]() {
+        mCoreThread = std::thread([this] {
             mCoreIoContext.run();
         });
 
-        // TCP server initialization if enabled in config
-        if (mConfig.isTcpServerEnabled) {
-            // Set tcp server thread count
-            uint threadCount;
 
-            switch (mConfig.tcpServerThreads) {
-                case Config::HALF_CPU_CORES:
-                    threadCount = std::ceil(std::thread::hardware_concurrency() / 2);
-                    break;
-                case Config::ALL_CPU_CORES:
-                    threadCount = std::thread::hardware_concurrency();
-                    break;
-                default:
-                    if (mConfig.tcpServerThreads > mHighThreadCountLimit) {
-                        std::cerr << "Core init warning: TCP server possible excessive thread count (" <<
-                                mConfig.tcpServerThreads << " threads)" << std::endl;
-                    }
-                    threadCount = mConfig.tcpServerThreads;
-                    break;
-            }
+        // Set IPC server thread count
+        uint threadCount;
 
-            if (threadCount < 1) {
-                std::cerr << "Core init error: TCP server thread count less than 1, setting value to 1" << std::endl;
-                threadCount = 1;
-            }
-
-            //Create TCP server threads with io context
-            mTcpServerThreadPool.emplace(threadCount);
-            mTcpServerGuard.emplace(ba::make_work_guard(mTcpServerIoContext));
-            for (size_t i = 0; i < threadCount; i++) {
-                ba::post(*mTcpServerThreadPool, [this]() {
-                    mTcpServerIoContext.run();
-                });
-            }
-            IPC::TcpServer::Instance();
+        switch (mConfig.ipcServerThreads) {
+            case Config::HALF_CPU_CORES:
+                threadCount = std::ceil(std::thread::hardware_concurrency() / 2);
+                break;
+            case Config::ALL_CPU_CORES:
+                threadCount = std::thread::hardware_concurrency();
+                break;
+            default:
+                if (mConfig.ipcServerThreads > ms_HIGH_THREAD_COUNT_LIMIT) {
+                    std::cerr << "Core init warning: IPC server possible excessive thread count (" <<
+                            mConfig.ipcServerThreads << " threads)" << std::endl;
+                }
+                threadCount = mConfig.ipcServerThreads;
+                break;
         }
+
+        if (threadCount < 1) {
+            std::cerr << "Core init error: IPC server thread count less than 1, setting value to 1" << std::endl;
+            threadCount = 1;
+        }
+
+        //Create TCP server threads with io context
+        mSocketServerThreadPool.emplace(threadCount);
+        mSocketServerGuard.emplace(ba::make_work_guard(mSocketServerIoContext));
+        for (size_t i = 0; i < threadCount; i++) {
+            ba::post(*mSocketServerThreadPool, [this] {
+                mSocketServerIoContext.run();
+            });
+        }
+        IPC::SocketServer::Instance();
+
 
         mIsInitialized.store(true);
         std::cout << "Initialization complete" << std::endl;
@@ -114,17 +112,17 @@ namespace SmartHome {
             signalHandler(ec, sig);
         });
 
-        // Start tcp server if enabled in config
-        if (mConfig.isTcpServerEnabled) {
-            auto &tcpServer = IPC::TcpServer::Instance();
-            if (!tcpServer.startTcpServer(&mTcpServerIoContext, mConfig.tcpServerEndpointAddress,
-                                          mConfig.tcpServerEndpointPort)) {
-                std::cerr << "Error tcp server failed to start" << std::endl;
-                shutdown();
-                return;
-            }
-            tcpServer.runTcpServer(&mTcpServerIoContext);
+
+        auto &socketServer = IPC::SocketServer::Instance();
+        IPC::SocketServer::Config config = {mConfig.tcp, mConfig.uds};
+
+        if (!socketServer.initializeSocketServer(&mSocketServerIoContext, config)) {
+            std::cerr << "Error IPC server failed to start" << std::endl;
+            shutdown();
+            return;
         }
+        socketServer.runSocketServer(&mSocketServerIoContext);
+
 
         // Main loop
         while (mIsRunning.load()) {
@@ -151,20 +149,20 @@ namespace SmartHome {
         mpService->onStop();
 
         // Stop TCP server
-        if (mConfig.isTcpServerEnabled) {
-            std::cout << "Stopping tcp server" << std::endl;
-            auto &tcpServer = IPC::TcpServer::Instance();
+        if (mConfig.tcp.isEnabled) {
+            std::cout << "Stopping IPC server" << std::endl;
+            auto &tcpServer = IPC::SocketServer::Instance();
             if (tcpServer.isRunning()) {
-                tcpServer.stopTcpServer();
+                tcpServer.stopSocketServer();
             }
         }
 
-        // Waiting for tcp server threads to finish
-        if (mTcpServerThreadPool.has_value()) {
-            mTcpServerGuard.reset();
-            mTcpServerThreadPool->stop();
-            mTcpServerThreadPool->join();
-            mTcpServerThreadPool.reset();
+        // Waiting for IPC server threads to finish
+        if (mSocketServerThreadPool.has_value()) {
+            mSocketServerGuard.reset();
+            mSocketServerThreadPool->stop();
+            mSocketServerThreadPool->join();
+            mSocketServerThreadPool.reset();
         }
 
         // Stop handling signals

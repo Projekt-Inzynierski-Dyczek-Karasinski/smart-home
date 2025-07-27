@@ -21,7 +21,7 @@ namespace SmartHome::Service {
 
     private:
         /// Path to lock file
-        static constexpr const char *lockFilePath = "/var/lock/smarthomed.lock";
+        static constexpr const char *ms_LOCK_FILE_PATH = "/var/lock/smarthomed.lock";
         /// Lock file RAII wrapper instance
         std::optional<Utils::FileLock> lockFile;
     };

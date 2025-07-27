@@ -48,7 +48,7 @@ namespace SmartHome::Service {
                     notifyWatchdog();
                 }
             });
-        };
+        }
     }
 }
 #endif

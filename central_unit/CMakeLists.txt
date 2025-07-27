@@ -23,6 +23,8 @@ option(BUILD_CORE "Build SmartHome daemon" ON)
 
 option(BUILD_MEDIATOR "Build module mediator" ON)
 
+option(BUILD_CLI "Build SmartHome CLI" ON)
+
 # Boost config
 set(Boost_NO_WARN_NEW_VERSIONS ON)
 set(Boost_USE_MULTITHREADED ON)
@@ -54,6 +56,10 @@ endif ()
 
 if (BUILD_MEDIATOR)
     add_subdirectory(src/mediator)
+endif ()
+
+if (BUILD_CLI)
+    add_subdirectory(src/cli)
 endif ()
 
 

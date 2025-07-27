@@ -1,6 +1,6 @@
 #pragma once
 
-#include "tcp/tcp_server.h"
+#include "socket_server.h"
 #include "service/service_manager.h"
 
 #include <atomic>
@@ -31,19 +31,18 @@ namespace SmartHome {
          * @brief Configuration structure for Core initialization.
          */
         struct Config {
-            enum tcpServerThreadCount : int {
+            enum IpcServerThreadCount : int {
                 HALF_CPU_CORES = -1,
                 ALL_CPU_CORES = 0,
             };
 
-            /// Enable/disable TCP server for IPC.
-            bool isTcpServerEnabled = true;
-            /// TCP server address.
-            std::string tcpServerEndpointAddress = "127.0.0.1";
-            /// TCP server port number.
-            int tcpServerEndpointPort = 43321;
             /// Number of TCP server threads (-1: half CPU cores, 0: all CPU cores, n >= 1: exact thread count).
-            int tcpServerThreads = HALF_CPU_CORES;
+            int ipcServerThreads = HALF_CPU_CORES;
+
+            /// Default TCP config from socket server
+            IPC::SocketServer::Config::Tcp tcp;
+            /// Default UDS config from socket server
+            IPC::SocketServer::Config::Uds uds;
         };
 
         /**
@@ -128,11 +127,11 @@ namespace SmartHome {
 
         std::unique_ptr<Service::ServiceManager> mpService;
 
-        // TCP server resources
-        ba::io_context mTcpServerIoContext;
-        std::optional<ba::thread_pool> mTcpServerThreadPool;
-        std::optional<ba::executor_work_guard<ba::io_context::executor_type> > mTcpServerGuard;
-        static constexpr uint mHighThreadCountLimit = 128; ///< Limit for high thread count warning
+        // Socket server resources
+        ba::io_context mSocketServerIoContext;
+        std::optional<ba::thread_pool> mSocketServerThreadPool;
+        std::optional<ba::executor_work_guard<ba::io_context::executor_type> > mSocketServerGuard;
+        static constexpr uint ms_HIGH_THREAD_COUNT_LIMIT = 128; ///< Limit for high thread count warning
 
         // Signal handling resources
         ba::io_context mCoreIoContext;

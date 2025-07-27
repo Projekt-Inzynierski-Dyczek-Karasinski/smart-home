@@ -1,5 +1,5 @@
 preset_values:
-  tcp_server_thread_count:
+  ipc_server_thread_count:
     half_cpu_cores: &half_cpu_cores -1
     all_cpu_cores: &all_cpu_cores 0
 
@@ -8,16 +8,18 @@ core:
   mode: "headless"  #TODO add kiosk gui
   log_level: "debug" #TODO implement verbose levels
   ipc:
-    tcp_server:
+    threads: *half_cpu_cores # Exact thread count if value > 0, possible preset values: *all_cpu_cores, *half_cpu_cores
+    tcp:
       enabled: true
       address: "127.0.0.1"
       port: 43321
-      threads: *half_cpu_cores # Exact thread count if value > 0, possible preset values: *all_cpu_cores, *half_cpu_cores
+    uds:
+      enabled: true
+      socket_path: "/var/run/smarthome.sock"
 
 services:
   mediator:
     enabled: false
     service_type: "Standalone" # TODO implement systemd service along proper mediator implementation
-    exec_path: ~ #For standalone mode - Default: /usr/local/bin/
-    config_path: ~ # Default: "/etc/smarthome/mediator.yaml"
-
+    exec_path: ~ #Option for standalone mode - Default: /usr/local/bin/
+    config_path: "/etc/smarthome/mediator.yaml"

@@ -25,5 +25,5 @@ namespace SmartHome::Utils {
             std::cerr << "Load config error: " << e.what() << std::endl;
             return false;
         }
-    };
+    }
 }

@@ -1,7 +1,7 @@
 #pragma once
 
 #include <string>
-
+#include <stdexcept>
 
 namespace SmartHome::Utils {
     /**
@@ -29,7 +29,7 @@ namespace SmartHome::Utils {
     /**
      * @brief RAII wrapper for exclusive file locking.
      *
-     * @details Acquires exclusive lock on specifed file using flock(). Lock is automatically released on destuction.
+     * @details Acquires exclusive lock on specified file using flock(). Lock is automatically released on destruction.
      */
     class FileLock {
     public:
@@ -57,9 +57,9 @@ namespace SmartHome::Utils {
 
     private:
         /**
-         * @brief Writes PID to lock file
+         * @brief Writes PID to lock file.
          *
-         * @return true if write operation was successful, false otherwise
+         * @return true if write operation was successful, false otherwise.
          */
         bool writePidToFile() const;
 
