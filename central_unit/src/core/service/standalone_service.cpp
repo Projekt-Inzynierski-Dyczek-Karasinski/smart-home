@@ -5,7 +5,7 @@
 namespace SmartHome::Service {
     bool StandaloneService::onInitialize() {
         try {
-            lockFile.emplace(lockFilePath);
+            lockFile.emplace(ms_LOCK_FILE_PATH);
             return true;
         } catch (std::exception &e) {
             std::cerr << "Standalone service initialization error: " << e.what() << std::endl;

@@ -68,11 +68,11 @@ int main(const int argc, char *argv[]) {
             ("help,h", "produce help message")
 
             ("uds,u",
-             bpo::value<std::string>()->default_value(SmartHomeCLI::defaultUdsEndpointPath)->implicit_value(
-                 SmartHomeCLI::defaultUdsEndpointPath),
+             bpo::value<std::string>()->default_value(SmartHomeCLI::DEFAULT_UDS_ENDPOINT_PATH)->implicit_value(
+                 SmartHomeCLI::DEFAULT_UDS_ENDPOINT_PATH),
              "UDS endpoint socket file path")
 
-            ("tcp,t", bpo::value<std::string>()->implicit_value(SmartHomeCLI::defaultTcpEndpointAddress),
+            ("tcp,t", bpo::value<std::string>()->implicit_value(SmartHomeCLI::DEFAULT_TCP_ENDPOINT_ADDRESS),
              "TCP ipv4 address and port in address:port format");
 
     //TODO consider implementing more advanced options

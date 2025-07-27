@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
 
     // Initialize YAML config manager
     auto &configManager = Utils::ConfigManager::Instance();
-    const std::string configPath = vm.contains("config") ? vm["config"].as<std::string>() : sDefaultConfigPath;
+    const std::string configPath = vm.contains("config") ? vm["config"].as<std::string>() : s_DEFAULT_CONFIG_PATH;
 
     //Load YAML config values
     if (configManager.loadConfig(configPath)) {

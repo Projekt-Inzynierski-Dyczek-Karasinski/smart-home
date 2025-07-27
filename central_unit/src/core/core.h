@@ -131,7 +131,7 @@ namespace SmartHome {
         ba::io_context mSocketServerIoContext;
         std::optional<ba::thread_pool> mSocketServerThreadPool;
         std::optional<ba::executor_work_guard<ba::io_context::executor_type> > mSocketServerGuard;
-        static constexpr uint mHighThreadCountLimit = 128; ///< Limit for high thread count warning
+        static constexpr uint ms_HIGH_THREAD_COUNT_LIMIT = 128; ///< Limit for high thread count warning
 
         // Signal handling resources
         ba::io_context mCoreIoContext;

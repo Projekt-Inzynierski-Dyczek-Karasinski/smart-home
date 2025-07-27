@@ -9,14 +9,14 @@ namespace SmartHome::IPC {
         SocketConnection::close();
     };
 
-    const boost::regex SocketConnection::msDelimiterRegex(SocketConnection::msMessageDelimiter);
+    const boost::regex SocketConnection::ms_DELIMITER_REGEX(SocketConnection::ms_MESSAGE_DELIMITER);
 
     std::string SocketConnection::read() {
         if (isOpen()) {
             size_t bytesTransferred = 0;
             try {
                 std::visit([this, &bytesTransferred ](auto &socket) {
-                    bytesTransferred = ba::read_until(socket, mStreamBuf, msDelimiterRegex);
+                    bytesTransferred = ba::read_until(socket, mStreamBuf, ms_DELIMITER_REGEX);
                 }, mSocket);
                 return getMessageFromBuffer(bytesTransferred); // Returns message payload w/o delimiter
             } catch (bs::system_error &e) {
@@ -38,7 +38,7 @@ namespace SmartHome::IPC {
         };
 
         std::visit([this, callback](auto &socket) {
-            ba::async_read_until(socket, mStreamBuf, msDelimiterRegex, callback);
+            ba::async_read_until(socket, mStreamBuf, ms_DELIMITER_REGEX, callback);
         }, mSocket);
     }
 
@@ -48,7 +48,7 @@ namespace SmartHome::IPC {
 
         try {
             std::visit([this, message](auto &socket) {
-                ba::write(socket, ba::buffer(message + msMessageDelimiter));
+                ba::write(socket, ba::buffer(message + ms_MESSAGE_DELIMITER));
             }, mSocket);
         } catch (bs::system_error &e) {
             handleError(e.code());
@@ -67,7 +67,7 @@ namespace SmartHome::IPC {
         };
 
         std::visit([this, message, callback](auto &socket) {
-            ba::async_write(socket, ba::buffer(message + msMessageDelimiter), callback);
+            ba::async_write(socket, ba::buffer(message + ms_MESSAGE_DELIMITER), callback);
         }, mSocket);
     }
 
@@ -139,8 +139,8 @@ namespace SmartHome::IPC {
         is.read(&message[0], static_cast<long>(bytesTransferred));
 
         // Cut delimiter from message
-        if (message.size() > strlen(msMessageDelimiter) && message.ends_with(msMessageDelimiter)) {
-            message.resize(message.size() - strlen(msMessageDelimiter));
+        if (message.size() > strlen(ms_MESSAGE_DELIMITER) && message.ends_with(ms_MESSAGE_DELIMITER)) {
+            message.resize(message.size() - strlen(ms_MESSAGE_DELIMITER));
         }
 
         return message;

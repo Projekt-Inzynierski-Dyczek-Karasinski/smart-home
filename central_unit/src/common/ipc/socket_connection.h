@@ -110,9 +110,9 @@ namespace SmartHome::IPC {
 
     protected:
         /// Message delimiter
-        static constexpr const char *msMessageDelimiter = "\r\n";
+        static constexpr const char *ms_MESSAGE_DELIMITER = "\r\n";
         /// Compiled regex for delimiter matching
-        static const boost::regex msDelimiterRegex;
+        static const boost::regex ms_DELIMITER_REGEX;
 
         /**
         * @brief Factory method to create appropriate socket type.

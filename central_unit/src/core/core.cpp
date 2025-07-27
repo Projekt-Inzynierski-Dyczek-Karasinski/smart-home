@@ -60,7 +60,7 @@ namespace SmartHome {
                 threadCount = std::thread::hardware_concurrency();
                 break;
             default:
-                if (mConfig.ipcServerThreads > mHighThreadCountLimit) {
+                if (mConfig.ipcServerThreads > ms_HIGH_THREAD_COUNT_LIMIT) {
                     std::cerr << "Core init warning: IPC server possible excessive thread count (" <<
                             mConfig.ipcServerThreads << " threads)" << std::endl;
                 }
