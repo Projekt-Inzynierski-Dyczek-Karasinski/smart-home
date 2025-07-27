@@ -28,7 +28,8 @@ namespace SmartHome {
      * @param coreConfig Pointer to Core configuration struct to be updated.
      * @param mediatorConfig Pointer to mediator launch configuration struct to be updated.
      */
-    void loadConfigValues(Utils::ConfigManager &configManager, Core::Config *coreConfig,
+    void loadConfigValues(Utils::ConfigManager &configManager,
+                          Core::Config *coreConfig,
                           MediatorConfig *mediatorConfig);
 
     /// Default path for smarthome YAML config

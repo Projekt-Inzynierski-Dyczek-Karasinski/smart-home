@@ -22,7 +22,8 @@ namespace SmartHomeCLI {
         }
     }
 
-    bool attemptTcpConnection(si::SocketConnection &connection, const std::string &tcpEndpointAddress,
+    bool attemptTcpConnection(si::SocketConnection &connection,
+                              const std::string &tcpEndpointAddress,
                               const int tcpEndpointPort) {
         const auto endpoint = bai::tcp::endpoint(bai::make_address(tcpEndpointAddress), tcpEndpointPort);
 
@@ -31,7 +32,7 @@ namespace SmartHomeCLI {
             socket.connect(endpoint);
             return true;
         } catch (std::exception &e) {
-            std::cerr<< "TCP connection attempt error: " << e.what() << std::endl;
+            std::cerr << "TCP connection attempt error: " << e.what() << std::endl;
             return false;
         }
     }
@@ -68,11 +69,11 @@ int main(const int argc, char *argv[]) {
             ("help,h", "produce help message")
 
             ("uds,u",
-             bpo::value<std::string>()->default_value(SmartHomeCLI::DEFAULT_UDS_ENDPOINT_PATH)->implicit_value(
-                 SmartHomeCLI::DEFAULT_UDS_ENDPOINT_PATH),
+             bpo::value<std::string>()->default_value(SmartHomeCLI::s_DEFAULT_UDS_ENDPOINT_PATH)->implicit_value(
+                 SmartHomeCLI::s_DEFAULT_UDS_ENDPOINT_PATH),
              "UDS endpoint socket file path")
 
-            ("tcp,t", bpo::value<std::string>()->implicit_value(SmartHomeCLI::DEFAULT_TCP_ENDPOINT_ADDRESS),
+            ("tcp,t", bpo::value<std::string>()->implicit_value(SmartHomeCLI::s_DEFAULT_TCP_ENDPOINT_ADDRESS),
              "TCP ipv4 address and port in address:port format");
 
     //TODO consider implementing more advanced options
