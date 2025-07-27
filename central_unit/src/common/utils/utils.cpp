@@ -2,7 +2,6 @@
 
 #include <fcntl.h>
 #include <iostream>
-#include <stdexcept>
 
 #include <sys/file.h>
 #include <boost/asio/detail/descriptor_ops.hpp>

@@ -120,8 +120,10 @@ namespace SmartHome::IPC {
         /**
          * @brief Common accept handler for both protocols.
          */
-        void acceptorHandler(const std::shared_ptr<SocketServerConnection> &connection, ba::io_context *ioContext,
-                             const bs::error_code &ec, SocketConnection::Type type);
+        void acceptorHandler(const std::shared_ptr<SocketServerConnection> &connection,
+                             ba::io_context *ioContext,
+                             const bs::error_code &ec,
+                             SocketConnection::Type type);
 
         /**
          * @brief Start asynchronous TCP accept loop.

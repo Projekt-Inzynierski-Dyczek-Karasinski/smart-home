@@ -31,7 +31,8 @@ namespace SmartHomeCLI {
      * @param tcpEndpointPort Port for TCP connection.
      * @return true if successfully, false otherwise.
      */
-    bool attemptTcpConnection(SmartHome::IPC::SocketConnection &connection, const std::string &tcpEndpointAddress,
+    bool attemptTcpConnection(SmartHome::IPC::SocketConnection &connection,
+                              const std::string &tcpEndpointAddress,
                               int tcpEndpointPort);
 
     /**

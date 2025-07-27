@@ -67,7 +67,8 @@ namespace SmartHome::IPC {
     }
 
     void SocketServer::acceptorHandler(const std::shared_ptr<SocketServerConnection> &connection,
-                                       ba::io_context *ioContext, const bs::error_code &ec,
+                                       ba::io_context *ioContext,
+                                       const bs::error_code &ec,
                                        const SocketConnection::Type type) {
         if (!ec && mIsSocketServerRunning.load()) {
             onAccept(connection, ioContext);
@@ -144,7 +145,7 @@ namespace SmartHome::IPC {
         std::lock_guard lock(mActiveConnectionsMutex);
 
         // TODO consider using another method then iteration from 1
-        for (uint32_t id = 1; id < std::numeric_limits<uint32_t>::max(); ++id) {
+        for (uint32_t id = 1; id < UINT32_MAX; ++id) {
             if (!mActiveConnections.contains(id)) {
                 return id;
             }
