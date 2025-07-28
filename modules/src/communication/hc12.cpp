@@ -23,7 +23,7 @@ HC12::HC12(Communication *communication) {
     digitalWrite(SET_PIN, HIGH);
     vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_HIGH));
 
-    createQueues();
+    createQueue();
     
     mBaudRate = (unsigned long)BAUD_RATE;
     mpSerial = new HardwareSerial(HARDWARE_SERIAL_UART_NR);
@@ -40,7 +40,7 @@ HC12::~HC12() {
     deleteTransmitTask();
     deleteSetupHC12Task();
 
-    deleteQueues();
+    deleteQueue();
     deleteSetupHC12Queues();
 
     digitalWrite(SET_PIN, LOW);
@@ -48,13 +48,13 @@ HC12::~HC12() {
     delete mpSerial;
 }
 
-void HC12::addMessageToTransmit(const uint8_t *MESSAGE) {
-    xQueueSend(mTransmitQueue, MESSAGE, portMAX_DELAY);
+void HC12::addMessageToTransmit(const uint8_t *message) {
+    xQueueSend(mTransmitQueue, message, portMAX_DELAY);
     vTaskResume(mTransmitTaskHandle);
 }
 
-void HC12::setupHC12(const uint8_t *COMMANDS) {
-    if (!(COMMANDS[0] == 'H' && COMMANDS[1] == 'C')) {
+void HC12::setupHC12(const uint8_t *commands) {
+    if (!(commands[0] == 'H' && commands[1] == 'C')) {
         Serial.println("HC12 COMMAND ERROR! In setupHC12() -> passed argument does not include hc12 command.");
     } else {
         createSetupHC12Queues();
@@ -64,15 +64,15 @@ void HC12::setupHC12(const uint8_t *COMMANDS) {
         uint8_t commandEndIndex = 0;
         uint8_t commandBuffor[SETUP_COMMAND_SIZE];
         uint8_t commandCounter = 0;
-        while (COMMANDS[commandEndIndex] != 0) {
-            if (COMMANDS[commandEndIndex] == (uint8_t)'|') {
+        while (commands[commandEndIndex] != 0) {
+            if (commands[commandEndIndex] == (uint8_t)'|') {
                 commandCounter++;
                 if (commandCounter > SETUP_MAX_NUM_OF_COMMANDS) {
                     Serial.print("HC12 COMMANDS ERROR! In setupHC12() -> passed too many commands. Number of commands must be lower or equal than ");
                     Serial.println(SETUP_MAX_NUM_OF_COMMANDS);
                     break;
                 }
-                uah::prepareBuffor(commandBuffor, &COMMANDS[commandStartIndex], (commandEndIndex - commandStartIndex), SETUP_COMMAND_SIZE);
+                uah::prepareBuffor(commandBuffor, &commands[commandStartIndex], (commandEndIndex - commandStartIndex), SETUP_COMMAND_SIZE);
 
                 xQueueSend(mSetupHC12CommandsQueue, commandBuffor, portMAX_DELAY);
                 commandStartIndex = commandEndIndex + 1;
@@ -81,13 +81,13 @@ void HC12::setupHC12(const uint8_t *COMMANDS) {
             commandEndIndex++;
         }
         
-        if (COMMANDS[commandEndIndex - 1] != (uint8_t)'|') {
+        if (commands[commandEndIndex - 1] != (uint8_t)'|') {
             commandCounter++;
             if (commandCounter > SETUP_MAX_NUM_OF_COMMANDS) {
                 Serial.print("HC12 COMMANDS ERROR! In setupHC12() -> passed too many commands. Number of commands must be lower or equal than ");
                 Serial.println(SETUP_MAX_NUM_OF_COMMANDS);
             } else {
-                uah::prepareBuffor(commandBuffor, &COMMANDS[commandStartIndex], (commandEndIndex - commandStartIndex), SETUP_COMMAND_SIZE);
+                uah::prepareBuffor(commandBuffor, &commands[commandStartIndex], (commandEndIndex - commandStartIndex), SETUP_COMMAND_SIZE);
                 xQueueSend(mSetupHC12CommandsQueue, commandBuffor, portMAX_DELAY);
             }
         }
@@ -99,13 +99,13 @@ void HC12::setupHC12(const uint8_t *COMMANDS) {
 
 // ============================ Queues ============================
 
-void HC12::createQueues() { 
+void HC12::createQueue() { 
     if (mTransmitQueue == NULL) {
         mTransmitQueue = xQueueCreate(PROTOCOL_MESSAGE_MAX_NUM, sizeof(uint8_t[PROTOCOL_SIZE]));
     }
 }
 
-void HC12::deleteQueues() {
+void HC12::deleteQueue() {
     if (mTransmitQueue != NULL) {
         vQueueDelete(mTransmitQueue);
         mTransmitQueue = NULL;
@@ -146,12 +146,13 @@ void HC12::HC12MainTask(void *parameters) {
     bool isWaitingForSendConfirmation = false;
 
     // clear random hc12 output after powering on
-    vTaskDelay(DELAY_AFTER_SET_PIN_HIGH);
+    vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_HIGH));
     while (hc12.mpSerial->available() > 0) {
         hc12.mpSerial->read();
     }
 
     for (;;) {
+        // TODO change this to queue
         // change status
         xTaskNotifyWait(0, ULONG_MAX, &status, 0);
         
@@ -175,8 +176,7 @@ void HC12::HC12MainTask(void *parameters) {
                     vTaskDelay(pdMS_TO_TICKS(1));
                 }
 
-                // TODO change coment if there are no more queues
-                // extra protection if somehow queues are not empty and corresponding task is suspended 
+                // extra protection if somehow queue is not empty and task is suspended 
                 if (uxQueueMessagesWaiting(hc12.mTransmitQueue) != 0) {
                     vTaskResume(hc12.mTransmitTaskHandle);
                 }
@@ -277,7 +277,7 @@ void HC12::transmitTask(void *parameters) {
                 xTaskNotify(hc12.mHC12MainTaskHandle, cancelWaitingForSendConfirmationNotif, eSetValueWithOverwrite);
                 // TODO change
                 // Serial.println("TRANSMITING ERROR! In transmitTask() -> hc12 module is not responding.");
-                Serial.println("HC12 NT");
+                // Serial.println("HC12 NT");
             }
         } else {
             xTaskNotify(hc12.mHC12MainTaskHandle, suspendTransmitTaskNotif, eSetValueWithOverwrite);
