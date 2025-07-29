@@ -23,6 +23,8 @@ HC12::HC12(Communication *communication) {
     digitalWrite(SET_PIN, HIGH);
     vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_HIGH));
 
+    mSendingDataMutex = xSemaphoreCreateMutex();
+
     createQueue();
     
     mBaudRate = (unsigned long)BAUD_RATE;
@@ -252,6 +254,8 @@ void HC12::transmitTask(void *parameters) {
     
     for (;;) {
         if (xQueueReceive(hc12.mTransmitQueue, transmitBuffor, pdMS_TO_TICKS(SUSPEND_TASK_TIME_SHORT)) == pdTRUE) {
+            xSemaphoreTake(hc12.mSendingDataMutex, portMAX_DELAY);
+
             // TODO consider making this delay more "inteligent" (eg. by cooldown timer)
             // this delay is required for HC12 transmit/receive message properly
             vTaskDelay(pdMS_TO_TICKS(DELAY_BETWEEN_MESSAGES));
@@ -279,6 +283,8 @@ void HC12::transmitTask(void *parameters) {
                 // Serial.println("TRANSMITING ERROR! In transmitTask() -> hc12 module is not responding.");
                 // Serial.println("HC12 NT");
             }
+
+            xSemaphoreGive(hc12.mSendingDataMutex);
         } else {
             xTaskNotify(hc12.mHC12MainTaskHandle, suspendTransmitTaskNotif, eSetValueWithOverwrite);
         }
@@ -364,6 +370,7 @@ void HC12::setupHC12Task(void *parameters) {
 
 
 void HC12::createSetupHC12Task() {
+    xSemaphoreTake(mSendingDataMutex, portMAX_DELAY);
     digitalWrite(SET_PIN, LOW);
     vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_LOW));
 
@@ -390,6 +397,7 @@ void HC12::deleteSetupHC12Task() {
 
     digitalWrite(SET_PIN, HIGH);
     vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_HIGH));
+    xSemaphoreGive(mSendingDataMutex);
 }
 // ================================================================
 

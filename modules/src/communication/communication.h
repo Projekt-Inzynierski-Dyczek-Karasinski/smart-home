@@ -28,6 +28,7 @@ public:
     void stopAddresingAlgorithm();
     void needRawMessage();
     void resetEncodeMessageTask();
+    void startPinging();
 
     void addByteToDecode(const uint8_t DATA);
     void sendMessage(const uint8_t MESSAGE[MESSAGE_SIZE]);

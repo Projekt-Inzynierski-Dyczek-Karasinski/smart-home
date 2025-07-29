@@ -11,6 +11,7 @@ namespace uint8ArrayHandlers {
     void printArrayAsInt(const uint8_t *array, const uint8_t len) {
         for (uint8_t i = 0; i < len; i++) {
             Serial.print((int)array[i]);
+            Serial.print(' ');
         }
         Serial.println();
     } 

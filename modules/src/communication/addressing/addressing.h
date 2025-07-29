@@ -12,14 +12,14 @@ public:
     explicit Addressing(Communication *communication);
     virtual ~Addressing();
 
-    // TODO consider changing this methods to voids that will set variable which pointer will be passed as param (to protect data with mutex)
-    const uint8_t (&getProtocolMACAddress() const)[MAC_ADDRESS_LENGTH];
-    const uint8_t getIPAddress();
+    void getProtocolMACAddress(uint8_t macAddress[6]);
+    uint8_t getIPAddress();
+    bool getIsAddressingWorking();
 
     void startAddressing();
     void stopAddressing();
 
-    void addMessage(const uint8_t MESSAGE[MESSAGE_SIZE]);
+    void addMessage(const uint8_t message[MESSAGE_SIZE]);
 
 protected:
     void createAddressingQueues();
@@ -34,6 +34,7 @@ protected:
     virtual void abortAddresing() = 0;
     void abortAddressingWithAbortMessage();
 
+    bool mIsAddressingWorking = false;
     Communication *mpCommunication;
 
     uint8_t mMACAddress[MAC_ADDRESS_LENGTH]; // module's MAC address 
@@ -41,11 +42,12 @@ protected:
     uint8_t mIPAddress = NULL_IP; // 0 is NULL, 1 is central unit's IP
 
     #ifdef ESP32_BOARD
-        const bool M_IS_MAC_ADDRESS_REAL = true;
+        const bool m_IS_MAC_ADDRESS_REAL = true;
     #else
         #error "MAC address not implemented!"
     #endif
-    
+    SemaphoreHandle_t mAddressingDataMutex = NULL;
+
     QueueHandle_t mAddressingQueue = NULL;
 
     TaskHandle_t mAddressingTaskHandle = NULL;

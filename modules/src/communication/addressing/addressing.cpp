@@ -21,17 +21,33 @@ Addressing::Addressing(Communication *communication)
         // TODO add function to get MAC address on different boards
         #error "MAC address not implemented!"
     #endif
+    mAddressingDataMutex = xSemaphoreCreateMutex();
 }
 
 Addressing::~Addressing() = default;
 
-const uint8_t (&Addressing::getProtocolMACAddress() const)[MAC_ADDRESS_LENGTH] {
-    return mProtocolMACAddress;
+void Addressing::getProtocolMACAddress(uint8_t macAddress[6]) {
+    xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
+    uah::prepareBuffor(macAddress, mProtocolMACAddress, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
+    xSemaphoreGive(mAddressingDataMutex);
 }
 
-const uint8_t Addressing::getIPAddress() {
-    return mIPAddress;
+uint8_t Addressing::getIPAddress() {
+    xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
+    const uint8_t ipAddress = mIPAddress;
+    xSemaphoreGive(mAddressingDataMutex);
+
+    return ipAddress;
 }
+// TODO remove and remove mIsAddressingWorking var
+// bool Addressing::getIsAddressingWorking() {
+//     bool isAddressingWorking;
+//     xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
+//     isAddressingWorking = mIsAddressingWorking;
+//     xSemaphoreGive(mAddressingDataMutex);
+
+//     return isAddressingWorking;
+// }
 
 void Addressing::startAddressing() {
     createAddressingTimers();
@@ -45,9 +61,9 @@ void Addressing::stopAddressing() {
     deleteAddressingTimers();
 }
 
-void Addressing::addMessage(const uint8_t MESSAGE[MESSAGE_SIZE]) {
+void Addressing::addMessage(const uint8_t message[MESSAGE_SIZE]) {
     if (mAddressingQueue != NULL) {
-        xQueueSend(mAddressingQueue, MESSAGE, portMAX_DELAY);
+        xQueueSend(mAddressingQueue, message, portMAX_DELAY);
     } else {
         Serial.println("ADDRESSING ERROR! In addMessage() -> can't add message to queue, because queue doesn't exists");
     }
@@ -73,6 +89,10 @@ void Addressing::deleteAddressingQueues() {
 // ============================ Deletes ============================
 
 void Addressing::deleteAddressingTask() {
+    xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
+    mIsAddressingWorking = false;
+    xSemaphoreGive(mAddressingDataMutex);
+
     if (mAddressingTaskHandle != NULL) {
         vTaskDelete(mAddressingTaskHandle);
         mAddressingTaskHandle = NULL;

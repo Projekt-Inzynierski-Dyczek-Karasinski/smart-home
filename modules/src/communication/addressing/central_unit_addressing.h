@@ -11,7 +11,7 @@ class Communication;
 
 // assuming that central unit is using hc12 to rf communication
 #ifndef HC12_MODULE
-    #error "Central unit should run with hc12 module"
+    #error "Central unit must run with hc12 module"
 #endif
 
 class CentralUnitAddressing final : public Addressing{
@@ -35,9 +35,11 @@ private:
     
     void printModulesAddressingData();
     void printNumOFModulesOnRfChannels();
-    void getModuleData(AddressingData *addressingData, uint8_t ipAddress);
+    void getModuleData(AddressingData *addressingData, const uint8_t ipAddress);
+    uint8_t getModuleRfChannel(const uint8_t ipAddress);
     uint8_t addModule(const uint8_t *macAddress, const bool isMACAddressReal, uint8_t rfChannel = 0);
     void removeModule(const uint8_t ipAddress);
+    uint8_t getTmpModuleIp();
 
     void abortAddresing() override;
     
@@ -45,6 +47,7 @@ private:
 
     AddressingData mModulesAddressingData[MAX_NUM_OF_MODULES]; 
     uint8_t mNumOFModulesOnRfChannel[MAX_NUM_OF_CHANNEL];
+    uint8_t mTmpModuleIp = NULL_IP; // TODO remember to clear that after end of new connection
 
     SemaphoreHandle_t mModulesAddressingDataMutex = NULL;
 };

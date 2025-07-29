@@ -4,7 +4,7 @@
 
 #define ADDRESSING_ABSOLUTE_TIMEOUT 60000 // 60s
 // TODO assign final value
-#define ADDRESSING_MESSAGE_TIMEOUT 1000 // 1s
+#define ADDRESSING_MESSAGE_TIMEOUT 5000 // 5s
 // TODO assign final value
 #define ADDRESSING_MAX_ATTEMPTS 5
 // TODO assign final value
@@ -27,14 +27,18 @@
 
 // ===================== Addressing API Calls =====================
 
+#define ADDRESSING_API_LEN 6
+
 #define ADDRESSING_ABORT "ADabor"
 #define ADDRESSING_NC_REAL_MAC_RF_CHANNELS "ADncry"
 #define ADDRESSING_NC_REAL_MAC_NO_RF_CHANNELS "ADncrn"
 #define ADDRESSING_NC_FAKE_MAC_RF_CHANNELS "ADncfy"
 #define ADDRESSING_NC_FAKE_MAC_NO_RF_CHANNELS "ADncfn"
 #define ADDRESSING_NEW_IP_NEW_RF_CHANNEL "ADi?c?"
-#define ADDRESSING_NEW_IP_NEW_NO_RF_CHANNEL "ADi?  "
+#define ADDRESSING_NEW_IP_NEW_NO_RF_CHANNEL "ADi?\0\0"
 #define ADDRESSING_SUMMARY "ADsumm"
 #define ADDRESSING_SUMMARY_OK "ADsuok"
 #define ADDRESSING_SUMMARY_BAD "ADsuba"
+#define ADDRESSING_PING "ADping"
+#define ADDRESSING_REPING "ADrepi"
 // ================================================================

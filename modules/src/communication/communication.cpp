@@ -4,10 +4,12 @@
 #include <Arduino.h>
 #include <HardwareSerial.h>
 
-#include "smart_home_config.h"
-#include "config/communication_config.h"
 #include "communication/uint8_array_handlers.h"
 #include "universal_module_system/debug_led.h"
+
+#include "smart_home_config.h"
+#include "config/communication_config.h"
+#include "config/addressing_config.h"
 
 #ifdef HC12_MODULE
     #include "communication/hc12.h"
@@ -50,6 +52,10 @@ void Communication::resetEncodeMessageTask() {
     deleteEncodeMessageTask();
     createEncodeMessageTask();
     taskEXIT_CRITICAL(&mCriticalSectionMutex);
+}
+
+void Communication::startPinging() {
+    xTaskNotify(mCommunicationMainTaskHandle, startPingingNotif, eSetValueWithOverwrite);
 }
 
 void Communication::addByteToDecode(const uint8_t DATA) {
@@ -169,6 +175,7 @@ void Communication::receivedMessageDecider(bool *isReadingRawMessage) {
         }
         #endif
         else {
+            // TODO uncomment
             // Serial.println("COMMUNICATION WARNING! In receivedMessageDecider() -> decider doesn't know what to do with received message");
             // Serial.print("Ignored message: ");
             uah::printArrayAsChar(buffor, MESSAGE_SIZE);
@@ -356,9 +363,9 @@ void Communication::decodeMessageTask(void *parameters) {
                     Serial.print("STATUS ERROR! In decodeMessageTask() -> got unknow status. Received Status: ");
                     Serial.println(timeoutStatus);
                 }
+                isRawMessage = false;
             }
             timeoutStatus = defaultStatusNotif;
-            isRawMessage = false;
         } 
 
         // decoding message
@@ -413,7 +420,7 @@ void Communication::decodeMessageTask(void *parameters) {
                         }
                     }
                     // if MAC or IP is incorrect 
-                    // TODO uncomment
+                    // TODO uncomment and implement
                     // else if (!isProperMACAndIP(protocolBuffor[pbMessageIndex], protocolBuffor[pbMessageIndex][6])) {
                     else if (false) {
                         #ifdef CENTRAL_UNIT
@@ -457,6 +464,8 @@ void Communication::decodeMessageTask(void *parameters) {
                         // TODO remove print ?
                         Serial.print("Received message: ");
                         uah::printArrayAsChar(messageBuffor, MESSAGE_SIZE);
+                        // TODO remove print 
+                        // uah::printArrayAsInt(protocolBuffor[0], PROTOCOL_SIZE);
 
                         if (isRawMessage) {
                             isRawMessage = false;
@@ -538,9 +547,11 @@ void Communication::encodeMessageTask(void *parameters) {
     static constexpr uint8_t CHECKSUM_INDEX = 14;
 
     // prepare MAC address in protocol buffor and clear rest of buffor
-    uah::prepareBuffor(protocolBuffor, com.mpAddressing->getProtocolMACAddress(), MAC_ADDRESS_LENGTH, PROTOCOL_SIZE);
+    uint8_t macAddress[6];
+    com.mpAddressing->getProtocolMACAddress(macAddress);
+    uah::prepareBuffor(protocolBuffor, macAddress, MAC_ADDRESS_LENGTH, PROTOCOL_SIZE);
     // prepare place for IP address
-    protocolBuffor[IP_INDEX] = com.mpAddressing->getIPAddress();;
+    protocolBuffor[IP_INDEX] = com.mpAddressing->getIPAddress();
 
     // TODO remove old
     // prepare IP and MAC addresses

@@ -19,7 +19,7 @@ class HC12 {
 public:
     /**
      * @brief Construct for a HC12 class. Creates main and transmit tasks, 
-     * queue for transmitting data. Starts HardwareSerial communication with HC12 module. 
+     * queue for transmitting data and mutex. Starts HardwareSerial communication with HC12 module. 
      * Sets SET_PIN to OUTPUT and its state to HIGH. 
      * 
      * @param communication pointer to instance of Communication class.
@@ -177,6 +177,9 @@ private:
         createSetupHC12TaskNotif,
         deleteSetupHC12TaskNotif,
     } mHC12MainNotifications;
+
+    // Mutex
+    SemaphoreHandle_t mSendingDataMutex = NULL;
     
     // Queues 
     QueueHandle_t mTransmitQueue = NULL;
