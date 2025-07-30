@@ -21,6 +21,7 @@ CentralUnitAddressing::CentralUnitAddressing(Communication *communication)
     mIPAddress = CENTRAL_UNIT_IP;
 
     mModulesAddressingDataMutex = xSemaphoreCreateMutex();
+
     // prepare array counting modules on rf channels and reserve place for central unit
     xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
     uah::prepareBuffor(mNumOFModulesOnRfChannel, MAX_NUM_OF_CHANNEL);
@@ -32,8 +33,8 @@ CentralUnitAddressing::CentralUnitAddressing(Communication *communication)
 
 CentralUnitAddressing::~CentralUnitAddressing() {
     deleteAddressingTask();
-    deleteAddressingQueues();
-    deleteAddressingTimers();
+    deleteAddressingQueue();
+    deleteAddressingTimer();
 }
 
 // ================================================================
@@ -157,7 +158,7 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
             if (xQueueReceive(ad.mAddressingQueue, receiveBuffor, pdMS_TO_TICKS(ADDRESSING_MESSAGE_TIMEOUT)) == pdTRUE) {
                 // if received message to abort addressing
                 if (uah::areArraysEqual(receiveBuffor, (uint8_t*)ADDRESSING_ABORT, ADDRESSING_API_LEN)) {
-                    ad.abortAddresing();
+                    ad.abortAddressing();
                     for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
                 } 
                 // if received message to restart addressing
@@ -185,7 +186,7 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
                                 Serial.println("Addressing complete");
                                 // TODO remove clearing data 
                                 // uint8_t mTmpModuleIp = NULL_IP; // TODO remember to clear that after end of new connection
-                                ad.abortAddresing();
+                                ad.abortAddressing();
                                 for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
                             } else if (uah::areArraysEqual(receiveBuffor, (uint8_t*)ADDRESSING_SUMMARY_BAD, ADDRESSING_API_LEN)) {
                                 isReceivedPropperMessage = true;
@@ -234,10 +235,6 @@ void CentralUnitAddressing::createAddressingTask() {
     } else {
         Serial.println("TASK CREATION ERROR! In createAddressingTask() -> Can't create addressing task, because task already exists");
     }
-
-    // xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
-    // mIsAddressingWorking = true;
-    // xSemaphoreGive(mAddressingDataMutex);
 }
 
 // ================================================================
@@ -252,7 +249,7 @@ void CentralUnitAddressing::addressingTimersCallbacks(TimerHandle_t xTimer){
     }
 }
 
-void CentralUnitAddressing::createAddressingTimers() {
+void CentralUnitAddressing::createAddressingTimer() {
     if (mAddressingTimeoutTimer == NULL) {
         mAddressingTimeoutTimer = xTimerCreate(
             "Addressing Absolute Timeout",
@@ -402,7 +399,7 @@ void CentralUnitAddressing::clearNewConnectionData() {
     xQueueReset(mAddressingQueue);
 }
 
-void CentralUnitAddressing::abortAddresing() {
+void CentralUnitAddressing::abortAddressing() {
     Serial.println("Aborting addressing...");
     clearNewConnectionData();
     

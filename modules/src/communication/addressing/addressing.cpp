@@ -41,35 +41,35 @@ uint8_t Addressing::getIPAddress() {
 }
 
 void Addressing::startAddressing() {
-    createAddressingTimers();
-    createAddressingQueues();
+    createAddressingTimer();
+    createAddressingQueue();
     createAddressingTask();
 }
 
 void Addressing::stopAddressing() {
     deleteAddressingTask();
-    deleteAddressingQueues();
-    deleteAddressingTimers();
+    deleteAddressingQueue();
+    deleteAddressingTimer();
 }
 
 void Addressing::addMessage(const uint8_t message[MESSAGE_SIZE]) {
     if (mAddressingQueue != NULL) {
         xQueueSend(mAddressingQueue, message, portMAX_DELAY);
     } else {
-        Serial.println("ADDRESSING ERROR! In addMessage() -> can't add message to queue, because queue doesn't exists");
+        Serial.println("ADDRESSING ERROR! In addMessage() -> can't add message to queue, because queue doesn't exist");
     }
 }
 // ================================================================
 
 // ============================ Queues ============================
 
-void Addressing::createAddressingQueues() {
+void Addressing::createAddressingQueue() {
     if (mAddressingQueue == NULL) {
         mAddressingQueue = xQueueCreate(MESSAGE_QUEUE_LEN, sizeof(uint8_t[MESSAGE_SIZE]));
     }
 }
 
-void Addressing::deleteAddressingQueues() {
+void Addressing::deleteAddressingQueue() {
     if (mAddressingQueue != NULL) {
         vQueueDelete(mAddressingQueue);
         mAddressingQueue = NULL;
@@ -85,7 +85,7 @@ void Addressing::deleteAddressingTask() {
         mAddressingTaskHandle = NULL;
     }
 }
-void Addressing::deleteAddressingTimers() {
+void Addressing::deleteAddressingTimer() {
     if (mAddressingTimeoutTimer != NULL) {
         xTimerDelete(mAddressingTimeoutTimer, portMAX_DELAY);
         mAddressingTimeoutTimer = NULL;
@@ -105,6 +105,6 @@ void Addressing::abortAddressingWithAbortMessage() {
         mpCommunication->sendMessage((uint8_t*)ADDRESSING_ABORT);
         vTaskDelay(pdMS_TO_TICKS(ADDRESSING_DELAY_BETWEEN_ABORT_MESSAGES));
     }
-    abortAddresing();
+    abortAddressing();
 }
 // ================================================================

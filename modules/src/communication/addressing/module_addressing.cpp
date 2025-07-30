@@ -25,8 +25,8 @@ ModuleAddressing::ModuleAddressing(Communication *communication)
 
 ModuleAddressing::~ModuleAddressing() {
     deleteAddressingTask();
-    deleteAddressingQueues();
-    deleteAddressingTimers();
+    deleteAddressingQueue();
+    deleteAddressingTimer();
 }
 
 #ifdef RF_CHANNELS
@@ -120,7 +120,7 @@ void ModuleAddressing::addressingTask(void* parameters) {
                             // TODO add saving data in flash memory
                             Serial.println("Addressing complete");
                             // TODO remove clearing data 
-                            ad.abortAddresing();
+                            ad.abortAddressing();
                             for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
                         } else {
                             Serial.println("ADDRESSING ERROR! In addressingTask() -> central unit send bad data in summary");
@@ -150,7 +150,7 @@ void ModuleAddressing::addressingTask(void* parameters) {
             if (xQueueReceive(ad.mAddressingQueue, receiveBuffor, pdMS_TO_TICKS(ADDRESSING_MESSAGE_TIMEOUT)) == pdTRUE) {
                 // if received message to abort addressing
                 if (uah::areArraysEqual(receiveBuffor, (uint8_t*)ADDRESSING_ABORT, ADDRESSING_API_LEN)) {
-                    ad.abortAddresing();
+                    ad.abortAddressing();
                 } 
                 // if received message to restart addressing
                 else if (uah::areArraysEqual(receiveBuffor, (uint8_t*)ADDRESSING_RESTART, ADDRESSING_API_LEN)) {
@@ -169,7 +169,7 @@ void ModuleAddressing::addressingTask(void* parameters) {
                                 isReceivedPropperMessage = true;
                                 uint8_t newRfChannel = receiveBuffor[13];
 
-                                ad.updateAddresingData(receiveBuffor, receiveBuffor[11], newRfChannel);
+                                ad.updateAddressingData(receiveBuffor, receiveBuffor[11], newRfChannel);
 
                                 // change rf channel
                                 uint8_t hc12Command[SETUP_COMMAND_SIZE];
@@ -185,7 +185,7 @@ void ModuleAddressing::addressingTask(void* parameters) {
                             // check is received propper message (ADi?)
                             if (receiveBuffor[10] == (uint8_t)'i' && receiveBuffor[12] == (uint8_t)BLANK_CHARACTER) {
                                 isReceivedPropperMessage = true;
-                                ad.updateAddresingData(receiveBuffor, receiveBuffor[11]);
+                                ad.updateAddressingData(receiveBuffor, receiveBuffor[11]);
                                 addressingState = SUMMARY;
                             }
                         #endif
@@ -263,10 +263,6 @@ void ModuleAddressing::createAddressingTask() {
     } else {
         Serial.println("TASK CREATION ERROR! In createAddressingTask() -> Can't create addressing task, because task already exists");
     }
-
-    // xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
-    // mIsAddressingWorking = true;
-    // xSemaphoreGive(mAddressingDataMutex);
 }
 // ================================================================
 
@@ -280,7 +276,7 @@ void ModuleAddressing::addressingTimersCallbacks(TimerHandle_t xTimer){
     }
 }
 
-void ModuleAddressing::createAddressingTimers() {
+void ModuleAddressing::createAddressingTimer() {
     if (mAddressingTimeoutTimer == NULL) {
         mAddressingTimeoutTimer = xTimerCreate(
             "Addressing Absolute Timeout",
@@ -295,7 +291,7 @@ void ModuleAddressing::createAddressingTimers() {
 
 // ============================ Other =============================
 
-void ModuleAddressing::updateAddresingData(const uint8_t *newMAC, const uint8_t newIP) {
+void ModuleAddressing::updateAddressingData(const uint8_t *newMAC, const uint8_t newIP) {
     xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
     uah::prepareBuffor(mProtocolMACAddress, newMAC, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
     mIPAddress = newIP;
@@ -304,7 +300,7 @@ void ModuleAddressing::updateAddresingData(const uint8_t *newMAC, const uint8_t 
 }
 
 #ifdef RF_CHANNELS
-void ModuleAddressing::updateAddresingData(const uint8_t *newMAC, const uint8_t newIP, const uint8_t newRfChannel) {
+void ModuleAddressing::updateAddressingData(const uint8_t *newMAC, const uint8_t newIP, const uint8_t newRfChannel) {
     xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
     uah::prepareBuffor(mProtocolMACAddress, newMAC, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
     mIPAddress = newIP;
@@ -319,18 +315,20 @@ void ModuleAddressing::clearNewConnectionData() {
     Serial.println("Clearing new connection data...");
 
     #ifdef RF_CHANNELS
-        updateAddresingData(mMACAddress, NULL_IP, DEFAULT_CHANNEL);
+        updateAddressingData(mMACAddress, NULL_IP, DEFAULT_CHANNEL);
     #else 
-        updateAddresingData(mMACAddress, NULL_IP);
+        updateAddressingData(mMACAddress, NULL_IP);
     #endif
 
-    mpCommunication->sendInternalMessage((uint8_t*)"HC+DEFAULT");
+    #ifdef HC12_MODULE
+        mpCommunication->sendInternalMessage((uint8_t*)"HC+DEFAULT");
+    #endif
     vTaskDelay(pdMS_TO_TICKS(ADDRESSING_DELAY_BETWEEN_ATTEMPTS));
     xQueueReset(mAddressingQueue);
 }
 
 
-void ModuleAddressing::abortAddresing() {
+void ModuleAddressing::abortAddressing() {
     Serial.println("Aborting addressing...");
 
     clearNewConnectionData();
