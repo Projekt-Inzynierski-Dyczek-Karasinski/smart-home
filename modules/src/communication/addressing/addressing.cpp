@@ -39,15 +39,6 @@ uint8_t Addressing::getIPAddress() {
 
     return ipAddress;
 }
-// TODO remove and remove mIsAddressingWorking var
-// bool Addressing::getIsAddressingWorking() {
-//     bool isAddressingWorking;
-//     xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
-//     isAddressingWorking = mIsAddressingWorking;
-//     xSemaphoreGive(mAddressingDataMutex);
-
-//     return isAddressingWorking;
-// }
 
 void Addressing::startAddressing() {
     createAddressingTimers();
@@ -89,10 +80,6 @@ void Addressing::deleteAddressingQueues() {
 // ============================ Deletes ============================
 
 void Addressing::deleteAddressingTask() {
-    // xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
-    // mIsAddressingWorking = false;
-    // xSemaphoreGive(mAddressingDataMutex);
-
     if (mAddressingTaskHandle != NULL) {
         vTaskDelete(mAddressingTaskHandle);
         mAddressingTaskHandle = NULL;

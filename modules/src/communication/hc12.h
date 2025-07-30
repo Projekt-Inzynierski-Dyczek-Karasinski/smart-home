@@ -7,7 +7,7 @@
 #include "config/communication_config.h"
 
 class Communication; 
-// TODO !BEFORE PULL REQUEST! check if all comments are still accurate 
+// TODO add @pre, @post etc.
 
 /**
  * @brief Driver class for HC12 module. Enables transmiting, receiving data via HC12 module and setting up HC12 module.
@@ -126,7 +126,7 @@ private:
      * @param parameters FreeRTOS task parameters.
      * 
      * @note This task is suspended after of no transmitting for 1 second and 
-     * is resumed by th Main HC12 task when a new message appear for transmission.
+     * is resumed by when a new message appear for transmission.
      *
      */
     static void transmitTask(void *parameters);

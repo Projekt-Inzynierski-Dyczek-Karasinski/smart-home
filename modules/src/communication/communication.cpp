@@ -1,4 +1,3 @@
-// TODO !BEFORE PULL REQUEST! check for "eSetValueWithoutOverwrite"!
 #include "communication/communication.h"
 
 #include <Arduino.h>
@@ -175,9 +174,8 @@ void Communication::receivedMessageDecider(bool *isReadingRawMessage) {
         }
         #endif
         else {
-            // TODO uncomment
-            // Serial.println("COMMUNICATION WARNING! In receivedMessageDecider() -> decider doesn't know what to do with received message");
-            // Serial.print("Ignored message: ");
+            Serial.println("COMMUNICATION WARNING! In receivedMessageDecider() -> decider doesn't know what to do with received message");
+            Serial.print("Ignored message: ");
             uah::printArrayAsChar(buffor, MESSAGE_SIZE);
         }
         *isReadingRawMessage = false;
@@ -193,7 +191,7 @@ void Communication::communicationMainTask(void* parameters) {
     bool isReadingRawMessage = false;
 
     for (;;) {
-        // TODO !BEFORE PULL REQUEST! change there and in other main tasks notifications to queues (race conditions)
+        // TODO change there and in other main tasks notifications to queues (race conditions)
         // change status
         xTaskNotifyWait(0, ULONG_MAX, &status, 0);
         switch (status) {
@@ -338,7 +336,7 @@ void Communication::decodeMessageTask(void *parameters) {
             if (timeoutStatus == readRawMessageNotif) {
                 isRawMessage = true;
                 // TODO remove print
-                Serial.println("isRawMessage = true;");
+                // Serial.println("Reading raw message");
             } else {
                 if (timeoutStatus == byteTimeoutNotif) {
                     xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
@@ -390,7 +388,6 @@ void Communication::decodeMessageTask(void *parameters) {
                     Serial.print("BAD END OF MESSAGE ERROR! In decodeMessageTask() -> message should end with 0 (\\0 char), but got: ");
                     Serial.println(protocolBuffor[pbMessageIndex][PROTOCOL_SIZE - 1]);
 
-                    // TODO assign final value
                     // wait for possible rest of the message and send "repeat"
                     vTaskDelay(RECEIVE_MESSAGE_TIMEOUT);
                     resetProtocolBuffor();
@@ -410,7 +407,6 @@ void Communication::decodeMessageTask(void *parameters) {
                         xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
                         Serial.println("BAD CHECKSUM ERROR! In decodeMessageTask() -> checksum incorrect");
 
-                        // TODO assign final value
                         // wait for possible rest of the message and send "repeat"
                         vTaskDelay(RECEIVE_MESSAGE_TIMEOUT);
                         resetProtocolBuffor();
@@ -423,12 +419,12 @@ void Communication::decodeMessageTask(void *parameters) {
                     // TODO uncomment and implement
                     // else if (!isProperMACAndIP(protocolBuffor[pbMessageIndex], protocolBuffor[pbMessageIndex][6])) {
                     else if (false) {
-                        #ifdef CENTRAL_UNIT
-                            Serial.println("CRITICAL ERROR! In decodeMessageTask() -> isProperMACAndIP() must never return false for CENTRAL_UNIT"); 
-                        #else
-                            xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
-                            resetProtocolBuffor();
-                        #endif
+                        // #ifdef CENTRAL_UNIT
+                        //     Serial.println("CRITICAL ERROR! In decodeMessageTask() -> isProperMACAndIP() must never return false for CENTRAL_UNIT"); 
+                        // #else
+                        //     xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
+                        //     resetProtocolBuffor();
+                        // #endif
                     }
                     // if entire message is not ready (message quantity)
                     else if (protocolBuffor[pbMessageIndex][MESSAGES_QUANTITY_INDEX] != 0) {
@@ -461,42 +457,18 @@ void Communication::decodeMessageTask(void *parameters) {
                             pbMessageIndex++;
                         } while(messagesQuantity != 0);
 
-                        // TODO remove print ?
-                        Serial.print("Received message: ");
-                        uah::printArrayAsChar(messageBuffor, MESSAGE_SIZE);
-                        // TODO remove print 
-                        // uah::printArrayAsInt(protocolBuffor[0], PROTOCOL_SIZE);
-
                         if (isRawMessage) {
                             isRawMessage = false;
+                            // TODO remove print ?
+                            Serial.print("Received raw message: ");
+                            uah::printArrayAsInt(protocolBuffor[0], PROTOCOL_SIZE);
                             xQueueSend(com.mReceiveMessageQueue, protocolBuffor[0], portMAX_DELAY);
                         } else {
+                            // TODO remove print ?
+                            Serial.print("Received message: ");
+                            uah::printArrayAsChar(messageBuffor, MESSAGE_SIZE);
                             xQueueSend(com.mReceiveMessageQueue, messageBuffor, portMAX_DELAY);
                         }
-
-                        // TODO remove
-                        // // if it is "repeat" message
-                        // if (uah::areArraysEqual(messageBuffor, (uint8_t*)"repeat", 6)) {
-                        //     com.repeatLastTransmittedMessage();
-                        // } 
-                        // #ifdef HC12_MODULE
-                        // // if it is HC_12 command
-                        // else if (messageBuffor[0] == (uint8_t)'H' && messageBuffor[1] == (uint8_t)'C') {
-                        //     com.mpRfModule->setupHC12(messageBuffor);
-                        // }
-                        // #endif
-                        // TODO implement
-                        // if Addressing Task is working
-                        // else if (msAddressingTaskHandle != NULL) {
-                        //     if (isRawMessage) {
-                        //         xQueueSend(msReceiveMessageQueue, protocolBuffor[0], portMAX_DELAY);
-                        //         isRawMessage = false;
-                        //     } else {
-                        //         xQueueSend(msReceiveMessageQueue, messageBuffor, portMAX_DELAY);
-                        //     }
-                        // }
-                        // TODO add message to queue
-                        // else
 
                         // clean up
                         resetProtocolBuffor();
@@ -546,6 +518,7 @@ void Communication::encodeMessageTask(void *parameters) {
     static constexpr uint8_t PROTOCOL_MESSAGE_LENGTH = 6;
     static constexpr uint8_t CHECKSUM_INDEX = 14;
 
+    // TODO implement seting IP address for central unit    
     // prepare MAC address in protocol buffor and clear rest of buffor
     uint8_t macAddress[6];
     com.mpAddressing->getProtocolMACAddress(macAddress);
@@ -553,28 +526,6 @@ void Communication::encodeMessageTask(void *parameters) {
     // prepare place for IP address
     protocolBuffor[IP_INDEX] = com.mpAddressing->getIPAddress();
 
-    // TODO remove old
-    // prepare IP and MAC addresses
-    // #ifdef CENTRAL_UNIT
-    //     for (uint8_t j = 0; j < 6; j++){
-    //         protocolBuffor[i][j] = msMACAddress[j];
-    //     }
-    //     protocolBuffor[i][6] = 1;
-    // #else
-    //     xSemaphoreTake(msAddressDataMutex, portMAX_DELAY);
-    //     protocolBuffor[i][6] = msIPAddress;
-    //     if (msIPAddress == 0) {
-    //         for (uint8_t j = 0; j < 6; j++){
-    //             protocolBuffor[i][j] = msMACAddress[j];
-    //         }
-    //     } else {
-    //         for (uint8_t j = 0; j < 6; j++){
-    //             protocolBuffor[i][j] = msCentralUnitMACAddress[j];
-    //         }
-    //     }
-    //     xSemaphoreGive(msAddressDataMutex);
-    // #endif
-    
     // prepare place for message
     for (uint8_t i = PROTOCOL_MESSAGE_START_INDEX; i < (PROTOCOL_MESSAGE_START_INDEX + PROTOCOL_MESSAGE_LENGTH); i++) {
         protocolBuffor[i] = BLANK_CHARACTER;
@@ -687,7 +638,7 @@ void Communication::sendCustomMessageTask(void *parameters) {
             if (buffor[index - 1] == (uint8_t)'\n') {
                 buffor[index - 1] = 0;
                 
-                // TODO remove debug print
+                // TODO remove print ?
                 Serial.print("Message Ready: ");
                 uah::printArrayAsChar(buffor, MESSAGE_SIZE);
 
@@ -752,11 +703,11 @@ void Communication::communicationTimersCallbacks(TimerHandle_t xTimer){
 
     if (xTimer == com.mReceiveMessageTimeoutTimer) {
         // TODO remove print
-        Serial.println("message timeout callback");
+        // Serial.println("message timeout callback");
         xTaskNotify(com.mCommunicationMainTaskHandle, messageTimeoutNotif, eSetValueWithOverwrite);
     } else if (xTimer == com.mReceiveByteTimeoutTimer) {
         // TODO remove print
-        Serial.println("byte timeout callback");
+        // Serial.println("byte timeout callback");
         xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
         xTaskNotify(com.mCommunicationMainTaskHandle, byteTimeoutNotif, eSetValueWithOverwrite);
     } else if (xTimer == com.mPingTimeoutTimer) {

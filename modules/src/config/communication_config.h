@@ -19,5 +19,5 @@
 #define REPEAT_LAST_MESSAGE_MAX_ATTEMPTS 3
 // TODO assign final value
 #define PING_MAX_ATTEMPTS 3
-// TODO increase delay ?
+// TODO assign final value
 #define DELAY_BETWEEN_MESSAGES 40

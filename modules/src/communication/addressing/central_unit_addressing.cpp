@@ -148,7 +148,7 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
 
             if (isRestarting) {
                 // TODO remove print
-                Serial.println("restarting after sending...");
+                // Serial.println("restarting after sending...");
                 ad.sendRestartMessage();
                 break;
             }
@@ -203,7 +203,7 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
 
                     if (isRestarting) {
                         // TODO remove print
-                        Serial.println("restarting after receiving...");
+                        // Serial.println("restarting after receiving...");
                         ad.sendRestartMessage();
                         break;
                     }

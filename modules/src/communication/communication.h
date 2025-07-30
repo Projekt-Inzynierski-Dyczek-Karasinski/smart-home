@@ -41,7 +41,6 @@ private:
     void createCommunicationQueues();
     void deleteCommunicationQueues();
 
-    // TODO change name
     void receivedMessageDecider(bool *isReadingRawMessage);
     static void communicationMainTask(void *parameters);
     void createCommunicationMainTask();
@@ -70,7 +69,7 @@ private:
     void transmitPing();
     void replyToPing();
 
-    // TODO change this to nonstatic
+    // TODO change this to nonstatic if possible
     static DebugLED *mspDebugLED;
 
     #ifdef HC12_MODULE

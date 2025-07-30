@@ -162,7 +162,6 @@ void HC12::HC12MainTask(void *parameters) {
         switch (status) {
             case defaultStatusNotif:
                 if (hc12.mpSerial->available() > 0) {
-                    // TODO add guards for setupHC12 ?
                     hc12Output = hc12.mpSerial->read();
 
                     if (isWaitingForSendConfirmation) {

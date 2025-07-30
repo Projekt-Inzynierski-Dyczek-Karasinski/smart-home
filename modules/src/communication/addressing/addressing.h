@@ -37,11 +37,11 @@ protected:
     virtual void abortAddresing() = 0;
     void abortAddressingWithAbortMessage();
 
+    // TODO add led blinking indicating restart, success and failure of addressing 
     // void restartLedBlink();
     // void successLedBlink();
     // void abortLedBlink();
 
-    // bool mIsAddressingWorking = false;
     Communication *mpCommunication;
 
     uint8_t mMACAddress[MAC_ADDRESS_LENGTH]; // module's MAC address 

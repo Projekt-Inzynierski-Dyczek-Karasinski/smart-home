@@ -64,7 +64,7 @@ void ModuleAddressing::addressingTask(void* parameters) {
             for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
         }
         absoluteAttemptCounter++;
-        
+
         uint8_t addressingState = START_ADDRESSING;
         uint8_t attemptCounter = 0;
 
@@ -142,7 +142,7 @@ void ModuleAddressing::addressingTask(void* parameters) {
 
             if (isRestarting) {
                 // TODO remove print
-                Serial.println("restarting after sending...");
+                // Serial.println("restarting after sending...");
                 break;
             }
 
@@ -233,7 +233,7 @@ void ModuleAddressing::addressingTask(void* parameters) {
 
                     if (isRestarting) {
                         // TODO remove print
-                        Serial.println("restarting after receiving...");
+                        // Serial.println("restarting after receiving...");
                         break;
                     }
 
