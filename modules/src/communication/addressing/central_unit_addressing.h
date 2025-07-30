@@ -41,6 +41,7 @@ private:
     void removeModule(const uint8_t ipAddress);
     uint8_t getTmpModuleIp();
 
+    void clearNewConnectionData() override;
     void abortAddresing() override;
     
     static CentralUnitAddressing *mspAddressing;

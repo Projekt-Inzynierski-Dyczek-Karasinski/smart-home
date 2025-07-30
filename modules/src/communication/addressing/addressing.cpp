@@ -89,9 +89,9 @@ void Addressing::deleteAddressingQueues() {
 // ============================ Deletes ============================
 
 void Addressing::deleteAddressingTask() {
-    xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
-    mIsAddressingWorking = false;
-    xSemaphoreGive(mAddressingDataMutex);
+    // xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
+    // mIsAddressingWorking = false;
+    // xSemaphoreGive(mAddressingDataMutex);
 
     if (mAddressingTaskHandle != NULL) {
         vTaskDelete(mAddressingTaskHandle);
@@ -107,6 +107,11 @@ void Addressing::deleteAddressingTimers() {
 // ================================================================
 
 // ============================ Other =============================
+
+void Addressing::sendRestartMessage() {
+    mpCommunication->sendMessage((uint8_t*)ADDRESSING_RESTART);
+    clearNewConnectionData();
+}
 
 void Addressing::abortAddressingWithAbortMessage() {
     for (uint8_t i = 0; i < ADDRESSING_NUM_OF_ABORT_MESSAGES; i++) {

@@ -397,10 +397,14 @@ void HC12::deleteSetupHC12Task() {
 
     digitalWrite(SET_PIN, HIGH);
     vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_HIGH));
+    // clear random hc12 output after changing state of SET_PIN
+    while (mpSerial->available() > 0) {
+        mpSerial->read();
+    }
     xSemaphoreGive(mSendingDataMutex);
 }
 // ================================================================
 
-// ============================ other =============================
+// ============================ Other =============================
 
 // ================================================================

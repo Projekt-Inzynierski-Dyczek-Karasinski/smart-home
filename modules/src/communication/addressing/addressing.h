@@ -14,7 +14,7 @@ public:
 
     void getProtocolMACAddress(uint8_t macAddress[6]);
     uint8_t getIPAddress();
-    bool getIsAddressingWorking();
+    // bool getIsAddressingWorking();
 
     void startAddressing();
     void stopAddressing();
@@ -31,10 +31,17 @@ protected:
     virtual void createAddressingTimers() = 0;
     void deleteAddressingTimers();
 
+
+    virtual void clearNewConnectionData() = 0;
+    void sendRestartMessage();
     virtual void abortAddresing() = 0;
     void abortAddressingWithAbortMessage();
 
-    bool mIsAddressingWorking = false;
+    // void restartLedBlink();
+    // void successLedBlink();
+    // void abortLedBlink();
+
+    // bool mIsAddressingWorking = false;
     Communication *mpCommunication;
 
     uint8_t mMACAddress[MAC_ADDRESS_LENGTH]; // module's MAC address 
