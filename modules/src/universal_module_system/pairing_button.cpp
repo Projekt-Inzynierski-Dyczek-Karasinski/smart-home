@@ -52,7 +52,7 @@ void PairingButton::buttonPressTimerCallback() {
         // after pressing button for 3 seconds call createPairingBlinkTask()
         else if (DEBOUNCING_COUNTER_TO_SECONDS(msButtonPressCounter) >= 3 && msButtonMode == 0) {
             if (msButtonMode != 1) {
-                mspCommunication->startAddresingAlgorithm();
+                mspCommunication->startAddressingAlgorithm();
             }
             msButtonMode = 1;
         }

@@ -333,7 +333,7 @@ void ModuleAddressing::abortAddressing() {
 
     clearNewConnectionData();
 
-    mpCommunication->stopAddresingAlgorithm();
+    mpCommunication->stopAddressingAlgorithm();
 }
 
 // ================================================================

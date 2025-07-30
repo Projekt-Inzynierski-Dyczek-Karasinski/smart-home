@@ -1,6 +1,8 @@
 #pragma once
 #include <Arduino.h>
 
+// TODO add @example tags
+
 /**
  * @brief Namespace containing utility functions for uint8_t arrays.
  * @note Available functions:
@@ -12,7 +14,6 @@
  * uint8_t calcLenOfDataInArray() 
  * 
  * bool areArraysEqual()
- * 
  */
 namespace uint8ArrayHandlers {
     /**

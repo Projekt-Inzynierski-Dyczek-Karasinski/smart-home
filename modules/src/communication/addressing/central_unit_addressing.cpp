@@ -403,6 +403,6 @@ void CentralUnitAddressing::abortAddressing() {
     Serial.println("Aborting addressing...");
     clearNewConnectionData();
     
-    mpCommunication->stopAddresingAlgorithm();
+    mpCommunication->stopAddressingAlgorithm();
 }
 // ================================================================

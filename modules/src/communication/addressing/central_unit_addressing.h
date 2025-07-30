@@ -54,7 +54,6 @@ private:
     static void addressingTask(void* parameters);
     /**
      * @brief Creates the FreeRTOS task responsible for the central unit's addressing process.
-     * Ensures that only one instance of the addressing task is running.
      */
     void createAddressingTask() override;
     /**

@@ -154,7 +154,7 @@ void HC12::HC12MainTask(void *parameters) {
     }
 
     for (;;) {
-        // TODO change this to queue
+        // TODO change this to queue (race conditions)
         // change status
         xTaskNotifyWait(0, ULONG_MAX, &status, 0);
         
