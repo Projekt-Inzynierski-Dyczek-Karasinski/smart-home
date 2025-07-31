@@ -26,15 +26,15 @@ public:
 
     /**
      * @brief Copies the current protocol MAC address into the provided buffer.
-     *        Ensures thread-safe access.
      * @param macAddress Output buffer of length 6 for the MAC address.
+     * @note Thread-safe.
      */
-    void getProtocolMACAddress(uint8_t macAddress[6]);
+    void getProtocolMACAddress(uint8_t macAddress[MAC_ADDRESS_LENGTH]);
 
     /**
      * @brief Gets the currently assigned IP address for the module.
-     *        Ensures thread-safe access.
      * @return IP address.
+     * @note Thread-safe.
      */
     uint8_t getIPAddress();
 

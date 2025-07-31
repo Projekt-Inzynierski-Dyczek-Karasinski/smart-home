@@ -94,7 +94,7 @@ void HC12::setupHC12(const uint8_t *commands) {
             }
         }
 
-        xTaskNotify(mHC12MainTaskHandle, createSetupHC12TaskNotif, eSetValueWithOverwrite);
+        xTaskNotify(mHC12MainTaskHandle, CREATE_SETUP_HC12_TASK_NOTIF, eSetValueWithOverwrite);
     }
 }
 // ================================================================
@@ -140,10 +140,21 @@ void HC12::deleteSetupHC12Queues() {
 
 // ========================== HC12 Main ===========================
 
+void HC12::hc12OutputDecider(const uint8_t *hc12Output, const bool *isSetupHC12Working, bool *isWaitingForSendConfirmation) {
+    if (*isWaitingForSendConfirmation) {
+        *isWaitingForSendConfirmation = false;
+        xTaskNotify(mTransmitTaskHandle, (uint32_t)*hc12Output, eSetValueWithOverwrite);
+    } else if (*isSetupHC12Working) {
+        xQueueSend(mSetupHC12ReceiveQueue, hc12Output, portMAX_DELAY);
+    } else {
+        mpCommunication->addByteToDecode(*hc12Output);
+    } 
+}
+
 void HC12::HC12MainTask(void *parameters) {
     auto &hc12 = *mspHC12;
 
-    uint32_t status = defaultStatusNotif;
+    uint32_t status = DEFAULT_STATUS_NOTIF;
     bool isSetupHC12Working = false;
     bool isWaitingForSendConfirmation = false;
 
@@ -160,18 +171,10 @@ void HC12::HC12MainTask(void *parameters) {
         
         uint8_t hc12Output;
         switch (status) {
-            case defaultStatusNotif:
+            case DEFAULT_STATUS_NOTIF:
                 if (hc12.mpSerial->available() > 0) {
                     hc12Output = hc12.mpSerial->read();
-
-                    if (isWaitingForSendConfirmation) {
-                        isWaitingForSendConfirmation = false;
-                        xTaskNotify(hc12.mTransmitTaskHandle, (uint32_t)hc12Output, eSetValueWithOverwrite);
-                    } else if (isSetupHC12Working) {
-                        xQueueSend(hc12.mSetupHC12ReceiveQueue, &hc12Output, portMAX_DELAY);
-                    } else {
-                        hc12.mpCommunication->addByteToDecode(hc12Output);
-                    } 
+                    hc12.hc12OutputDecider(&hc12Output, &isSetupHC12Working, &isWaitingForSendConfirmation);
                 } else {
                     // delay for watchdog 
                     vTaskDelay(pdMS_TO_TICKS(1));
@@ -183,30 +186,30 @@ void HC12::HC12MainTask(void *parameters) {
                 }
                 break;
 
-            case waitingForSendConfirmationNotif:
+            case WAITING_FOR_SEND_CONFIRMATION_NOTIF:
                 isWaitingForSendConfirmation = true;
                 break;
 
-            case cancelWaitingForSendConfirmationNotif:
+            case CANCEL_WAITING_FOR_SEND_CONFIRMATION_NOTIF:
                 isWaitingForSendConfirmation = false;
                 break;
 
-            case suspendTransmitTaskNotif:
+            case SUSPEND_TRANSMIT_TASK_NOTIF:
                 // TODO remove print
                 // Serial.println("vTaskSuspend(hc12.mTransmitTaskHandle);");
                 vTaskSuspend(hc12.mTransmitTaskHandle);
                 break;
 
-            case createSetupHC12TaskNotif:
+            case CREATE_SETUP_HC12_TASK_NOTIF:
                 // TODO remove print
-                // Serial.println("createSetupHC12TaskNotif");
+                // Serial.println("CREATE_SETUP_HC12_TASK_NOTIF");
                 isSetupHC12Working = true;
                 hc12.createSetupHC12Task();
                 break;
 
-            case deleteSetupHC12TaskNotif:
+            case DELETE_SETUP_HC12_TASK_NOTIF:
                 // TODO remove print
-                // Serial.println("deleteSetupHC12TaskNotif");
+                // Serial.println("DELETE_SETUP_HC12_TASK_NOTIF");
                 isSetupHC12Working = false;
                 hc12.deleteSetupHC12Task();
                 break;
@@ -218,7 +221,7 @@ void HC12::HC12MainTask(void *parameters) {
         }
 
         // reset notifications status 
-        status = defaultStatusNotif;        
+        status = DEFAULT_STATUS_NOTIF;        
     }
 }
 
@@ -264,7 +267,7 @@ void HC12::transmitTask(void *parameters) {
             // clearing old notification (if exist)
             xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, 0);
             // // transmiting data
-            xTaskNotify(hc12.mHC12MainTaskHandle, waitingForSendConfirmationNotif, eSetValueWithOverwrite);
+            xTaskNotify(hc12.mHC12MainTaskHandle, WAITING_FOR_SEND_CONFIRMATION_NOTIF, eSetValueWithOverwrite);
             
             // transmiting data
             hc12.mpSerial->write(transmitBuffer, PROTOCOL_SIZE);
@@ -277,7 +280,7 @@ void HC12::transmitTask(void *parameters) {
                     Serial.println(hc12Respond);
                 }
             } else {
-                xTaskNotify(hc12.mHC12MainTaskHandle, cancelWaitingForSendConfirmationNotif, eSetValueWithOverwrite);
+                xTaskNotify(hc12.mHC12MainTaskHandle, CANCEL_WAITING_FOR_SEND_CONFIRMATION_NOTIF, eSetValueWithOverwrite);
                 // TODO change
                 // Serial.println("TRANSMITING ERROR! In transmitTask() -> hc12 module is not responding.");
                 // Serial.println("HC12 NT");
@@ -285,7 +288,7 @@ void HC12::transmitTask(void *parameters) {
 
             xSemaphoreGive(hc12.mSendingDataMutex);
         } else {
-            xTaskNotify(hc12.mHC12MainTaskHandle, suspendTransmitTaskNotif, eSetValueWithOverwrite);
+            xTaskNotify(hc12.mHC12MainTaskHandle, SUSPEND_TRANSMIT_TASK_NOTIF, eSetValueWithOverwrite);
         }
     }
 }
@@ -361,7 +364,7 @@ void HC12::setupHC12Task(void *parameters) {
                 }
             }
         } else {
-            xTaskNotify(hc12->mHC12MainTaskHandle, deleteSetupHC12TaskNotif, eSetValueWithOverwrite);
+            xTaskNotify(hc12->mHC12MainTaskHandle, DELETE_SETUP_HC12_TASK_NOTIF, eSetValueWithOverwrite);
             for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
         }
     }

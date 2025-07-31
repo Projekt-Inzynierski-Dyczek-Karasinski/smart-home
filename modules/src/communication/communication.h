@@ -67,7 +67,7 @@ public:
      *        Resumes the decode task if necessary.
      * @param data Byte to add to the receive queue.
      */
-    void addByteToDecode(const uint8_t data);
+    void addByteToDecode(uint8_t data);
 
      /**
      * @brief Add a message that needs to be transmitted to the encoding queue. 
@@ -109,7 +109,16 @@ private:
      * @param isReadingRawMessage Pointer to flag for raw message state.
      */
     void receivedMessageDecider(bool *isReadingRawMessage);
-
+    /**
+     * @brief Handles when main task is in default state.
+     * @param isReadingRawMessage Pointer to flag for raw message state.
+     */
+    void normalOperationHandling(bool *isReadingRawMessage);
+    /**
+     * @brief Handles when main task get notification about ping timeout.
+     * @param pingAttempts Pointer to counter with number of ping attempts.
+     */
+    void pingTimeoutNotifHandling(uint8_t *pingAttempts);
     /**
      * @brief Main FreeRTOS task for Communication class. 
      * It is responsible for suspending/deleting resuming/creating other communication related tasks.
@@ -129,6 +138,12 @@ private:
      */
     void deleteCommunicationMainTask();
 
+    /**
+     * @brief Verifies the checksum of a given protocol message.
+     * @param message The protocol message array to verify checksum.
+     * @return True if the checksum is correct, false otherwise.
+     */
+    bool isCheckSumCorrect(const uint8_t message[PROTOCOL_SIZE]);
     /**
      * @brief FreeRTOS task for decoding incoming messages from the byte queue.
      * @param parameters Task parameters (unused).
@@ -195,14 +210,14 @@ private:
     /**
      * @brief Clears (sets all bytes to 0) the stored last transmitted RF message.
      * Clears the buffer and sets repeat attempts to zero.
-     * Ensures thread-safe access.
+     * @note Thread-safe.
      */
     void setLastTransmittedMessage();
     /**
      * @brief Set the last transmitted RF message value.
-     * Ensures thread-safe access.
      * @param message Message to set.
      * @warning Do not set "repeat" message to last transmitted message, that may cause spamming "repeat" messages if RF transmission is disturbed.
+     * @note Thread-safe.
      */
     void setLastTransmittedMessage(const uint8_t message[MESSAGE_SIZE]);
     /**
@@ -213,7 +228,7 @@ private:
     /**
      * @brief Resend the last message, if the repeat count is not exceeded.
      * Used when get "repeat" message.
-     * Ensures thread-safe access.
+     * @note Thread-safe.
      */
     void repeatLastTransmittedMessage();
 
@@ -241,19 +256,19 @@ private:
     #endif
 
     typedef enum : uint32_t {
-        defaultStatusNotif = 0,
+        DEFAULT_STATUS_NOTIF = 0,
         // rf communication timeouts
-        byteTimeoutNotif,
-        messageTimeoutNotif,
+        BYTE_TIMEOUT_NOTIF,
+        MESSAGE_TIMEOUT_NOTIF,
         // suspending notifications
-        suspendDecodeMessageTaskNotif,
-        suspendEndcodeMessageTaskNotif,
+        SUSPEND_DECODE_MESSAGE_TASK_NOTIF,
+        SUSPEND_ENDCODE_MESSAGE_TASK_NOTIF,
         // ping notifications
-        startPingingNotif,
-        sendPingNotif,
+        START_PINGING_NOTIF,
+        PING_TIMEOUT_NOTIF,
         // addressing notifications
-        readRawMessageNotif,
-        stopAddresingAlgorithmNotif,
+        READ_RAW_MESSAGE_NOTIF,
+        STOP_ADDRESING_ALGORITHM_NOTIF,
     } mCommunicationMainNotifications; ///< Enum with main communication task notifications.
 
     uint8_t mLastTransmittedMessage[MESSAGE_SIZE]; ///< Recently transmitted message (for "repeat" logic).

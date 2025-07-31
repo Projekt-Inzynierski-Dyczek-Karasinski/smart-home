@@ -31,8 +31,8 @@ public:
     #ifdef RF_CHANNELS
         /**
          * @brief Returns the current RF channel used by the module.
-         *        Ensures thread-safe access.
          * @return The current RF channel number.
+         * @note Thread-safe.
          */
         uint8_t getRfChannel();
     #endif
@@ -60,19 +60,19 @@ private:
     void createAddressingTimer() override;
 
     /**
-     * @brief Updates the protocol MAC and IP address information for module.
-     * Ensures thread-safe modification and the notifies Communication class to restart tasks which uses this variables.
+     * @brief Updates the protocol MAC and IP address information for module and the notifies Communication class to restart tasks which uses this variables.
      * @param newMAC New MAC address array.
      * @param newIP New IP address to assign.
+     * @note Thread-safe.
      */
     void updateAddressingData(const uint8_t *newMAC, const uint8_t newIP);
     #ifdef RF_CHANNELS
         /**
-         * @brief Overloaded: Updates protocol MAC, IP, and RF channel for this module.
-         * Ensures thread-safe modification and the notifies Communication class to restart tasks which uses this variables.
+         * @brief Overloaded: Updates protocol MAC, IP, and RF channel for this module and the notifies Communication class to restart tasks which uses this variables.
          * @param newMAC New MAC address array.
          * @param newIP New IP address to assign.
          * @param newRfChannel New RF channel to assign.
+         * @note Thread-safe.
          */
         void updateAddressingData(const uint8_t *newMAC, const uint8_t newIP, const uint8_t newRfChannel);
     #endif

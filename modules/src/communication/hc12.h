@@ -74,6 +74,14 @@ private:
      */
     void deleteSetupHC12Queues();
     
+    
+    /**
+     * @brief Decides what to do with output from HC12 module.
+     * @param hc12Output Pointer to variable storing output from HC12 module.
+     * @param isSetupHC12Working Pointer to if the setup task is sending commands to HC12.
+     * @param isWaitingForSendConfirmation Pointer to variable if is being waited for confirmation from HC12.
+     */
+    void hc12OutputDecider(const uint8_t *hc12Output, const bool *isSetupHC12Working, bool *isWaitingForSendConfirmation);
     /**
      * @brief Main HC12 FreeRTOS task. Reads all output from HC12 module and passes it to Communication class.
      * This task is responsible for suspending/deleting resuming/creating other HC12 tasks.
@@ -129,14 +137,14 @@ private:
 
     // Notifications for Main HC12 task
     typedef enum : uint32_t {
-        defaultStatusNotif = 0,
-        waitingForSendConfirmationNotif,
-        cancelWaitingForSendConfirmationNotif,
-        suspendTransmitTaskNotif,
+        DEFAULT_STATUS_NOTIF = 0,
+        WAITING_FOR_SEND_CONFIRMATION_NOTIF,
+        CANCEL_WAITING_FOR_SEND_CONFIRMATION_NOTIF,
+        SUSPEND_TRANSMIT_TASK_NOTIF,
 
         // setup HC12 notifications
-        createSetupHC12TaskNotif,
-        deleteSetupHC12TaskNotif,
+        CREATE_SETUP_HC12_TASK_NOTIF,
+        DELETE_SETUP_HC12_TASK_NOTIF,
     } mHC12MainNotifications;
 
     SemaphoreHandle_t mSendingDataMutex = NULL; ///< Handle to FreeRTOS mutex protecting access to UART transmission to HC12 module.

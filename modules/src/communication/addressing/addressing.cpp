@@ -26,7 +26,7 @@ Addressing::Addressing(Communication *communication)
 
 Addressing::~Addressing() = default;
 
-void Addressing::getProtocolMACAddress(uint8_t macAddress[6]) {
+void Addressing::getProtocolMACAddress(uint8_t macAddress[MAC_ADDRESS_LENGTH]) {
     xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
     uah::prepareBuffer(macAddress, mProtocolMACAddress, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
     xSemaphoreGive(mAddressingDataMutex);

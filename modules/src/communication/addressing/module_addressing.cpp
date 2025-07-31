@@ -44,46 +44,33 @@ uint8_t ModuleAddressing::getRfChannel() {
 void ModuleAddressing::addressingTask(void* parameters) {
     auto &ad = *mspAddressing;
 
-    enum ADDRESSING_STATES : uint8_t {
+    enum class ADDRESSING_STATES : uint8_t {
         START_ADDRESSING = 0,
         WAIT_FOR_PING,
-        REPING,
-        SUMMARY
-    };
-    
+        REPLY_PING,
+        PROCESS_SUMMARY
+    };    
 
     uint8_t receiveBuffer[MESSAGE_SIZE];
     uint8_t sendBuffer[MESSAGE_SIZE];
 
     xTimerStart(ad.mAddressingTimeoutTimer, portMAX_DELAY);
 
-    uint8_t absoluteAttemptCounter = 0;
-    for (;;) {
-        if (absoluteAttemptCounter > ADDRESSING_ABSOLUTE_MAX_ATTEMPTS) {
-            ad.abortAddressingWithAbortMessage();
-            for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
-        }
-        absoluteAttemptCounter++;
-
-        uint8_t addressingState = START_ADDRESSING;
+    for (uint8_t absoluteAttemptCounter = 0; absoluteAttemptCounter < ADDRESSING_ABSOLUTE_MAX_ATTEMPTS; absoluteAttemptCounter++) {
+        ADDRESSING_STATES addressingState = ADDRESSING_STATES::START_ADDRESSING;
         uint8_t attemptCounter = 0;
 
-        // variables for data passed in SUMMARY
+        // variables for data passed in PROCESS_SUMMARY
         uint8_t ipToCheck = NULL_IP;
         uint8_t rfChannelToCheck;
         uint8_t macToCheck[6];
         bool isMacRealToCheck;
 
-        for (;;) {
-            if (attemptCounter > ADDRESSING_MAX_ATTEMPTS) {
-                ad.sendRestartMessage();
-                break;
-            }
-
+        while (attemptCounter < ADDRESSING_MAX_ATTEMPTS) {
             // sending
             bool isRestarting = false;
             switch (addressingState) {
-                case START_ADDRESSING:
+                case ADDRESSING_STATES::START_ADDRESSING:
                     #ifdef ESP32_BOARD
                         #ifdef RF_CHANNELS
                             uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_NC_REAL_MAC_RF_CHANNELS, ADDRESSING_API_LEN, MESSAGE_SIZE);
@@ -97,17 +84,13 @@ void ModuleAddressing::addressingTask(void* parameters) {
                     ad.mpCommunication->sendMessage(sendBuffer);
                     break;
 
-                case WAIT_FOR_PING:
-                    // do not do anything, wait for ping
-                    break;
-
-                case REPING:
+                case ADDRESSING_STATES::REPLY_PING:
                     // send reping 
                     uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_REPING, ADDRESSING_API_LEN, ADDRESSING_API_LEN);
                     ad.mpCommunication->sendMessage(sendBuffer);
-                    addressingState = SUMMARY;
+                    addressingState = ADDRESSING_STATES::PROCESS_SUMMARY;
                         
-                case SUMMARY:
+                case ADDRESSING_STATES::PROCESS_SUMMARY:
                     if (ipToCheck != NULL_IP) {
                         if (
                             ipToCheck == ad.getIPAddress() &&
@@ -126,17 +109,12 @@ void ModuleAddressing::addressingTask(void* parameters) {
                             Serial.println("ADDRESSING ERROR! In addressingTask() -> central unit send bad data in summary");
                             uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_SUMMARY_BAD, ADDRESSING_API_LEN, MESSAGE_SIZE);
                             ad.mpCommunication->sendMessage(sendBuffer);
-                            ad.clearNewConnectionData();
                             isRestarting = true;
                         }
                     }
                     break;
 
                 default:
-                    Serial.print("ADDRESSING ERROR! In addressingTask() -> got unknow addressingState: ");
-                    Serial.println(addressingState);
-                    ad.sendRestartMessage();
-                    isRestarting = true;
                     break;
             }
 
@@ -151,16 +129,16 @@ void ModuleAddressing::addressingTask(void* parameters) {
                 // if received message to abort addressing
                 if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_ABORT, ADDRESSING_API_LEN)) {
                     ad.abortAddressing();
+                    for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
                 } 
                 // if received message to restart addressing
                 else if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_RESTART, ADDRESSING_API_LEN)) {
-                    ad.clearNewConnectionData();
                     break;
                 } else {
                     bool isReceivedPropperMessage = false;
 
                     switch (addressingState) {
-                    case START_ADDRESSING:
+                    case ADDRESSING_STATES::START_ADDRESSING:
                         // !remember in receiveBuffer is raw message!
                         // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
                         #ifdef RF_CHANNELS
@@ -179,35 +157,36 @@ void ModuleAddressing::addressingTask(void* parameters) {
                                 hc12Command[4] = (newRfChannel / 100) + (uint8_t)'0';
                                 ad.mpCommunication->sendInternalMessage(hc12Command);
 
-                                addressingState = WAIT_FOR_PING;
+                                addressingState = ADDRESSING_STATES::WAIT_FOR_PING;
                             }
                         #else 
                             // check is received propper message (ADi?)
                             if (receiveBuffer[10] == (uint8_t)'i' && receiveBuffer[12] == (uint8_t)BLANK_CHARACTER) {
                                 isReceivedPropperMessage = true;
                                 ad.updateAddressingData(receiveBuffer, receiveBuffer[11]);
-                                addressingState = SUMMARY;
+                                addressingState = PROCESS_SUMMARY;
                             }
                         #endif
                         break;
 
-                    case WAIT_FOR_PING:
+                    case ADDRESSING_STATES::WAIT_FOR_PING:
                         if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_PING, ADDRESSING_API_LEN)) {
                             isReceivedPropperMessage = true;
-                            addressingState = REPING;
+                            // TODO remove print
+                            // Serial.println("Got ping");
+                            addressingState = ADDRESSING_STATES::REPLY_PING;
                         }
                         break;
 
-                    case REPING:
-                        Serial.println("ADDRESSING ERROR! In addressingTask() -> addressingState == REPING in receiving part of task, did you forget change?");
-                        ad.sendRestartMessage();
+                    case ADDRESSING_STATES::REPLY_PING:
+                        Serial.println("ADDRESSING ERROR! In addressingTask() -> addressingState == REPLY_PING in receiving part of task, did you forget change?");
                         isRestarting = true;
                         break;
 
-                    case SUMMARY:
+                    case ADDRESSING_STATES::PROCESS_SUMMARY:
                         // if central unit is still sending ping
                         if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_PING, ADDRESSING_API_LEN)) {
-                            addressingState = REPING;
+                            addressingState = ADDRESSING_STATES::REPLY_PING;
                         } else if (
                             uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_SUMMARY, ADDRESSING_API_LEN) &&
                             receiveBuffer[6]  == (uint8_t)'i' &&
@@ -224,10 +203,6 @@ void ModuleAddressing::addressingTask(void* parameters) {
                         break;
 
                     default:
-                        Serial.print("ADDRESSING ERROR! In addressingTask() -> got unknow addressingState: ");
-                        Serial.println(addressingState);
-                        ad.sendRestartMessage();
-                        isRestarting = true;
                         break;
                     }
 
@@ -247,7 +222,12 @@ void ModuleAddressing::addressingTask(void* parameters) {
                 attemptCounter++;
             }
         }
+
+        ad.sendRestartMessage();
     }
+
+    ad.abortAddressingWithAbortMessage();
+    for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
 }
 
 void ModuleAddressing::createAddressingTask() {

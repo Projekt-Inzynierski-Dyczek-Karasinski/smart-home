@@ -69,52 +69,52 @@ private:
     
     /**
      * @brief Prints information about all modules' addressing data to the serial output.
-     * Ensures thread-safe access.
+     * @note Thread-safe.
      */
     void printModulesAddressingData();
     /**
      * @brief Prints the number of modules registered on each RF channel to the serial output.
-     * Ensures thread-safe access.
+     * @note Thread-safe.
      */
     void printNumOFModulesOnRfChannels();
 
     /**
      * @brief Retrieves the addressing data for the module with the given IP address.
-     * Ensures thread-safe access.
      * @param addressingData Pointer to an AddressingData structure to be filled.
      * @param ipAddress IP address of the module to get data for.
+     * @note Thread-safe.
      */
     void getModuleData(AddressingData *addressingData, const uint8_t ipAddress);
     /**
      * @brief Gets the RF channel assigned to a module with the given IP address.
-     * Ensures thread-safe access.
      * @param ipAddress IP address of the module.
      * @return Assigned RF channel for the specified module.
+     * @note Thread-safe.
      */
-    uint8_t getModuleRfChannel(const uint8_t ipAddress);
+    uint8_t getModuleRfChannel(uint8_t ipAddress);
 
     /**
      * @brief Adds a new module to the addressing table.
      * Assigns an IP address, RF channel, and stores MAC information.
-     * Ensures thread-safe access.
      * @param macAddress Pointer to the MAC address array of the module.
      * @param isMACAddressReal True if MAC address is real, false if fake.
      * @param rfChannel RF channel to assign, or 0 for automatic selection.
      * @return Assigned IP address for the new module, or NULL_IP (0) if assignment failed.
+     * @note Thread-safe.
      */
     uint8_t addModule(const uint8_t *macAddress, const bool isMACAddressReal, uint8_t rfChannel = 0);
     /**
      * @brief Removes a module from the addressing table using its IP address.
      * Frees up its IP and RF channel slot for a new module.
-     * Ensures thread-safe access.
      * @param ipAddress IP address of the module to remove.
+     * @note Thread-safe.
      */
     void removeModule(const uint8_t ipAddress);
 
     /**
      * @brief Gets the temporary IP address assigned to the module currently being addressed.
-     * Ensures thread-safe access.
      * @return IP address of the current module in addressing, or NULL_IP (0) if none.
+     * @note Thread-safe.
      */
     uint8_t getTmpModuleIp();
 

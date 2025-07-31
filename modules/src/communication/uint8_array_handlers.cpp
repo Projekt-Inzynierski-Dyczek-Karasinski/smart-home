@@ -2,6 +2,7 @@
 
 namespace uint8ArrayHandlers {
     void printArrayAsChar(const uint8_t *array, const uint8_t len) {
+        // TODO change print to concatenate message before using Serial.print
         for (uint8_t i = 0; i < len; i++) {
             Serial.print((char)array[i]);
         }
@@ -9,6 +10,7 @@ namespace uint8ArrayHandlers {
     } 
     
     void printArrayAsInt(const uint8_t *array, const uint8_t len) {
+        // TODO change print to concatenate message before using Serial.print
         for (uint8_t i = 0; i < len; i++) {
             Serial.print((int)array[i]);
             Serial.print(' ');
