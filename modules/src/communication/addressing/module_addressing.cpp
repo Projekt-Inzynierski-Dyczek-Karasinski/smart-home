@@ -52,8 +52,8 @@ void ModuleAddressing::addressingTask(void* parameters) {
     };
     
 
-    uint8_t receiveBuffor[MESSAGE_SIZE];
-    uint8_t sendBuffor[MESSAGE_SIZE];
+    uint8_t receiveBuffer[MESSAGE_SIZE];
+    uint8_t sendBuffer[MESSAGE_SIZE];
 
     xTimerStart(ad.mAddressingTimeoutTimer, portMAX_DELAY);
 
@@ -86,15 +86,15 @@ void ModuleAddressing::addressingTask(void* parameters) {
                 case START_ADDRESSING:
                     #ifdef ESP32_BOARD
                         #ifdef RF_CHANNELS
-                            uah::prepareBuffor(sendBuffor, (uint8_t*)ADDRESSING_NC_REAL_MAC_RF_CHANNELS, ADDRESSING_API_LEN, MESSAGE_SIZE);
+                            uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_NC_REAL_MAC_RF_CHANNELS, ADDRESSING_API_LEN, MESSAGE_SIZE);
                         #else 
-                            uah::prepareBuffor(sendBuffor, (uint8_t*)ADDRESSING_NC_REAL_MAC_NO_RF_CHANNELS, ADDRESSING_API_LEN, MESSAGE_SIZE);
+                            uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_NC_REAL_MAC_NO_RF_CHANNELS, ADDRESSING_API_LEN, MESSAGE_SIZE);
                         #endif
                     #else
                         #error "Not implemented"
                     #endif
                     ad.mpCommunication->needRawMessage();
-                    ad.mpCommunication->sendMessage(sendBuffor);
+                    ad.mpCommunication->sendMessage(sendBuffer);
                     break;
 
                 case WAIT_FOR_PING:
@@ -103,8 +103,8 @@ void ModuleAddressing::addressingTask(void* parameters) {
 
                 case REPING:
                     // send reping 
-                    uah::prepareBuffor(sendBuffor, (uint8_t*)ADDRESSING_REPING, ADDRESSING_API_LEN, ADDRESSING_API_LEN);
-                    ad.mpCommunication->sendMessage(sendBuffor);
+                    uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_REPING, ADDRESSING_API_LEN, ADDRESSING_API_LEN);
+                    ad.mpCommunication->sendMessage(sendBuffer);
                     addressingState = SUMMARY;
                         
                 case SUMMARY:
@@ -115,8 +115,8 @@ void ModuleAddressing::addressingTask(void* parameters) {
                             isMacRealToCheck == ad.m_IS_MAC_ADDRESS_REAL &&
                             uah::areArraysEqual(ad.mMACAddress, macToCheck, MAC_ADDRESS_LENGTH)
                         ) {
-                            uah::prepareBuffor(sendBuffor, (uint8_t*)ADDRESSING_SUMMARY_OK, ADDRESSING_API_LEN, MESSAGE_SIZE);
-                            ad.mpCommunication->sendMessage(sendBuffor);
+                            uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_SUMMARY_OK, ADDRESSING_API_LEN, MESSAGE_SIZE);
+                            ad.mpCommunication->sendMessage(sendBuffer);
                             // TODO add saving data in flash memory
                             Serial.println("Addressing complete");
                             // TODO remove clearing data 
@@ -124,8 +124,8 @@ void ModuleAddressing::addressingTask(void* parameters) {
                             for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
                         } else {
                             Serial.println("ADDRESSING ERROR! In addressingTask() -> central unit send bad data in summary");
-                            uah::prepareBuffor(sendBuffor, (uint8_t*)ADDRESSING_SUMMARY_BAD, ADDRESSING_API_LEN, MESSAGE_SIZE);
-                            ad.mpCommunication->sendMessage(sendBuffor);
+                            uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_SUMMARY_BAD, ADDRESSING_API_LEN, MESSAGE_SIZE);
+                            ad.mpCommunication->sendMessage(sendBuffer);
                             ad.clearNewConnectionData();
                             isRestarting = true;
                         }
@@ -147,13 +147,13 @@ void ModuleAddressing::addressingTask(void* parameters) {
             }
 
             // receiving
-            if (xQueueReceive(ad.mAddressingQueue, receiveBuffor, pdMS_TO_TICKS(ADDRESSING_MESSAGE_TIMEOUT)) == pdTRUE) {
+            if (xQueueReceive(ad.mAddressingQueue, receiveBuffer, pdMS_TO_TICKS(ADDRESSING_MESSAGE_TIMEOUT)) == pdTRUE) {
                 // if received message to abort addressing
-                if (uah::areArraysEqual(receiveBuffor, (uint8_t*)ADDRESSING_ABORT, ADDRESSING_API_LEN)) {
+                if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_ABORT, ADDRESSING_API_LEN)) {
                     ad.abortAddressing();
                 } 
                 // if received message to restart addressing
-                else if (uah::areArraysEqual(receiveBuffor, (uint8_t*)ADDRESSING_RESTART, ADDRESSING_API_LEN)) {
+                else if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_RESTART, ADDRESSING_API_LEN)) {
                     ad.clearNewConnectionData();
                     break;
                 } else {
@@ -161,19 +161,19 @@ void ModuleAddressing::addressingTask(void* parameters) {
 
                     switch (addressingState) {
                     case START_ADDRESSING:
-                        // !remember in receiveBuffor is raw message!
+                        // !remember in receiveBuffer is raw message!
                         // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
                         #ifdef RF_CHANNELS
                             // check is received propper message (ADi?c?), indexes are offset due to reading raw message
-                            if (receiveBuffor[10] == (uint8_t)'i' && receiveBuffor[12] == (uint8_t)'c') {
+                            if (receiveBuffer[10] == (uint8_t)'i' && receiveBuffer[12] == (uint8_t)'c') {
                                 isReceivedPropperMessage = true;
-                                uint8_t newRfChannel = receiveBuffor[13];
+                                uint8_t newRfChannel = receiveBuffer[13];
 
-                                ad.updateAddressingData(receiveBuffor, receiveBuffor[11], newRfChannel);
+                                ad.updateAddressingData(receiveBuffer, receiveBuffer[11], newRfChannel);
 
                                 // change rf channel
                                 uint8_t hc12Command[SETUP_COMMAND_SIZE];
-                                uah::prepareBuffor(hc12Command, (uint8_t*)"HC+C000", 7, SETUP_COMMAND_SIZE);
+                                uah::prepareBuffer(hc12Command, (uint8_t*)"HC+C000", 7, SETUP_COMMAND_SIZE);
                                 hc12Command[6] = (newRfChannel % 10) + (uint8_t)'0';
                                 hc12Command[5] = ((newRfChannel / 10) % 10) + (uint8_t)'0';
                                 hc12Command[4] = (newRfChannel / 100) + (uint8_t)'0';
@@ -183,16 +183,16 @@ void ModuleAddressing::addressingTask(void* parameters) {
                             }
                         #else 
                             // check is received propper message (ADi?)
-                            if (receiveBuffor[10] == (uint8_t)'i' && receiveBuffor[12] == (uint8_t)BLANK_CHARACTER) {
+                            if (receiveBuffer[10] == (uint8_t)'i' && receiveBuffer[12] == (uint8_t)BLANK_CHARACTER) {
                                 isReceivedPropperMessage = true;
-                                ad.updateAddressingData(receiveBuffor, receiveBuffor[11]);
+                                ad.updateAddressingData(receiveBuffer, receiveBuffer[11]);
                                 addressingState = SUMMARY;
                             }
                         #endif
                         break;
 
                     case WAIT_FOR_PING:
-                        if (uah::areArraysEqual(receiveBuffor, (uint8_t*)ADDRESSING_PING, ADDRESSING_API_LEN)) {
+                        if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_PING, ADDRESSING_API_LEN)) {
                             isReceivedPropperMessage = true;
                             addressingState = REPING;
                         }
@@ -206,20 +206,20 @@ void ModuleAddressing::addressingTask(void* parameters) {
 
                     case SUMMARY:
                         // if central unit is still sending ping
-                        if (uah::areArraysEqual(receiveBuffor, (uint8_t*)ADDRESSING_PING, ADDRESSING_API_LEN)) {
+                        if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_PING, ADDRESSING_API_LEN)) {
                             addressingState = REPING;
                         } else if (
-                            uah::areArraysEqual(receiveBuffor, (uint8_t*)ADDRESSING_SUMMARY, ADDRESSING_API_LEN) &&
-                            receiveBuffor[6]  == (uint8_t)'i' &&
-                            receiveBuffor[8]  == (uint8_t)'c' &&
-                            receiveBuffor[10] == (uint8_t)'r' &&
-                            receiveBuffor[12] == (uint8_t)'m'
+                            uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_SUMMARY, ADDRESSING_API_LEN) &&
+                            receiveBuffer[6]  == (uint8_t)'i' &&
+                            receiveBuffer[8]  == (uint8_t)'c' &&
+                            receiveBuffer[10] == (uint8_t)'r' &&
+                            receiveBuffer[12] == (uint8_t)'m'
                         ) {
                             isReceivedPropperMessage = true;
-                            ipToCheck = receiveBuffor[7];
-                            rfChannelToCheck = receiveBuffor[9];
-                            isMacRealToCheck = receiveBuffor[11];
-                            uah::prepareBuffor(macToCheck, &receiveBuffor[13], MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
+                            ipToCheck = receiveBuffer[7];
+                            rfChannelToCheck = receiveBuffer[9];
+                            isMacRealToCheck = receiveBuffer[11];
+                            uah::prepareBuffer(macToCheck, &receiveBuffer[13], MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
                         }
                         break;
 
@@ -293,7 +293,7 @@ void ModuleAddressing::createAddressingTimer() {
 
 void ModuleAddressing::updateAddressingData(const uint8_t *newMAC, const uint8_t newIP) {
     xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
-    uah::prepareBuffor(mProtocolMACAddress, newMAC, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
+    uah::prepareBuffer(mProtocolMACAddress, newMAC, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
     mIPAddress = newIP;
     xSemaphoreGive(mAddressingDataMutex);
     mpCommunication->resetEncodeMessageTask();
@@ -302,7 +302,7 @@ void ModuleAddressing::updateAddressingData(const uint8_t *newMAC, const uint8_t
 #ifdef RF_CHANNELS
 void ModuleAddressing::updateAddressingData(const uint8_t *newMAC, const uint8_t newIP, const uint8_t newRfChannel) {
     xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
-    uah::prepareBuffor(mProtocolMACAddress, newMAC, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
+    uah::prepareBuffer(mProtocolMACAddress, newMAC, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
     mIPAddress = newIP;
     mRfChannel = newRfChannel;
     xSemaphoreGive(mAddressingDataMutex);

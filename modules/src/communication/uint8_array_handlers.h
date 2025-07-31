@@ -9,7 +9,7 @@
  * 
  * void printArrayAsChar()
  * 
- * void prepareBuffor()
+ * void prepareBuffer()
  * 
  * uint8_t calcLenOfDataInArray() 
  * 
@@ -37,21 +37,21 @@ namespace uint8ArrayHandlers {
     /**
      * @brief Fills given uint8_t array with 0.
      * 
-     * @param buffor uint8_t array to be filled with 0.
+     * @param buffer uint8_t array to be filled with 0.
      * @param len length of the value array.
      * 
      */
-    void prepareBuffor(uint8_t *buffor, const uint8_t len);
+    void prepareBuffer(uint8_t *buffer, const uint8_t len);
     /**
-     * @brief Sets given uint8_t array (buffor) to given value and fills the rest with 0.
+     * @brief Sets given uint8_t array (buffer) to given value and fills the rest with 0.
      * 
-     * @param buffor uint8_t array to be filled with given value.
-     * @param value uint8_t array to be copied into buffor.
+     * @param buffer uint8_t array to be filled with given value.
+     * @param value uint8_t array to be copied into buffer.
      * @param len length of the value array.
-     * @param maxLen length of the buffor.
+     * @param maxLen length of the buffer.
      * 
      */
-    void prepareBuffor(uint8_t *buffor, const uint8_t *value, uint8_t len, const uint8_t maxLen);
+    void prepareBuffer(uint8_t *buffer, const uint8_t *value, uint8_t len, const uint8_t maxLen);
 
     /**
      * @brief Calculates length of data in given uint8_t array (assuming that first occur of 0 is end of data).

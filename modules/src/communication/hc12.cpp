@@ -64,7 +64,7 @@ void HC12::setupHC12(const uint8_t *commands) {
         // split multiple command in COMMANDS array
         uint8_t commandStartIndex = 0;
         uint8_t commandEndIndex = 0;
-        uint8_t commandBuffor[SETUP_COMMAND_SIZE];
+        uint8_t commandBuffer[SETUP_COMMAND_SIZE];
         uint8_t commandCounter = 0;
         while (commands[commandEndIndex] != 0) {
             if (commands[commandEndIndex] == (uint8_t)'|') {
@@ -74,9 +74,9 @@ void HC12::setupHC12(const uint8_t *commands) {
                     Serial.println(SETUP_MAX_NUM_OF_COMMANDS);
                     break;
                 }
-                uah::prepareBuffor(commandBuffor, &commands[commandStartIndex], (commandEndIndex - commandStartIndex), SETUP_COMMAND_SIZE);
+                uah::prepareBuffer(commandBuffer, &commands[commandStartIndex], (commandEndIndex - commandStartIndex), SETUP_COMMAND_SIZE);
 
-                xQueueSend(mSetupHC12CommandsQueue, commandBuffor, portMAX_DELAY);
+                xQueueSend(mSetupHC12CommandsQueue, commandBuffer, portMAX_DELAY);
                 commandStartIndex = commandEndIndex + 1;
             }
             
@@ -89,8 +89,8 @@ void HC12::setupHC12(const uint8_t *commands) {
                 Serial.print("HC12 COMMANDS ERROR! In setupHC12() -> passed too many commands. Number of commands must be lower or equal than ");
                 Serial.println(SETUP_MAX_NUM_OF_COMMANDS);
             } else {
-                uah::prepareBuffor(commandBuffor, &commands[commandStartIndex], (commandEndIndex - commandStartIndex), SETUP_COMMAND_SIZE);
-                xQueueSend(mSetupHC12CommandsQueue, commandBuffor, portMAX_DELAY);
+                uah::prepareBuffer(commandBuffer, &commands[commandStartIndex], (commandEndIndex - commandStartIndex), SETUP_COMMAND_SIZE);
+                xQueueSend(mSetupHC12CommandsQueue, commandBuffer, portMAX_DELAY);
             }
         }
 
@@ -249,10 +249,10 @@ void HC12::deleteHC12MainTask() {
 void HC12::transmitTask(void *parameters) {
     auto &hc12 = *mspHC12;
 
-    uint8_t transmitBuffor[PROTOCOL_SIZE];
+    uint8_t transmitBuffer[PROTOCOL_SIZE];
     
     for (;;) {
-        if (xQueueReceive(hc12.mTransmitQueue, transmitBuffor, pdMS_TO_TICKS(SUSPEND_TASK_TIME_SHORT)) == pdTRUE) {
+        if (xQueueReceive(hc12.mTransmitQueue, transmitBuffer, pdMS_TO_TICKS(SUSPEND_TASK_TIME_SHORT)) == pdTRUE) {
             xSemaphoreTake(hc12.mSendingDataMutex, portMAX_DELAY);
 
             // TODO consider making this delay more "inteligent" (eg. by cooldown timer)
@@ -267,7 +267,7 @@ void HC12::transmitTask(void *parameters) {
             xTaskNotify(hc12.mHC12MainTaskHandle, waitingForSendConfirmationNotif, eSetValueWithOverwrite);
             
             // transmiting data
-            hc12.mpSerial->write(transmitBuffor, PROTOCOL_SIZE);
+            hc12.mpSerial->write(transmitBuffer, PROTOCOL_SIZE);
 
             // TODO remove?
             // wait for confirmation from HC12
@@ -318,32 +318,32 @@ void HC12::deleteTransmitTask() {
 void HC12::setupHC12Task(void *parameters) {
     auto hc12 = mspHC12;
 
-    // prepare commandBuffor
-    uint8_t commandBuffor[SETUP_COMMAND_SIZE];
+    // prepare commandBuffer
+    uint8_t commandBuffer[SETUP_COMMAND_SIZE];
     for (uint8_t i = 0; i < SETUP_COMMAND_SIZE; i++) {
-        commandBuffor[i] = 0;
+        commandBuffer[i] = 0;
     }
-    // prepare receiveBuffor
-    uint8_t receiveByteBuffor = 0;
-    uint8_t receiveBuffor[MESSAGE_SIZE];
+    // prepare receiveBuffer
+    uint8_t receiveByteBuffer = 0;
+    uint8_t receiveBuffer[MESSAGE_SIZE];
     for (uint8_t i = 0; i < MESSAGE_SIZE; i++) {
-        receiveBuffor[i] = 0;
+        receiveBuffer[i] = 0;
     }
 
     for (;;) {
-        if (xQueueReceive(hc12->mSetupHC12CommandsQueue, commandBuffor, 0) == pdTRUE) {
+        if (xQueueReceive(hc12->mSetupHC12CommandsQueue, commandBuffer, 0) == pdTRUE) {
             Serial.print("setupHC12Task received command: ");
-            uah::printArrayAsChar(commandBuffor, SETUP_COMMAND_SIZE);
+            uah::printArrayAsChar(commandBuffer, SETUP_COMMAND_SIZE);
 
             // TODO add better protection against bad commands
-            if (!(commandBuffor[0] == (uint8_t)'H' && commandBuffor[1] == (uint8_t)'C')) {
+            if (!(commandBuffer[0] == (uint8_t)'H' && commandBuffer[1] == (uint8_t)'C')) {
                 Serial.println("HC12 COMMAND ERROR! In setupHC12Task() -> received array is not hc12 command.");
             } else {
-                uint8_t lenOfCommand = uah::calcLenOfDataInArray(commandBuffor, SETUP_COMMAND_SIZE);
-                commandBuffor[0] = (uint8_t)'A';
-                commandBuffor[1] = (uint8_t)'T';
+                uint8_t lenOfCommand = uah::calcLenOfDataInArray(commandBuffer, SETUP_COMMAND_SIZE);
+                commandBuffer[0] = (uint8_t)'A';
+                commandBuffer[1] = (uint8_t)'T';
                 
-                hc12->mpSerial->write(commandBuffor, lenOfCommand);
+                hc12->mpSerial->write(commandBuffer, lenOfCommand);
 
                 bool hasHC12Responded = false;
                 uint8_t hc12Response;

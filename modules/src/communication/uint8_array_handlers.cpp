@@ -16,23 +16,23 @@ namespace uint8ArrayHandlers {
         Serial.println();
     } 
 
-    void prepareBuffor(uint8_t *buffor, const uint8_t len) {
+    void prepareBuffer(uint8_t *buffer, const uint8_t len) {
         for (uint8_t i = 0; i < len; i++) {
-            buffor[i] = 0;
+            buffer[i] = 0;
         }
     } 
 
-    void prepareBuffor(uint8_t *buffor, const uint8_t *value, uint8_t len, const uint8_t maxLen) {
+    void prepareBuffer(uint8_t *buffer, const uint8_t *value, uint8_t len, const uint8_t maxLen) {
         if (len > maxLen) {
             len = maxLen;
-            Serial.println("VALUE ERROR! In uint8ArrayHandlers::prepareBuffor() -> len must not be larger than maxLen");
+            Serial.println("VALUE ERROR! In uint8ArrayHandlers::prepareBuffer() -> len must not be larger than maxLen");
         }
 
         for (uint8_t i = 0; i < len; i++) {
-            buffor[i] = value[i];
+            buffer[i] = value[i];
         }
         for (uint8_t i = len; i < maxLen; i++) {
-            buffor[i] = 0;
+            buffer[i] = 0;
         }
     } 
 
