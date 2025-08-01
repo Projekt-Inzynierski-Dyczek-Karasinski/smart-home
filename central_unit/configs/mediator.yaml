@@ -1,0 +1,7 @@
+log_level: "debug" #TODO implement verbose levels
+
+connection:
+  - type: "tcp"
+    enabled: true
+    address: "127.0.0.1"
+    port: 43321

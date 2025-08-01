@@ -7,10 +7,20 @@
 // TODO assign final value
 #define MAX_RESET_BLINK_TIME 3000
 
+
+DebugLED* DebugLED::mspInstance = nullptr;
+
 TaskHandle_t DebugLED::msPairingBlinkHandle = NULL;
 TaskHandle_t DebugLED::msResetBlinkHandle = NULL;;
 TimerHandle_t DebugLED::msBlinkTimeout = NULL;
 
+
+DebugLED* DebugLED::getInstance() {
+    if (mspInstance == nullptr) {
+        mspInstance = new DebugLED();
+    }
+    return mspInstance;
+}
 
 DebugLED::DebugLED() {
     pinMode(LED_PIN, OUTPUT);
@@ -24,6 +34,7 @@ DebugLED::~DebugLED() {
     deleteBlinkTimeout();
     digitalWrite(LED_PIN, LOW);
 }
+
 
 // =========================== Getters ============================
 

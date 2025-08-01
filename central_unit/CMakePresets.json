@@ -1,0 +1,49 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}"
+    },
+    {
+      "name": "native_debug",
+      "inherits": "base",
+      "displayName": "Native Debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "TARGET_DEVICE": "Native"
+      }
+    },
+    {
+      "name": "native",
+      "inherits": "base",
+      "displayName": "Native",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "TARGET_DEVICE": "Native"
+      }
+    },
+    {
+      "name": "rpi_zero_2w_debug",
+      "inherits": "base",
+      "displayName": "RPi Zero 2W Debug",
+      "toolchainFile": "${sourceDir}/cmake/rpi_zero_2w_toolchain.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "TARGET_DEVICE": "RPI_ZERO_2W"
+      }
+    },
+    {
+      "name": "rpi_zero_2w",
+      "inherits": "base",
+      "displayName": "RPi Zero 2W Release",
+      "toolchainFile": "${sourceDir}/cmake/rpi_zero_2w_toolchain.cmake",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "TARGET_DEVICE": "RPI_ZERO_2W"
+      }
+    }
+  ]
+}

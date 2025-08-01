@@ -8,14 +8,15 @@
 #include "communication/communication.h"
 
 void setup() {
-    vTaskDelay(pdMS_TO_TICKS(1000));
     Serial.begin(9600);
+    vTaskDelay(pdTICKS_TO_MS(1000));
+
     Serial.println(); 
     Serial.println("---FreeRTOS START---");
+    DebugLED* debugLed = DebugLED::getInstance();
     
-    DebugLED debugLed;
-    Communication& communication = Communication::getInstance(&debugLed);
-    PairingButton pairingButton(&debugLed, &communication);
+    Communication& communication = Communication::getInstance(debugLed);
+    PairingButton* pairingButton = PairingButton::getInstance(debugLed, &communication);
 
     Serial.println("---setup() and loop() deleted---");
     vTaskDelete(NULL);
