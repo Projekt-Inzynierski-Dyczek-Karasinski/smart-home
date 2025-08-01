@@ -30,7 +30,7 @@
     #define MAX_NUM_OF_CHANNEL 127
 #endif
 
-// TODO change to numeric values
+// TODO change API Calls to numeric values
 
 // ===================== Addressing API Calls =====================
 

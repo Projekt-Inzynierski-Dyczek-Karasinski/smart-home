@@ -18,7 +18,7 @@ namespace uint8ArrayHandlers {
         Serial.println();
     } 
 
-    void prepareBuffer(uint8_t *buffer, const uint8_t len) {
+    void clearBuffer(uint8_t *buffer, const uint8_t len) {
         for (uint8_t i = 0; i < len; i++) {
             buffer[i] = 0;
         }
@@ -33,9 +33,8 @@ namespace uint8ArrayHandlers {
         for (uint8_t i = 0; i < len; i++) {
             buffer[i] = value[i];
         }
-        for (uint8_t i = len; i < maxLen; i++) {
-            buffer[i] = 0;
-        }
+        
+        clearBuffer(&buffer[len], (maxLen - len));
     } 
 
     uint8_t calcLenOfDataInArray(const uint8_t *array, const uint8_t maxLen) {

@@ -161,6 +161,11 @@ private:
     void deleteDecodeMessageTask();
 
     /**
+     * @brief Calculates and sets checksum to given buffer.
+     * @param protocolBuffer Buffer for which to calculate and set checksum.
+     */
+    void prepareChecksum(uint8_t protocolBuffer[PROTOCOL_SIZE]);
+    /**
      * @brief FreeRTOS task responsible for encoding outgoing messages and adding them to the transmit queue.
      *        Formats messages according to protocol before transmission.
      * @param parameters Task parameters (unused).

@@ -35,7 +35,8 @@ namespace uint8ArrayHandlers {
      * @param buffer Array to be filled with 0.
      * @param len Length of the value array.
      */
-    void prepareBuffer(uint8_t *buffer, const uint8_t len);
+    void clearBuffer(uint8_t *buffer, const uint8_t len);
+    
     /**
      * @brief Sets given uint8_t array (buffer) to given value and fills the rest with 0.
      * @param buffer Array to be filled with given value.

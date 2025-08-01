@@ -48,6 +48,12 @@ private:
     };
 
     /**
+     * @brief Prepare buffer for sending summary data to the module.
+     * @param sendBuffer Buffer to be prepared.
+     * @param moduleData Data of the module which is addressing.
+     */
+    void prepareSummary(uint8_t *sendBuffer, const AddressingData *moduleData);
+    /**
      * @brief Static FreeRTOS task function. Handles message exchanges and addressing logic of the central unit's addressing procedure.
      * @param parameters Task parameters (unused).
      */

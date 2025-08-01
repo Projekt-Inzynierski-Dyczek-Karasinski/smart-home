@@ -89,6 +89,7 @@ void ModuleAddressing::addressingTask(void* parameters) {
                     uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_REPING, ADDRESSING_API_LEN, ADDRESSING_API_LEN);
                     ad.mpCommunication->sendMessage(sendBuffer);
                     addressingState = ADDRESSING_STATES::PROCESS_SUMMARY;
+                    break;
                         
                 case ADDRESSING_STATES::PROCESS_SUMMARY:
                     if (ipToCheck != NULL_IP) {
@@ -126,97 +127,83 @@ void ModuleAddressing::addressingTask(void* parameters) {
 
             // receiving
             if (xQueueReceive(ad.mAddressingQueue, receiveBuffer, pdMS_TO_TICKS(ADDRESSING_MESSAGE_TIMEOUT)) == pdTRUE) {
-                // if received message to abort addressing
-                if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_ABORT, ADDRESSING_API_LEN)) {
-                    ad.abortAddressing();
-                    for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
-                } 
-                // if received message to restart addressing
-                else if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_RESTART, ADDRESSING_API_LEN)) {
+                if (ad.isAddressingFailed(receiveBuffer)) {
                     break;
-                } else {
-                    bool isReceivedPropperMessage = false;
+                }
 
-                    switch (addressingState) {
-                    case ADDRESSING_STATES::START_ADDRESSING:
-                        // !remember in receiveBuffer is raw message!
-                        // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
-                        #ifdef RF_CHANNELS
-                            // check is received propper message (ADi?c?), indexes are offset due to reading raw message
-                            if (receiveBuffer[10] == (uint8_t)'i' && receiveBuffer[12] == (uint8_t)'c') {
-                                isReceivedPropperMessage = true;
-                                uint8_t newRfChannel = receiveBuffer[13];
-
-                                ad.updateAddressingData(receiveBuffer, receiveBuffer[11], newRfChannel);
-
-                                // change rf channel
-                                uint8_t hc12Command[SETUP_COMMAND_SIZE];
-                                uah::prepareBuffer(hc12Command, (uint8_t*)"HC+C000", 7, SETUP_COMMAND_SIZE);
-                                hc12Command[6] = (newRfChannel % 10) + (uint8_t)'0';
-                                hc12Command[5] = ((newRfChannel / 10) % 10) + (uint8_t)'0';
-                                hc12Command[4] = (newRfChannel / 100) + (uint8_t)'0';
-                                ad.mpCommunication->sendInternalMessage(hc12Command);
-
-                                addressingState = ADDRESSING_STATES::WAIT_FOR_PING;
-                            }
-                        #else 
-                            // check is received propper message (ADi?)
-                            if (receiveBuffer[10] == (uint8_t)'i' && receiveBuffer[12] == (uint8_t)BLANK_CHARACTER) {
-                                isReceivedPropperMessage = true;
-                                ad.updateAddressingData(receiveBuffer, receiveBuffer[11]);
-                                addressingState = PROCESS_SUMMARY;
-                            }
-                        #endif
-                        break;
-
-                    case ADDRESSING_STATES::WAIT_FOR_PING:
-                        if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_PING, ADDRESSING_API_LEN)) {
+                bool isReceivedPropperMessage = false;
+                switch (addressingState) {
+                case ADDRESSING_STATES::START_ADDRESSING:
+                    // !remember in receiveBuffer is raw message!
+                    // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
+                    #ifdef RF_CHANNELS
+                        // check is received propper message (ADi?c?), indexes are offset due to reading raw message
+                        if (receiveBuffer[10] == (uint8_t)'i' && receiveBuffer[12] == (uint8_t)'c') {
                             isReceivedPropperMessage = true;
-                            // TODO remove print
-                            // Serial.println("Got ping");
-                            addressingState = ADDRESSING_STATES::REPLY_PING;
+                            uint8_t newRfChannel = receiveBuffer[13];
+
+                            ad.updateAddressingData(receiveBuffer, receiveBuffer[11], newRfChannel);
+                            ad.changeRfChannel(newRfChannel);
+                            
+                            addressingState = ADDRESSING_STATES::WAIT_FOR_PING;
                         }
-                        break;
-
-                    case ADDRESSING_STATES::REPLY_PING:
-                        Serial.println("ADDRESSING ERROR! In addressingTask() -> addressingState == REPLY_PING in receiving part of task, did you forget change?");
-                        isRestarting = true;
-                        break;
-
-                    case ADDRESSING_STATES::PROCESS_SUMMARY:
-                        // if central unit is still sending ping
-                        if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_PING, ADDRESSING_API_LEN)) {
-                            addressingState = ADDRESSING_STATES::REPLY_PING;
-                        } else if (
-                            uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_SUMMARY, ADDRESSING_API_LEN) &&
-                            receiveBuffer[6]  == (uint8_t)'i' &&
-                            receiveBuffer[8]  == (uint8_t)'c' &&
-                            receiveBuffer[10] == (uint8_t)'r' &&
-                            receiveBuffer[12] == (uint8_t)'m'
-                        ) {
+                    #else 
+                        // check is received propper message (ADi?)
+                        if (receiveBuffer[10] == (uint8_t)'i' && receiveBuffer[12] == (uint8_t)BLANK_CHARACTER) {
                             isReceivedPropperMessage = true;
-                            ipToCheck = receiveBuffer[7];
-                            rfChannelToCheck = receiveBuffer[9];
-                            isMacRealToCheck = receiveBuffer[11];
-                            uah::prepareBuffer(macToCheck, &receiveBuffer[13], MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
+                            ad.updateAddressingData(receiveBuffer, receiveBuffer[11]);
+                            addressingState = PROCESS_SUMMARY;
                         }
-                        break;
+                    #endif
+                    break;
 
-                    default:
-                        break;
-                    }
-
-                    if (isRestarting) {
+                case ADDRESSING_STATES::WAIT_FOR_PING:
+                    if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_PING, ADDRESSING_API_LEN)) {
+                        isReceivedPropperMessage = true;
                         // TODO remove print
-                        // Serial.println("restarting after receiving...");
-                        break;
+                        // Serial.println("Got ping");
+                        addressingState = ADDRESSING_STATES::REPLY_PING;
                     }
+                    break;
 
-                    if (isReceivedPropperMessage) {
-                        attemptCounter = 0;
-                    } else {
-                        attemptCounter++;
+                case ADDRESSING_STATES::REPLY_PING:
+                    Serial.println("ADDRESSING ERROR! In addressingTask() -> addressingState == REPLY_PING in receiving part of task, did you forget change?");
+                    isRestarting = true;
+                    break;
+
+                case ADDRESSING_STATES::PROCESS_SUMMARY:
+                    // if central unit is still sending ping
+                    if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_PING, ADDRESSING_API_LEN)) {
+                        addressingState = ADDRESSING_STATES::REPLY_PING;
+                    } else if (
+                        uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_SUMMARY, ADDRESSING_API_LEN) &&
+                        receiveBuffer[6]  == (uint8_t)'i' &&
+                        receiveBuffer[8]  == (uint8_t)'c' &&
+                        receiveBuffer[10] == (uint8_t)'r' &&
+                        receiveBuffer[12] == (uint8_t)'m'
+                    ) {
+                        isReceivedPropperMessage = true;
+                        ipToCheck = receiveBuffer[7];
+                        rfChannelToCheck = receiveBuffer[9];
+                        isMacRealToCheck = receiveBuffer[11];
+                        uah::prepareBuffer(macToCheck, &receiveBuffer[13], MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
                     }
+                    break;
+
+                default:
+                    break;
+                }
+
+                if (isRestarting) {
+                    // TODO remove print
+                    // Serial.println("restarting after receiving...");
+                    break;
+                }
+
+                if (isReceivedPropperMessage) {
+                    attemptCounter = 0;
+                } else {
+                    attemptCounter++;
                 }
             } else {
                 attemptCounter++;
@@ -300,6 +287,7 @@ void ModuleAddressing::clearNewConnectionData() {
         updateAddressingData(mMACAddress, NULL_IP);
     #endif
 
+    // TODO change it to HC12 method (maybe add methods for more often used commands), consider adding pointer directly to RF module
     #ifdef HC12_MODULE
         mpCommunication->sendInternalMessage((uint8_t*)"HC+DEFAULT");
     #endif

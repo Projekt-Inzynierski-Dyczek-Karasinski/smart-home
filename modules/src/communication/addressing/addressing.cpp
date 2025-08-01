@@ -107,4 +107,31 @@ void Addressing::abortAddressingWithAbortMessage() {
     }
     abortAddressing();
 }
+
+bool Addressing::isAddressingFailed(const uint8_t *receiveBuffer) {
+    // if received message to abort addressing
+    if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_ABORT, ADDRESSING_API_LEN)) {
+        abortAddressing();
+        for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
+        return true;
+    } 
+    // if received message to restart addressing
+    if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_RESTART, ADDRESSING_API_LEN)) {
+        return true;
+    }
+
+    return false;
+}
+
+#ifdef HC12_MODULE
+    void Addressing::changeRfChannel(const uint8_t newRfChannel) {
+
+        uint8_t hc12Command[SETUP_COMMAND_SIZE];
+        uah::prepareBuffer(hc12Command, (uint8_t*)"HC+C000", 7, SETUP_COMMAND_SIZE);
+        hc12Command[6] = (newRfChannel % 10) + (uint8_t)'0';
+        hc12Command[5] = ((newRfChannel / 10) % 10) + (uint8_t)'0';
+        hc12Command[4] = (newRfChannel / 100) + (uint8_t)'0';
+        mpCommunication->sendInternalMessage(hc12Command);
+    }
+#endif
 // ================================================================

@@ -109,6 +109,27 @@ protected:
      */
     void abortAddressingWithAbortMessage();
 
+    /**
+     * @brief Checks if addressing should be continued after receiving message.
+     * If received message is to abort addressing, then will handle abort.
+     * If received message is to restart addressing, then it will return true.
+     * Otherwise, it will return false.
+     * @param receiveBuffer Received message.
+     * @return False if addressing should be continued, true otherwise.
+     * @warning This method must not be called outside addressing task.
+     * @note If received message is to abort addressing, technically function returns true, 
+     * but infinite loop prevents getting to "return" line (because task calling function will be deleted).
+     */
+    bool isAddressingFailed(const uint8_t *receiveBuffer);
+
+    // TODO move this method to HC12 class when adding handling with propper mac and ip in decoding message task
+    #ifdef HC12_MODULE
+        /**
+         * @brief Prepares and sends HC12 command to change RF channel.
+         * @param newRfChannel New RF channel.
+         */
+        void changeRfChannel(uint8_t newRfChannel);
+    #endif
     // TODO add led blinking indicating restart, success and failure of addressing 
     // void restartLedBlink();
     // void successLedBlink();

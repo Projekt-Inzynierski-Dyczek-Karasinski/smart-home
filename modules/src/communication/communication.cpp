@@ -216,10 +216,8 @@ void Communication::communicationMainTask(void* parameters) {
     auto &com = Communication::getInstance(Communication::mspDebugLED);
 
     uint32_t status = DEFAULT_STATUS_NOTIF;
-
     uint8_t pingAttempts = 0;
     bool isReadingRawMessage = false;
-
     for (;;) {
         // TODO change main tasks notifications to queues (race conditions)
         // change status
@@ -276,7 +274,6 @@ void Communication::communicationMainTask(void* parameters) {
                 Serial.println(status);
                 break;
         }
-
         // reset notifications status 
         status = DEFAULT_STATUS_NOTIF;
     }
@@ -336,20 +333,30 @@ void Communication::decodeMessageTask(void *parameters) {
 
     auto resetProtocolBuffer = [&]() {
         for (uint8_t i = 0; i < PROTOCOL_MESSAGE_MAX_NUM; i++){
-            for (uint8_t j = 0; j < PROTOCOL_SIZE; j++) {
-                protocolBuffer[i][j] = 0;
-            }
+            uah::clearBuffer(protocolBuffer[i], PROTOCOL_SIZE);
         }
         protoBuffByteIndex = 0;
         protoBuffMessageIndex = 0;
     };
     resetProtocolBuffer();
 
+    auto handleIncorrectMessage = [&](bool isReadingRawMessage) {
+        xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
+        // wait for possible rest of the message and send "repeat"
+        vTaskDelay(RECEIVE_MESSAGE_TIMEOUT);
+        resetProtocolBuffer();
+        xQueueReset(com.mReceiveByteQueue);
+        if (!isReadingRawMessage) {
+            com.transmitRepeatMessage();                            
+        }
+    };
+
     // buffer for byte received from rfModule
     uint8_t queueBuffer;
 
     // task loop
     for (;;) {
+        // TODO add method for handling notifications
         // notifications handling 
         if (xTaskNotifyWait(0, ULONG_MAX, &timeoutStatus, 0) == pdTRUE) {
             if (timeoutStatus == READ_RAW_MESSAGE_NOTIF) {
@@ -402,92 +409,73 @@ void Communication::decodeMessageTask(void *parameters) {
                 protoBuffByteIndex = 0;
 
                 // if message is not end properly
-                if (protocolBuffer[protoBuffMessageIndex][PROTOCOL_SIZE - 1] != 0) {
+                const uint8_t endOfMessage = protocolBuffer[protoBuffMessageIndex][PROTOCOL_SIZE - 1];
+                if (endOfMessage != 0) {
+                    handleIncorrectMessage(isRawMessage);
+                    Serial.print("BAD END OF MESSAGE ERROR! In decodeMessageTask() -> message should end with 0 (\\0 char), but got: ");
+                    Serial.println(endOfMessage);
+                } 
+                // if checksum is incorrect
+                else if (!com.isCheckSumCorrect(protocolBuffer[protoBuffMessageIndex])) {
+                    handleIncorrectMessage(isRawMessage);
+                    Serial.println("BAD CHECKSUM ERROR! In decodeMessageTask() -> checksum incorrect");
+                }
+                // if MAC or IP is incorrect 
+                // TODO uncomment and implement
+                // else if (!isProperMACAndIP(protocolBuffer[protoBuffMessageIndex], protocolBuffer[protoBuffMessageIndex][6])) {
+                else if (false) {
+                    // #ifdef CENTRAL_UNIT
+                    //     Serial.println("CRITICAL ERROR! In decodeMessageTask() -> isProperMACAndIP() must never return false for CENTRAL_UNIT"); 
+                    // #else
+                    //     xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
+                    //     resetProtocolBuffer();
+                    // #endif
+                }
+                // if entire message is not ready (message quantity)
+                else if (protocolBuffer[protoBuffMessageIndex][messagesQuantityIndex] != 0) {
+                    protoBuffMessageIndex++;
+                }
+                // entire message is ready
+                else {
                     xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
-                    
-                    Serial.print("BAD END OF message ERROR! In decodeMessageTask() -> message should end with 0 (\\0 char), but got: ");
-                    Serial.println(protocolBuffer[protoBuffMessageIndex][PROTOCOL_SIZE - 1]);
 
-                    // wait for possible rest of the message and send "repeat"
-                    vTaskDelay(RECEIVE_MESSAGE_TIMEOUT);
-                    resetProtocolBuffer();
-                    xQueueReset(com.mReceiveByteQueue);
-                    if (!isRawMessage) {
-                        com.transmitRepeatMessage();                        
-                    }
-                } else {
-                                       
-                    // if checksum is incorrect
-                    if (!com.isCheckSumCorrect(protocolBuffer[protoBuffMessageIndex])) {
-                        xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
-                        Serial.println("BAD CHECKSUM ERROR! In decodeMessageTask() -> checksum incorrect");
+                    // prepare received message buffer
+                    uint8_t messageBuffer[MESSAGE_SIZE];
+                    uah::clearBuffer(messageBuffer, MESSAGE_SIZE);
+                    uint8_t messageIndex = 0;
+                    uint8_t messagesQuantity;
+                    protoBuffMessageIndex = 0;
 
-                        // wait for possible rest of the message and send "repeat"
-                        vTaskDelay(RECEIVE_MESSAGE_TIMEOUT);
-                        resetProtocolBuffer();
-                        xQueueReset(com.mReceiveByteQueue);
-                        if (!isRawMessage) {
-                            com.transmitRepeatMessage();                            
-                        }
-                    }
-                    // if MAC or IP is incorrect 
-                    // TODO uncomment and implement
-                    // else if (!isProperMACAndIP(protocolBuffer[protoBuffMessageIndex], protocolBuffer[protoBuffMessageIndex][6])) {
-                    else if (false) {
-                        // #ifdef CENTRAL_UNIT
-                        //     Serial.println("CRITICAL ERROR! In decodeMessageTask() -> isProperMACAndIP() must never return false for CENTRAL_UNIT"); 
-                        // #else
-                        //     xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
-                        //     resetProtocolBuffer();
-                        // #endif
-                    }
-                    // if entire message is not ready (message quantity)
-                    else if (protocolBuffer[protoBuffMessageIndex][messagesQuantityIndex] != 0) {
-                        protoBuffMessageIndex++;
-                    }
-                    // entire message is ready
-                    else {
-                        xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
-
-                        // prepare received message buffer
-                        uint8_t messageBuffer[MESSAGE_SIZE];
-                        uah::prepareBuffer(messageBuffer, MESSAGE_SIZE);
-                        uint8_t messageIndex = 0;
-                        uint8_t messagesQuantity;
-                        protoBuffMessageIndex = 0;
-
-                        // decode message
-                        // TODO add protection against packet loss (messageQuantity ins't decrementing always only by 1)
-                        do {
-                            for (uint8_t i = protocolMessageStartIndex; i < (protocolMessageStartIndex + protocolMessageLength); i++) {
-                                messageBuffer[messageIndex] = protocolBuffer[protoBuffMessageIndex][i];
-                                messageIndex++;
-                                // protection against buffer overload (62 => 63 max buffer index -1 for \0)
-                                if (messageIndex > MAX_MESSAGE_INDEX - 1) {
-                                    break;
-                                }
+                    // decode message
+                    // TODO add protection against packet loss (messageQuantity ins't decrementing only by 1) and add separate method for that
+                    do {
+                        for (uint8_t i = protocolMessageStartIndex; i < (protocolMessageStartIndex + protocolMessageLength); i++) {
+                            messageBuffer[messageIndex] = protocolBuffer[protoBuffMessageIndex][i];
+                            messageIndex++;
+                            // protection against buffer overload (62 => 63 max buffer index -1 for \0)
+                            if (messageIndex > MAX_MESSAGE_INDEX - 1) {
+                                break;
                             }
-
-                            messagesQuantity = protocolBuffer[protoBuffMessageIndex][messagesQuantityIndex];
-                            protoBuffMessageIndex++;
-                        } while(messagesQuantity != 0);
-
-                        if (isRawMessage) {
-                            isRawMessage = false;
-                            // TODO remove print ?
-                            Serial.print("Received raw message: ");
-                            uah::printArrayAsInt(protocolBuffer[0], PROTOCOL_SIZE);
-                            xQueueSend(com.mReceiveMessageQueue, protocolBuffer[0], portMAX_DELAY);
-                        } else {
-                            // TODO remove print ?
-                            Serial.print("Received message: ");
-                            uah::printArrayAsChar(messageBuffer, MESSAGE_SIZE);
-                            xQueueSend(com.mReceiveMessageQueue, messageBuffer, portMAX_DELAY);
                         }
+                        messagesQuantity = protocolBuffer[protoBuffMessageIndex][messagesQuantityIndex];
+                        protoBuffMessageIndex++;
+                    } while(messagesQuantity != 0);
 
-                        // clean up
-                        resetProtocolBuffer();
+                    if (isRawMessage) {
+                        isRawMessage = false;
+                        // TODO remove print ?
+                        Serial.print("Received raw message: ");
+                        uah::printArrayAsInt(protocolBuffer[0], PROTOCOL_SIZE);
+                        xQueueSend(com.mReceiveMessageQueue, protocolBuffer[0], portMAX_DELAY);
+                    } else {
+                        // TODO remove print ?
+                        Serial.print("Received message: ");
+                        uah::printArrayAsChar(messageBuffer, MESSAGE_SIZE);
+                        xQueueSend(com.mReceiveMessageQueue, messageBuffer, portMAX_DELAY);
                     }
+
+                    // clean up
+                    resetProtocolBuffer();
                 }
             }
         } else {
@@ -520,6 +508,19 @@ void Communication::deleteDecodeMessageTask() {
 
 // ======================== Encode Message ========================
 
+void Communication::prepareChecksum(uint8_t protocolBuffer[PROTOCOL_SIZE]) {
+    static constexpr uint8_t checksumIndex = 14;
+
+    protocolBuffer[checksumIndex] = 0;
+    uint16_t checkSum = 0;
+    for (uint8_t i = 0; i < PROTOCOL_SIZE; i++) {
+        checkSum += (uint16_t)protocolBuffer[i];
+    }
+    checkSum = (CHECKSUM_MODULO - (checkSum % CHECKSUM_MODULO)) % CHECKSUM_MODULO;
+
+    protocolBuffer[checksumIndex] = checkSum;
+}
+
 void Communication::encodeMessageTask(void *parameters) {
     auto &com = Communication::getInstance(Communication::mspDebugLED);
 
@@ -531,8 +532,7 @@ void Communication::encodeMessageTask(void *parameters) {
     static constexpr uint8_t messagesQuantityIndex = 7;
     static constexpr uint8_t protocolMessageStartIndex = 8;
     static constexpr uint8_t protocolMessageLength = 6;
-    static constexpr uint8_t checksumIndex = 14;
-
+    
     // TODO implement seting IP address for central unit    
     // prepare MAC address in protocol buffer and clear rest of buffer
     uint8_t macAddress[6];
@@ -548,7 +548,7 @@ void Communication::encodeMessageTask(void *parameters) {
 
     // prepare message to send buffer
     uint8_t messageBuffer[MESSAGE_SIZE];
-    uah::prepareBuffer(messageBuffer, MESSAGE_SIZE);
+    uah::clearBuffer(messageBuffer, MESSAGE_SIZE);
 
     // task loop
     for (;;) {
@@ -571,15 +571,8 @@ void Communication::encodeMessageTask(void *parameters) {
                     protocolBuffer[protocolMessageStartIndex + i] = messageBuffer[messageIndex] != 0 ? messageBuffer[messageIndex] : BLANK_CHARACTER;
                     messageIndex++;
                 }
-
                 // calculate and set checksum
-                protocolBuffer[checksumIndex] = 0;
-                uint16_t checkSum = 0;
-                for (uint8_t i = 0; i < PROTOCOL_SIZE; i++) {
-                    checkSum += (uint16_t)protocolBuffer[i];
-                }
-                checkSum = (CHECKSUM_MODULO - (checkSum % CHECKSUM_MODULO)) % CHECKSUM_MODULO;
-                protocolBuffer[checksumIndex] = checkSum;
+                com.prepareChecksum(protocolBuffer);
                 
                 com.mpRfModule->addMessageToTransmit(protocolBuffer);
 
@@ -594,7 +587,6 @@ void Communication::encodeMessageTask(void *parameters) {
                 // Serial.print("protocolBuffer message: ");
                 // uah::printArrayAsChar(&protocolBuffer[protocolMessageStartIndex], protocolMessageLength);
             }
-
             if (!uah::areArraysEqual(messageBuffer, (uint8_t*)"repeat", 6)) {
                 com.setLastTransmittedMessage(messageBuffer);
             }
@@ -680,7 +672,7 @@ void Communication::sendCustomMessageTask(void *parameters) {
                 }
 
                 // reset buffer
-                uah::prepareBuffer(buffer, index);
+                uah::clearBuffer(buffer, index);
                 index = 0;
             }
         }
@@ -777,7 +769,7 @@ void Communication::deleteCommunicationTimers() {
 
 void Communication::setLastTransmittedMessage() {
     xSemaphoreTake(mLastTransmittedMessageMutex, portMAX_DELAY);
-    uah::prepareBuffer(mLastTransmittedMessage, MESSAGE_SIZE);
+    uah::clearBuffer(mLastTransmittedMessage, MESSAGE_SIZE);
     mLastTransmittedMessageAttempts = 0;
     xSemaphoreGive(mLastTransmittedMessageMutex);
 }
