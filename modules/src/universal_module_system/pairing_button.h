@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include "debug_led.h"
+#include "communication/communication.h"
 
 /**
  * @brief Class that controls the Pairing Button by attaching interrupt to it. 
@@ -11,9 +12,8 @@
  * 
  * Pressing button for 10 seconds initializes a reset process. 
  * @warning This class must be initialized only once and destructor of this class should never be used. 
- * @note This class should be initialized at the very beginning of setup() (but after DebugLED class). Serial.begin() have to be initialized separately before this class to see debug messages.
+ * @note This class should be initialized at the beginning of setup() (but after DebugLED and Communication classes). Serial.begin() have to be initialized separately before this class to see debug messages.
  * This class is a singleton.
- * 
  */
 class PairingButton {
 public:
@@ -22,7 +22,7 @@ public:
      * @param DebugLED* Pointer to DebugLED object.
      * @return PairingButton* pointer to the instance of PairingButton.
      */
-    static PairingButton* getInstance(DebugLED *debugLED);
+    static PairingButton* getInstance(DebugLED *debugLED, Communication *communication);
     
     // Delete copy constructor and assignment operator
     PairingButton(const PairingButton&) = delete;
@@ -34,7 +34,7 @@ private:
      * @param DebugLED* Pointer to DebugLED object.
      * @note Constructor of this class is private, because this class is a singleton.
      */
-    PairingButton(DebugLED *debugLED);
+    PairingButton(DebugLED *debugLED, Communication *communication);
     
     /**
      * @brief Destructor of PairingButton class. Detaches interrupt from BUTTON_PIN and deletes Button Press Timer if exists.
@@ -85,6 +85,8 @@ private:
     static PairingButton* mspInstance;
 
     static DebugLED *mspDebugLED;
+    static Communication *mspCommunication;
+
     static uint8_t msButtonMode;
     static uint8_t msButtonPressCounter;
     static int8_t msButtonNotPressedCounter;

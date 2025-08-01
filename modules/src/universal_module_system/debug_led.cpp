@@ -5,8 +5,6 @@
 #define RESET_BLINK_DELAY 100
 
 // TODO assign final value
-#define MAX_CONNECTION_BLINK_TIME 15000
-// TODO assign final value
 #define MAX_RESET_BLINK_TIME 3000
 
 
@@ -27,6 +25,7 @@ DebugLED* DebugLED::getInstance() {
 DebugLED::DebugLED() {
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, LOW);
+    Serial.println("DebugLED initialized");
 }
 
 DebugLED::~DebugLED() {
@@ -75,13 +74,12 @@ void DebugLED::createPairingBlinkTask() {
             "Pairing Blink",
             1024,
             NULL,
-            0,
+            1,
             &msPairingBlinkHandle
         );
     } else {
         Serial.println("void createConnectionBlinkTask() - Can't create Connection Blink task -> Connection Blink task already exists");
     }
-    startBlinkTimeout(MAX_CONNECTION_BLINK_TIME);
 }
 void DebugLED::deletePairingBlinkTask() {
     if (msPairingBlinkHandle != NULL) {
@@ -114,7 +112,7 @@ void DebugLED::createResetBlinkTask() {
             "Reset Blink",
             1024,
             NULL,
-            0,
+            1,
             &msResetBlinkHandle
         );
         startBlinkTimeout(MAX_RESET_BLINK_TIME);

@@ -5,7 +5,7 @@
 #define DEBOUNCING_COUNTER_TO_SECONDS(value) (value * DEBOUNCING_TIME / 1000)
 
 PairingButton* PairingButton::mspInstance = nullptr;
-
+Communication* PairingButton::mspCommunication = nullptr;
 DebugLED* PairingButton::mspDebugLED = nullptr;
 
 uint8_t PairingButton::msButtonMode = 0;
@@ -14,17 +14,19 @@ int8_t PairingButton::msButtonNotPressedCounter = 3;
 TimerHandle_t PairingButton::msButtonPressTimer = NULL;
 
 
-PairingButton* PairingButton::getInstance(DebugLED *debugLED) {
+PairingButton* PairingButton::getInstance(DebugLED *debugLED, Communication *communication) {
     if (mspInstance == nullptr) {
-        mspInstance = new PairingButton(debugLED);
+        mspInstance = new PairingButton(debugLED, communication);
     }
     return mspInstance;
 }
 
-PairingButton::PairingButton(DebugLED *debugLED) {
+PairingButton::PairingButton(DebugLED *debugLED, Communication *communication) {
     mspDebugLED = debugLED;
+    mspCommunication = communication;
     pinMode(BUTTON_PIN, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
+    Serial.println("PairingButton initialized");
 }
 
 PairingButton::~PairingButton() {
@@ -58,8 +60,10 @@ void PairingButton::buttonPressTimerCallback() {
         } 
         // after pressing button for 3 seconds call createPairingBlinkTask()
         else if (DEBOUNCING_COUNTER_TO_SECONDS(msButtonPressCounter) >= 3 && msButtonMode == 0) {
+            if (msButtonMode != 1) {
+                mspCommunication->startAddressingAlgorithm();
+            }
             msButtonMode = 1;
-            mspDebugLED->createPairingBlinkTask();
         }
     } else {
         msButtonNotPressedCounter--;

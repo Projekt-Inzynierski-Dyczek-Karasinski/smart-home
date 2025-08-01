@@ -1,0 +1,137 @@
+#include "communication/addressing/addressing.h"
+
+#include <Arduino.h>
+
+#include "smart_home_config.h"
+#include "config/communication_config.h"
+#include "config/addressing_config.h"
+#include "communication/uint8_array_handlers.h"
+#include "communication/communication.h"
+
+namespace uah = uint8ArrayHandlers;
+
+// ============================ Public ============================
+
+Addressing::Addressing(Communication *communication) 
+    : mpCommunication(communication) {
+    #ifdef ESP32_BOARD
+        esp_read_mac(mMACAddress, ESP_MAC_WIFI_STA);
+        esp_read_mac(mProtocolMACAddress, ESP_MAC_WIFI_STA);
+    #else
+        // TODO add function to get MAC address on different boards
+        #error "MAC address not implemented!"
+    #endif
+    mAddressingDataMutex = xSemaphoreCreateMutex();
+}
+
+Addressing::~Addressing() = default;
+
+void Addressing::getProtocolMACAddress(uint8_t macAddress[MAC_ADDRESS_LENGTH]) {
+    xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
+    uah::prepareBuffer(macAddress, mProtocolMACAddress, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
+    xSemaphoreGive(mAddressingDataMutex);
+}
+
+uint8_t Addressing::getIPAddress() {
+    xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
+    const uint8_t ipAddress = mIPAddress;
+    xSemaphoreGive(mAddressingDataMutex);
+
+    return ipAddress;
+}
+
+void Addressing::startAddressing() {
+    createAddressingTimer();
+    createAddressingQueue();
+    createAddressingTask();
+}
+
+void Addressing::stopAddressing() {
+    deleteAddressingTask();
+    deleteAddressingQueue();
+    deleteAddressingTimer();
+}
+
+void Addressing::addMessage(const uint8_t message[MESSAGE_SIZE]) {
+    if (mAddressingQueue != NULL) {
+        xQueueSend(mAddressingQueue, message, portMAX_DELAY);
+    } else {
+        Serial.println("ADDRESSING ERROR! In addMessage() -> can't add message to queue, because queue doesn't exist");
+    }
+}
+// ================================================================
+
+// ============================ Queues ============================
+
+void Addressing::createAddressingQueue() {
+    if (mAddressingQueue == NULL) {
+        mAddressingQueue = xQueueCreate(MESSAGE_QUEUE_LEN, sizeof(uint8_t[MESSAGE_SIZE]));
+    }
+}
+
+void Addressing::deleteAddressingQueue() {
+    if (mAddressingQueue != NULL) {
+        vQueueDelete(mAddressingQueue);
+        mAddressingQueue = NULL;
+    }
+}
+// =================================================================
+
+// ============================ Deletes ============================
+
+void Addressing::deleteAddressingTask() {
+    if (mAddressingTaskHandle != NULL) {
+        vTaskDelete(mAddressingTaskHandle);
+        mAddressingTaskHandle = NULL;
+    }
+}
+void Addressing::deleteAddressingTimer() {
+    if (mAddressingTimeoutTimer != NULL) {
+        xTimerDelete(mAddressingTimeoutTimer, portMAX_DELAY);
+        mAddressingTimeoutTimer = NULL;
+    }
+}
+// ================================================================
+
+// ============================ Other =============================
+
+void Addressing::sendRestartMessage() {
+    mpCommunication->sendMessage((uint8_t*)ADDRESSING_RESTART);
+    clearNewConnectionData();
+}
+
+void Addressing::abortAddressingWithAbortMessage() {
+    for (uint8_t i = 0; i < ADDRESSING_NUM_OF_ABORT_MESSAGES; i++) {
+        mpCommunication->sendMessage((uint8_t*)ADDRESSING_ABORT);
+        vTaskDelay(pdMS_TO_TICKS(ADDRESSING_DELAY_BETWEEN_ABORT_MESSAGES));
+    }
+    abortAddressing();
+}
+
+bool Addressing::isAddressingFailed(const uint8_t *receiveBuffer) {
+    // if received message to abort addressing
+    if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_ABORT, ADDRESSING_API_LEN)) {
+        abortAddressing();
+        for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
+        return true;
+    } 
+    // if received message to restart addressing
+    if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_RESTART, ADDRESSING_API_LEN)) {
+        return true;
+    }
+
+    return false;
+}
+
+#ifdef HC12_MODULE
+    void Addressing::changeRfChannel(const uint8_t newRfChannel) {
+
+        uint8_t hc12Command[SETUP_COMMAND_SIZE];
+        uah::prepareBuffer(hc12Command, (uint8_t*)"HC+C000", 7, SETUP_COMMAND_SIZE);
+        hc12Command[6] = (newRfChannel % 10) + (uint8_t)'0';
+        hc12Command[5] = ((newRfChannel / 10) % 10) + (uint8_t)'0';
+        hc12Command[4] = (newRfChannel / 100) + (uint8_t)'0';
+        mpCommunication->sendInternalMessage(hc12Command);
+    }
+#endif
+// ================================================================
