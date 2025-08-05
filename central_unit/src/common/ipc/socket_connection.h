@@ -1,5 +1,7 @@
 #pragma once
 
+#include "async_logger.h"
+
 #include <memory>
 #include <variant>
 #include <iostream>
@@ -40,10 +42,11 @@ namespace SmartHome::IPC {
         *
         * @param ioContext Boost::Asio IO context for async operations.
         * @param socketType Type of socket to create.
+        * @param logger Shared pointer instance reference of logger.
         *
         * @throw std::invalid_argument if socketType is invalid.
         */
-        explicit SocketConnection(ba::io_context &ioContext, Type socketType);
+        explicit SocketConnection(ba::io_context &ioContext, Type socketType, const std::shared_ptr<Utils::Logger> &logger);
 
         /**
         * @brief Destructor - closes connection if still open.
@@ -139,6 +142,7 @@ namespace SmartHome::IPC {
 
         Type mType; ///< Socket type
         ba::io_context &mIoContext; ///< IO context reference
+        std::shared_ptr<Utils::Logger> mpLogger;
         ba::streambuf mStreamBuf; ///< Buffer for async read operations
 
         /// Atomic flag to prevent concurrent close operations

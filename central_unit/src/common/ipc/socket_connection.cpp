@@ -1,8 +1,8 @@
 #include "socket_connection.h"
 
 namespace SmartHome::IPC {
-    SocketConnection::SocketConnection(ba::io_context &ioContext, const Type socketType)
-        : mSocket(createSocket(ioContext, socketType)), mType(socketType), mIoContext(ioContext) {
+    SocketConnection::SocketConnection(ba::io_context &ioContext, const Type socketType, const std::shared_ptr<Utils::Logger> &logger)
+        : mSocket(createSocket(ioContext, socketType)), mType(socketType), mIoContext(ioContext), mpLogger(logger) {
     };
 
     SocketConnection::~SocketConnection() {
@@ -84,9 +84,9 @@ namespace SmartHome::IPC {
                 socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
                 socket.close(ec);
                 if (ec) {
-                    std::cerr << "IPC connection close error: " << ec.message() << std::endl;
+                    mpLogger->errorf("[SOCKET_CONNECTION] IPC connection close failed: %s ", ec.message().c_str());
                 }
-                std::cout << "IPC connection closed" << std::endl;
+                mpLogger->debug("[SOCKET_CONNECTION] IPC connection closed");
             }
         };
 
@@ -114,20 +114,20 @@ namespace SmartHome::IPC {
     void SocketConnection::handleError(const bs::error_code &ec) {
         switch (ec.value()) {
             case ba::error::operation_aborted:
-                std::cout << "IPC connection: operation aborted" << std::endl;
+                mpLogger->info("[SOCKET_CONNECTION] IPC operation aborted");
                 break;
             case ba::error::eof:
-                std::cout << "IPC connection: read EOF" << std::endl;
+                mpLogger->info("[SOCKET_CONNECTION] IPC connection read EOF");
                 close();
                 break;
             case ba::error::connection_reset:
             case ba::error::broken_pipe:
-                std::cout << "IPC connection: connection lost" << std::endl;
+                mpLogger->info("[SOCKET_CONNECTION] IPC lost connection");
                 close();
                 break;
             default:
                 if (ec) {
-                    std::cerr << "IPC connection: " << ec.message() << std::endl;
+                    mpLogger->errorf("[SOCKET_CONNECTION] IPC connection failed: %s ", ec.message().c_str());
                     close();
                 }
         }

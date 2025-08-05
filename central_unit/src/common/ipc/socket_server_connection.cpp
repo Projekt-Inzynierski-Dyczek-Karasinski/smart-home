@@ -30,9 +30,9 @@ namespace SmartHome::IPC {
                 socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
                 socket.close(ec);
                 if (ec) {
-                    std::cerr << "IPC connection shutdown error: " << ec.message() << std::endl;
+                    mpLogger->errorf("[SOCKET_SERVER_CONNECTION] IPC connection close failed: %s", ec.message().c_str());
                 }
-                std::cout << "IPC connection [" << mConnectionId << "] closed" << std::endl;
+                mpLogger->debugf("[SOCKET_SERVER_CONNECTION] IPC connection closed (ID:%d)", mConnectionId.load());
             }
         };
         std::visit(socketVisitor, mSocket);
