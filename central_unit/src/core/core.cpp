@@ -26,21 +26,24 @@ namespace SmartHome {
         }
     }
 
-    bool Core::initialize(const Config &configStruct) {
+    bool Core::initialize(const Config &configStruct, const std::shared_ptr<Utils::Logger> &logger) {
         if (mIsInitialized.load()) {
-            std::cerr << "Core already initialized" << std::endl;
+            logger->error("[CORE] Core already initialized");
             return false;
         }
 
-        mpService = Service::ServiceManager::create();
+
+        // Initialize AsyncLogger, using Logger for further initialization
+        mLogger = std::make_shared<Utils::AsyncLogger>(logger, mCoreIoContext);
+
+        mpService = Service::ServiceManager::create(logger, Utils::ServiceType::AUTO);
         if (!mpService->onInitialize()) {
-            std::cerr << "Failed to initialize service" << std::endl;
+            logger->error("[CORE] Failed to initialize service");
+            stopCoreThread();
             return false;
         }
-
-        std::cout << "Initializing core" << std::endl;
-        // Save config
-        mConfig = configStruct;
+        // Enable file logging after service init to avoid overwriting logs of already running instance
+        logger->enableFileLoggingIfConfigured();
 
         // Create thread running io context for signal handling and service manager
         mCoreGuard.emplace(ba::make_work_guard(mCoreIoContext));
@@ -48,6 +51,10 @@ namespace SmartHome {
             mCoreIoContext.run();
         });
 
+
+        logger->debug("[CORE] Starting Core initialization");
+        // Save config
+        mConfig = configStruct;
 
         // Set IPC server thread count
         uint threadCount;
@@ -61,15 +68,15 @@ namespace SmartHome {
                 break;
             default:
                 if (mConfig.ipcServerThreads > ms_HIGH_THREAD_COUNT_LIMIT) {
-                    std::cerr << "Core init warning: IPC server possible excessive thread count (" <<
-                            mConfig.ipcServerThreads << " threads)" << std::endl;
+                    logger->warningf("[CORE] IPC server thread count exceeds recommended limit (%d active threads)",
+                                    mConfig.ipcServerThreads);
                 }
                 threadCount = mConfig.ipcServerThreads;
                 break;
         }
 
         if (threadCount < 1) {
-            std::cerr << "Core init error: IPC server thread count less than 1, setting value to 1" << std::endl;
+            logger->error("[CORE] IPC server thread count less than 1, setting value to 1");
             threadCount = 1;
         }
 
@@ -85,24 +92,23 @@ namespace SmartHome {
 
 
         mIsInitialized.store(true);
-        std::cout << "Initialization complete" << std::endl;
+        logger->debug("[CORE] Core successfully initialized");
 
         return true;
     }
 
     void Core::run() {
         if (!mIsInitialized.load()) {
-            std::cerr << "Core not initialized" << std::endl;
-            return;
+            throw std::runtime_error("[CORE] Core is not initialized");
         }
         if (mIsRunning.load()) {
-            std::cerr << "Core already running" << std::endl;
+            mLogger->error("[CORE] Core is already running");
             return;
         }
 
         // Begin core
         mIsRunning.store(true);
-        std::cout << "Running core" << std::endl;
+        mLogger->debug("[CORE] Starting Core run loop");
 
         mpService->onStart();
 
@@ -116,8 +122,8 @@ namespace SmartHome {
         auto &socketServer = IPC::SocketServer::Instance();
         IPC::SocketServer::Config config = {mConfig.tcp, mConfig.uds};
 
-        if (!socketServer.initializeSocketServer(&mSocketServerIoContext, config)) {
-            std::cerr << "Error IPC server failed to start" << std::endl;
+        if (!socketServer.initializeSocketServer(&mSocketServerIoContext, config, mLogger)) {
+            mLogger->critical("[CORE] Failed to initialize IPC socket server");
             shutdown();
             return;
         }
@@ -127,21 +133,15 @@ namespace SmartHome {
         // Main loop
         while (mIsRunning.load()) {
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            //TODO implement watchdog
         }
-        std::cout << "Core finished running" << std::endl;
-
-        // Stopping signal thread
-        if (mCoreThread.has_value()) {
-            mCoreGuard.reset();
-            mCoreIoContext.stop();
-            mCoreThread->join();
-            mCoreThread.reset();
-        }
-        std::cout << "Core cleanup complete" << std::endl;
+        mLogger->debug("[CORE] Exiting");
+        stopCoreThread();
     }
 
     void Core::shutdown() {
-        std::cout << "Shutting down core" << std::endl;
+        //TODO add is shutting down check
+        mLogger->debug("[CORE] Starting core shutdown");
 
         // Stop core main loop
         mIsRunning.store(false);
@@ -150,7 +150,7 @@ namespace SmartHome {
 
         // Stop TCP server
         if (mConfig.tcp.isEnabled) {
-            std::cout << "Stopping IPC server" << std::endl;
+            mLogger->debug("[CORE] Shutting down IPC socket server");
             auto &tcpServer = IPC::SocketServer::Instance();
             if (tcpServer.isRunning()) {
                 tcpServer.stopSocketServer();
@@ -171,7 +171,7 @@ namespace SmartHome {
             mSignals.reset();
         }
 
-        std::cout << "Shutdown complete" << std::endl;
+        mLogger->debug("[CORE] Shutdown complete");
     }
 
     bool Core::isRunning() const {
@@ -192,7 +192,7 @@ namespace SmartHome {
                     shutdown();
                     break;
                 case SIGHUP:
-                    std::cout << "HUP - not implemented" << std::endl;
+                    mLogger->debug("[CORE] Not implemented");
                     //TODO implement reload
                     break;
                 default:
@@ -201,7 +201,15 @@ namespace SmartHome {
             }
         } else {
             // Handle signal error
-            std::cerr << "Signal handler error: " << ec.value() << std::endl;
+            mLogger->errorf("[CORE] Signal handler error: %s", ec.message().c_str());
+        }
+    }
+
+    void Core::stopCoreThread() {
+        if (mCoreThread.has_value()) {
+            mCoreGuard.reset();
+            mCoreThread->join();
+            mCoreThread.reset();
         }
     }
 }

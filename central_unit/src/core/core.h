@@ -2,6 +2,7 @@
 
 #include "socket_server.h"
 #include "service/service_manager.h"
+#include "async_logger.h"
 
 #include <atomic>
 #include <memory>
@@ -68,9 +69,10 @@ namespace SmartHome {
          *          Must be called before run(). Can only be initialized once.
          *
          * @param configStruct Configuration parameters.
+         * @param logger Shared pointer instance reference of configured logger.
          * @return true if successful, false on error.
          */
-        bool initialize(const Config &configStruct);
+        bool initialize(const Config &configStruct, const std::shared_ptr<Utils::Logger> &logger);
 
         /**
          * @brief Starts Core subsystems and runs main loop.
@@ -103,6 +105,8 @@ namespace SmartHome {
          */
         ba::io_context &getCoreIoContext();
 
+        std::shared_ptr<Utils::AsyncLogger> mLogger; ///< Logger instance
+
     private:
         /**
          * @brief Private constructor for singleton pattern.
@@ -121,6 +125,11 @@ namespace SmartHome {
          * @param signal Signal number.
          */
         void signalHandler(const bs::error_code &ec, int signal);
+
+        /**
+         * @brief Stops core thread.
+         */
+        void stopCoreThread();
 
         // Configuration
         Config mConfig;
