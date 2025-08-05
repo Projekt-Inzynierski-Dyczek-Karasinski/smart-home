@@ -22,11 +22,11 @@ namespace SmartHome::Utils {
          * @details Copies logger configuration and applies it.
          *          If source logger has file logging enabled, continues logging to the same file.
          *
-         * @param logger Source logger to copy configuration from.
+         * @param logger Shared pointer instance reference of logger to copy configuration from.
          * @param ioContext Boost.Asio io_context for async operations.
          *
          */
-        AsyncLogger(const Logger &logger, ba::io_context &ioContext);
+        AsyncLogger(const std::shared_ptr<Logger> &logger, ba::io_context &ioContext);
 
         /**
          * @brief Construct AsyncLogger with default configuration.
