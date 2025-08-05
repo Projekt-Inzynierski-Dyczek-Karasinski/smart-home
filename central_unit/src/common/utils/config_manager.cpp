@@ -5,24 +5,19 @@
 #include <yaml-cpp/yaml.h>
 
 namespace SmartHome::Utils {
-    ConfigManager &ConfigManager::Instance() {
-        static ConfigManager ConfigInstance;
-        return ConfigInstance;
-    }
 
-    ConfigManager::ConfigManager() = default;
-
-    ConfigManager::~ConfigManager() = default;
+    ConfigManager::ConfigManager(const std::shared_ptr<Logger> &logger): mpLogger(logger) {
+    } ;
 
     bool ConfigManager::loadConfig(const std::string &configPath) {
         try {
             // Try to load config file
             mConfigNode = YAML::LoadFile(configPath);
-            mIsConfigLoaded.store(true);
+            mIsConfigLoaded = true;
             return true;
         } catch (YAML::Exception &e) {
             // Handle loading error
-            std::cerr << "Load config error: " << e.what() << std::endl;
+            mpLogger->errorf("[CONFIG_MANAGER] Load config error: %s", e.what());
             return false;
         }
     }
