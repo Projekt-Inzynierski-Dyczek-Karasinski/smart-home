@@ -19,6 +19,17 @@ namespace SmartHome {
     };
 
     /**
+     * @brief Loads logger configuration vales from YAML file.
+     *
+     * @details Reads smarthome logger configuration from YAML file and updates provided config structs.
+     *          Existing values in structs are overwritten with values from the YAML file if present.
+     *
+     * @param configManager Configuration manager instance for YAML file handling.
+     * @param config Pointer to logger configuration struct to be updated.
+     */
+    void loadLoggerConfig(Utils::ConfigManager &configManager, Utils::Logger::Config *config);
+
+    /**
      * @brief Loads configuration vales from YAML file.
      *
      * @details Reads smarthome configuration from YAML file and updates provided config structs.
