@@ -7,6 +7,9 @@
 #include <systemd/sd-daemon.h>
 
 namespace SmartHome::Service {
+    SystemdService::SystemdService(const std::shared_ptr<Utils::Logger> &logger): ServiceManager(logger) {
+    }
+
     bool SystemdService::onInitialize() {
         if (getenv("NOTIFY_SOCKET")) {
             mIsWatchdogEnabled = sd_watchdog_enabled(0, &mWatchdogInterval) > 0;
@@ -15,7 +18,7 @@ namespace SmartHome::Service {
             }
             return true;
         }
-        std::cerr << "Systemd service error: Cannot find notify_socket" << std::endl;
+        mpLogger->error("[SYSTEMD_SERVICE] Service initialization failed, could not find notify_socket");
         return false;
     }
 
@@ -25,9 +28,11 @@ namespace SmartHome::Service {
             sd_notify(0, "WATCHDOG=1");
             notifyWatchdog();
         }
+        mpLogger->info("[SYSTEMD_SERVICE] Systemd service started");
     }
 
     void SystemdService::onStop() {
+        mpLogger->debug("[SYSTEMD_SERVICE] Stopping service");
         sd_notify(0, "STOPPING=1");
         if (mIsWatchdogEnabled && mWatchdogTimer.has_value()) {
             mWatchdogTimer->cancel();

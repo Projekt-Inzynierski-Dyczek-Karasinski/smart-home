@@ -13,6 +13,8 @@ namespace SmartHome::Service {
      */
     class StandaloneService final : public ServiceManager {
     public:
+        explicit StandaloneService(const std::shared_ptr<Utils::Logger> &logger);
+
         bool onInitialize() override;
 
         void onStart() override;

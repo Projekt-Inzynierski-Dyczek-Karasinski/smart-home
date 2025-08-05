@@ -21,6 +21,8 @@ namespace SmartHome::Service {
      */
     class SystemdService final : public ServiceManager {
     public:
+        explicit SystemdService(const std::shared_ptr<Utils::Logger> &logger);
+
         bool onInitialize() override;
 
         void onStart() override;
