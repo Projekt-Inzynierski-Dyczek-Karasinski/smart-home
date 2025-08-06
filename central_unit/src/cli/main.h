@@ -1,12 +1,14 @@
 #pragma once
 
 #include "socket_connection.h"
+#include "async_logger.h"
 
 #include <utility>
 
 #include <boost/asio.hpp>
 #include <boost/program_options.hpp>
 
+namespace su = SmartHome::Utils;
 
 namespace ba = boost::asio;
 namespace bai = boost::asio::ip;
@@ -41,6 +43,17 @@ namespace SmartHomeCLI {
      * @param connection A connection instance reference.
      */
     void runCli(SmartHome::IPC::SocketConnection &connection);
+
+    /**
+     * @brief Shutdowns logger thread.
+     */
+    void loggerShutdown();
+
+    // Global variables with inline specifier
+    inline ba::io_context ioContext; ///< Boost::Asio IO context for async operations
+    inline su::AsyncLogger logger(ioContext); ///< Async logger instance
+    inline std::optional<ba::executor_work_guard<ba::io_context::executor_type>> loggerGuard; ///< IO context guard
+    inline std::optional<std::thread> loggerThread;
 
     /// Default IP address for TCP connection (address:port)
     static constexpr const char *s_DEFAULT_TCP_ENDPOINT_ADDRESS = "127.0.0.1:43321";

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "logger/logger.h"
+
 #include <optional>
 #include <string>
 
@@ -9,26 +11,17 @@ namespace SmartHome::Utils {
     /**
      * @brief YAML configuration manager for smart home system.
      *
-     * @details Thread-safe singleton allowing type-safe access to
+     * @details Configuration manager allowing type-safe access to
      *          configuration values using dot notation.
      */
     class ConfigManager {
     public:
         /**
-         * @brief Get singleton instance of ConfigManager.
+         * @brief ConfigManager constructor assigning logger instance reference.
          *
-         * @details Thread-safe initialization using static local variable.
-         *          Instance is created on first call and reused after.
-         *
-         * @return Reference to Config singleton instance.
+         * @param logger Logger shared pointer instance reference.
          */
-        static ConfigManager &Instance();
-
-        // Prevent copying
-        ConfigManager(const ConfigManager &) = delete;
-
-        // Prevent assignment
-        ConfigManager &operator=(const ConfigManager &) = delete;
+        explicit ConfigManager(const std::shared_ptr<Logger> &logger);
 
         /**
          * @brief Loads config file from YAML file.
@@ -74,18 +67,9 @@ namespace SmartHome::Utils {
         void getValue(const std::string &valuePath, T &value);
 
     private:
-        /**
-         * @brief Private constructor for singleton pattern.
-         */
-        ConfigManager();
-
-        /**
-         * @brief Private destructor for singleton pattern.
-         */
-        ~ConfigManager();
-
         YAML::Node mConfigNode; ///< YAML configuration file root node.
-        std::atomic<bool> mIsConfigLoaded{false}; ///< Configuration loaded state.
+        bool mIsConfigLoaded = false; ///< Configuration loaded state.
+        std::shared_ptr<Logger> mpLogger; ///< Logger instance reference
     };
 }
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <optional>
 #include <string>
 #include <stdexcept>
 
@@ -37,7 +38,7 @@ namespace SmartHome::Utils {
          * @brief Construct and acquire lock on file.
          *
          * @param lockFilePath Path to lock file.
-         * @throw std::runtime_error if lock cannot be created or locked.
+         * @throw std::runtime_error if opening, locking or writing operations fail.
          */
         explicit FileLock(const std::string &lockFilePath);
 
@@ -63,6 +64,22 @@ namespace SmartHome::Utils {
          */
         bool writePidToFile() const;
 
+        /**
+         * @brief Helper function for reading PID from lockfile.
+         *
+         * @return PID written in lock file if preset, nullopt otherwise.
+         */
+        std::optional<pid_t> readPidFromFile() const;
+
+        /**
+         * @brief Helper function for checking if process is currently running.
+         *
+         * @param pid PID of process to check.
+         * @return True if process is running, false otherwise
+         */
+        static bool isProcessRunning(const pid_t &pid);
+
         int mLockFd = -1; ///< File descriptor for lock file
+        std::string mLockFilePath;
     };
 }

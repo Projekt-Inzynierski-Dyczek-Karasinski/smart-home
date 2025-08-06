@@ -17,7 +17,7 @@ namespace SmartHomeCLI {
             socket.connect(endpoint);
             return true;
         } catch (std::exception &e) {
-            std::cerr << "UDS connection attempt error:" << e.what() << std::endl;
+            logger.debugf("[SMARTHOMECTL] UDS connection attempt failed: %s", e.what());
             return false;
         }
     }
@@ -33,11 +33,13 @@ namespace SmartHomeCLI {
             return true;
         } catch (std::exception &e) {
             std::cerr << "TCP connection attempt error: " << e.what() << std::endl;
+            logger.debugf("[SMARTHOMECTL] TCP connection attempt failed: %s", e.what());
             return false;
         }
     }
 
     void runCli(si::SocketConnection &connection) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Wait for logs
         std::string input = "";
         while (connection.isOpen()) {
             std::cout << "Smarthomectl: " << std::flush;
@@ -55,9 +57,15 @@ namespace SmartHomeCLI {
                 std::string output = connection.read();
                 std::cout << "\r\033[K" << output << std::endl;
             } catch (bs::system_error &e) {
-                std::cout << e.what() << std::endl;
+                logger.errorf("[SMARTHOMECTL] IO error: %s", e.what());
             }
         }
+    }
+
+    void loggerShutdown() {
+        logger.debug("[SMARTHOMECTL] Exiting");
+        loggerGuard.reset();
+        loggerThread->join();
     }
 }
 
@@ -77,6 +85,7 @@ int main(const int argc, char *argv[]) {
              "TCP ipv4 address and port in address:port format");
 
     //TODO consider implementing more advanced options
+    //TODO add logger options and default values
 
     bpo::variables_map vm;
     try {
@@ -98,28 +107,41 @@ int main(const int argc, char *argv[]) {
                                                    ? si::SocketConnection::Type::TCP
                                                    : si::SocketConnection::Type::UDS;
 
-    ba::io_context ioContext;
+    auto &ioContext = SmartHomeCLI::ioContext;
+
+    //TODO Change to utility thread and add signal handling
+    SmartHomeCLI::loggerGuard.emplace(ba::make_work_guard(ioContext));
+    SmartHomeCLI::loggerThread = std::thread([&] {
+        ioContext.run();
+    });
+
+    auto logger = std::make_shared<SmartHome::Utils::Logger>();
+    logger->setLevel(su::LogLevels::Level::DEBUG);
+    logger->info("[SMARTHOMECTL] Logger enabled");
 
     if (ipcType == si::SocketConnection::Type::UDS) {
-        auto udsConnection = si::SocketConnection(ioContext, si::SocketConnection::Type::UDS);
+        auto udsConnection = si::SocketConnection(ioContext, si::SocketConnection::Type::UDS, logger);
 
         std::string udsEndpointPath;
         try {
             udsEndpointPath = vm["uds"].as<std::string>();
         } catch (std::exception &e) {
             std::cerr << e.what() << std::endl;
+            logger->criticalf("[SMARTHOMECTL] UDS connection unexpected error: %s", e.what());
+            SmartHomeCLI::loggerShutdown();
             return EXIT_FAILURE;
         }
 
         if (SmartHomeCLI::attemptUdsConnection(udsConnection, udsEndpointPath)) {
-            std::cout << "Connected via UDS" << std::endl;
+            logger->info("[SMARTHOMECTL] Connected via UDS");
             SmartHomeCLI::runCli(udsConnection);
 
             udsConnection.close();
+            SmartHomeCLI::loggerShutdown();
             return EXIT_SUCCESS;
         }
     } else {
-        auto tcpConnection = si::SocketConnection(ioContext, si::SocketConnection::Type::TCP);
+        auto tcpConnection = si::SocketConnection(ioContext, si::SocketConnection::Type::TCP, logger);
 
         std::string tcpEndpointAddress = "";
         int tcpEndpointPort = 0;
@@ -132,23 +154,29 @@ int main(const int argc, char *argv[]) {
                 tcpEndpointAddress = tmp[0];
                 tcpEndpointPort = std::stoi(tmp[1]);
             } else {
-                std::cerr << "tcp endpoint address is invalid" << std::endl;
+                logger->critical("[SMARTHOMECTL] TCP endpoint address is invalid");
+                SmartHomeCLI::loggerShutdown();
                 return EXIT_FAILURE;
             }
         } catch (std::exception &e) {
             std::cerr << e.what() << std::endl;
+            logger->criticalf("[SMARTHOMECTL] TCP connection unexpected error: %s", e.what());
+            SmartHomeCLI::loggerShutdown();
             return EXIT_FAILURE;
         }
 
         if (SmartHomeCLI::attemptTcpConnection(tcpConnection, tcpEndpointAddress, tcpEndpointPort)) {
-            std::cout << "Connected via TCP" << std::endl;
+            logger->info("[SMARTHOMECTL] Connected via TCP");
             SmartHomeCLI::runCli(tcpConnection);
 
             tcpConnection.close();
+            logger->debug("[SMARTHOMECTL] Exiting");
+            SmartHomeCLI::loggerShutdown();
             return EXIT_SUCCESS;
         }
     }
 
-    std::cerr << "Connection failure: smarthomed not reachable" << std::endl;
+    logger->critical("[SMARTHOMECTL] Connection failure - smarthomed not reachable");
+    SmartHomeCLI::loggerShutdown();
     return EXIT_FAILURE;
 }

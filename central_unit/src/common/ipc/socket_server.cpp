@@ -20,9 +20,12 @@ namespace SmartHome::IPC {
         }
     }
 
-    bool SocketServer::initializeSocketServer(ba::io_context *ioContext, const Config &config) {
+    bool SocketServer::initializeSocketServer(ba::io_context *ioContext,
+                                              const Config &config,
+                                              const std::shared_ptr<Utils::Logger> &logger) {
         mConfig = config;
         bool isIpcLaunchSuccessful = false;
+        mpLogger = logger;
 
         // Create endpoint and acceptor for TCP connections if enabled
         if (mConfig.tcp.isEnabled) {
@@ -30,11 +33,18 @@ namespace SmartHome::IPC {
                 mTcpEndpoint = bai::tcp::endpoint(bai::make_address(mConfig.tcp.endpointAddress),
                                                   mConfig.tcp.endpointPort);
                 mpTcpAcceptor = std::make_unique<bai::tcp::acceptor>(*ioContext, mTcpEndpoint);
-                std::cout << "IPC TCP acceptor started on " << mConfig.tcp.endpointAddress << ":"
-                        << mConfig.tcp.endpointPort << std::endl;
+                mpLogger->infof("[SOCKET_SERVER] TCP acceptor started on %s:%d", mConfig.tcp.endpointAddress.c_str(),
+                                mConfig.tcp.endpointPort);
                 isIpcLaunchSuccessful = true;
+            } catch (bs::system_error &e) {
+                mpLogger->errorf("[SOCKET_SERVER] TCP acceptor start failed: %s (category: %s ,code: %d)",
+                                 e.what(),
+                                 e.code().category().name(),
+                                 e.code().value());
+            } catch (std::filesystem::filesystem_error &e) {
+                mpLogger->errorf("[SOCKET_SERVER] TCP acceptor start failed %s", e.what());
             } catch (std::exception &e) {
-                std::cerr << "Error during TCP acceptor start: " << e.what() << std::endl;
+                mpLogger->errorf("[SOCKET_SERVER] TCP acceptor start failed unexpected error: %s", e.what());
             }
         }
 
@@ -44,10 +54,17 @@ namespace SmartHome::IPC {
                 std::filesystem::remove(mConfig.uds.endpointPath);
                 mUdsEndpoint = bal::stream_protocol::endpoint(mConfig.uds.endpointPath);
                 mpUdsAcceptor = std::make_unique<bal::stream_protocol::acceptor>(*ioContext, mUdsEndpoint);
-                std::cout << "IPC UDS acceptor started on " << mConfig.uds.endpointPath << std::endl;
+                mpLogger->infof("[SOCKET_SERVER] UDS acceptor started on %s", mConfig.uds.endpointPath.c_str());
                 isIpcLaunchSuccessful = true;
+            } catch (bs::system_error &e) {
+                mpLogger->errorf("[SOCKET_SERVER] UDS acceptor start failed: %s (category: %s ,code: %d)",
+                                 e.what(),
+                                 e.code().category().name(),
+                                 e.code().value());
+            } catch (std::filesystem::filesystem_error &e) {
+                mpLogger->errorf("[SOCKET_SERVER] UDS acceptor start failed %s", e.what());
             } catch (std::exception &e) {
-                std::cerr << "Error during UDS acceptor start: " << e.what() << std::endl;
+                mpLogger->errorf("[SOCKET_SERVER] UDS acceptor start failed unexpected error: %s", e.what());
             }
         }
 
@@ -55,14 +72,14 @@ namespace SmartHome::IPC {
         return isIpcLaunchSuccessful;
     }
 
-    void SocketServer::onAcceptError(const bs::error_code &ec) {
+    void SocketServer::onAcceptError(const bs::error_code &ec) const {
         // TODO more cases or if?
         switch (ec.value()) {
             case ba::error::operation_aborted:
-                std::cout << "IPC accept connection aborted" << std::endl;
+                mpLogger->info("[SOCKET_SERVER] IPC accept connection aborted");
                 break;
             default:
-                std::cerr << "Accept connection error: " << ec.message() << std::endl;
+                mpLogger->errorf("[SOCKET_SERVER] IPC accept failed: %s", ec.message().c_str());
         }
     }
 
@@ -84,7 +101,8 @@ namespace SmartHome::IPC {
 
 
     void SocketServer::startTcpAcceptor(ba::io_context *ioContext) {
-        auto newTcpConnection = std::make_shared<SocketServerConnection>(*ioContext, SocketServerConnection::Type::TCP);
+        auto newTcpConnection = std::make_shared<SocketServerConnection>(
+            *ioContext, SocketServerConnection::Type::TCP, mpLogger);
         auto &socket = std::get<bai::tcp::socket>(newTcpConnection->mSocket);
 
         mpTcpAcceptor->async_accept(socket, [this, newTcpConnection, ioContext](const bs::error_code ec) {
@@ -93,7 +111,8 @@ namespace SmartHome::IPC {
     }
 
     void SocketServer::startUdsAcceptor(ba::io_context *ioContext) {
-        auto newUdsConnection = std::make_shared<SocketServerConnection>(*ioContext, SocketServerConnection::Type::UDS);
+        auto newUdsConnection = std::make_shared<SocketServerConnection>(
+            *ioContext, SocketServerConnection::Type::UDS, mpLogger);
         auto &socket = std::get<bal::stream_protocol::socket>(newUdsConnection->mSocket);
 
         mpUdsAcceptor->async_accept(socket, [this, newUdsConnection, ioContext](const bs::error_code ec) {
@@ -107,7 +126,7 @@ namespace SmartHome::IPC {
         try {
             connectionId = getNextConnectionId();
         } catch (std::exception &e) {
-            std::cerr << "Socket server accept connection error: " << e.what() << std::endl;
+            mpLogger->errorf("[SOCKET_SERVER] Socket server accept failed: %s", e.what());
             connection->close();
             // Retry after dealy
             std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -127,19 +146,20 @@ namespace SmartHome::IPC {
             mActiveConnections[connectionId] = connection;
         }
 
-        std::visit([connectionId](auto &socket) {
-            std::cout << "Connection [" << connectionId << "] accepted" << std::endl;
+        std::visit([connectionId, this](auto &socket) {
+            mpLogger->debugf("[SOCKET_SERVER] Connection accepted (ID:%d)", connectionId);
         }, connection->mSocket);
 
         // Start reading incoming messages
         connection->asyncReadLoop([this, connection, connectionId](const std::string &message) {
-            std::cout << "Received from" << connectionId << ": " << message << std::endl;
+            mpLogger->debugf("[SOCKET_SERVER] Message received: %s", message.c_str());
 
             //TODO implement api integration and change line below for an api call
-            connection->writeAsync(message, [message]() { std::cout << "Sent message: " << message << std::endl; });
+            connection->writeAsync(message, [message, this]() {
+                mpLogger->debugf("[SOCKET_SERVER] Message sent: %s", message.c_str());
+            });
         });
     }
-
 
     uint32_t SocketServer::getNextConnectionId() {
         std::lock_guard lock(mActiveConnectionsMutex);
@@ -166,7 +186,7 @@ namespace SmartHome::IPC {
             if (mpTcpAcceptor) startTcpAcceptor(ioContext);
             if (mpUdsAcceptor) startUdsAcceptor(ioContext);
         } else {
-            std::cerr << "IPC server run error: server not initialized" << std::endl;
+            mpLogger->errorf("[SOCKET_SERVER] IPC server not initialized");
         }
     }
 
@@ -175,32 +195,32 @@ namespace SmartHome::IPC {
 
         // Close TCP acceptor
         if (mpTcpAcceptor) {
-            std::cout << "Stopping TCP acceptor" << std::endl;
+            mpLogger->debug("[SOCKET_SERVER] Stopping TCP acceptor");
             try {
                 bs::error_code ec;
                 mpTcpAcceptor->cancel(ec);
                 mpTcpAcceptor->close(ec);
                 if (ec) {
-                    std::cerr << "Error during server close: " << ec.message() << std::endl;
+                    mpLogger->debugf("[SOCKET_SERVER] TCP acceptor close failed: %s", ec.message().c_str());
                 }
             } catch (std::exception &e) {
-                std::cerr << "Unexpected error during server close: " << e.what() << std::endl;
+                mpLogger->errorf("[SOCKET_SERVER] TCP acceptor close unexpected error: %s", e.what());
             }
             mpTcpAcceptor.reset();
         }
 
         // Close UDS acceptor
         if (mpUdsAcceptor) {
-            std::cout << "Stopping UDS acceptor" << std::endl;
+            mpLogger->debug("[SOCKET_SERVER] Stopping UDS acceptor");
             try {
                 bs::error_code ec;
                 mpUdsAcceptor->cancel(ec);
                 mpUdsAcceptor->close(ec);
                 if (ec) {
-                    std::cerr << "Error during server close: " << ec.message() << std::endl;
+                    mpLogger->debugf("[SOCKET_SERVER] UDS acceptor close failed: %s", ec.message().c_str());
                 }
             } catch (std::exception &e) {
-                std::cerr << "Unexpected error during server close: " << e.what() << std::endl;
+                mpLogger->errorf("[SOCKET_SERVER] UDS acceptor close unexpected error: %s", e.what());
             }
             mpUdsAcceptor.reset();
         }

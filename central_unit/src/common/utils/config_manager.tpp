@@ -8,7 +8,7 @@
 namespace SmartHome::Utils {
     template<typename T>
     std::optional<T> ConfigManager::getValue(const std::string &valuePath) {
-        if (mIsConfigLoaded.load()) {
+        if (mIsConfigLoaded) {
             // Prepare keys from string
             std::vector<std::string> keys = {};
             boost::split(keys, valuePath, boost::is_any_of("."));
@@ -23,8 +23,7 @@ namespace SmartHome::Utils {
                 if (!currentNode.IsDefined()) {
                     // Handle invalid path
                     if (!currentValuePath.empty()) currentValuePath.pop_back();
-                    std::cerr << "Config getValue() error: value path \"" << currentValuePath << "\" is not defined"
-                            << std::endl;
+                    mpLogger->errorf("[CONFIG_MANAGER] Could not find %s value", currentValuePath.c_str());
                     return std::nullopt;
                 }
             }
@@ -36,13 +35,12 @@ namespace SmartHome::Utils {
                 return currentNode.as<T>();
             } catch (const std::exception &e) {
                 currentValuePath.pop_back();
-                std::cerr << "Config getValue() error: bad conversion on " << currentValuePath << ": " <<
-                        currentNode << std::endl;
+                mpLogger->errorf("[CONFIG_MANAGER] Type conversion error on %s value", currentValuePath.c_str());
                 return std::nullopt;
             }
         }
         // Handle config not loaded
-        std::cerr << "Config getValue() error: config not loaded" << std::endl;
+        mpLogger->errorf("[CONFIG_MANAGER] Config file not loaded", valuePath.c_str());
         return std::nullopt;
     }
 

@@ -21,10 +21,39 @@ namespace SmartHome::Service {
      */
     class SystemdService final : public ServiceManager {
     public:
+        /**
+         * @brief Construct systemd service manager.
+         *
+         * @param logger Shared logger instance for service messages.
+         */
+        explicit SystemdService(const std::shared_ptr<Utils::Logger> &logger);
+
+        /**
+         * @brief Initialize systemd service.
+         *
+         * @details Checks for systemd environment (NOTIFY_SOCKET) and sets up watchdog timer if enabled.
+         *          Watchdog interval is read from systemd configuration.
+         *
+         * @return true if systemd environment found and initialized,
+         *         false if not running under systemd.
+         */
         bool onInitialize() override;
 
+        /**
+         * @brief Start systemd service.
+         *
+         * @details Notifies systemd that service is ready and starts watchdog keep-alive timer if enabled.
+         *
+         * @pre onInitialize() called and returned true.
+         */
         void onStart() override;
 
+        /**
+         * @brief Stop systemd service.
+         *
+         * @details Notifies systemd about shutdown and cancels watchdog timer.
+         *          Systemd will wait for service to fully stop before considering it terminated.
+         */
         void onStop() override;
 
     private:

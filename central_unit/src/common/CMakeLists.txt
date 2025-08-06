@@ -7,26 +7,42 @@ find_package(Boost 1.74 REQUIRED COMPONENTS
 )
 
 
+# SMARTHOME LOGGER
+add_library(smarthome_logger STATIC
+        utils/logger/logger.cpp
+        utils/logger/async_logger.cpp
+)
+
+add_library(smarthome::logger ALIAS smarthome_logger)
+
+target_include_directories(smarthome_logger PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils/logger>
+)
+
+target_link_libraries(smarthome_logger PRIVATE
+        Boost::system
+)
+
+# SMARTHOME IPC
 add_library(smarthome_ipc STATIC
         ipc/socket_connection.cpp
         ipc/socket_server_connection.cpp
         ipc/socket_server.cpp
-
 )
 
 add_library(smarthome::ipc ALIAS smarthome_ipc)
 
 target_include_directories(smarthome_ipc PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/ipc>
-
 )
 
-target_link_libraries(smarthome_ipc PUBLIC
+target_link_libraries(smarthome_ipc PRIVATE
         Boost::system
         Boost::regex
+        smarthome::logger
 )
 
-
+# SMARTHOME UTILITY
 add_library(smarthome_utility STATIC
         utils/config_manager.cpp
         utils/utils.cpp
@@ -40,8 +56,9 @@ target_include_directories(smarthome_utility PUBLIC
 
 )
 
-
-target_link_libraries(smarthome_utility PRIVATE
+target_link_libraries(smarthome_utility
+        PRIVATE
         yaml-cpp
-
+        PUBLIC
+        smarthome::logger
 )

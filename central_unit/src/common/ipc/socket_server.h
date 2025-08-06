@@ -1,6 +1,7 @@
 #pragma once
 
 #include "socket_server_connection.h"
+#include "async_logger.h"
 
 #include <utility>
 #include <unordered_map>
@@ -67,12 +68,15 @@ namespace SmartHome::IPC {
          *
          * @param ioContext Boost::Asio IO context for async operations.
          * @param config Server configuration.
+         * @param logger Logger shared pointer instance pointer.
          *
          * @return true if at least one protocol initialized successfully.
          *
          * @post To start accepting connections, call runSocketServer().
          */
-        bool initializeSocketServer(ba::io_context *ioContext, const Config &config);
+        bool initializeSocketServer(ba::io_context *ioContext,
+                                    const Config &config,
+                                    const std::shared_ptr<Utils::Logger> &logger);
 
         /**
          * @brief Start accepting connections.
@@ -114,11 +118,18 @@ namespace SmartHome::IPC {
 
         /**
          * @brief Handle acceptor errors.
+         *
+         * @param ec Boost::System error code.
          */
-        static void onAcceptError(const bs::error_code &ec);
+        void onAcceptError(const bs::error_code &ec) const;
 
         /**
          * @brief Common accept handler for both protocols.
+         *
+         * @param connection Connection instance shared pointer reference.
+         * @param ioContext Boost::Asio IO context for async operations.
+         * @param ec Boost::System error code.
+         * @param type Acceptor type.
          */
         void acceptorHandler(const std::shared_ptr<SocketServerConnection> &connection,
                              ba::io_context *ioContext,
@@ -177,6 +188,7 @@ namespace SmartHome::IPC {
         void removeActiveConnection(uint32_t connectionId);
 
         Config mConfig;
+        std::shared_ptr<Utils::Logger> mpLogger; ///< Logger instance shared pointer
 
         /// Map of active connections (ID: weak_ptr)
         std::unordered_map<uint32_t, std::weak_ptr<SocketServerConnection> > mActiveConnections;
@@ -186,7 +198,7 @@ namespace SmartHome::IPC {
         std::unique_ptr<bai::tcp::acceptor> mpTcpAcceptor; ///< TCP acceptor for incoming connections.
         bai::tcp::endpoint mTcpEndpoint;
 
-        //UDS
+        // UDS
         std::unique_ptr<bal::stream_protocol::acceptor> mpUdsAcceptor; ///< UDS acceptor for incoming connections.
         bal::stream_protocol::endpoint mUdsEndpoint;
 

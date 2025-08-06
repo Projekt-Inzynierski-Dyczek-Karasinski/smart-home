@@ -2,11 +2,25 @@ preset_values:
   ipc_server_thread_count:
     half_cpu_cores: &half_cpu_cores -1
     all_cpu_cores: &all_cpu_cores 0
+  log_levels:
+    none: &none 0
+    critical: &critical 1
+    error: &error 2
+    warning: &warning 3
+    info: &info 4
+    debug: &debug 5
 
 
 core:
   mode: "headless"  #TODO add kiosk gui
-  log_level: "debug" #TODO implement verbose levels
+  logging:
+    log_level: *warning
+    enable_console_log_output: true
+    log_file:
+      enabled: true
+      create_new: true
+      archive_old: true
+      path: "/var/log/smarthome/core.log"
   ipc:
     threads: *half_cpu_cores # Exact thread count if value > 0, possible preset values: *all_cpu_cores, *half_cpu_cores
     tcp:
@@ -15,7 +29,7 @@ core:
       port: 43321
     uds:
       enabled: true
-      socket_path: "/var/run/smarthome.sock"
+      socket_path: "/var/run/smarthomed.sock"
 
 services:
   mediator:
