@@ -6,53 +6,117 @@
 #include <iostream>
 #include <filesystem>
 
-#include <boost/process.hpp>
-#include <boost/program_options.hpp>
-
-namespace bp = boost::process;
-namespace bpo = boost::program_options;
-
 namespace SmartHome {
-    void loadLoggerConfig(Utils::ConfigManager &configManager, Utils::Logger::Config *config) {
+    void loadLoggerYamlConfig(Utils::ConfigManager &configManager, Utils::Logger::Config &config) {
         std::string root = "core.logging";
-        config->logLevel = Utils::LogLevels::toLevel(
+        config.logLevel = Utils::LogLevels::toLevel(
             configManager.getValue<int>(root + ".log_level").
             value_or(static_cast<int>(Utils::LogLevels::defaultLevel)));
-        configManager.getValue(root + ".enable_console_log_output", config->enableConsoleLogOutput);
+        configManager.getValue(root + ".enable_console_log_output", config.enableConsoleLogOutput);
 
         root += ".log_file";
-        configManager.getValue(root + ".enabled", config->logFile.enabled);
-        configManager.getValue(root + ".create_new", config->logFile.createNew);
-        configManager.getValue(root + ".archive_old", config->logFile.archiveOld);
-        configManager.getValue(root + ".path", config->logFile.path);
+        configManager.getValue(root + ".enabled", config.logFile.enabled);
+        configManager.getValue(root + ".create_new", config.logFile.createNew);
+        configManager.getValue(root + ".archive_old", config.logFile.archiveOld);
+        configManager.getValue(root + ".path", config.logFile.path);
     }
 
-    void loadConfigValues(Utils::ConfigManager &configManager, Core::Config *coreConfig,
-                          MediatorConfig *mediatorConfig) {
+    void loadYamlConfigs(Utils::ConfigManager &configManager, Core::Config &coreConfig,
+                         MediatorConfig &mediatorConfig) {
         // Mediator config
         std::string root = "services.mediator";
-        configManager.getValue(root + ".enabled", mediatorConfig->isEnabled);
-        mediatorConfig->serviceType = Utils::resolveServiceType(
+        configManager.getValue(root + ".enabled", mediatorConfig.isEnabled);
+        mediatorConfig.serviceType = Utils::resolveServiceType(
             configManager.getValue<std::string>(root + ".service_type").value());
-        configManager.getValue(root + ".exec_path", mediatorConfig->execPath);
-        configManager.getValue(root + ".config_path", mediatorConfig->configPath);
+        configManager.getValue(root + ".exec_path", mediatorConfig.execPath);
+        configManager.getValue(root + ".config_path", mediatorConfig.configPath);
 
         // Core config
         root = "core.ipc";
-        configManager.getValue(root + ".threads", coreConfig->ipcServerThreads);
+        configManager.getValue(root + ".threads", coreConfig.ipcServerThreads);
 
         root = "core.ipc.tcp";
-        configManager.getValue(root + ".enabled", coreConfig->tcp.isEnabled);
-        configManager.getValue(root + ".address", coreConfig->tcp.endpointAddress);
-        configManager.getValue(root + ".port", coreConfig->tcp.endpointPort);
+        configManager.getValue(root + ".enabled", coreConfig.tcp.isEnabled);
+        configManager.getValue(root + ".address", coreConfig.tcp.endpointAddress);
+        configManager.getValue(root + ".port", coreConfig.tcp.endpointPort);
 
         root = "core.ipc.uds";
-        configManager.getValue(root + ".enabled", coreConfig->uds.isEnabled);
-        configManager.getValue(root + ".socket_path", coreConfig->uds.endpointPath);
+        configManager.getValue(root + ".enabled", coreConfig.uds.isEnabled);
+        configManager.getValue(root + ".socket_path", coreConfig.uds.endpointPath);
+    }
+
+
+    void overwriteConfigsWithProgramOptions(const bpo::variables_map &vm,
+                                            loggerTemporaryOptions &logTmpOpt,
+                                            Core::Config &coreConfig,
+                                            Utils::Logger::Config &loggerConfig) {
+        // Logger config
+        if (logTmpOpt.isVerbositySet) loggerConfig.logLevel = Utils::LogLevels::toLevel(logTmpOpt.verboseLevel);
+        if (logTmpOpt.isQuietSet) loggerConfig.enableConsoleLogOutput = false;
+        if (vm.contains("no-log-file")) loggerConfig.logFile.enabled = false;
+        if (vm.contains("log-file")) loggerConfig.logFile.path = vm["log-file"].as<std::string>();
+        loggerConfig.logFile.createNew = !vm["append-log"].as<bool>();
+        loggerConfig.logFile.archiveOld = !vm["no-archive"].as<bool>();
+
+        // Core config
+        if (vm.contains("port")) coreConfig.tcp.endpointPort = vm["port"].as<int>();
+        if (vm.contains("ipv4")) coreConfig.tcp.endpointAddress = vm["ipv4"].as<std::string>();
+    }
+
+    void loadConfigs(const bpo::variables_map &vm,
+                     const bpo::parsed_options &parsed,
+                     const std::shared_ptr<Utils::Logger> &logger,
+                     Core::Config &coreConfig,
+                     MediatorConfig &mediatorConfig) {
+        loggerTemporaryOptions logTmpOpt;
+
+        // Set temporary logger config based on program options and default values before reading YAML config
+        if (vm.contains("verbose")) {
+            // Increase verbose level
+            for (const auto &option: parsed.options) {
+                if (option.string_key == "verbose") {
+                    logTmpOpt.verboseLevel++;
+                }
+            }
+            logTmpOpt.isVerbositySet = true;
+        }
+
+        if (vm.contains("quiet")) {
+            logger->disableConsoleLogging();
+            logTmpOpt.isQuietSet = true;
+        }
+
+        if (vm.contains("log-level")) {
+            // Overwrite verbose with explicit log-level
+            logTmpOpt.verboseLevel = vm["log-level"].as<uint8_t>();
+            logTmpOpt.isVerbositySet = true;
+        }
+
+        if (logTmpOpt.isVerbositySet) logger->setLevel(Utils::LogLevels::toLevel(logTmpOpt.verboseLevel));;
+
+        // Load YAML config
+        auto configManager = Utils::ConfigManager(logger);
+        Utils::Logger::Config loggerConfig;
+        const std::string configPath = vm.contains("config") ? vm["config"].as<std::string>() : s_DEFAULT_CONFIG_PATH;
+        if (configManager.loadConfig(configPath)) {
+            logger->debug("[MAIN] Loading YAML logger config");
+            loadLoggerYamlConfig(configManager, loggerConfig);
+
+            logger->debug("[MAIN] Loading YAML core config");
+            loadYamlConfigs(configManager, coreConfig, mediatorConfig);
+        } else {
+            logger->error("[MAIN] Could not load YAML config");
+        }
+
+        overwriteConfigsWithProgramOptions(vm, logTmpOpt, coreConfig, loggerConfig);
+
+        logger->applyConfig(loggerConfig);
+        logger->debug("[MAIN] Smarthome configured");
     }
 }
 
 using namespace SmartHome;
+
 
 int main(int argc, char *argv[]) {
     // Define program options
@@ -100,88 +164,7 @@ int main(int argc, char *argv[]) {
     Core::Config coreConfig;
     MediatorConfig mediatorConfig;
 
-    // Load configs
-    {
-        Utils::Logger::Config loggerConfig;
-        auto configManager = Utils::ConfigManager(logger);
-
-        // Flags for checking if values were set from program options
-        bool isVerbositySet = false;
-        bool isQuietSet = false;
-        bool isLogFileDisabledSet = false;
-
-        auto verboseLevel = static_cast<uint8_t>(Utils::LogLevels::defaultLevel);
-
-        // Set temporary logger config based on program options and default values before reading YAML
-        if (vm.contains("verbose")) {
-            // Increase verbose level
-            for (const auto &option: parsed.options) {
-                if (option.string_key == "verbose") {
-                    verboseLevel++;
-                }
-            }
-            isVerbositySet = true;
-        }
-
-        if (vm.contains("quiet")) {
-            logger->disableConsoleLogging();
-            isQuietSet = true;
-        }
-
-        if (vm.contains("log-level")) {
-            // Overwrite verbose with explicit log-level
-            verboseLevel = vm["log-level"].as<uint8_t>();
-            isVerbositySet = true;
-        }
-
-        if (vm.contains("no-log-file")) {
-            logger->disableFileLogging();
-            isLogFileDisabledSet = true;
-        }
-
-        if (isVerbositySet) {
-            logger->setLevel(Utils::LogLevels::toLevel(verboseLevel));
-        };
-
-
-        // Load YAML config
-        const std::string configPath = vm.contains("config") ? vm["config"].as<std::string>() : s_DEFAULT_CONFIG_PATH;
-
-        if (configManager.loadConfig(configPath)) {
-            logger->debug("[MAIN] Loading YAML logger config");
-            loadLoggerConfig(configManager, &loggerConfig);
-
-            logger->debug("[MAIN] Loading YAML core config");
-            loadConfigValues(configManager, &coreConfig, &mediatorConfig);
-        } else {
-            logger->error("[MAIN] Could not load YAML config");
-        }
-
-
-        // Overwrite YAML config with program options values
-        if (isVerbositySet)
-            loggerConfig.logLevel = Utils::LogLevels::toLevel(verboseLevel);
-
-        if (isQuietSet)
-            loggerConfig.enableConsoleLogOutput = false;
-
-        if (isLogFileDisabledSet)
-            loggerConfig.logFile.enabled = false;
-
-        if (vm.contains("log-file"))
-            loggerConfig.logFile.path = vm["log-file"].as<std::string>();
-
-        loggerConfig.logFile.createNew = !vm["append-log"].as<bool>();
-
-        loggerConfig.logFile.archiveOld = !vm["no-archive"].as<bool>();
-
-        if (vm.contains("port")) coreConfig.tcp.endpointPort = vm["port"].as<int>();
-        if (vm.contains("ipv4")) coreConfig.tcp.endpointAddress = vm["ipv4"].as<std::string>();
-
-        logger->applyConfig(loggerConfig);
-        logger->debug("[MAIN] Smarthome configured");
-    }
-
+    loadConfigs(vm, parsed, logger, coreConfig, mediatorConfig);
 
     // Initialize Core
     logger->debug("[MAIN] Initializing Core...");

@@ -3,6 +3,12 @@
 #include "core.h"
 #include "config_manager.h"
 
+#include <boost/process.hpp>
+#include <boost/program_options.hpp>
+
+namespace bp = boost::process;
+namespace bpo = boost::program_options;
+
 namespace SmartHome {
     /**
      *@brief Configuration for launching and managing mediator service.
@@ -19,29 +25,83 @@ namespace SmartHome {
     };
 
     /**
-     * @brief Loads logger configuration vales from YAML file.
+     * @brief Temporary storage for logger command-line options.
      *
-     * @details Reads smarthome logger configuration from YAML file and updates provided config structs.
-     *          Existing values in structs are overwritten with values from the YAML file if present.
-     *
-     * @param configManager Configuration manager instance for YAML file handling.
-     * @param config Pointer to logger configuration struct to be updated.
+     * @details Holds logger settings parsed from program options before they are merged with YAML configuration.
      */
-    void loadLoggerConfig(Utils::ConfigManager &configManager, Utils::Logger::Config *config);
+    struct loggerTemporaryOptions {
+        bool isVerbositySet = false;
+        bool isQuietSet = false;
+
+        uint8_t verboseLevel = static_cast<uint8_t>(Utils::LogLevels::defaultLevel);
+    };
+
 
     /**
-     * @brief Loads configuration vales from YAML file.
+     * @brief Loads logger configuration values from YAML file.
      *
-     * @details Reads smarthome configuration from YAML file and updates provided config structs.
+     * @details Reads SmartHome logger configuration from YAML file and updates provided config struct.
+     *          Existing values in struct are overwritten with values from the YAML file if present.
+     *
+     * @param configManager Configuration manager instance for YAML file handling.
+     * @param config Logger configuration struct to be updated.
+     */
+    void loadLoggerYamlConfig(Utils::ConfigManager &configManager, Utils::Logger::Config &config);
+
+    /**
+     * @brief Loads configuration values from YAML file.
+     *
+     * @details Reads SmartHome configuration from YAML file and updates provided config structs.
      *          Existing values in structs are overwritten with values from the YAML file if present.
      *
      * @param configManager Configuration manager instance for YAML file handling.
-     * @param coreConfig Pointer to Core configuration struct to be updated.
-     * @param mediatorConfig Pointer to mediator launch configuration struct to be updated.
+     * @param coreConfig Core configuration struct to be updated.
+     * @param mediatorConfig Mediator launch configuration struct to be updated.
      */
-    void loadConfigValues(Utils::ConfigManager &configManager,
-                          Core::Config *coreConfig,
-                          MediatorConfig *mediatorConfig);
+    void loadYamlConfigs(Utils::ConfigManager &configManager,
+                         Core::Config &coreConfig,
+                         MediatorConfig &mediatorConfig);
+
+    /**
+     * @brief Overwrites configurations with command-line options.
+     *
+     * @details Command-line arguments override YAML configuration values.
+     *          This allows users to change settings at runtime without
+     *          editing config files.
+     *
+     * @param vm Variables map containing parsed command-line options.
+     * @param logTmpOpt Temporary logger options from initial parsing.
+     * @param coreConfig Core configuration to update.
+     * @param loggerConfig Logger configuration to update.
+     */
+    void overwriteConfigsWithProgramOptions(const bpo::variables_map &vm,
+                                            loggerTemporaryOptions &logTmpOpt,
+                                            Core::Config &coreConfig,
+                                            Utils::Logger::Config &loggerConfig);
+
+    /**
+     * @brief Loads all configurations from YAML and command-line.
+     *
+     * @details Main configuration loading function that:
+     *          1. Sets temporary logger settings from command-line
+     *          2. Loads YAML configuration file
+     *          3. Overwrites YAML values with command-line options
+     *          4. Applies final configuration to logger
+     *
+     * @param vm Variables map containing parsed command-line options.
+     * @param parsed Parsed options structure for counting repeated flags (e.g., -vvv).
+     * @param logger Logger instance to configure and use for loading messages.
+     * @param coreConfig Core configuration struct to update.
+     * @param mediatorConfig Mediator configuration struct to update.
+     *
+     * @note Priority order: defaults -> YAML -> command-line.
+     */
+    void loadConfigs(const bpo::variables_map &vm,
+                     const bpo::parsed_options &parsed,
+                     const std::shared_ptr<Utils::Logger> &logger,
+                     Core::Config &coreConfig,
+                     MediatorConfig &mediatorConfig);
+
 
     /// Default path for smarthome YAML config
     static constexpr const char *s_DEFAULT_CONFIG_PATH = "/etc/smarthome/smart_home.yaml";
