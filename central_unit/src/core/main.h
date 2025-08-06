@@ -66,8 +66,7 @@ namespace SmartHome {
      * @brief Overwrites configurations with command-line options.
      *
      * @details Command-line arguments override YAML configuration values.
-     *          This allows users to change settings at runtime without
-     *          editing config files.
+     *          This allows users to change settings at runtime without editing config files.
      *
      * @param vm Variables map containing parsed command-line options.
      * @param logTmpOpt Temporary logger options from initial parsing.
@@ -91,8 +90,8 @@ namespace SmartHome {
      * @param vm Variables map containing parsed command-line options.
      * @param parsed Parsed options structure for counting repeated flags (e.g., -vvv).
      * @param logger Logger instance to configure and use for loading messages.
-     * @param coreConfig Core configuration struct to update.
-     * @param mediatorConfig Mediator configuration struct to update.
+     * @param coreConfig Core configuration struct to fill.
+     * @param mediatorConfig Mediator configuration struct to fill.
      *
      * @note Priority order: defaults -> YAML -> command-line.
      */

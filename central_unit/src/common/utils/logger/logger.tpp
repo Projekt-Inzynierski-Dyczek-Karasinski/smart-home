@@ -1,7 +1,5 @@
 #pragma once
 
-#include "logger.h"
-
 namespace SmartHome::Utils {
     template<typename... Args>
     std::string Logger::formatMessage(const char *format, Args... args) {

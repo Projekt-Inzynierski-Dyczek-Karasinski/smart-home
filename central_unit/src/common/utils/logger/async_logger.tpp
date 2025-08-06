@@ -1,7 +1,5 @@
 #pragma once
 
-#include "async_logger.h"
-
 namespace SmartHome::Utils {
     template<typename... Args>
     void AsyncLogger::logf(const LogLevels::Level level, const char *format, Args... args) {

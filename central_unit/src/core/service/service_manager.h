@@ -64,6 +64,6 @@ namespace SmartHome::Service {
         virtual void onStop() = 0;
 
     protected:
-        std::shared_ptr<Utils::Logger> mpLogger;
+        std::shared_ptr<Utils::Logger> mpLogger; ///< Logger instance shared pointer
     };
 }

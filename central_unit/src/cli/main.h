@@ -49,9 +49,10 @@ namespace SmartHomeCLI {
      */
     void loggerShutdown();
 
-    inline ba::io_context ioContext;
-    inline su::AsyncLogger logger(ioContext);
-    inline std::optional<ba::executor_work_guard<ba::io_context::executor_type>> loggerGuard;
+    // Global variables with inline specifier
+    inline ba::io_context ioContext; ///< Boost::Asio IO context for async operations
+    inline su::AsyncLogger logger(ioContext); ///< Async logger instance
+    inline std::optional<ba::executor_work_guard<ba::io_context::executor_type>> loggerGuard; ///< IO context guard
     inline std::optional<std::thread> loggerThread;
 
     /// Default IP address for TCP connection (address:port)

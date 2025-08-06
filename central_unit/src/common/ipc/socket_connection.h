@@ -142,7 +142,7 @@ namespace SmartHome::IPC {
 
         Type mType; ///< Socket type
         ba::io_context &mIoContext; ///< IO context reference
-        std::shared_ptr<Utils::Logger> mpLogger;
+        std::shared_ptr<Utils::Logger> mpLogger; ///< Logger instance shared pointer
         ba::streambuf mStreamBuf; ///< Buffer for async read operations
 
         /// Atomic flag to prevent concurrent close operations

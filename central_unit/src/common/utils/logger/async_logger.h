@@ -54,26 +54,65 @@ namespace SmartHome::Utils {
          */
         void log(LogLevels::Level level, const std::string &message) override;
 
+        /**
+         * @brief Asynchronously log formatted message with specified level.
+         * @tparam Args Variadic template arguments for formatting.
+         * @param level Verbosity level of the message.
+         * @param format Printf-style format string.
+         * @param args Arguments for format string.
+         *
+         * @note Formatting happens in calling thread, only writing is async.
+         */
         template<typename... Args>
         void logf(LogLevels::Level level, const char *format, Args... args);
 
+        /**
+         * @brief Asynchronously log formatted critical error message.
+         * @tparam Args Variadic template arguments for formatting.
+         * @param format Printf-style format string.
+         * @param args Arguments for format string.
+         */
         template<typename... Args>
         void criticalf(const char *format, Args... args);
 
+        /**
+         * @brief Asynchronously log formatted error message.
+         * @tparam Args Variadic template arguments for formatting.
+         * @param format Printf-style format string.
+         * @param args Arguments for format string.
+         */
         template<typename... Args>
         void errorf(const char *format, Args... args);
 
+        /**
+         * @brief Asynchronously log formatted warning message.
+         * @tparam Args Variadic template arguments for formatting.
+         * @param format Printf-style format string.
+         * @param args Arguments for format string.
+         */
         template<typename... Args>
         void warningf(const char *format, Args... args);
 
+        /**
+         * @brief Asynchronously log formatted informational message.
+         * @tparam Args Variadic template arguments for formatting.
+         * @param format Printf-style format string.
+         * @param args Arguments for format string.
+         */
         template<typename... Args>
         void infof(const char *format, Args... args);
 
+        /**
+         * @brief Asynchronously log formatted debug message.
+         * @tparam Args Variadic template arguments for formatting.
+         * @param format Printf-style format string.
+         * @param args Arguments for format string.
+         */
         template<typename... Args>
         void debugf(const char *format, Args... args);
 
     private:
-        ba::io_context::strand mIoStrand;
+        ba::io_context::strand mIoStrand; ///< Boost.Asio IO context strand for log serialization
     };
 }
 
