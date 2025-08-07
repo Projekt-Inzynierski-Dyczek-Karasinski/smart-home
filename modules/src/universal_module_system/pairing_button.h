@@ -19,7 +19,8 @@ class PairingButton {
 public:
     /**
      * @brief Method that initializes PairingButton and returns a pointer to the instance of PairingButton
-     * @param DebugLED* Pointer to DebugLED object.
+     * @param debugLED Pointer to DebugLED object.
+     * @param communication Pointer to Communication object.
      * @return PairingButton* pointer to the instance of PairingButton.
      */
     static PairingButton* getInstance(DebugLED *debugLED, Communication *communication);
@@ -31,7 +32,8 @@ public:
 private:
     /**
      * @brief Constructor of PairingButton class. Sets BUTTON_PIN to INPUT_PULLUP and attaches interrupt to it.
-     * @param DebugLED* Pointer to DebugLED object.
+     * @param debugLED Pointer to DebugLED object.
+     * @param communication Pointer to Communication object.
      * @note Constructor of this class is private, because this class is a singleton.
      */
     PairingButton(DebugLED *debugLED, Communication *communication);
@@ -63,7 +65,7 @@ private:
      * @note This method exists only because is necessary for creating timer inside class in freeRTOS.
      * 
      * This method is private.
-     * @param TimerHandle_t FreeRTOS software timer.
+     * @param xTimer FreeRTOS software timer.
      */
     static void buttonPressTimerCallbackHandle(TimerHandle_t xTimer);
 

@@ -19,7 +19,7 @@ void setup() {
     PairingButton* pairingButton = PairingButton::getInstance(debugLed, &communication);
 
     Serial.println("---setup() and loop() deleted---");
-    vTaskDelete(NULL);
+    vTaskDelete(nullptr);
 }
 
 void loop() {}

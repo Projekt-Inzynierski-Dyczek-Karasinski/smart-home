@@ -26,7 +26,7 @@ public:
      * @brief Destructor. Cleans up FreeRTOS resources (task, queue, timer) used by class.
      * @warning Destructor of this class exists only for programming principles. This class should never be deleted.
      */
-    ~ModuleAddressing();
+    ~ModuleAddressing() override;
 
     #ifdef RF_CHANNELS
         /**
@@ -34,7 +34,7 @@ public:
          * @return The current RF channel number.
          * @note Thread-safe.
          */
-        uint8_t getRfChannel();
+        uint8_t getRfChannel() const;
     #endif
 
 private:
@@ -65,7 +65,7 @@ private:
      * @param newIP New IP address to assign.
      * @note Thread-safe.
      */
-    void updateAddressingData(const uint8_t *newMAC, const uint8_t newIP);
+    void updateAddressingData(const uint8_t *newMAC, uint8_t newIP);
     #ifdef RF_CHANNELS
         /**
          * @brief Overloaded: Updates protocol MAC, IP, and RF channel for this module and the notifies Communication class to restart tasks which uses this variables.
@@ -74,7 +74,7 @@ private:
          * @param newRfChannel New RF channel to assign.
          * @note Thread-safe.
          */
-        void updateAddressingData(const uint8_t *newMAC, const uint8_t newIP, const uint8_t newRfChannel);
+        void updateAddressingData(const uint8_t *newMAC, uint8_t newIP, uint8_t newRfChannel);
     #endif
 
     /**

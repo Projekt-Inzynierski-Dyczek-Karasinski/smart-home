@@ -82,8 +82,7 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
         xQueueReceive(ad.mAddressingQueue, receiveBuffer, portMAX_DELAY);
         
         uint8_t attemptCounter = 0;
-        uint8_t moduleNewIP;
-        uint8_t moduleNewRfChannel;
+        uint8_t moduleNewIP = NULL_IP;
         AddressingData savedModuleData;
 
         while (attemptCounter < ADDRESSING_MAX_ATTEMPTS) {
@@ -98,7 +97,7 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
                         uint8_t moduleMAC[MAC_ADDRESS_LENGTH];
                         uah::prepareBuffer(moduleMAC, receiveBuffer, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
                         moduleNewIP = ad.addModule(moduleMAC, true);
-                        moduleNewRfChannel = ad.getModuleRfChannel(moduleNewIP);        
+                        const uint8_t moduleNewRfChannel = ad.getModuleRfChannel(moduleNewIP);
 
                         // send module information about module's new IP address and rf channel
                         uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_NEW_IP_NEW_RF_CHANNEL, ADDRESSING_API_LEN, MESSAGE_SIZE);
@@ -216,12 +215,12 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
 }
 
 void CentralUnitAddressing::createAddressingTask() {
-    if (mAddressingTaskHandle == NULL) {
+    if (mAddressingTaskHandle == nullptr) {
         xTaskCreate(
             addressingTask,
             "Addressing Task",
             2048,
-            NULL,
+            nullptr,
             MEDIUM_TASK_PRIORITY,
             &mAddressingTaskHandle
         );
@@ -234,7 +233,7 @@ void CentralUnitAddressing::createAddressingTask() {
 
 // ============================ Timers ============================
 
-void CentralUnitAddressing::addressingTimersCallbacks(TimerHandle_t xTimer){
+void CentralUnitAddressing::addressingTimersCallbacks(TimerHandle_t xTimer) {
     auto &ad = *mspAddressing;
 
     if (xTimer == ad.mAddressingTimeoutTimer) {
@@ -243,12 +242,12 @@ void CentralUnitAddressing::addressingTimersCallbacks(TimerHandle_t xTimer){
 }
 
 void CentralUnitAddressing::createAddressingTimer() {
-    if (mAddressingTimeoutTimer == NULL) {
+    if (mAddressingTimeoutTimer == nullptr) {
         mAddressingTimeoutTimer = xTimerCreate(
             "Addressing Absolute Timeout",
             pdMS_TO_TICKS(ADDRESSING_ABSOLUTE_TIMEOUT),
             pdFALSE,
-            NULL,
+            nullptr,
             addressingTimersCallbacks
         );
     }
@@ -257,7 +256,7 @@ void CentralUnitAddressing::createAddressingTimer() {
 
 // =================== Modules Addressing Data ====================
 
-void CentralUnitAddressing::printModulesAddressingData() {
+void CentralUnitAddressing::printModulesAddressingData() const {
     xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
     for (uint8_t i = 0; i < MAX_NUM_OF_MODULES; i++) {
         if (mModulesAddressingData[i].ipAddress != NULL_IP) {
@@ -275,7 +274,7 @@ void CentralUnitAddressing::printModulesAddressingData() {
     xSemaphoreGive(mModulesAddressingDataMutex);
 }
 
-void CentralUnitAddressing::printNumOFModulesOnRfChannels() {
+void CentralUnitAddressing::printNumOFModulesOnRfChannels() const {
     xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
     for (uint8_t i = 0; i < MAX_NUM_OF_CHANNEL; i++) {
         if (mNumOFModulesOnRfChannel[i] != 0) {
@@ -292,7 +291,7 @@ void CentralUnitAddressing::printNumOFModulesOnRfChannels() {
     xSemaphoreGive(mModulesAddressingDataMutex);
 }
 
-void CentralUnitAddressing::getModuleData(AddressingData *addressingData, const uint8_t ipAddress) {
+void CentralUnitAddressing::getModuleData(AddressingData *addressingData, const uint8_t ipAddress) const {
     xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
 
     const uint8_t index = ipToIndex(ipAddress);
@@ -304,7 +303,7 @@ void CentralUnitAddressing::getModuleData(AddressingData *addressingData, const 
     xSemaphoreGive(mModulesAddressingDataMutex);
 }
 
-uint8_t CentralUnitAddressing::getModuleRfChannel(const uint8_t ipAddress) {
+uint8_t CentralUnitAddressing::getModuleRfChannel(const uint8_t ipAddress) const {
     xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
     const uint8_t index = ipToIndex(ipAddress);
     const uint8_t rfChannel = mModulesAddressingData[index].rfChannel;
@@ -371,7 +370,7 @@ void CentralUnitAddressing::removeModule(const uint8_t ipAddress) {
     xSemaphoreGive(mModulesAddressingDataMutex);
 }
 
-uint8_t CentralUnitAddressing::getTmpModuleIp() {
+uint8_t CentralUnitAddressing::getTmpModuleIp() const {
     xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
     const uint8_t tmpModuleIp = mTmpModuleIp;
     xSemaphoreGive(mModulesAddressingDataMutex);

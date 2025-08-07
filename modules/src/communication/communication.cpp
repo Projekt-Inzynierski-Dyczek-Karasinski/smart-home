@@ -1,9 +1,10 @@
-#include "communication/communication.h"
+#include "communication.h"
+// #include "communication/communication.h"
 
 #include <Arduino.h>
 #include <HardwareSerial.h>
 
-#include "communication/uint8_array_handlers.h"
+#include "uint8_array_handlers.h"
 #include "universal_module_system/debug_led.h"
 
 #include "smart_home_config.h"
@@ -11,7 +12,7 @@
 #include "config/addressing_config.h"
 
 #ifdef HC12_MODULE
-    #include "communication/hc12.h"
+    #include "hc12.h"
 #else
     #error "Not implemented" 
 #endif
@@ -19,7 +20,7 @@
 #ifdef CENTRAL_UNIT 
     #include "communication/addressing/central_unit_addressing.h"
 #else
-    #include "communication/addressing/module_addressing.h"
+    #include "addressing/module_addressing.h"
 #endif
 
 namespace uah = uint8ArrayHandlers;
@@ -28,21 +29,21 @@ DebugLED* Communication::mspDebugLED = nullptr;
 
 // ============================ Public ============================
 
-Communication& Communication::getInstance(DebugLED *debugLED) {
+Communication &Communication::getInstance(DebugLED *debugLED) {
     static Communication instance(debugLED);
     return instance;
 }
 
-void Communication::startAddressingAlgorithm() {
+void Communication::startAddressingAlgorithm() const {
     mspDebugLED->createPairingBlinkTask();
     mpAddressing->startAddressing();
 }
 
-void Communication::stopAddressingAlgorithm() {
+void Communication::stopAddressingAlgorithm() const {
     xTaskNotify(mCommunicationMainTaskHandle, STOP_ADDRESING_ALGORITHM_NOTIF, eSetValueWithOverwrite);
 }
 
-void Communication::needRawMessage() {
+void Communication::needRawMessage() const {
     xTaskNotify(mCommunicationMainTaskHandle, READ_RAW_MESSAGE_NOTIF, eSetValueWithOverwrite);
 }
 
@@ -53,28 +54,29 @@ void Communication::resetEncodeMessageTask() {
     taskEXIT_CRITICAL(&mCriticalSectionMutex);
 }
 
-void Communication::startPinging() {
+void Communication::startPinging() const {
     xTaskNotify(mCommunicationMainTaskHandle, START_PINGING_NOTIF, eSetValueWithOverwrite);
 }
 
-void Communication::addByteToDecode(const uint8_t data) {
+void Communication::addByteToDecode(const uint8_t data) const {
     xQueueSend(mReceiveByteQueue, &data, portMAX_DELAY);
     vTaskResume(mDecodeMessageTaskHandle);
 }
 
-void Communication::sendMessage(const uint8_t message[MESSAGE_SIZE]) {
+void Communication::sendMessage(const uint8_t message[MESSAGE_SIZE]) const {
     xQueueSend(mSendMessagesQueue, message, portMAX_DELAY);
     vTaskResume(mEncodeMessageTaskHandle);
-} 
+}
 
-void Communication::sendInternalMessage(const uint8_t message[MESSAGE_SIZE]) {
+void Communication::sendInternalMessage(const uint8_t message[MESSAGE_SIZE]) const {
     xQueueSend(mReceiveMessageQueue, message, portMAX_DELAY);
 }
+
 // ================================================================
 
 // ================== Constructor and Destructor ==================
 
-Communication::Communication(DebugLED *debugLED) : 
+Communication::Communication(DebugLED *debugLED) :
     #ifdef HC12_MODULE
         mpRfModule(new HC12(this)),
     #else
@@ -117,29 +119,29 @@ Communication::~Communication() {
 // ============================ Queues ============================
 
 void Communication::createCommunicationQueues() {
-    if (mReceiveMessageQueue == NULL) {
+    if (mReceiveMessageQueue == nullptr) {
         mReceiveMessageQueue = xQueueCreate(MESSAGE_QUEUE_LEN, sizeof(uint8_t[MESSAGE_SIZE]));
     }
-    if (mReceiveByteQueue == NULL) {
+    if (mReceiveByteQueue == nullptr) {
         mReceiveByteQueue = xQueueCreate(RECEIVE_BYTE_QUEUE_LEN, sizeof(uint8_t));
     }
-    if (mSendMessagesQueue == NULL) {
+    if (mSendMessagesQueue == nullptr) {
         mSendMessagesQueue = xQueueCreate(MESSAGE_QUEUE_LEN, sizeof(uint8_t[MESSAGE_SIZE]));
     }
 }
 
 void Communication::deleteCommunicationQueues() {
-    if (mReceiveMessageQueue != NULL) {
+    if (mReceiveMessageQueue != nullptr) {
         vQueueDelete(mReceiveMessageQueue);
-        mReceiveMessageQueue = NULL;
+        mReceiveMessageQueue = nullptr;
     }
-    if (mReceiveByteQueue != NULL) {
+    if (mReceiveByteQueue != nullptr) {
         vQueueDelete(mReceiveByteQueue);
-        mReceiveByteQueue = NULL;
+        mReceiveByteQueue = nullptr;
     }
-    if (mSendMessagesQueue != NULL) {
+    if (mSendMessagesQueue != nullptr) {
         vQueueDelete(mSendMessagesQueue);
-        mSendMessagesQueue = NULL;
+        mSendMessagesQueue = nullptr;
     }
 }
 // ================================================================
@@ -199,7 +201,7 @@ void Communication::normalOperationHandling(bool *isReadingRawMessage) {
     vTaskDelay(pdMS_TO_TICKS(1));
 }
 
-void Communication::pingTimeoutNotifHandling(uint8_t *pingAttempts) {
+void Communication::pingTimeoutNotifHandling(uint8_t *pingAttempts) const {
     Serial.println("Ping Timeout");
     *pingAttempts++;
 
@@ -280,12 +282,12 @@ void Communication::communicationMainTask(void* parameters) {
 }
 
 void Communication::createCommunicationMainTask() {
-    if (mCommunicationMainTaskHandle == NULL) {
+    if (mCommunicationMainTaskHandle == nullptr) {
         xTaskCreate(
             communicationMainTask,
             "Communication Main",
             2048,
-            NULL,
+            nullptr,
             BACKGROUND_TASK_PRIORITY,
             &mCommunicationMainTaskHandle
         );
@@ -294,9 +296,9 @@ void Communication::createCommunicationMainTask() {
     }
 }
 void Communication::deleteCommunicationMainTask() {
-    if (mCommunicationMainTaskHandle != NULL) {
+    if (mCommunicationMainTaskHandle != nullptr) {
         vTaskDelete(mCommunicationMainTaskHandle);
-        mCommunicationMainTaskHandle = NULL;
+        mCommunicationMainTaskHandle = nullptr;
     }
 }
 // ================================================================
@@ -316,7 +318,7 @@ void Communication::decodeMessageTask(void *parameters) {
 
     // timeout status/cause
     uint32_t timeoutStatus = DEFAULT_STATUS_NOTIF;
-    // if true decodeMessageTask() will put in xQueueSend() protocolBuffer[0] insted messageBuffer
+    // if true decodeMessageTask() will put in xQueueSend() protocolBuffer[0] instead messageBuffer
     bool isRawMessage = false;
 
     // prepare message protocol buffer
@@ -340,7 +342,7 @@ void Communication::decodeMessageTask(void *parameters) {
     };
     resetProtocolBuffer();
 
-    auto handleIncorrectMessage = [&](bool isReadingRawMessage) {
+    auto handleIncorrectMessage = [&](const bool isReadingRawMessage) {
         xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
         // wait for possible rest of the message and send "repeat"
         vTaskDelay(RECEIVE_MESSAGE_TIMEOUT);
@@ -447,7 +449,7 @@ void Communication::decodeMessageTask(void *parameters) {
                     protoBuffMessageIndex = 0;
 
                     // decode message
-                    // TODO add protection against packet loss (messageQuantity ins't decrementing only by 1) and add separate method for that
+                    // TODO add protection against packet loss (messageQuantity isn't decrementing only by 1) and add separate method for that
                     do {
                         for (uint8_t i = protocolMessageStartIndex; i < (protocolMessageStartIndex + protocolMessageLength); i++) {
                             messageBuffer[messageIndex] = protocolBuffer[protoBuffMessageIndex][i];
@@ -485,12 +487,12 @@ void Communication::decodeMessageTask(void *parameters) {
 }
 
 void Communication::createDecodeMessageTask() {
-    if (mDecodeMessageTaskHandle == NULL) {
+    if (mDecodeMessageTaskHandle == nullptr) {
         xTaskCreate(
             decodeMessageTask,
             "Decode message",
             2048,
-            NULL,
+            nullptr,
             LOW_TASK_PRIORITY,
             &mDecodeMessageTaskHandle
         );
@@ -499,9 +501,9 @@ void Communication::createDecodeMessageTask() {
     }
 }
 void Communication::deleteDecodeMessageTask() {
-    if (mDecodeMessageTaskHandle != NULL) {
+    if (mDecodeMessageTaskHandle != nullptr) {
         vTaskDelete(mDecodeMessageTaskHandle);
-        mDecodeMessageTaskHandle = NULL;
+        mDecodeMessageTaskHandle = nullptr;
     }
 }
 // ================================================================
@@ -533,7 +535,7 @@ void Communication::encodeMessageTask(void *parameters) {
     static constexpr uint8_t protocolMessageStartIndex = 8;
     static constexpr uint8_t protocolMessageLength = 6;
     
-    // TODO implement seting IP address for central unit    
+    // TODO implement setting IP address for central unit
     // prepare MAC address in protocol buffer and clear rest of buffer
     uint8_t macAddress[6];
     com.mpAddressing->getProtocolMACAddress(macAddress);
@@ -552,19 +554,18 @@ void Communication::encodeMessageTask(void *parameters) {
 
     // task loop
     for (;;) {
-        uint8_t messageIndex = 0;
-        int8_t messagesQuantity = 0;
-
         // wait until the message appears in the queue and save message in local messageBuffer
         if (xQueueReceive(com.mSendMessagesQueue, &messageBuffer, pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG)) == pdTRUE) {
+            int8_t messagesQuantity = 0;
+            uint8_t messageIndex = 0;
             // calc messageQuantity
-            uint8_t messageLen = uah::calcLenOfDataInArray(messageBuffer, MESSAGE_SIZE);
+            const uint8_t messageLen = uah::calcLenOfDataInArray(messageBuffer, MESSAGE_SIZE);
             messagesQuantity = messageLen / protocolMessageLength;
             if (messageLen % protocolMessageLength == 0) {
                 messagesQuantity--;
             }
 
-            // put part of message in protocolBuffer and send it to transmiting task 
+            // put part of message in protocolBuffer and send it to transmitting task
             for (messagesQuantity; messagesQuantity >= 0; messagesQuantity--) {
                 protocolBuffer[messagesQuantityIndex] = messagesQuantity;
                 for (uint8_t i = 0; i < protocolMessageLength; i++) {
@@ -597,12 +598,12 @@ void Communication::encodeMessageTask(void *parameters) {
 }
 
 void Communication::createEncodeMessageTask() {
-    if (mEncodeMessageTaskHandle == NULL) {
+    if (mEncodeMessageTaskHandle == nullptr) {
         xTaskCreate(
             encodeMessageTask,
             "Encode Message",
             2048,
-            NULL,
+            nullptr,
             MEDIUM_TASK_PRIORITY,
             &mEncodeMessageTaskHandle
         );
@@ -612,9 +613,9 @@ void Communication::createEncodeMessageTask() {
 }
 
 void Communication::deleteEncodeMessageTask() {
-    if (mEncodeMessageTaskHandle != NULL) {
+    if (mEncodeMessageTaskHandle != nullptr) {
         vTaskDelete(mEncodeMessageTaskHandle);
-        mEncodeMessageTaskHandle = NULL;
+        mEncodeMessageTaskHandle = nullptr;
     }
 }
 // ================================================================
@@ -624,7 +625,7 @@ void Communication::deleteEncodeMessageTask() {
 // ===================== Send Custom Message ======================
 
 void Communication::sendCustomMessageTask(void *parameters) {
-    auto &com = Communication::getInstance(Communication::mspDebugLED);
+    const auto &com = Communication::getInstance(Communication::mspDebugLED);
 
     // prepare buffer
     uint8_t buffer[MESSAGE_SIZE];
@@ -682,12 +683,12 @@ void Communication::sendCustomMessageTask(void *parameters) {
 }
 
 void Communication::createSendCustomMessageTask() {
-    if (mSendCustomMessageTaskHandle == NULL) {
+    if (mSendCustomMessageTaskHandle == nullptr) {
         xTaskCreate(
             sendCustomMessageTask,
             "Send custom message",
             2048,
-            NULL,
+            nullptr,
             BACKGROUND_TASK_PRIORITY,
             &mSendCustomMessageTaskHandle
         );
@@ -697,9 +698,9 @@ void Communication::createSendCustomMessageTask() {
 }
 
 void Communication::deleteSendCustomMessageTask() {
-    if (mSendCustomMessageTaskHandle != NULL) {
+    if (mSendCustomMessageTaskHandle != nullptr) {
         vTaskDelete(mSendCustomMessageTaskHandle);
-        mSendCustomMessageTaskHandle = NULL;
+        mSendCustomMessageTaskHandle = nullptr;
     }
 }
 // ================================================================
@@ -707,7 +708,7 @@ void Communication::deleteSendCustomMessageTask() {
 // ============================ Timers ============================
 
 void Communication::communicationTimersCallbacks(TimerHandle_t xTimer){
-    auto &com = Communication::getInstance(Communication::mspDebugLED);
+    const auto &com = Communication::getInstance(Communication::mspDebugLED);
 
     if (xTimer == com.mReceiveMessageTimeoutTimer) {
         // TODO remove print
@@ -724,43 +725,43 @@ void Communication::communicationTimersCallbacks(TimerHandle_t xTimer){
 }
 
 void Communication::createCommunicationTimers() {
-    if (mReceiveMessageTimeoutTimer == NULL) {
+    if (mReceiveMessageTimeoutTimer == nullptr) {
         mReceiveMessageTimeoutTimer = xTimerCreate(
             "Receive Message Timeout",
             pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT),
             pdFALSE,
-            NULL,
+            nullptr,
             communicationTimersCallbacks
         );
     }
-    if (mReceiveByteTimeoutTimer == NULL) {
+    if (mReceiveByteTimeoutTimer == nullptr) {
         mReceiveByteTimeoutTimer = xTimerCreate(
             "Receive Byte Timeout",
             pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT),
             pdFALSE,
-            NULL,
+            nullptr,
             communicationTimersCallbacks
         );
     }
-    if (mPingTimeoutTimer == NULL) {
+    if (mPingTimeoutTimer == nullptr) {
         mPingTimeoutTimer = xTimerCreate(
             "Ping Timeout",
             pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT),
             pdTRUE,
-            NULL,
+            nullptr,
             communicationTimersCallbacks
         );
     }
 }
 
 void Communication::deleteCommunicationTimers() {
-    if (mReceiveMessageTimeoutTimer != NULL) {
+    if (mReceiveMessageTimeoutTimer != nullptr) {
         xTimerDelete(mReceiveMessageTimeoutTimer, portMAX_DELAY);
-        mReceiveMessageTimeoutTimer = NULL;
+        mReceiveMessageTimeoutTimer = nullptr;
     }
-    if (mReceiveByteTimeoutTimer != NULL) {
+    if (mReceiveByteTimeoutTimer != nullptr) {
         xTimerDelete(mReceiveByteTimeoutTimer, portMAX_DELAY);
-        mReceiveByteTimeoutTimer = NULL;
+        mReceiveByteTimeoutTimer = nullptr;
     }
 }
 // ================================================================
@@ -781,7 +782,7 @@ void Communication::setLastTransmittedMessage(const uint8_t message[MESSAGE_SIZE
     xSemaphoreGive(mLastTransmittedMessageMutex);
 }
 
-void Communication::transmitRepeatMessage() {
+void Communication::transmitRepeatMessage() const {
     uint8_t buffer[MESSAGE_SIZE];
     uah::prepareBuffer(buffer, (uint8_t*)"repeat", 6, MESSAGE_SIZE);
     xQueueSend(mSendMessagesQueue, buffer, portMAX_DELAY);
@@ -801,13 +802,13 @@ void Communication::repeatLastTransmittedMessage() {
     }
 }
 
-void Communication::transmitPing() {
+void Communication::transmitPing() const {
     uint8_t buffer[MESSAGE_SIZE];
     uah::prepareBuffer(buffer, (uint8_t*)"ping", 4, MESSAGE_SIZE);
     xQueueSend(mSendMessagesQueue, buffer, portMAX_DELAY);
 }
 
-void Communication::replyToPing() {
+void Communication::replyToPing() const {
     uint8_t buffer[MESSAGE_SIZE];
     uah::prepareBuffer(buffer, (uint8_t*)"reping", 6, MESSAGE_SIZE);
     xQueueSend(mSendMessagesQueue, buffer, portMAX_DELAY);

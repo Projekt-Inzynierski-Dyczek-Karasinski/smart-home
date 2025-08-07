@@ -30,9 +30,9 @@ ModuleAddressing::~ModuleAddressing() {
 }
 
 #ifdef RF_CHANNELS
-uint8_t ModuleAddressing::getRfChannel() {
+uint8_t ModuleAddressing::getRfChannel() const {
     xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
-    uint8_t rfChannel = mRfChannel;
+    const uint8_t rfChannel = mRfChannel;
     xSemaphoreGive(mAddressingDataMutex);
     return rfChannel;
 }
@@ -140,7 +140,7 @@ void ModuleAddressing::addressingTask(void* parameters) {
                         // check is received propper message (ADi?c?), indexes are offset due to reading raw message
                         if (receiveBuffer[10] == (uint8_t)'i' && receiveBuffer[12] == (uint8_t)'c') {
                             isReceivedPropperMessage = true;
-                            uint8_t newRfChannel = receiveBuffer[13];
+                            const uint8_t newRfChannel = receiveBuffer[13];
 
                             ad.updateAddressingData(receiveBuffer, receiveBuffer[11], newRfChannel);
                             ad.changeRfChannel(newRfChannel);
@@ -166,11 +166,6 @@ void ModuleAddressing::addressingTask(void* parameters) {
                     }
                     break;
 
-                case ADDRESSING_STATES::REPLY_PING:
-                    Serial.println("ADDRESSING ERROR! In addressingTask() -> addressingState == REPLY_PING in receiving part of task, did you forget change?");
-                    isRestarting = true;
-                    break;
-
                 case ADDRESSING_STATES::PROCESS_SUMMARY:
                     // if central unit is still sending ping
                     if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_PING, ADDRESSING_API_LEN)) {
@@ -188,15 +183,6 @@ void ModuleAddressing::addressingTask(void* parameters) {
                         isMacRealToCheck = receiveBuffer[11];
                         uah::prepareBuffer(macToCheck, &receiveBuffer[13], MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
                     }
-                    break;
-
-                default:
-                    break;
-                }
-
-                if (isRestarting) {
-                    // TODO remove print
-                    // Serial.println("restarting after receiving...");
                     break;
                 }
 
@@ -218,12 +204,12 @@ void ModuleAddressing::addressingTask(void* parameters) {
 }
 
 void ModuleAddressing::createAddressingTask() {
-    if (mAddressingTaskHandle == NULL) {
+    if (mAddressingTaskHandle == nullptr) {
         xTaskCreate(
             addressingTask,
             "Addressing Task",
             2048,
-            NULL,
+            nullptr,
             MEDIUM_TASK_PRIORITY,
             &mAddressingTaskHandle
         );
@@ -244,12 +230,12 @@ void ModuleAddressing::addressingTimersCallbacks(TimerHandle_t xTimer){
 }
 
 void ModuleAddressing::createAddressingTimer() {
-    if (mAddressingTimeoutTimer == NULL) {
+    if (mAddressingTimeoutTimer == nullptr) {
         mAddressingTimeoutTimer = xTimerCreate(
             "Addressing Absolute Timeout",
             pdMS_TO_TICKS(ADDRESSING_ABSOLUTE_TIMEOUT),
             pdFALSE,
-            NULL,
+            nullptr,
             addressingTimersCallbacks
         );
     }

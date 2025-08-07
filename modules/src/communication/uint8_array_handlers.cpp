@@ -44,7 +44,7 @@ namespace uint8ArrayHandlers {
         return maxLen;
     }
 
-    bool areArraysEqual(const uint8_t *array1, const uint8_t *array2, uint8_t len) {
+    bool areArraysEqual(const uint8_t *array1, const uint8_t *array2, const uint8_t len) {
         for (uint8_t i = 0; i < len; i++){
             if (array1[i] != array2[i]) {
                 return false;

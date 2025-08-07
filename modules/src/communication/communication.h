@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <HardwareSerial.h>
 
-#include "smart_home_config.h"
+#include "../smart_home_config.h"
 #include "config/communication_config.h"
 #include "universal_module_system/debug_led.h"
 #ifdef HC12_MODULE
@@ -39,17 +39,17 @@ public:
     /**
      * @brief Start the addressing process. Initiates the necessary task and LED signaling for pairing.
      */
-    void startAddressingAlgorithm();
+    void startAddressingAlgorithm() const;
 
     /**
      * @brief Signals the main task to stop the addressing process.
      */
-    void stopAddressingAlgorithm();
+    void stopAddressingAlgorithm() const;
 
     /**
      * @brief Signals the main task to not decode the next RF message (used at the start of the addressing process).
      */
-    void needRawMessage();
+    void needRawMessage() const;
 
     // TODO consider change so that don't be necessary
     /**
@@ -60,27 +60,27 @@ public:
     /**
      * @brief Signals the main task to start pinging process.
      */
-    void startPinging();
+    void startPinging() const;
 
     /**
      * @brief Add a single byte to the byte queue for decoding.
      *        Resumes the decode task if necessary.
      * @param data Byte to add to the receive queue.
      */
-    void addByteToDecode(uint8_t data);
+    void addByteToDecode(uint8_t data) const;
 
      /**
      * @brief Add a message that needs to be transmitted to the encoding queue. 
      * @param message Message to transmit.
      */
-    void sendMessage(const uint8_t message[MESSAGE_SIZE]);
+    void sendMessage(const uint8_t message[MESSAGE_SIZE]) const;
     
     /**
-     * @brief Add a message to received queue (omitting decoding proccess).
+     * @brief Add a message to received queue (omitting decoding process).
      *        Used for internal communication of different parts of module.
      * @param message Message.
      */
-    void sendInternalMessage(const uint8_t message[MESSAGE_SIZE]);
+    void sendInternalMessage(const uint8_t message[MESSAGE_SIZE]) const;
 
 private:
     /**
@@ -88,7 +88,7 @@ private:
      *        Initializes FreeRTOS queues, tasks, timers, semaphores necessary for all communication (internal and RF) works.
      * @param debugLED Pointer to DebugLED instance.
      */
-    Communication(DebugLED *debugLED);
+    explicit Communication(DebugLED *debugLED);
     /**
      * @brief Destructor. Cleans up FreeRTOS resources used by the class.
      * @warning Destructor of this class exists only for programming principles. This class should never be deleted.
@@ -118,7 +118,7 @@ private:
      * @brief Handles when main task get notification about ping timeout.
      * @param pingAttempts Pointer to counter with number of ping attempts.
      */
-    void pingTimeoutNotifHandling(uint8_t *pingAttempts);
+    void pingTimeoutNotifHandling(uint8_t *pingAttempts) const;
     /**
      * @brief Main FreeRTOS task for Communication class. 
      * It is responsible for suspending/deleting resuming/creating other communication related tasks.
@@ -229,7 +229,7 @@ private:
      * @brief Transmit a "repeat" message to request re-transmission.
      * Used when checksum or last byte of message is incorrect.
      */
-    void transmitRepeatMessage();
+    void transmitRepeatMessage() const;
     /**
      * @brief Resend the last message, if the repeat count is not exceeded.
      * Used when get "repeat" message.
@@ -240,11 +240,11 @@ private:
     /**
      * @brief Transmit a "ping" message.
      */
-    void transmitPing();
+    void transmitPing() const;
     /**
      * @brief Transmit a "reping" message, as a reply to a received "ping" message.
      */
-    void replyToPing();
+    void replyToPing() const;
 
     // TODO change this to nonstatic if possible
     static DebugLED *mspDebugLED; ///< Pointer to debugLED class instance.
@@ -281,18 +281,18 @@ private:
 
     portMUX_TYPE mCriticalSectionMutex = portMUX_INITIALIZER_UNLOCKED; ///< FreeRTOS critical section mutex (used only for resetting encode task).
 
-    SemaphoreHandle_t mLastTransmittedMessageMutex = NULL; ///< Handle to FreeRTOS mutex protecting the last transmitted message and last transmitted counter.
+    SemaphoreHandle_t mLastTransmittedMessageMutex = nullptr; ///< Handle to FreeRTOS mutex protecting the last transmitted message and last transmitted counter.
 
-    QueueHandle_t mReceiveMessageQueue = NULL; ///< Handle to FreeRTOS queue for received (decoded and internal) messages, queue length: 10x64 bytes (uint8_t).
-    QueueHandle_t mReceiveByteQueue = NULL; ///< Handle to FreeRTOS queue for bytes to decode get from RF transmission, queue length: 128 bytes (uint8_t).
-    QueueHandle_t mSendMessagesQueue = NULL; ///< Handle to FreeRTOS queue for messages to encode and RF transmission, queue length: 10x64 bytes (uint8_t).
+    QueueHandle_t mReceiveMessageQueue = nullptr; ///< Handle to FreeRTOS queue for received (decoded and internal) messages, queue length: 10x64 bytes (uint8_t).
+    QueueHandle_t mReceiveByteQueue = nullptr; ///< Handle to FreeRTOS queue for bytes to decode get from RF transmission, queue length: 128 bytes (uint8_t).
+    QueueHandle_t mSendMessagesQueue = nullptr; ///< Handle to FreeRTOS queue for messages to encode and RF transmission, queue length: 10x64 bytes (uint8_t).
 
-    TaskHandle_t mCommunicationMainTaskHandle = NULL; ///< Handle to FreeRTOS main communication task. 
-    TaskHandle_t mDecodeMessageTaskHandle = NULL; ///< Handle to FreeRTOS decode task. 
-    TaskHandle_t mEncodeMessageTaskHandle = NULL; ///< Handle to FreeRTOS encode task. 
-    TaskHandle_t mSendCustomMessageTaskHandle = NULL; ///< Handle to FreeRTOS task for handling custom messages sent via Serial. 
+    TaskHandle_t mCommunicationMainTaskHandle = nullptr; ///< Handle to FreeRTOS main communication task.
+    TaskHandle_t mDecodeMessageTaskHandle = nullptr; ///< Handle to FreeRTOS decode task.
+    TaskHandle_t mEncodeMessageTaskHandle = nullptr; ///< Handle to FreeRTOS encode task.
+    TaskHandle_t mSendCustomMessageTaskHandle = nullptr; ///< Handle to FreeRTOS task for handling custom messages sent via Serial.
 
-    TimerHandle_t mReceiveMessageTimeoutTimer = NULL; ///< Handle to FreeRTOS software timer indicating timeout of the message. 
-    TimerHandle_t mReceiveByteTimeoutTimer = NULL; ///< Handle to FreeRTOS software timer indicating timeout of the receiving byte for decode task.
-    TimerHandle_t mPingTimeoutTimer = NULL; ///< Handle to FreeRTOS software timer indicating timeout of "ping" message.
+    TimerHandle_t mReceiveMessageTimeoutTimer = nullptr; ///< Handle to FreeRTOS software timer indicating timeout of the message.
+    TimerHandle_t mReceiveByteTimeoutTimer = nullptr; ///< Handle to FreeRTOS software timer indicating timeout of the receiving byte for decode task.
+    TimerHandle_t mPingTimeoutTimer = nullptr; ///< Handle to FreeRTOS software timer indicating timeout of "ping" message.
 };

@@ -34,7 +34,7 @@ public:
      * @brief Destructor. Cleans up FreeRTOS resources (task, queue, timer) used by class.
      * @warning Destructor of this class exists only for programming principles. This class should never be deleted.
      */
-    ~CentralUnitAddressing();
+    ~CentralUnitAddressing() override;
 
 private:
     /**
@@ -67,7 +67,7 @@ private:
      * Calls abortAddressingWithAbortMessage() method as callback.
      * @param xTimer The triggered FreeRTOS timer handle.
      */
-    static void addressingTimersCallbacks(TimerHandle_t xTimer);
+    static void addressingTimersCallbacks( TimerHandle_t xTimer);
     /**
      * @brief Creates the FreeRTOS timer controlling the absolute duration of addressing process.
      */
@@ -77,12 +77,12 @@ private:
      * @brief Prints information about all modules' addressing data to the serial output.
      * @note Thread-safe.
      */
-    void printModulesAddressingData();
+    void printModulesAddressingData() const;
     /**
      * @brief Prints the number of modules registered on each RF channel to the serial output.
      * @note Thread-safe.
      */
-    void printNumOFModulesOnRfChannels();
+    void printNumOFModulesOnRfChannels() const;
 
     /**
      * @brief Retrieves the addressing data for the module with the given IP address.
@@ -90,14 +90,14 @@ private:
      * @param ipAddress IP address of the module to get data for.
      * @note Thread-safe.
      */
-    void getModuleData(AddressingData *addressingData, const uint8_t ipAddress);
+    void getModuleData(AddressingData *addressingData, uint8_t ipAddress) const;
     /**
      * @brief Gets the RF channel assigned to a module with the given IP address.
      * @param ipAddress IP address of the module.
      * @return Assigned RF channel for the specified module.
      * @note Thread-safe.
      */
-    uint8_t getModuleRfChannel(uint8_t ipAddress);
+    uint8_t getModuleRfChannel(uint8_t ipAddress) const;
 
     /**
      * @brief Adds a new module to the addressing table.
@@ -108,21 +108,21 @@ private:
      * @return Assigned IP address for the new module, or NULL_IP (0) if assignment failed.
      * @note Thread-safe.
      */
-    uint8_t addModule(const uint8_t *macAddress, const bool isMACAddressReal, uint8_t rfChannel = 0);
+    uint8_t addModule(const uint8_t *macAddress, bool isMACAddressReal, uint8_t rfChannel = 0);
     /**
      * @brief Removes a module from the addressing table using its IP address.
      * Frees up its IP and RF channel slot for a new module.
      * @param ipAddress IP address of the module to remove.
      * @note Thread-safe.
      */
-    void removeModule(const uint8_t ipAddress);
+    void removeModule(uint8_t ipAddress);
 
     /**
      * @brief Gets the temporary IP address assigned to the module currently being addressed.
      * @return IP address of the current module in addressing, or NULL_IP (0) if none.
      * @note Thread-safe.
      */
-    uint8_t getTmpModuleIp();
+    uint8_t getTmpModuleIp() const;
 
     /**
      * @brief Clears all data related to a new connection attempt.
@@ -141,5 +141,5 @@ private:
     uint8_t mNumOFModulesOnRfChannel[MAX_NUM_OF_CHANNEL]; ///< Array containing the number of modules assigned to each RF channel.
     uint8_t mTmpModuleIp = NULL_IP; ///< IP address of the module currently being addressed. // TODO remember to clear that after end of new connection
 
-    SemaphoreHandle_t mModulesAddressingDataMutex = NULL; ///< Handle to mutex protecting access to modules addressing data.
+    SemaphoreHandle_t mModulesAddressingDataMutex = nullptr; ///< Handle to mutex protecting access to modules addressing data.
 };

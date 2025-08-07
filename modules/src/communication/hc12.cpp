@@ -1,9 +1,8 @@
-#include "communication/hc12.h"
+#include "hc12.h"
 
 #include <Arduino.h>
 #include <HardwareSerial.h>
 
-#include "smart_home_config.h"
 #include "config/communication_config.h"
 
 #include "communication/uint8_array_handlers.h"
@@ -50,7 +49,7 @@ HC12::~HC12() {
     delete mpSerial;
 }
 
-void HC12::addMessageToTransmit(const uint8_t *message) {
+void HC12::addMessageToTransmit(const uint8_t *message) const {
     xQueueSend(mTransmitQueue, message, portMAX_DELAY);
     vTaskResume(mTransmitTaskHandle);
 }
@@ -102,37 +101,37 @@ void HC12::setupHC12(const uint8_t *commands) {
 // ============================ Queues ============================
 
 void HC12::createQueue() { 
-    if (mTransmitQueue == NULL) {
+    if (mTransmitQueue == nullptr) {
         mTransmitQueue = xQueueCreate(PROTOCOL_MESSAGE_MAX_NUM, sizeof(uint8_t[PROTOCOL_SIZE]));
     }
 }
 
 void HC12::deleteQueue() {
-    if (mTransmitQueue != NULL) {
+    if (mTransmitQueue != nullptr) {
         vQueueDelete(mTransmitQueue);
-        mTransmitQueue = NULL;
+        mTransmitQueue = nullptr;
     }
 }
 
 void HC12::createSetupHC12Queues() {
-    if (mSetupHC12CommandsQueue == NULL) {
+    if (mSetupHC12CommandsQueue == nullptr) {
         mSetupHC12CommandsQueue = xQueueCreate(SETUP_MAX_NUM_OF_COMMANDS, sizeof(uint8_t[SETUP_COMMAND_SIZE]));
     }
 
-    if (mSetupHC12ReceiveQueue == NULL) {
+    if (mSetupHC12ReceiveQueue == nullptr) {
         mSetupHC12ReceiveQueue = xQueueCreate(SETUP_MAX_LEN_OF_RESPONSE, sizeof(uint8_t));
     }
 }
 
 void HC12::deleteSetupHC12Queues() {
-    if (mSetupHC12CommandsQueue != NULL) {
+    if (mSetupHC12CommandsQueue != nullptr) {
         vQueueDelete(mSetupHC12CommandsQueue);
-        mSetupHC12CommandsQueue = NULL;
+        mSetupHC12CommandsQueue = nullptr;
     }
 
-    if (mSetupHC12ReceiveQueue != NULL) {
+    if (mSetupHC12ReceiveQueue != nullptr) {
         vQueueDelete(mSetupHC12ReceiveQueue);
-        mSetupHC12ReceiveQueue = NULL;
+        mSetupHC12ReceiveQueue = nullptr;
     }
 }
 
@@ -140,7 +139,7 @@ void HC12::deleteSetupHC12Queues() {
 
 // ========================== HC12 Main ===========================
 
-void HC12::hc12OutputDecider(const uint8_t *hc12Output, const bool *isSetupHC12Working, bool *isWaitingForSendConfirmation) {
+void HC12::hc12OutputDecider(const uint8_t *hc12Output, const bool *isSetupHC12Working, bool *isWaitingForSendConfirmation) const {
     if (*isWaitingForSendConfirmation) {
         *isWaitingForSendConfirmation = false;
         xTaskNotify(mTransmitTaskHandle, (uint32_t)*hc12Output, eSetValueWithOverwrite);
@@ -226,12 +225,12 @@ void HC12::HC12MainTask(void *parameters) {
 }
 
 void HC12::createHC12MainTask() {
-    if (mHC12MainTaskHandle == NULL) {
+    if (mHC12MainTaskHandle == nullptr) {
         xTaskCreate(
             HC12MainTask,
             "HC12 Main Task",
             2048,
-            NULL,
+            nullptr,
             BACKGROUND_TASK_PRIORITY,
             &mHC12MainTaskHandle
         );
@@ -240,9 +239,9 @@ void HC12::createHC12MainTask() {
     }
 }
 void HC12::deleteHC12MainTask() {
-    if (mHC12MainTaskHandle != NULL) {
+    if (mHC12MainTaskHandle != nullptr) {
         vTaskDelete(mHC12MainTaskHandle);
-        mHC12MainTaskHandle = NULL;
+        mHC12MainTaskHandle = nullptr;
     }
 }
 // ================================================================
@@ -250,7 +249,7 @@ void HC12::deleteHC12MainTask() {
 // ========================== Send Task ===========================
 
 void HC12::transmitTask(void *parameters) {
-    auto &hc12 = *mspHC12;
+    const auto &hc12 = *mspHC12;
 
     uint8_t transmitBuffer[PROTOCOL_SIZE];
     
@@ -258,7 +257,7 @@ void HC12::transmitTask(void *parameters) {
         if (xQueueReceive(hc12.mTransmitQueue, transmitBuffer, pdMS_TO_TICKS(SUSPEND_TASK_TIME_SHORT)) == pdTRUE) {
             xSemaphoreTake(hc12.mSendingDataMutex, portMAX_DELAY);
 
-            // TODO consider making this delay more "inteligent" (eg. by cooldown timer)
+            // TODO consider making this delay more "intelligent" (eg. by cooldown timer)
             // this delay is required for HC12 transmit/receive message properly
             vTaskDelay(pdMS_TO_TICKS(DELAY_BETWEEN_MESSAGES));
 
@@ -266,23 +265,22 @@ void HC12::transmitTask(void *parameters) {
             uint32_t hc12Respond;
             // clearing old notification (if exist)
             xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, 0);
-            // // transmiting data
             xTaskNotify(hc12.mHC12MainTaskHandle, WAITING_FOR_SEND_CONFIRMATION_NOTIF, eSetValueWithOverwrite);
             
-            // transmiting data
+            // transmitting data
             hc12.mpSerial->write(transmitBuffer, PROTOCOL_SIZE);
 
             // TODO remove?
             // wait for confirmation from HC12
             if (xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
                 if (hc12Respond != 255) {
-                    Serial.print("TRANSMITING ERROR! In transmitTask() -> hc12 module did not confirm properly. HC12 module should send 255 signal but got: ");
+                    Serial.print("TRANSMITTING ERROR! In transmitTask() -> hc12 module did not confirm properly. HC12 module should send 255 signal but got: ");
                     Serial.println(hc12Respond);
                 }
             } else {
                 xTaskNotify(hc12.mHC12MainTaskHandle, CANCEL_WAITING_FOR_SEND_CONFIRMATION_NOTIF, eSetValueWithOverwrite);
                 // TODO change
-                // Serial.println("TRANSMITING ERROR! In transmitTask() -> hc12 module is not responding.");
+                // Serial.println("TRANSMITTING ERROR! In transmitTask() -> hc12 module is not responding.");
                 // Serial.println("HC12 NT");
             }
 
@@ -294,12 +292,12 @@ void HC12::transmitTask(void *parameters) {
 }
 
 void HC12::createTransmitTask() {
-    if (mTransmitTaskHandle == NULL) {
+    if (mTransmitTaskHandle == nullptr) {
         xTaskCreate(
             transmitTask,
             "HC12 Transmit Task",
             2048,
-            NULL,
+            nullptr,
             HIGH_TASK_PRIORITY,
             &mTransmitTaskHandle
         );
@@ -309,9 +307,9 @@ void HC12::createTransmitTask() {
 }
 
 void HC12::deleteTransmitTask() {
-    if (mTransmitTaskHandle != NULL) {
+    if (mTransmitTaskHandle != nullptr) {
         vTaskDelete(mTransmitTaskHandle);
-        mTransmitTaskHandle = NULL;
+        mTransmitTaskHandle = nullptr;
     }
 }
 // ================================================================
@@ -319,18 +317,12 @@ void HC12::deleteTransmitTask() {
 // ========================== Setup HC12 ==========================
 
 void HC12::setupHC12Task(void *parameters) {
-    auto hc12 = mspHC12;
+    const auto hc12 = mspHC12;
 
     // prepare commandBuffer
     uint8_t commandBuffer[SETUP_COMMAND_SIZE];
     for (uint8_t i = 0; i < SETUP_COMMAND_SIZE; i++) {
         commandBuffer[i] = 0;
-    }
-    // prepare receiveBuffer
-    uint8_t receiveByteBuffer = 0;
-    uint8_t receiveBuffer[MESSAGE_SIZE];
-    for (uint8_t i = 0; i < MESSAGE_SIZE; i++) {
-        receiveBuffer[i] = 0;
     }
 
     for (;;) {
@@ -342,7 +334,7 @@ void HC12::setupHC12Task(void *parameters) {
             if (!(commandBuffer[0] == (uint8_t)'H' && commandBuffer[1] == (uint8_t)'C')) {
                 Serial.println("HC12 COMMAND ERROR! In setupHC12Task() -> received array is not hc12 command.");
             } else {
-                uint8_t lenOfCommand = uah::calcLenOfDataInArray(commandBuffer, SETUP_COMMAND_SIZE);
+                const uint8_t lenOfCommand = uah::calcLenOfDataInArray(commandBuffer, SETUP_COMMAND_SIZE);
                 commandBuffer[0] = (uint8_t)'A';
                 commandBuffer[1] = (uint8_t)'T';
                 
@@ -376,12 +368,12 @@ void HC12::createSetupHC12Task() {
     digitalWrite(SET_PIN, LOW);
     vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_LOW));
 
-    if (mSetupHC12TaskHandle == NULL) {
+    if (mSetupHC12TaskHandle == nullptr) {
         xTaskCreate(
             setupHC12Task,
             "HC12 Setup Task",
             2048,
-            NULL,
+            nullptr,
             HIGH_TASK_PRIORITY,
             &mSetupHC12TaskHandle
         );
@@ -390,9 +382,9 @@ void HC12::createSetupHC12Task() {
     }
 }
 void HC12::deleteSetupHC12Task() {
-    if (mSetupHC12TaskHandle != NULL) {
+    if (mSetupHC12TaskHandle != nullptr) {
         vTaskDelete(mSetupHC12TaskHandle);
-        mSetupHC12TaskHandle = NULL;
+        mSetupHC12TaskHandle = nullptr;
     }
 
     deleteSetupHC12Queues();

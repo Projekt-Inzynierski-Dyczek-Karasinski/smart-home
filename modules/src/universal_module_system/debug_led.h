@@ -77,8 +77,8 @@ private:
 
     /**
      * @brief Make LED blink for a given times.
-     * @param uint32_t Time in milliseconds for which the LED will be on.
-     * @param uint32_t Time in milliseconds for which the LED will be off.
+     * @param ledOnDuration Time in milliseconds for which the LED will be on.
+     * @param ledOffDuration Time in milliseconds for which the LED will be off.
      * @note This method is private.
      */
     static void blink(uint32_t ledOnDuration, uint32_t ledOffDuration);
@@ -94,7 +94,7 @@ private:
      * @note This method exists only because is necessary for creating task inside class in freeRTOS.
      * 
      * This method is private.
-     * @param void* FreeRTOS task parameters.
+     * @param parameters FreeRTOS task parameters.
      */
     static void createPairingBlinkTaskHandle(void *parameters);
 
@@ -109,7 +109,7 @@ private:
      * @note This method exists only because is necessary for creating task inside class in freeRTOS.
      * 
      * This method is private.
-     * @param void* FreeRTOS task parameters.
+     * @param parameters FreeRTOS task parameters.
      */
     static void createResetBlinkTaskHandle(void *parameters);
 
@@ -124,14 +124,14 @@ private:
      * @note This method exists only because is necessary for creating timer inside class in freeRTOS.
      * 
      * This method is private.
-     * @param TimerHandle_t FreeRTOS software timer.
+     * @param xTimer FreeRTOS software timer.
      */
     static void startBlinkTimeoutHandle(TimerHandle_t xTimer);
 
     /**
      * @brief Creates and starts Blink Timeout Timer. If timer is already started, it will be restarted.
      * @note This method is private.
-     * @param uint32_t Time in milliseconds after which the timer will expire.
+     * @param maxBlinkTime Time in milliseconds after which the timer will expire.
      */
     static void startBlinkTimeout(uint32_t maxBlinkTime);
 
