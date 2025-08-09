@@ -1,7 +1,7 @@
 #include "uint8_array_handlers.h"
 
 namespace Utils {
-    namespace Uint8ArrayHandlers {
+    namespace ArrayHandlers {
         void printArrayAsChar(const uint8_t *array, const uint8_t len) {
             // TODO change print to concatenate message before using Serial.print
             for (uint8_t i = 0; i < len; i++) {
@@ -28,7 +28,7 @@ namespace Utils {
         void prepareBuffer(uint8_t *buffer, const uint8_t *value, uint8_t len, const uint8_t maxLen) {
             if (len > maxLen) {
                 len = maxLen;
-                Serial.println("VALUE ERROR! In Uint8ArrayHandlers::prepareBuffer() -> len must not be larger than maxLen");
+                Serial.println("VALUE ERROR! In ArrayHandlers::prepareBuffer() -> len must not be larger than maxLen");
             }
 
             for (uint8_t i = 0; i < len; i++) {
@@ -41,6 +41,13 @@ namespace Utils {
         uint8_t calcLenOfDataInArray(const uint8_t *array, const uint8_t maxLen) {
             for (uint8_t i = 0; i < maxLen; i++) {
                 if (array[i] == 0) return i;
+            }
+            return maxLen;
+        }
+
+        uint8_t calcLenOfDataInArray(const char *array, const uint8_t maxLen) {
+            for (uint8_t i = 0; i < maxLen; i++) {
+                if (array[i] == '\0') return i;
             }
             return maxLen;
         }

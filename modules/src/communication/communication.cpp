@@ -23,7 +23,7 @@
     #include "addressing/module_addressing.h"
 #endif
 
-namespace uah = Utils::Uint8ArrayHandlers;
+namespace uah = Utils::ArrayHandlers;
 
 DebugLED* Communication::mspDebugLED = nullptr;
 
@@ -655,7 +655,13 @@ void Communication::sendCustomMessageTask(void *parameters) {
                     xTaskNotify(com.mCommunicationMainTaskHandle, START_PINGING_NOTIF, eSetValueWithOverwrite);
                 } else if (uah::areArraysEqual(buffer, (uint8_t*)"readraw", 7)) {
                     xTaskNotify(com.mCommunicationMainTaskHandle, READ_RAW_MESSAGE_NOTIF, eSetValueWithOverwrite);
-                } 
+                }
+                #ifdef ESP32_BOARD
+                else if (uah::areArraysEqual(buffer, (uint8_t*)"reboot", 6)) {
+                    Serial.println("Rebooting...");
+                    ESP.restart();
+                }
+                #endif
                 // rest
                 else {
                     // check if is HC_12 command

@@ -10,45 +10,55 @@ namespace Utils {
          * @brief Enumeration of available log levels.
          */
         enum class Level : uint8_t {
-            NONE = 0, ///< Prints nothing
+            NONE = 0, ///< Prints nothing (for production)
             ERROR = 1, ///< Prints only errors
             WARNING = 2, ///< Prints warnings and errors
             INFO = 3, ///< Prints information, warnings and errors
             DEBUG = 4, ///< Prints everything
         };
-        static constexpr auto minLevel = Level::ERROR;
-        static constexpr auto maxLevel = Level::DEBUG;
-
-        // TODO remove?
-        /**
-         * @brief Convert log level to string representation.
-         *
-         * @param level log level to convert.
-         * @return String view of the level name.
-         */
-        // static constexpr std::string_view toString(const Level level) {
-        //     switch (level) {
-        //         case Level::NONE: return "NONE";
-        //         case Level::ERROR: return "ERROR";
-        //         case Level::WARNING: return "WARNING";
-        //         case Level::INFO: return "INFO";
-        //         case Level::DEBUG: return "DEBUG";
-        //         default: return "UNDEFINED";
-        //     }
 
         class Logger {
         public:
-            explicit Logger(Level level = static_cast<Level>(DEFAULT_LOGGING_LEVEL));
-            ~Logger();
+            explicit Logger(Level level = static_cast<Level>(LOGGING_LEVEL));
+            ~Logger() = default;
 
+            /**
+             * @brief Logs an <b>error</b> message.
+             * @param name Name of the location of the log.
+             * @param message Message of the log.
+             */
             void error(const char *name, const char *message);
+            /**
+             * @brief Logs a <b>warning</b> message.
+             * @param name Name of the location of the log.
+             * @param message Message of the log.
+             */
             void warning(const char *name, const char *message);
+            /**
+             * @brief Logs an <b>info</b> message.
+             * @param name Name of the location of the log.
+             * @param message Message of the log.
+             */
             void info(const char *name, const char *message);
+            /**
+             * @brief Logs a <b>debug</b> message.
+             * @param name Name of the location of the log.
+             * @param message Message of the log.
+             */
             void debug(const char *name, const char *message);
         private:
-            void writeLog(Level level, const char *name, const char *functionName, const char *message);
+            /**
+             * @brief Convert log level to char array representation.
+             * @param buffer Array to store name of log level.
+             * @param level Log level to convert.
+             * @return True if successfully converted log level, false otherwise.
+             */
+            bool logLevelToString(char *buffer, Level level);
 
-            Level mLogLevel;
+
+            void writeLog(Level level, const char *name, const char *message);
+
+            Level mLogLevel; ///< Currently set logging level.
         };
     }
 }

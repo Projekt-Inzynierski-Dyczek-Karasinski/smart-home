@@ -9,7 +9,7 @@
 #include "../../utils/uint8_array_handlers.h"
 #include "communication/communication.h"
 
-namespace uah = Utils::Uint8ArrayHandlers;
+namespace uah = Utils::ArrayHandlers;
 
 ModuleAddressing* ModuleAddressing::mspAddressing = nullptr;
 

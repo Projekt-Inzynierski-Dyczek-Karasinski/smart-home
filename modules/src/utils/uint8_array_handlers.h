@@ -13,7 +13,7 @@ namespace Utils {
      * uint8_t calcLenOfDataInArray()
      * bool areArraysEqual()
      */
-    namespace Uint8ArrayHandlers {
+    namespace ArrayHandlers {
         /**
          * @brief Prints given uint8_t array as a char array.
          * @param array Array to be printed.
@@ -51,6 +51,13 @@ namespace Utils {
          * @return Length of the array until first occur of 0 or maxLen if no 0 was found.
          */
         uint8_t calcLenOfDataInArray(const uint8_t *array, uint8_t maxLen);
+        /**
+         * @brief Calculates length of data in given char array (assuming that first occur of '\0' is end of data).
+         * @param array Array to be calculated.
+         * @param maxLen Length of the array.
+         * @return Length of the array until first occur of '\0' or maxLen if no '\0' was found.
+         */
+        uint8_t calcLenOfDataInArray(const char *array, uint8_t maxLen);
 
         /**
          * @brief Compares two uint8_t arrays of given length.
