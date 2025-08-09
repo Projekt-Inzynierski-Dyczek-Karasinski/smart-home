@@ -1,10 +1,9 @@
-#ifndef PAIRING_BUTTON_H
-#define PAIRING_BUTTON_H
+#pragma once
 
-#include <Arduino.h>
 #include "debug_led.h"
 #include "communication/communication.h"
 
+// TODO change to thread-save singleton and change some methods and vars to nonstatic
 /**
  * @brief Class that controls the Pairing Button by attaching interrupt to it. 
  * 
@@ -94,5 +93,3 @@ private:
     static int8_t msButtonNotPressedCounter;
     static TimerHandle_t msButtonPressTimer;
 };
-
-#endif

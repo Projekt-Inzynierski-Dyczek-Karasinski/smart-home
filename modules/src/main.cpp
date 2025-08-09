@@ -13,17 +13,17 @@ void setup() {
     vTaskDelay(pdTICKS_TO_MS(1000));
     ul::Logger logger = ul::Logger();
 
-    DebugLED* debugLed = DebugLED::getInstance();
+    DebugLED* debugLed = DebugLED::getInstance(&logger);
     Communication& communication = Communication::getInstance(debugLed);
     PairingButton* pairingButton = PairingButton::getInstance(debugLed, &communication);
 
-    logger.info("MAIN", "Deleting functions setup() and loop().");
+    logger.info("Main", "Deleting functions setup() and loop().");
     vTaskDelete(nullptr);
-    logger.error("MAIN", "Failed to delete setup().");
+    logger.error("Main", "Failed to delete setup().");
 }
 
 void loop() {
     ul::Logger logger = ul::Logger();
-    logger.error("MAIN", "Failed to delete loop().");
+    logger.error("Main", "Failed to delete loop().");
     vTaskDelay(pdMS_TO_TICKS(1000));
 }

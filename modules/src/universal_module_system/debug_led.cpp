@@ -1,5 +1,6 @@
 #include "debug_led.h"
-#include "../smart_home_config.h"
+
+#include "utils/logger.h"
 
 #define CONNECTION_BLINK_DELAY 500
 #define RESET_BLINK_DELAY 100
@@ -14,18 +15,19 @@ TaskHandle_t DebugLED::msPairingBlinkHandle = nullptr;
 TaskHandle_t DebugLED::msResetBlinkHandle = nullptr;
 TimerHandle_t DebugLED::msBlinkTimeout = nullptr;
 
+namespace ul = Utils::Logging;
 
-DebugLED* DebugLED::getInstance() {
+DebugLED* DebugLED::getInstance(ul::Logger *logger) {
     if (mspInstance == nullptr) {
-        mspInstance = new DebugLED();
+        mspInstance = new DebugLED(logger);
     }
     return mspInstance;
 }
 
-DebugLED::DebugLED() {
+DebugLED::DebugLED(ul::Logger *logger) : mpLogger(logger) {
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, LOW);
-    Serial.println("DebugLED initialized");
+    mpLogger->info("DebugLED", "DebugLED initialized.");
 }
 
 DebugLED::~DebugLED() {
@@ -47,11 +49,9 @@ TaskHandle_t DebugLED::getResetBlinkHandle() {
 }
 // ================================================================
 
-void DebugLED::blink(uint32_t ledOnDuration, uint32_t ledOffDuration) {
+void DebugLED::blink(const uint32_t ledOnDuration, const uint32_t ledOffDuration) {
     digitalWrite(LED_PIN, HIGH);
-    // neopixelWrite(LED_PIN, 64, 0, 0);
     vTaskDelay(pdMS_TO_TICKS(ledOnDuration));
-    // neopixelWrite(LED_PIN, 0, 0, 0);
     digitalWrite(LED_PIN, LOW);
     vTaskDelay(pdMS_TO_TICKS(ledOffDuration));
 }
@@ -76,11 +76,11 @@ void DebugLED::createPairingBlinkTask() {
             "Pairing Blink",
             1024,
             nullptr,
-            1,
+            BACKGROUND_TASK_PRIORITY,
             &msPairingBlinkHandle
         );
     } else {
-        Serial.println("void createConnectionBlinkTask() - Can't create Connection Blink task -> Connection Blink task already exists");
+        mspInstance->mpLogger->warning("DebugLED", "Can't create Connection Blink task, because task already exists.");
     }
 }
 void DebugLED::deletePairingBlinkTask() {
@@ -119,7 +119,7 @@ void DebugLED::createResetBlinkTask() {
         );
         startBlinkTimeout(MAX_RESET_BLINK_TIME);
     } else {
-        Serial.println("void createResetBlinkTask() - Can't create Reset Blink task -> Reset Blink task already exists");
+        mspInstance->mpLogger->warning("DebugLED", "Can't create Reset Blink task, because task already exists.");
     }
 }
 void DebugLED::deleteResetBlinkTask() {
@@ -147,7 +147,7 @@ void DebugLED::blinkTimeoutCallback() {
 
         deleteBlinkTimeout();
     } else {
-        Serial.println("void blinkTimeoutCallback() - Can't delete blinkTimeout timer -> blinkTimeout timer not exists");
+        mspInstance->mpLogger->error("DebugLED", "Can't delete Blink Timeout timer, because timer not exists.");
     }
 }
 void DebugLED::startBlinkTimeoutHandle(TimerHandle_t xTimer) {
@@ -168,7 +168,7 @@ void DebugLED::startBlinkTimeout(uint32_t maxBlinkTime) {
     if (msBlinkTimeout != nullptr) {
         xTimerStart(msBlinkTimeout, portMAX_DELAY);
     } else {
-        Serial.println("void startBlinkTimeout() - Can't create blinkTimeout timer -> blinkTimeout timer not created");
+        mspInstance->mpLogger->error("DebugLED", "Can't start Blink Timeout timer, because timer not exists.");
     }
 }
 void DebugLED::deleteBlinkTimeout() {

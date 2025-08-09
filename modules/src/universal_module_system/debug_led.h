@@ -1,7 +1,10 @@
-#ifndef DEBUG_LED_H
-#define DEBUG_LED_H
+#pragma once
 
 #include <Arduino.h>
+#include "utils/logger.h"
+
+// TODO change to thread-save singleton and change some methods and vars to nonstatic
+namespace ul = Utils::Logging;
 
 /**
  * @brief Class that controls the LED. 
@@ -21,7 +24,7 @@ public:
      * @brief Method that initializes DebugLED and returns a pointer to the instance of DebugLED.
      * @return DebugLED* pointer to the instance of DebugLED.
      */
-    static DebugLED* getInstance();
+    static DebugLED* getInstance(ul::Logger *logger);
     
     // Delete copy constructor and assignment operator
     DebugLED(const DebugLED&) = delete;
@@ -66,7 +69,7 @@ private:
      * @brief Constructor of DebugLED class. Sets LED_PIN to OUTPUT and its state to LOW.
      * @note Constructor of this class is private, because this class is a singleton.
      */
-    DebugLED();
+    explicit DebugLED(ul::Logger *logger);
 
     /**
      * @brief Destructor of DebugLED class. Deletes all class's tasks and timers.
@@ -146,6 +149,6 @@ private:
     static TaskHandle_t msPairingBlinkHandle;
     static TaskHandle_t msResetBlinkHandle;
     static TimerHandle_t msBlinkTimeout;
-};
 
-#endif
+    ul::Logger *mpLogger;
+};
