@@ -5,10 +5,10 @@
 #include "smart_home_config.h"
 #include "config/communication_config.h"
 #include "config/addressing_config.h"
-#include "communication/uint8_array_handlers.h"
+#include "../../utils/uint8_array_handlers.h"
 #include "communication/communication.h"
 
-namespace uah = uint8ArrayHandlers;
+namespace uah = Utils::Uint8ArrayHandlers;
 
 // ============================ Public ============================
 

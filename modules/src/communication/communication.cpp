@@ -4,7 +4,7 @@
 #include <Arduino.h>
 #include <HardwareSerial.h>
 
-#include "uint8_array_handlers.h"
+#include "../utils/uint8_array_handlers.h"
 #include "universal_module_system/debug_led.h"
 
 #include "smart_home_config.h"
@@ -23,7 +23,7 @@
     #include "addressing/module_addressing.h"
 #endif
 
-namespace uah = uint8ArrayHandlers;
+namespace uah = Utils::Uint8ArrayHandlers;
 
 DebugLED* Communication::mspDebugLED = nullptr;
 

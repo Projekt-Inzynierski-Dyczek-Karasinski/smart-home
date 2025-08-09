@@ -138,7 +138,7 @@ private:
     static CentralUnitAddressing *mspAddressing; ///< Static pointer to a CentralUnitAddressing instance.
 
     AddressingData mModulesAddressingData[MAX_NUM_OF_MODULES]; ///< Array containing addressing data for all registered modules.
-    uint8_t mNumOFModulesOnRfChannel[MAX_NUM_OF_CHANNEL]; ///< Array containing the number of modules assigned to each RF channel.
+    uint8_t mNumOFModulesOnRfChannel[MAX_NUM_OF_CHANNEL]{}; ///< Array containing the number of modules assigned to each RF channel.
     uint8_t mTmpModuleIp = NULL_IP; ///< IP address of the module currently being addressed. // TODO remember to clear that after end of new connection
 
     SemaphoreHandle_t mModulesAddressingDataMutex = nullptr; ///< Handle to mutex protecting access to modules addressing data.
