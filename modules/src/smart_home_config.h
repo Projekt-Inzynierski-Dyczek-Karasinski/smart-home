@@ -7,6 +7,9 @@
 #define CRITICAL_TASK_PRIORITY 5
 #define HC12_MODULE
 
+#ifndef TERMINAL_BAUD_RATE
+    #define TERMINAL_BAUD_RATE 9600
+#endif
 #ifndef LOGGING_LEVEL
     #define LOGGING_LEVEL 3 // INFO
 #endif

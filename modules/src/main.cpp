@@ -12,7 +12,6 @@ namespace ul = Utils::Logging;
 void setup() {
     vTaskDelay(pdTICKS_TO_MS(1000));
     ul::Logger logger = ul::Logger();
-
     DebugLED* debugLed = DebugLED::getInstance(&logger);
     Communication& communication = Communication::getInstance(debugLed);
     PairingButton* pairingButton = PairingButton::getInstance(debugLed, &communication);

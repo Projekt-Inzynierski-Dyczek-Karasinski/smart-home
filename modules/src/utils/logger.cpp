@@ -8,11 +8,12 @@ namespace uah = Utils::ArrayHandlers;
 
 namespace Utils {
     namespace Logging {
+        xSemaphoreHandle Logger::smSerialBeginMutex = xSemaphoreCreateMutex();
+        bool Logger::smIsSerialBegin = false;
+
         Logger::Logger(const Level level) : mLogLevel(level) {
             if (mLogLevel == Level::NONE) return;
-            Serial.begin(9600);
-            Serial.println();
-
+            beginSerial();
             info("Logger", "Logger initialized.");
         }
 
@@ -27,6 +28,20 @@ namespace Utils {
         }
         void Logger::debug(const char *name, const char *message) {
             writeLog(Level::DEBUG, name, message);
+        }
+
+        void Logger::beginSerial()  {
+            xSemaphoreTake(smSerialBeginMutex, portMAX_DELAY);
+            if (!smIsSerialBegin) {
+                Serial.begin(TERMINAL_BAUD_RATE);
+                Serial.println();
+                smIsSerialBegin = true;
+
+                char message[35];
+                sprintf(message, "Serial began with baudrate %i.", TERMINAL_BAUD_RATE);
+                info("Logger", message);
+            }
+            xSemaphoreGive(smSerialBeginMutex);
         }
 
         bool Logger::logLevelToString(char *buffer, const Level level) {
@@ -69,6 +84,5 @@ namespace Utils {
             Serial.print(logInfo);
             Serial.println(message);
         }
-
     }
 }

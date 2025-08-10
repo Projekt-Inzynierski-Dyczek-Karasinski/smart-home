@@ -3,15 +3,15 @@
 
 // TODO add @example tags
 
-
 namespace Utils {
     /**
-     * @brief Namespace containing utility functions for uint8_t arrays.
-     * @note Available functions:
-     * void printArrayAsChar()
-     * void prepareBuffer()
-     * uint8_t calcLenOfDataInArray()
-     * bool areArraysEqual()
+     * @brief Namespace containing utility functions for arrays.
+     * @note Available functions:\n
+     * void printArrayAsChar()\n
+     * void printArrayAsInt()\n
+     * void prepareBuffer()\n
+     * uint8_t calcLenOfDataInArray()\n
+     * bool areArraysEqual()\n
      */
     namespace ArrayHandlers {
         /**
