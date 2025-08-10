@@ -1,4 +1,5 @@
 #include "pairing_button.h"
+#include "utils/logger.h"
 
 #define DEBOUNCING_TIME 100
 #define DEBOUNCING_COUNTER_TO_SECONDS(value) (value * DEBOUNCING_TIME / 1000)
@@ -12,6 +13,7 @@ uint8_t PairingButton::msButtonPressCounter = 0;
 int8_t PairingButton::msButtonNotPressedCounter = 3;
 TimerHandle_t PairingButton::msButtonPressTimer = nullptr;
 
+namespace ul = Utils::Logging;
 
 PairingButton* PairingButton::getInstance(DebugLED *debugLED, Communication *communication) {
     if (mspInstance == nullptr) {
@@ -25,7 +27,9 @@ PairingButton::PairingButton(DebugLED *debugLED, Communication *communication) {
     mspCommunication = communication;
     pinMode(BUTTON_PIN, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
-    Serial.println("PairingButton initialized");
+
+    mLogger = ul::Logger();
+    mLogger.info("PairingButtonClass", "PairingButton initialized.");
 }
 
 PairingButton::~PairingButton() {
@@ -35,6 +39,7 @@ PairingButton::~PairingButton() {
 
 void IRAM_ATTR PairingButton::buttonISR() {
     detachInterrupt(digitalPinToInterrupt(BUTTON_PIN));
+    mspInstance->mLogger.debug("PairingButton ISR", "Button pressed.");
     startButtonPressTimer();
 
     // Force context switch if higher priority task was woken

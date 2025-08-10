@@ -14,12 +14,18 @@ namespace Utils {
         Logger::Logger(const Level level) : mLogLevel(level) {
             if (mLogLevel == Level::NONE) return;
             beginSerial();
-            info("Logger", "Logger initialized.");
         }
 
         void Logger::error(const char *name, const char *message) {
             writeLog(Level::ERROR, name, message);
         }
+        void Logger::errorWithValue(const char *name, const char *message, const uint8_t value) {
+
+        }
+        void Logger::errorWithValue(const char *name, const char *message, const uint8_t *value) {
+
+        }
+
         void Logger::warning(const char *name, const char *message) {
             writeLog(Level::WARNING, name, message);
         }
@@ -39,7 +45,7 @@ namespace Utils {
 
                 char message[35];
                 sprintf(message, "Serial began with baudrate %i.", TERMINAL_BAUD_RATE);
-                info("Logger", message);
+                info("Logger Class", message);
             }
             xSemaphoreGive(smSerialBeginMutex);
         }
@@ -51,38 +57,38 @@ namespace Utils {
                 case Level::INFO: strcpy(buffer, "[INFO]"); return true;
                 case Level::DEBUG: strcpy(buffer, "[DEBUG]"); return true;
                 default:
-                    error("LOGGER", "Bad level, log ignored.");
+                    char errorMessage[38];
+                    sprintf(errorMessage, "Incorrect log level: %i, log ignored.", level);
+                    error("Logger Method", errorMessage);
                     return false;
             }
         }
 
         void Logger::writeLog(const Level level, const char *name, const char *message) {
-            constexpr uint8_t logInfoLength = 32;
             constexpr uint8_t logTypeLength = 10;
-            constexpr uint8_t logInfoConstCharsLength = 4;
-            constexpr uint8_t maxLengthOfName = logInfoLength - logTypeLength - logInfoConstCharsLength;
 
             // protections
             if (mLogLevel < level) return;
-            if (uah::calcLenOfDataInArray(name, maxLengthOfName + 1) > maxLengthOfName) {
-                error("LOGGER", "Name of log too long, log ignored.");
-                return;
-            }
             char logType[logTypeLength];
             if (!logLevelToString(logType, level)) return;
 
-            // prepare first half of log
-            char logInfo[logInfoLength];
-            sprintf(
-                logInfo,
-                "%s [%s] ",
+            const uint16_t size = snprintf(
+                nullptr,
+                0,
+                "%s [%s] %s",
                 logType,
-                name
+                name,
+                message
             );
-
-            // print log, separate prints for saving memory
-            Serial.print(logInfo);
-            Serial.println(message);
+            char log[size + 1];
+            sprintf(
+                log,
+                "%s [%s] %s",
+                logType,
+                name,
+                message
+            );
+            Serial.println(log);
         }
     }
 }

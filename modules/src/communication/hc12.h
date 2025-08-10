@@ -6,6 +6,9 @@
 #include "smart_home_config.h"
 #include "config/communication_config.h"
 
+#include "utils/logger.h"
+
+namespace ul = Utils::Logging;
 class Communication; 
 // TODO add @pre, @post etc.
 
@@ -156,4 +159,6 @@ private:
     TaskHandle_t mHC12MainTaskHandle = nullptr; ///< Handle to FreeRTOS main HC12 task.
     TaskHandle_t mTransmitTaskHandle = nullptr; ///< Handle to FreeRTOS transmission task.
     TaskHandle_t mSetupHC12TaskHandle = nullptr; ///< Handle to FreeRTOS setup task.
+
+    ul::Logger mLogger;
 };

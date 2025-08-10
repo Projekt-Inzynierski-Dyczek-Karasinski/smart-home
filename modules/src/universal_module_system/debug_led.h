@@ -24,7 +24,7 @@ public:
      * @brief Method that initializes DebugLED and returns a pointer to the instance of DebugLED.
      * @return DebugLED* pointer to the instance of DebugLED.
      */
-    static DebugLED* getInstance(ul::Logger *logger);
+    static DebugLED* getInstance();
     
     // Delete copy constructor and assignment operator
     DebugLED(const DebugLED&) = delete;
@@ -69,7 +69,7 @@ private:
      * @brief Constructor of DebugLED class. Sets LED_PIN to OUTPUT and its state to LOW.
      * @note Constructor of this class is private, because this class is a singleton.
      */
-    explicit DebugLED(ul::Logger *logger);
+    explicit DebugLED();
 
     /**
      * @brief Destructor of DebugLED class. Deletes all class's tasks and timers.
@@ -150,5 +150,5 @@ private:
     static TaskHandle_t msResetBlinkHandle;
     static TimerHandle_t msBlinkTimeout;
 
-    ul::Logger *mpLogger;
+    ul::Logger mLogger;
 };

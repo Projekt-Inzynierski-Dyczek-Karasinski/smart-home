@@ -47,6 +47,20 @@ namespace Utils {
              */
             void error(const char *name, const char *message);
             /**
+             * @brief Logs an <i>error</i> message.
+             * @param name Name of the location/purpose of the log.
+             * @param message The log message.
+             * @param value Value to add to end of log.
+             */
+            void errorWithValue(const char *name, const char *message, uint8_t value);
+            /**
+             * @brief Logs an <i>error</i> message.
+             * @param name Name of the location/purpose of the log.
+             * @param message The log message.
+             * @param value Array of values to add to end of log.
+             */
+            void errorWithValue(const char *name, const char *message, const uint8_t *value);
+            /**
              * @brief Logs a <i>warning</i> message.
              * @param name Name of the location/purpose of the log.
              * @param message The log message.
