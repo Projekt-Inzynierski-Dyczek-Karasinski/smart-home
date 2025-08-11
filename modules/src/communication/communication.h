@@ -71,7 +71,7 @@ public:
     /**
      * @brief Add a single byte to the byte queue for decoding.
      *        Resumes the decode task if necessary.
-     * @param data Byte to add to the receive queue.
+     * @param data Byte to add to receive queue.
      */
     void addByteToDecode(uint8_t data) const;
 
@@ -275,13 +275,13 @@ private:
         MESSAGE_TIMEOUT_NOTIF,
         // suspending notifications
         SUSPEND_DECODE_MESSAGE_TASK_NOTIF,
-        SUSPEND_ENDCODE_MESSAGE_TASK_NOTIF,
+        SUSPEND_ENCODE_MESSAGE_TASK_NOTIF,
         // ping notifications
         START_PINGING_NOTIF,
         PING_TIMEOUT_NOTIF,
         // addressing notifications
         READ_RAW_MESSAGE_NOTIF,
-        STOP_ADDRESING_ALGORITHM_NOTIF,
+        STOP_ADDRESSING_ALGORITHM_NOTIF,
     } mCommunicationMainNotifications; ///< Enum with main communication task notifications.
 
     uint8_t mLastTransmittedMessage[MESSAGE_SIZE]; ///< Recently transmitted message (for "repeat" logic).

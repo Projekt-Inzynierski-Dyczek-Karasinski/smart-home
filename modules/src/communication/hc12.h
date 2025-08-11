@@ -1,10 +1,7 @@
 #pragma once
 
-#include <Arduino.h>
 #include <HardwareSerial.h>
-
-#include "smart_home_config.h"
-#include "config/communication_config.h"
+#include <memory>
 
 #include "utils/logger.h"
 
@@ -23,8 +20,9 @@ public:
      * queue for transmitting data and mutex. Starts HardwareSerial communication with HC12 module. 
      * Sets SET_PIN to OUTPUT and its state to HIGH. 
      * @param communication pointer to instance of Communication class.
+     * @param logger Shared pointer to the Logger instance.
      */
-    explicit HC12(Communication *communication);
+    HC12(Communication *communication, const std::shared_ptr<ul::Logger> &logger);
     /**
      * @brief Destructor of HC12 class. Deletes all FreeRTOS objects and HardwareSerial. Sets SET_PIN to LOW.
      * @warning Destructor of this class exists only for programming principles. This class should never be deleted.
@@ -160,5 +158,5 @@ private:
     TaskHandle_t mTransmitTaskHandle = nullptr; ///< Handle to FreeRTOS transmission task.
     TaskHandle_t mSetupHC12TaskHandle = nullptr; ///< Handle to FreeRTOS setup task.
 
-    ul::Logger mLogger;
+    std::shared_ptr<ul::Logger> mpLogger;
 };

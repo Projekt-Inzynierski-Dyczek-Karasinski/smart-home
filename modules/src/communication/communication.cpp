@@ -42,7 +42,7 @@ void Communication::startAddressingAlgorithm() const {
 }
 
 void Communication::stopAddressingAlgorithm() const {
-    xTaskNotify(mCommunicationMainTaskHandle, STOP_ADDRESING_ALGORITHM_NOTIF, eSetValueWithOverwrite);
+    xTaskNotify(mCommunicationMainTaskHandle, STOP_ADDRESSING_ALGORITHM_NOTIF, eSetValueWithOverwrite);
 }
 
 void Communication::needRawMessage() const {
@@ -80,7 +80,7 @@ void Communication::sendInternalMessage(const uint8_t message[MESSAGE_SIZE]) con
 
 Communication::Communication(DebugLED *debugLED, const std::shared_ptr<ul::Logger> &logger) :
     #ifdef HC12_MODULE
-        mpRfModule(new HC12(this)),
+        mpRfModule(new HC12(this, logger)),
     #else
         #error "Not implemented" 
     #endif
@@ -181,9 +181,10 @@ void Communication::receivedMessageDecider(bool *isReadingRawMessage) {
         }
         #endif
         else {
+            // TODO change message in this log
             mpLogger->warninga(
                 "Communication Main",
-                "Received message decider doesn't know what to do with received message. Ignored message: ",
+                "Received custom message.\nIgnored message: ",
                 buffer,
                 MESSAGE_SIZE
             );
@@ -251,7 +252,7 @@ void Communication::communicationMainTask(void* parameters) {
                 vTaskSuspend(com.mDecodeMessageTaskHandle);
                 break;
             
-            case SUSPEND_ENDCODE_MESSAGE_TASK_NOTIF:
+            case SUSPEND_ENCODE_MESSAGE_TASK_NOTIF:
                 com.mpLogger->debug("Communication Main", "vTaskSuspend(com.mEncodeMessageTaskHandle);");
                 com.setLastTransmittedMessage();
                 vTaskSuspend(com.mEncodeMessageTaskHandle);
@@ -272,7 +273,7 @@ void Communication::communicationMainTask(void* parameters) {
                 xTaskNotify(com.mDecodeMessageTaskHandle, READ_RAW_MESSAGE_NOTIF, eSetValueWithOverwrite);
                 break;
 
-            case STOP_ADDRESING_ALGORITHM_NOTIF:
+            case STOP_ADDRESSING_ALGORITHM_NOTIF:
                 isReadingRawMessage = false;
                 mspDebugLED->deletePairingBlinkTask();
                 com.mpAddressing->stopAddressing();
@@ -331,10 +332,10 @@ void Communication::decodeMessageTask(void *parameters) {
     // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
     uint8_t protocolBuffer[PROTOCOL_MESSAGE_MAX_NUM][PROTOCOL_SIZE];
 
-    const uint8_t ipIndex = 6;
-    const uint8_t messagesQuantityIndex = 7;
-    const uint8_t protocolMessageStartIndex = 8;
-    const uint8_t protocolMessageLength = 6;
+    constexpr uint8_t ipIndex = 6;
+    constexpr uint8_t messagesQuantityIndex = 7;
+    constexpr uint8_t protocolMessageStartIndex = 8;
+    constexpr uint8_t protocolMessageLength = 6;
 
     uint8_t protoBuffMessageIndex = 0;
     uint8_t protoBuffByteIndex = 0;
@@ -574,7 +575,7 @@ void Communication::encodeMessageTask(void *parameters) {
                 com.setLastTransmittedMessage(messageBuffer);
             }
         } else {
-            xTaskNotify(com.mCommunicationMainTaskHandle, SUSPEND_ENDCODE_MESSAGE_TASK_NOTIF, eSetValueWithOverwrite);
+            xTaskNotify(com.mCommunicationMainTaskHandle, SUSPEND_ENCODE_MESSAGE_TASK_NOTIF, eSetValueWithOverwrite);
         }
     }
 }
@@ -603,7 +604,7 @@ void Communication::deleteEncodeMessageTask() {
 // ================================================================
 
 // TODO consider implementation #ifdef DEBUG_MODE for below section
-// TODO change name for this task (eg. input/teminal input)
+// TODO change name for this task (eg. input/terminal input)
 
 // ===================== Send Custom Message ======================
 
@@ -775,7 +776,6 @@ void Communication::transmitRepeatMessage() const {
 }
 
 void Communication::repeatLastTransmittedMessage() {
-    bool isMaxAttemptsExceeded = false;
     xSemaphoreTake(mLastTransmittedMessageMutex, portMAX_DELAY);
     if (mLastTransmittedMessage[0] != 0) {
         xQueueSend(mSendMessagesQueue, mLastTransmittedMessage, portMAX_DELAY);

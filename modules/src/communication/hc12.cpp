@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <HardwareSerial.h>
+#include <memory>
 
 #include "config/communication_config.h"
 
@@ -14,10 +15,10 @@ HC12* HC12::mspHC12 = nullptr;
 
 // ============================ Public ============================
 
-HC12::HC12(Communication *communication) {
+HC12::HC12(Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
     mpCommunication = communication;
     mspHC12 = this;
-    mLogger = ul::Logger();
+    mpLogger = logger;
 
     pinMode(SET_PIN, OUTPUT);
     digitalWrite(SET_PIN, HIGH);
@@ -34,7 +35,7 @@ HC12::HC12(Communication *communication) {
     createTransmitTask();
     createHC12MainTask();
 
-    mLogger.info("HC12 Class", "HC12 initialized.");
+    mpLogger->info("HC12 Class", "HC12 initialized.");
 }
 
 HC12::~HC12() {
@@ -57,7 +58,7 @@ void HC12::addMessageToTransmit(const uint8_t *message) const {
 
 void HC12::setupHC12(const uint8_t *commands) {
     if (!(commands[0] == 'H' && commands[1] == 'C')) {
-        mLogger.error("HC12 Method", "HC12 commands passed in setupHC12() must start with 'H', 'C'");
+        mpLogger->error("HC12 Method", "HC12 commands passed in setupHC12() must start with 'H', 'C'");
     } else {
         createSetupHC12Queues();
 
@@ -70,7 +71,7 @@ void HC12::setupHC12(const uint8_t *commands) {
             if (commands[commandEndIndex] == (uint8_t)'|') {
                 commandCounter++;
                 if (commandCounter > SETUP_MAX_NUM_OF_COMMANDS) {
-                    mLogger.error("HC12 Method", "Passed too many commands in setupHC12().");
+                    mpLogger->error("HC12 Method", "Passed too many commands in setupHC12().");
                     break;
                 }
                 uah::prepareBuffer(commandBuffer, &commands[commandStartIndex], (commandEndIndex - commandStartIndex), SETUP_COMMAND_SIZE);
@@ -85,7 +86,7 @@ void HC12::setupHC12(const uint8_t *commands) {
         if (commands[commandEndIndex - 1] != (uint8_t)'|') {
             commandCounter++;
             if (commandCounter > SETUP_MAX_NUM_OF_COMMANDS) {
-                mLogger.error("HC12 Method", "Passed too many commands in setupHC12().");
+                mpLogger->error("HC12 Method", "Passed too many commands in setupHC12().");
             } else {
                 uah::prepareBuffer(commandBuffer, &commands[commandStartIndex], (commandEndIndex - commandStartIndex), SETUP_COMMAND_SIZE);
                 xQueueSend(mSetupHC12CommandsQueue, commandBuffer, portMAX_DELAY);
@@ -193,18 +194,18 @@ void HC12::HC12MainTask(void *parameters) {
                 break;
 
             case SUSPEND_TRANSMIT_TASK_NOTIF:
-                hc12.mLogger.debug("HC12 Main", "vTaskSuspend(hc12.mTransmitTaskHandle)");
+                hc12.mpLogger->debug("HC12 Main", "vTaskSuspend(hc12.mTransmitTaskHandle)");
                 vTaskSuspend(hc12.mTransmitTaskHandle);
                 break;
 
             case CREATE_SETUP_HC12_TASK_NOTIF:
-                hc12.mLogger.debug("HC12 Main", "CREATE_SETUP_HC12_TASK_NOTIF");
+                hc12.mpLogger->debug("HC12 Main", "CREATE_SETUP_HC12_TASK_NOTIF");
                 isSetupHC12Working = true;
                 hc12.createSetupHC12Task();
                 break;
 
             case DELETE_SETUP_HC12_TASK_NOTIF:
-                hc12.mLogger.debug("HC12 Main", "DELETE_SETUP_HC12_TASK_NOTIF");
+                hc12.mpLogger->debug("HC12 Main", "DELETE_SETUP_HC12_TASK_NOTIF");
                 isSetupHC12Working = false;
                 hc12.deleteSetupHC12Task();
                 break;
@@ -212,7 +213,7 @@ void HC12::HC12MainTask(void *parameters) {
             default:
                 char errorMessage[40];
                 sprintf(errorMessage, "Got unknow status. Received Status: %i", status);
-                hc12.mLogger.error("HC12 Main", errorMessage);
+                hc12.mpLogger->error("HC12 Main", errorMessage);
                 break;
         }
 
@@ -232,7 +233,7 @@ void HC12::createHC12MainTask() {
             &mHC12MainTaskHandle
         );
     } else {
-        mLogger.error("HC12 FreeRTOS", "Can't create HC12 Main task, because task already exists");
+        mpLogger->warning("HC12 FreeRTOS", "Can't create HC12 Main task, because task already exists");
     }
 }
 void HC12::deleteHC12MainTask() {
@@ -277,7 +278,7 @@ void HC12::transmitTask(void *parameters) {
                         "HC12 module did not confirm properly. HC12 module should send 255 signal but got: %i.",
                         hc12Respond
                     );
-                    hc12.mLogger.warning("HC12 Transmit", warningMessage);
+                    hc12.mpLogger->warning("HC12 Transmit", warningMessage);
                 }
             } else {
                 xTaskNotify(hc12.mHC12MainTaskHandle, CANCEL_WAITING_FOR_SEND_CONFIRMATION_NOTIF, eSetValueWithOverwrite);
@@ -304,7 +305,7 @@ void HC12::createTransmitTask() {
             &mTransmitTaskHandle
         );
     } else {
-        mLogger.error("HC12 FreeRTOS", "Can't create transmit task, because task already exists");
+        mpLogger->warning("HC12 FreeRTOS", "Can't create transmit task, because task already exists");
     }
 }
 
