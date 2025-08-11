@@ -76,14 +76,12 @@ private:
     // TODO consider changing this:
     /**
      * @brief Prints information about all modules' addressing data to the serial output.
-     * @warning This is special debug method that prints by its own.
-     * @note Thread-safe.
+     * @warning This is special debug method that prints by its own. That print is <b>not</b> thread-safe, (only printing is not thread-safe).
      */
     void printModulesAddressingData() const;
     /**
      * @brief Prints the number of modules registered on each RF channel to the serial output.
-     * @warning This is special debug method that prints by its own.
-     * @note Thread-safe.
+     * @warning This is special debug method that prints by its own. That print is <b>not</b> thread-safe, (only printing is not thread-safe).
      */
     void printNumOFModulesOnRfChannels() const;
 

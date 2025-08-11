@@ -15,7 +15,6 @@ uint8_t PairingButton::msButtonPressCounter = 0;
 int8_t PairingButton::msButtonNotPressedCounter = 3;
 TimerHandle_t PairingButton::msButtonPressTimer = nullptr;
 
-namespace ul = Utils::Logging;
 
 PairingButton* PairingButton::getInstance(DebugLED *debugLED, Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
     if (mspInstance == nullptr) {
@@ -82,7 +81,7 @@ void PairingButton::buttonPressTimerCallback() {
     }
 }
 void PairingButton::buttonPressTimerCallbackHandle(TimerHandle_t xTimer) {
-    const PairingButton* instance = static_cast<PairingButton*>(pvTimerGetTimerID(xTimer)); // NOLINT(*-use-auto)
+    const PairingButton* instance = static_cast<PairingButton*>(pvTimerGetTimerID(xTimer)); 
     instance->buttonPressTimerCallback();
 }
 void PairingButton::startButtonPressTimer() {

@@ -13,7 +13,7 @@
 #include "communication/communication.h"
 
 namespace uah = Utils::ArrayHandlers;
-namespace ul = Utils::Logging;
+
 
 ModuleAddressing* ModuleAddressing::mspAddressing = nullptr;
 

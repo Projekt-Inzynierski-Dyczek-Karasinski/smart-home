@@ -252,7 +252,9 @@ void CentralUnitAddressing::createAddressingTimer() {
 // =================== Modules Addressing Data ====================
 
 void CentralUnitAddressing::printModulesAddressingData() const {
-    mpLogger->warning("CentralUnitAddressing Class", "Debug method printModulesAddressingData() call.");
+    if (!mpLogger->getIsSerialEnabled()) return;
+
+    mpLogger->warning("CentralUnitAddressing Class", "Debug method printModulesAddressingData() call - not thread-safe print.");
     xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
     for (uint8_t i = 0; i < MAX_NUM_OF_MODULES; i++) {
         if (mModulesAddressingData[i].ipAddress != NULL_IP) {
@@ -272,7 +274,9 @@ void CentralUnitAddressing::printModulesAddressingData() const {
 }
 
 void CentralUnitAddressing::printNumOFModulesOnRfChannels() const {
-    mpLogger->warning("CentralUnitAddressing Class", "Debug method printNumOFModulesOnRfChannels() call.");
+    if (!mpLogger->getIsSerialEnabled()) return;
+
+    mpLogger->warning("CentralUnitAddressing Class", "Debug method printNumOFModulesOnRfChannels() call - not thread-safe print.");
     xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
     for (uint8_t i = 0; i < MAX_NUM_OF_CHANNEL; i++) {
         if (mNumOFModulesOnRfChannel[i] != 0) {

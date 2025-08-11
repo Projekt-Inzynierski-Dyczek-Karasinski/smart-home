@@ -9,16 +9,37 @@ namespace uah = Utils::ArrayHandlers;
 
 namespace Utils {
     namespace Logging {
-        xSemaphoreHandle Logger::smSerialBeginMutex = xSemaphoreCreateMutex();
-        bool Logger::smIsSerialBegin = false;
+        xSemaphoreHandle Logger::smSerialMutex = xSemaphoreCreateMutex();
+        bool Logger::smIsSerialEnabled = false;
 
-        Logger::Logger(const Level level) : mLogLevel(level) {
-            if (mLogLevel == Level::NONE) return;
+        Logger::Logger(const Level level) {
+            mLogLevelMutex = xSemaphoreCreateMutex();
+            xSemaphoreTake(mLogLevelMutex, portMAX_DELAY);
+            mLogLevel = level;
+            xSemaphoreGive(mLogLevelMutex);
+
+            if (getLogLevel() == Level::NONE) return;
             beginSerial();
-            if (mLogLevel == Level::DEBUG) {
+            if (getLogLevel() == Level::DEBUG) {
+                xSemaphoreTake(smSerialMutex, portMAX_DELAY);
                 Serial.println();
-                warning("Logger Level DEBUG", "Logger is set with Level::DEBUG.\n If this main Logger instance (that is used for all components),\n Logger will print a huge amount of messages,\n consider making new instance to debug only part of program,\n otherwise that may cause unintended behaviour (including panic core).\n");
+                warning("Logger Level DEBUG", "Logger is set with Level::DEBUG.\n If this is main Logger instance (that is used for all components),\n Logger will print a huge amount of messages,\n consider making new instance to debug only part of program,\n otherwise that may cause unintended behaviour (including panic core).\n");
+                xSemaphoreGive(smSerialMutex);
             }
+        }
+
+        Level Logger::getLogLevel() const {
+            xSemaphoreTake(mLogLevelMutex, portMAX_DELAY);
+            const Level level = mLogLevel;
+            xSemaphoreGive(mLogLevelMutex);
+            return level;
+        }
+
+        bool Logger::getIsSerialEnabled() {
+            xSemaphoreTake(smSerialMutex, portMAX_DELAY);
+            const bool isSerialEnabled = smIsSerialEnabled;
+            xSemaphoreGive(smSerialMutex);
+            return isSerialEnabled;
         }
 
         void Logger::error(const char *name, const char *message) {
@@ -62,17 +83,18 @@ namespace Utils {
         }
 
         void Logger::beginSerial()  {
-            xSemaphoreTake(smSerialBeginMutex, portMAX_DELAY);
-            if (!smIsSerialBegin) {
+            xSemaphoreTake(smSerialMutex, portMAX_DELAY);
+            if (!smIsSerialEnabled) {
                 Serial.begin(TERMINAL_BAUD_RATE);
                 Serial.println();
-                smIsSerialBegin = true;
+                smIsSerialEnabled = true;
+                xSemaphoreGive(smSerialMutex);
 
                 char message[35];
                 sprintf(message, "Serial began with baudrate %i.", TERMINAL_BAUD_RATE);
                 info("Logger Class", message);
             }
-            xSemaphoreGive(smSerialBeginMutex);
+            xSemaphoreGive(smSerialMutex);
         }
 
         bool Logger::logLevelToString(char *buffer, const Level level) {
@@ -92,28 +114,32 @@ namespace Utils {
         void Logger::log(const Level level, const char *name, const char *message) {
             constexpr uint8_t logTypeLength = 10;
             // protections
-            if (mLogLevel < level) return;
+            if (getLogLevel() < level) return;
             char logType[logTypeLength];
             if (!logLevelToString(logType, level)) return;
 
             // write log
+            xSemaphoreTake(smSerialMutex, portMAX_DELAY);
             writeLog(logType, name, message);
+            xSemaphoreGive(smSerialMutex);
         }
         void Logger::log(const Level level, const char *name, const char *message, const int value) {
             constexpr uint8_t logTypeLength = 10;
             // protections
-            if (mLogLevel < level) return;
+            if (getLogLevel() < level) return;
             char logType[logTypeLength];
             if (!logLevelToString(logType, level)) return;
 
             // write log
+            xSemaphoreTake(smSerialMutex, portMAX_DELAY);
             writeLog(logType, name, message, false);
             Serial.println((int)value);
+            xSemaphoreGive(smSerialMutex);
         }
         void Logger::log(const Level level, const char *name, const char *message, const uint8_t *values, const uint8_t len, const bool isAscii) {
             constexpr uint8_t logTypeLength = 10;
             // protections
-            if (mLogLevel < level) return;
+            if (getLogLevel() < level) return;
             char logType[logTypeLength];
             if (!logLevelToString(logType, level)) return;
 
@@ -127,10 +153,12 @@ namespace Utils {
                 valueBuffer[realLen - 1] = '\0';
 
                 // write log
+                xSemaphoreTake(smSerialMutex, portMAX_DELAY);
                 writeLog(logType, name, message, false);
                 Serial.println(valueBuffer);
             } else {
                 // special log for rare cases
+                xSemaphoreTake(smSerialMutex, portMAX_DELAY);
                 writeLog(logType, name, message, false);
                 char currentPrint[5];
                 for (uint8_t i = 0; i < len; i++) {
@@ -139,25 +167,13 @@ namespace Utils {
                 }
                 Serial.println();
             }
+            xSemaphoreGive(smSerialMutex);
         }
 
         void Logger::writeLog(const char *logType, const char *name, const char *message, const bool newLine) const {
-            const uint16_t size = snprintf(
-                nullptr,
-                0,
-                "%s [%s] %s",
-                logType,
-                name,
-                message
-            ) + 1;
+            const uint16_t size = snprintf(nullptr, 0, "%s [%s] %s", logType, name, message) + 1;
             char log[size];
-            sprintf(
-                log,
-                "%s [%s] %s",
-                logType,
-                name,
-                message
-            );
+            sprintf(log, "%s [%s] %s", logType, name, message);
 
             if (newLine) {
                 Serial.println(log);

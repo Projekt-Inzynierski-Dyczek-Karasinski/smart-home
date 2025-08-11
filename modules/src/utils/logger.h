@@ -39,6 +39,20 @@ namespace Utils {
             ~Logger() = default;
 
             /**
+             * @brief Getter returning currently set log level.
+             * @return Currently set log level.
+             * @note Thread-safe.
+             */
+            Level getLogLevel() const;
+
+            /**
+             * @brief Static getter returning if Serial is enabled (was called <code>Serial.begin()</code>).
+             * @return True if Serial is enabled, false otherwise.
+             * @note Thread-safe.
+             */
+            static bool getIsSerialEnabled();
+
+            /**
              * @brief Logs an <i>error</i> message.
              * @param name Name of the location/purpose of the log.
              * @param message The log message.
@@ -152,6 +166,7 @@ namespace Utils {
              * @param level Log severity level of the message.
              * @param name Name of the location/purpose of the log.
              * @param message The log message.
+             * @note Thread-safe.
              */
             void log(Level level, const char *name, const char *message);
             /**
@@ -160,6 +175,7 @@ namespace Utils {
              * @param name Name of the location/purpose of the log.
              * @param message The log message.
              * @param value Value to add to end of log.
+             * @note Thread-safe.
              */
             void log(Level level, const char *name, const char *message, int value);
             /**
@@ -170,6 +186,7 @@ namespace Utils {
              * @param values Array of values to add to end of log.
              * @param len Length of array.
              * @param isAscii True if values in array should be converted to chars before print, false otherwise.
+             * @note Thread-safe.
              */
             void log(Level level, const char *name, const char *message, const uint8_t *values, uint8_t len, bool isAscii);
 
@@ -179,13 +196,15 @@ namespace Utils {
              * @param name Name of the location/purpose of the log.
              * @param message The log message.
              * @param newLine True if log should end with new line, false otherwise,\n default: true.
+             * @warning This method is <b>not</b> thread-safe by its own and should be called only in <code>log()</code> method.
              */
             void writeLog(const char *logType, const char *name, const char *message, bool newLine = true) const;
 
-            Level mLogLevel; ///< Currently set logging level.
+            static xSemaphoreHandle smSerialMutex; ///< Static handle to FreeRTOS mutex protecting changing settings of Serial and printing.
+            static bool smIsSerialEnabled; ///< Static flag ensuring that <code>Serial.begin()</code> is called only once.
 
-            static xSemaphoreHandle smSerialBeginMutex; ///< Static handle to FreeRTOS mutex protecting <code>smIsSerialBegin</code>
-            static bool smIsSerialBegin; ///< Static flag ensuring that <code>Serial.begin()</code> is called only once.
+            Level mLogLevel; ///< Currently set logging level.
+            xSemaphoreHandle mLogLevelMutex; ///< Handle to FreeRTOS mutex protecting <code>mLogLevel</code>.
         };
     }
 }

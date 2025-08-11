@@ -18,8 +18,6 @@ TaskHandle_t DebugLED::msPairingBlinkHandle = nullptr;
 TaskHandle_t DebugLED::msResetBlinkHandle = nullptr;
 TimerHandle_t DebugLED::msBlinkTimeout = nullptr;
 
-namespace ul = Utils::Logging;
-
 DebugLED* DebugLED::getInstance(const std::shared_ptr<ul::Logger> &logger) {
     if (mspInstance == nullptr) {
         mspInstance = new DebugLED(logger);

@@ -330,12 +330,11 @@ void HC12::setupHC12Task(void *parameters) {
 
     for (;;) {
         if (xQueueReceive(hc12->mSetupHC12CommandsQueue, commandBuffer, 0) == pdTRUE) {
-            Serial.print("setupHC12Task received command: ");
-            uah::printArrayAsChar(commandBuffer, SETUP_COMMAND_SIZE);
+            hc12->mpLogger->infoa("HC12 Setup", "Received command: ", commandBuffer, SETUP_COMMAND_SIZE);
 
             // TODO add better protection against bad commands
             if (!(commandBuffer[0] == (uint8_t)'H' && commandBuffer[1] == (uint8_t)'C')) {
-                Serial.println("HC12 COMMAND ERROR! In setupHC12Task() -> received array is not hc12 command.");
+                hc12->mpLogger->error("HC12 Setup", "Received array is not hc12 command.");
             } else {
                 const uint8_t lenOfCommand = uah::calcLenOfDataInArray(commandBuffer, SETUP_COMMAND_SIZE);
                 commandBuffer[0] = (uint8_t)'A';
@@ -343,19 +342,22 @@ void HC12::setupHC12Task(void *parameters) {
                 
                 hc12->mpSerial->write(commandBuffer, lenOfCommand);
 
-                bool hasHC12Responded = false;
-                uint8_t hc12Response;
+                uint8_t hc12Response[SETUP_MAX_LEN_OF_RESPONSE];
+                uint8_t index = 0;
+                uah::clearBuffer(hc12Response, SETUP_MAX_LEN_OF_RESPONSE);
+
                 for (;;) {
-                    if (xQueueReceive(hc12->mSetupHC12ReceiveQueue, &hc12Response, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
-                        Serial.print((char)hc12Response);
-                        hasHC12Responded = true;
+                    if (xQueueReceive(hc12->mSetupHC12ReceiveQueue, &hc12Response[index], pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
+                        index++;
                     } else {
                         break;
                     }
                 }
 
-                if (!hasHC12Responded) {
-                    Serial.println("SETUP HC12 ERROR! In setupHC12Task() -> hc12 module is not responding.");
+                if (index == 0) {
+                    hc12->mpLogger->error("HC12 Setup", "HC12 module is not responding.");
+                } else {
+                    hc12->mpLogger->infoa("HC12 Setup", "HC12 response: ", hc12Response, SETUP_MAX_LEN_OF_RESPONSE);
                 }
             }
         } else {

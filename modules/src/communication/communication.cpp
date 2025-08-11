@@ -462,7 +462,7 @@ void Communication::decodeMessageTask(void *parameters) {
                         xQueueSend(com.mReceiveMessageQueue, protocolBuffer[0], portMAX_DELAY);
                     } else {
                         // TODO remove print ?
-                        com.mpLogger->infoa("Communication Decode", "Received raw message: ", messageBuffer, MESSAGE_SIZE);
+                        com.mpLogger->infoa("Communication Decode", "Received message: ", messageBuffer, MESSAGE_SIZE);
                         xQueueSend(com.mReceiveMessageQueue, messageBuffer, portMAX_DELAY);
                     }
 
