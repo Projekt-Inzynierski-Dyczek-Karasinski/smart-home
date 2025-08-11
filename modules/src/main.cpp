@@ -14,7 +14,7 @@ namespace ul = Utils::Logging;
 void setup() {
     // TODO remove delay before merge with main
     vTaskDelay(pdTICKS_TO_MS(1000));
-    const auto logger = std::make_shared<ul::Logger>(ul::Level::DEBUG); //TODO !BEFORE PULL REQUEST! remove ul::Level::DEBUG
+    const auto logger = std::make_shared<ul::Logger>();
 
     DebugLED* debugLed = DebugLED::getInstance(logger);
     Communication& communication = Communication::getInstance(debugLed, logger);

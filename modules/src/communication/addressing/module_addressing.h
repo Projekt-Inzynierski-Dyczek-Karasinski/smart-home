@@ -1,18 +1,18 @@
 #pragma once
 
 #include <Arduino.h>
+#include <memory>
 
 #include "smart_home_config.h"
 #include "config/addressing_config.h"
 
 #include "communication/addressing/addressing.h"
 
-class Communication; 
-// TODO add @details
+class Communication;
+namespace ul = Utils::Logging;
 /**
  * @brief Handles the addressing procedure for a module.
- * 
- * Manages the module's MAC/IP addressing, radio frequency channel (if supported by the RF module), and coordination with FreeRTOS tasks, queues,
+ * @details Manages the module's MAC/IP addressing, radio frequency channel (if supported by the RF module), and coordination with FreeRTOS tasks, queues,
  * and timer for module the addressing procedure. Inherits addressing utilities from the Addressing base class.
  */
 class ModuleAddressing final : public Addressing {
@@ -20,8 +20,9 @@ public:
     /**
      * @brief Constructs a ModuleAddressing object and sets default values for the module's addressing variables.
      * @param communication Pointer to the Communication object.
+     * @param logger Shared pointer to the Logger instance.
      */
-    explicit ModuleAddressing(Communication *communication);
+    ModuleAddressing(Communication *communication, const std::shared_ptr<ul::Logger> &logger);
     /**
      * @brief Destructor. Cleans up FreeRTOS resources (task, queue, timer) used by class.
      * @warning Destructor of this class exists only for programming principles. This class should never be deleted.

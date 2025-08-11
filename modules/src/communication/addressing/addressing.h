@@ -1,10 +1,14 @@
 #pragma once
 
 #include <Arduino.h>
+#include <memory>
 
 #include "config/communication_config.h"
 #include "config/addressing_config.h"
+#include "utils/logger.h"
 
+
+namespace ul = Utils::Logging;
 class Communication; 
 
 /**
@@ -16,8 +20,9 @@ public:
     /**
      * @brief Constructs an Addressing object.
      * @param communication Pointer to the Communication object.
+     * @param logger Shared pointer to the Logger instance.
      */
-    explicit Addressing(Communication *communication);
+    Addressing(Communication *communication, const std::shared_ptr<ul::Logger> &logger);
 
     /**
      * @brief Virtual destructor for safe polymorphic deletion.
@@ -154,4 +159,6 @@ protected:
     TaskHandle_t mAddressingTaskHandle = nullptr; ///< Handle to the addressing FreeRTOS task.
 
     TimerHandle_t mAddressingTimeoutTimer = nullptr; ///< Handle to the addressing timeout FreeRTOS software timer.
+
+    std::shared_ptr<ul::Logger> mpLogger;
 };

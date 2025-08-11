@@ -1,6 +1,7 @@
 #include "addressing.h"
 
 #include <Arduino.h>
+#include <memory>
 
 #include "smart_home_config.h"
 #include "config/communication_config.h"
@@ -9,10 +10,11 @@
 #include "communication/communication.h"
 
 namespace uah = Utils::ArrayHandlers;
+namespace ul = Utils::Logging;
 
 // ============================ Public ============================
 
-Addressing::Addressing(Communication *communication) 
+Addressing::Addressing(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
     : mpCommunication(communication) {
     #ifdef ESP32_BOARD
         esp_read_mac(mMACAddress, ESP_MAC_WIFI_STA);
@@ -21,6 +23,7 @@ Addressing::Addressing(Communication *communication)
         // TODO add function to get MAC address on different boards
         #error "MAC address not implemented!"
     #endif
+    mpLogger = logger;
     mAddressingDataMutex = xSemaphoreCreateMutex();
 }
 
@@ -56,7 +59,7 @@ void Addressing::addMessage(const uint8_t message[MESSAGE_SIZE]) const {
     if (mAddressingQueue != nullptr) {
         xQueueSend(mAddressingQueue, message, portMAX_DELAY);
     } else {
-        Serial.println("ADDRESSING ERROR! In addMessage() -> can't add message to queue, because queue doesn't exist");
+        mpLogger->warning("Addressing FreeRTOS", "Can't add message to queue, because queue doesn't exist.");
     }
 }
 // ================================================================

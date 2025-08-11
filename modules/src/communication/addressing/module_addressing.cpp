@@ -1,26 +1,30 @@
-#include "communication/addressing/module_addressing.h"
+#include "module_addressing.h"
 
 #include <Arduino.h>
+#include <memory>
 
 #include "smart_home_config.h"
 #include "config/communication_config.h"
 #include "config/addressing_config.h"
 
 #include "../../utils/uint8_array_handlers.h"
+#include "../../utils/logger.h"
+
 #include "communication/communication.h"
 
 namespace uah = Utils::ArrayHandlers;
+namespace ul = Utils::Logging;
 
 ModuleAddressing* ModuleAddressing::mspAddressing = nullptr;
 
 // ============================ Public ============================
 
-ModuleAddressing::ModuleAddressing(Communication *communication)
-    : Addressing(communication) {
+ModuleAddressing::ModuleAddressing(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
+    : Addressing(communication, logger) {
     mspAddressing = this;
     mIPAddress = NULL_IP;     
-    
-    Serial.println("ModuleAddressing initialized");
+
+    mpLogger->info("ModuleAddressing Class", "ModuleAddressing initialized.");
 }
 
 ModuleAddressing::~ModuleAddressing() {
@@ -102,12 +106,12 @@ void ModuleAddressing::addressingTask(void* parameters) {
                             uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_SUMMARY_OK, ADDRESSING_API_LEN, MESSAGE_SIZE);
                             ad.mpCommunication->sendMessage(sendBuffer);
                             // TODO add saving data in flash memory
-                            Serial.println("Addressing complete");
+                            ad.mpLogger->info("ModuleAddressing Main", "Addressing complete." );
                             // TODO remove clearing data 
                             ad.abortAddressing();
                             for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
                         } else {
-                            Serial.println("ADDRESSING ERROR! In addressingTask() -> central unit send bad data in summary");
+                            ad.mpLogger->warning("ModuleAddressing Main", "Central unit send bad data in summary." );
                             uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_SUMMARY_BAD, ADDRESSING_API_LEN, MESSAGE_SIZE);
                             ad.mpCommunication->sendMessage(sendBuffer);
                             isRestarting = true;
@@ -120,8 +124,6 @@ void ModuleAddressing::addressingTask(void* parameters) {
             }
 
             if (isRestarting) {
-                // TODO remove print
-                // Serial.println("restarting after sending...");
                 break;
             }
 
@@ -160,8 +162,7 @@ void ModuleAddressing::addressingTask(void* parameters) {
                 case ADDRESSING_STATES::WAIT_FOR_PING:
                     if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_PING, ADDRESSING_API_LEN)) {
                         isReceivedPropperMessage = true;
-                        // TODO remove print
-                        // Serial.println("Got ping");
+                        ad.mpLogger->debug("ModuleAddressing Main", "Got ping.");
                         addressingState = ADDRESSING_STATES::REPLY_PING;
                     }
                     break;
@@ -214,7 +215,7 @@ void ModuleAddressing::createAddressingTask() {
             &mAddressingTaskHandle
         );
     } else {
-        Serial.println("TASK CREATION ERROR! In createAddressingTask() -> Can't create addressing task, because task already exists");
+        mpLogger->warning("ModuleAddressing FreeRTOS", "Can't create addressing task, because task already exists.");
     }
 }
 // ================================================================
@@ -265,7 +266,7 @@ void ModuleAddressing::updateAddressingData(const uint8_t *newMAC, const uint8_t
 #endif
 
 void ModuleAddressing::clearNewConnectionData() {
-    Serial.println("Clearing new connection data...");
+    mpLogger->info("ModuleAddressing Main", "Clearing new connection data.");
 
     #ifdef RF_CHANNELS
         updateAddressingData(mMACAddress, NULL_IP, DEFAULT_CHANNEL);
@@ -283,7 +284,7 @@ void ModuleAddressing::clearNewConnectionData() {
 
 
 void ModuleAddressing::abortAddressing() {
-    Serial.println("Aborting addressing...");
+    mpLogger->warning("ModuleAddressing Main", "Aborting addressing.");
 
     clearNewConnectionData();
 

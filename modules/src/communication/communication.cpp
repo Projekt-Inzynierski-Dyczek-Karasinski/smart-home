@@ -1,5 +1,4 @@
 #include "communication.h"
-// #include "communication/communication.h"
 
 #include <Arduino.h>
 #include <HardwareSerial.h>
@@ -85,9 +84,9 @@ Communication::Communication(DebugLED *debugLED, const std::shared_ptr<ul::Logge
         #error "Not implemented" 
     #endif
     #ifdef CENTRAL_UNIT 
-        mpAddressing(new CentralUnitAddressing(this))
+        mpAddressing(new CentralUnitAddressing(this, logger))
     #else
-        mpAddressing(new ModuleAddressing(this))
+        mpAddressing(new ModuleAddressing(this, logger))
     #endif
 {
     mspCommunication = this;
@@ -374,16 +373,16 @@ void Communication::decodeMessageTask(void *parameters) {
             } else {
                 if (timeoutStatus == BYTE_TIMEOUT_NOTIF) {
                     xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
-                    com.mpLogger->debug("Communication Decode", "Byte timeout.");
+                    com.mpLogger->warning("Communication Decode", "Byte timeout.");
                     resetProtocolBuffer();
                     xQueueReset(com.mReceiveByteQueue);
                 } else if (timeoutStatus == MESSAGE_TIMEOUT_NOTIF) {
                     xTimerStop(com.mReceiveByteTimeoutTimer, portMAX_DELAY);
-                    com.mpLogger->debug("Communication Decode", "Message timeout.");
+                    com.mpLogger->warning("Communication Decode", "Message timeout.");
                     resetProtocolBuffer();
                     xQueueReset(com.mReceiveByteQueue);
                 } else {
-                    com.mpLogger->debugv("Communication Decode", "Got unknow notification status. Received Status: ", (int)timeoutStatus);
+                    com.mpLogger->errorv("Communication Decode", "Got unknow notification status. Received Status: ", (int)timeoutStatus);
                 }
                 isRawMessage = false;
             }

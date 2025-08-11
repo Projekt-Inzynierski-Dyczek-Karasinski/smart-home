@@ -38,8 +38,6 @@ namespace Utils {
             explicit Logger(Level level = static_cast<Level>(LOGGING_LEVEL));
             ~Logger() = default;
 
-            Level getLogLevel() const;
-
             /**
              * @brief Logs an <i>error</i> message.
              * @param name Name of the location/purpose of the log.

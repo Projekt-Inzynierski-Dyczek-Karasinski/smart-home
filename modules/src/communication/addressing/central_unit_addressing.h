@@ -1,24 +1,23 @@
 #pragma once
 
 #include <Arduino.h>
+#include <memory>
 
 #include "smart_home_config.h"
-#include "config/communication_config.h"
 
 #include "communication/addressing/addressing.h"
-
-class Communication; 
 
 // assuming that central unit is using hc12 to rf communication
 #ifndef HC12_MODULE
     #error "Central unit must run with hc12 module"
 #endif
 
-// TODO add @details
+class Communication;
+namespace ul = Utils::Logging;
+
 /**
  * @brief Manages the addressing procedure for the central unit.
- *  
- * Handles adding and removing of modules, assignment and tracking of MAC/IP/RF channel 
+ * @details Handles adding and removing of modules, assignment and tracking of MAC/IP/RF channel
  * and coordination of FreeRTOS task, timer and queue required for addressing logic.
  * Ensures thread-safe updates and provides centralized management of addressing data. 
  * Inherits addressing utilities from the Addressing base class.
@@ -28,8 +27,9 @@ public:
     /**
      * @brief Constructs a CentralUnitAddressing object and sets default values for addressing variables.
      * @param communication Pointer to the Communication object.
+     * @param logger Shared pointer to the Logger instance.
      */
-    explicit CentralUnitAddressing(Communication *communication);
+    CentralUnitAddressing(Communication *communication, const std::shared_ptr<ul::Logger> &logger);
     /**
      * @brief Destructor. Cleans up FreeRTOS resources (task, queue, timer) used by class.
      * @warning Destructor of this class exists only for programming principles. This class should never be deleted.
@@ -72,14 +72,17 @@ private:
      * @brief Creates the FreeRTOS timer controlling the absolute duration of addressing process.
      */
     void createAddressingTimer() override;
-    
+
+    // TODO consider changing this:
     /**
      * @brief Prints information about all modules' addressing data to the serial output.
+     * @warning This is special debug method that prints by its own.
      * @note Thread-safe.
      */
     void printModulesAddressingData() const;
     /**
      * @brief Prints the number of modules registered on each RF channel to the serial output.
+     * @warning This is special debug method that prints by its own.
      * @note Thread-safe.
      */
     void printNumOFModulesOnRfChannels() const;

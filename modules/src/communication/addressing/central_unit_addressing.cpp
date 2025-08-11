@@ -1,12 +1,14 @@
-#include "communication/addressing/central_unit_addressing.h"
+#include "central_unit_addressing.h"
 
 #include <Arduino.h>
+#include <memory>
 
 #include "smart_home_config.h"
 #include "config/communication_config.h"
 #include "config/addressing_config.h"
 
 #include "../../utils/uint8_array_handlers.h"
+#include "utils/logger.h"
 #include "communication/communication.h"
 
 namespace uah = Utils::ArrayHandlers;
@@ -15,8 +17,8 @@ CentralUnitAddressing* CentralUnitAddressing::mspAddressing = nullptr;
 
 // ============================ Public ============================
 
-CentralUnitAddressing::CentralUnitAddressing(Communication *communication) 
-    : Addressing(communication) {
+CentralUnitAddressing::CentralUnitAddressing(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
+    : Addressing(communication, logger) {
     mspAddressing = this;
     mIPAddress = CENTRAL_UNIT_IP;
 
@@ -28,7 +30,7 @@ CentralUnitAddressing::CentralUnitAddressing(Communication *communication)
     mNumOFModulesOnRfChannel[0] = 1;
     xSemaphoreGive(mModulesAddressingDataMutex);
 
-    Serial.println("CentralUnitAddressing initialized");
+    mpLogger->info("CentralUnitAddressing Class", "CentralUnitAddressing initialized.");
 }
 
 CentralUnitAddressing::~CentralUnitAddressing() {
@@ -115,7 +117,7 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
                         addressingState = PINGING;
                         continue;
                     } else {
-                        Serial.println("ADDRESSING ERROR! In addressingTask() -> got bad new connection message.");
+                        ad.mpLogger->warning("CentralUnitAddressing Main", "Got bad new connection message.");
                         isRestarting = true;
                     }
                     break;
@@ -124,8 +126,7 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
                     // send ping 
                     uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_PING, ADDRESSING_API_LEN, ADDRESSING_API_LEN);
                     ad.mpCommunication->sendMessage(sendBuffer);
-                    // TODO remove print
-                    // Serial.println("sending ping");
+                    ad.mpLogger->debug("CentralUnitAddressing Main", "Sending ping.");
                     break;
 
                 case PROCESS_SUMMARY:
@@ -135,15 +136,12 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
                     break;            
                 
                 default:
-                    Serial.print("ADDRESSING ERROR! In addressingTask() -> got unknow addressingState: ");
-                    Serial.println(addressingState);
+                    ad.mpLogger->errorv("CentralUnitAddressing Main", "Got unknow addressingState: ", addressingState);
                     isRestarting = true;
                     break;
             }
 
             if (isRestarting) {
-                // TODO remove print
-                // Serial.println("restarting after sending...");
                 break;
             }
 
@@ -156,7 +154,7 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
                 bool isReceivedPropperMessage = false;
                 switch (addressingState) {
                     case START_ADDRESSING:
-                        Serial.println("ADDRESSING ERROR! In addressingTask() -> got addressingState == START_ADDRESSING in receiving part of task, did you forget change?");
+                        ad.mpLogger->error("CentralUnitAddressing Main", "Got addressingState == START_ADDRESSING in receiving part of task, did you forget change?");
                         isRestarting = true;
                         break;
 
@@ -170,28 +168,25 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
                     case PROCESS_SUMMARY:
                         if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_SUMMARY_OK, ADDRESSING_API_LEN)) {
                             isReceivedPropperMessage = true;
-                            Serial.println("Addressing complete");
+                            ad.mpLogger->info("CentralUnitAddressing Main", "Addressing complete." );
                             // TODO remove clearing data 
                             // uint8_t mTmpModuleIp = NULL_IP; // TODO remember to clear that after end of new connection
                             ad.abortAddressing();
                             for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
                         } else if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_SUMMARY_BAD, ADDRESSING_API_LEN)) {
                             isReceivedPropperMessage = true;
-                            Serial.println("ADDRESSING ERROR! In addressingTask() -> module rejects summary");
+                            ad.mpLogger->warning("CentralUnitAddressing Main", "Module rejects summary.");
                             isRestarting = true;
                         }
                         break;  
                     
                     default:
-                        Serial.print("ADDRESSING ERROR! In addressingTask() -> got unknow addressingState: ");
-                        Serial.println(addressingState);
+                        ad.mpLogger->warningv("CentralUnitAddressing Main", "Got unknow addressingState:", addressingState);
                         isRestarting = true;
                         break;
                 }
 
                 if (isRestarting) {
-                    // TODO remove print
-                    // Serial.println("restarting after receiving...");
                     ad.sendRestartMessage();
                     break;
                 }
@@ -225,7 +220,7 @@ void CentralUnitAddressing::createAddressingTask() {
             &mAddressingTaskHandle
         );
     } else {
-        Serial.println("TASK CREATION ERROR! In createAddressingTask() -> Can't create addressing task, because task already exists");
+        mpLogger->warning("CentralUnitAddressing FreeRTOS", "Can't create addressing task, because task already exists.");
     }
 }
 
@@ -257,16 +252,18 @@ void CentralUnitAddressing::createAddressingTimer() {
 // =================== Modules Addressing Data ====================
 
 void CentralUnitAddressing::printModulesAddressingData() const {
+    mpLogger->warning("CentralUnitAddressing Class", "Debug method printModulesAddressingData() call.");
     xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
     for (uint8_t i = 0; i < MAX_NUM_OF_MODULES; i++) {
         if (mModulesAddressingData[i].ipAddress != NULL_IP) {
             char buffer[48];
             sprintf(
-                buffer, "Module: %d, ip: %d, rf: %d, mac real: %d, mac: ", i, 
-                mModulesAddressingData[i].ipAddress, 
+                buffer, "Module: %d, ip: %d, rf: %d, mac real: %d, mac: ", i,
+                mModulesAddressingData[i].ipAddress,
                 mModulesAddressingData[i].rfChannel, 
                 mModulesAddressingData[i].isMACAddressReal
             );
+
             Serial.print(buffer);
             uah::printArrayAsInt(mModulesAddressingData[i].macAddress, MAC_ADDRESS_LENGTH); 
         }
@@ -275,6 +272,7 @@ void CentralUnitAddressing::printModulesAddressingData() const {
 }
 
 void CentralUnitAddressing::printNumOFModulesOnRfChannels() const {
+    mpLogger->warning("CentralUnitAddressing Class", "Debug method printNumOFModulesOnRfChannels() call.");
     xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
     for (uint8_t i = 0; i < MAX_NUM_OF_CHANNEL; i++) {
         if (mNumOFModulesOnRfChannel[i] != 0) {
@@ -350,7 +348,7 @@ uint8_t CentralUnitAddressing::addModule(const uint8_t *macAddress, const bool i
     xSemaphoreGive(mModulesAddressingDataMutex);
 
     if (chosenIP == NULL_IP) {
-        Serial.println("CHOOSING IP ERROR! In addModule() -> not found free IP address");
+        mpLogger->error("CentralUnitAddressing AddModule", "Not found free IP address.");
     }
     return chosenIP;
 }
@@ -383,7 +381,7 @@ uint8_t CentralUnitAddressing::getTmpModuleIp() const {
 // ============================ Other =============================
 
 void CentralUnitAddressing::clearNewConnectionData() {
-    Serial.println("Clearing new connection data...");
+    mpLogger->info("CentralUnitAddressing Main", "Clearing new connection data.");
     const uint8_t tmpModuleIp = getTmpModuleIp();
     if (tmpModuleIp != NULL_IP) {
         removeModule(tmpModuleIp);
@@ -395,7 +393,7 @@ void CentralUnitAddressing::clearNewConnectionData() {
 }
 
 void CentralUnitAddressing::abortAddressing() {
-    Serial.println("Aborting addressing...");
+    mpLogger->warning("CentralUnitAddressing Main", "Aborting addressing.");
     clearNewConnectionData();
     
     mpCommunication->stopAddressingAlgorithm();
