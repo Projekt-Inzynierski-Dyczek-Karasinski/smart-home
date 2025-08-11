@@ -3,6 +3,7 @@
 
 #include <Arduino.h>
 #include <HardwareSerial.h>
+#include <memory>
 
 #include "../utils/uint8_array_handlers.h"
 #include "universal_module_system/debug_led.h"
@@ -25,12 +26,13 @@
 
 namespace uah = Utils::ArrayHandlers;
 
+Communication* Communication::mspCommunication = nullptr;
 DebugLED* Communication::mspDebugLED = nullptr;
 
 // ============================ Public ============================
 
-Communication &Communication::getInstance(DebugLED *debugLED) {
-    static Communication instance(debugLED);
+Communication &Communication::getInstance(DebugLED *debugLED, const std::shared_ptr<ul::Logger> &logger) {
+    static Communication instance(debugLED, logger);
     return instance;
 }
 
@@ -76,7 +78,7 @@ void Communication::sendInternalMessage(const uint8_t message[MESSAGE_SIZE]) con
 
 // ================== Constructor and Destructor ==================
 
-Communication::Communication(DebugLED *debugLED) :
+Communication::Communication(DebugLED *debugLED, const std::shared_ptr<ul::Logger> &logger) :
     #ifdef HC12_MODULE
         mpRfModule(new HC12(this)),
     #else
@@ -88,7 +90,9 @@ Communication::Communication(DebugLED *debugLED) :
         mpAddressing(new ModuleAddressing(this))
     #endif
 {
+    mspCommunication = this;
     mspDebugLED = debugLED;
+    mpLogger = logger;
 
     mLastTransmittedMessageMutex = xSemaphoreCreateMutex();
     setLastTransmittedMessage();
@@ -101,7 +105,7 @@ Communication::Communication(DebugLED *debugLED) :
     createEncodeMessageTask();
     createCommunicationMainTask();
 
-    Serial.println("Communication initialized"); 
+    mpLogger->info("Communication Class", "Communication initialized.");
 }
 
 Communication::~Communication() {
@@ -163,7 +167,7 @@ void Communication::receivedMessageDecider(bool *isReadingRawMessage) {
         // if it is "reping", reply to ping
         else if (uah::areArraysEqual(buffer, (uint8_t*)"reping", 6)) {
             xTimerStop(mPingTimeoutTimer, portMAX_DELAY);
-            Serial.println("Ping Success");
+            mpLogger->info("Communication Main", "Ping Success");
         }
         // if is addressing message
         else if ((buffer[0] == (uint8_t)'A' && buffer[1] == (uint8_t)'D') || *isReadingRawMessage) {
@@ -177,9 +181,12 @@ void Communication::receivedMessageDecider(bool *isReadingRawMessage) {
         }
         #endif
         else {
-            Serial.println("COMMUNICATION WARNING! In receivedMessageDecider() -> decider doesn't know what to do with received message");
-            Serial.print("Ignored message: ");
-            uah::printArrayAsChar(buffer, MESSAGE_SIZE);
+            mpLogger->warninga(
+                "Communication Main",
+                "Received message decider doesn't know what to do with received message. Ignored message: ",
+                buffer,
+                MESSAGE_SIZE
+            );
         }
         *isReadingRawMessage = false;
     }
@@ -188,9 +195,11 @@ void Communication::receivedMessageDecider(bool *isReadingRawMessage) {
 void Communication::normalOperationHandling(bool *isReadingRawMessage) {
     // extra protection if somehow queues are not empty and corresponding task is suspended 
     if (uxQueueMessagesWaiting(mReceiveByteQueue) != 0) {
+        mpLogger->debug("Communication Main", "vTaskResume(mDecodeMessageTaskHandle);");
         vTaskResume(mDecodeMessageTaskHandle);
     }
     if (uxQueueMessagesWaiting(mSendMessagesQueue) != 0) {
+        mpLogger->debug("Communication Main", "vTaskResume(mEncodeMessageTaskHandle);");
         vTaskResume(mEncodeMessageTaskHandle);
     }
 
@@ -202,20 +211,20 @@ void Communication::normalOperationHandling(bool *isReadingRawMessage) {
 }
 
 void Communication::pingTimeoutNotifHandling(uint8_t *pingAttempts) const {
-    Serial.println("Ping Timeout");
+    mpLogger->info("Communication Main", "Ping Timeout");
     *pingAttempts++;
 
     if (*pingAttempts > PING_MAX_ATTEMPTS) {
         xTimerStop(mPingTimeoutTimer, portMAX_DELAY);
         *pingAttempts = 0;
-        Serial.println("PING ERROR! In pingTimeoutNotifHandling() -> no response to ping.");
+        mpLogger->info("Communication Main", "No response to ping.");
     } else {
         transmitPing();
     }
 }
 
 void Communication::communicationMainTask(void* parameters) {
-    auto &com = Communication::getInstance(Communication::mspDebugLED);
+    auto &com = *mspCommunication;
 
     uint32_t status = DEFAULT_STATUS_NOTIF;
     uint8_t pingAttempts = 0;
@@ -238,14 +247,12 @@ void Communication::communicationMainTask(void* parameters) {
                 break;
 
             case SUSPEND_DECODE_MESSAGE_TASK_NOTIF:
-                // TODO remove print
-                // Serial.println("vTaskSuspend(mDecodeMessageTaskHandle)");
+                com.mpLogger->debug("Communication Main", "vTaskSuspend(com.mDecodeMessageTaskHandle);");
                 vTaskSuspend(com.mDecodeMessageTaskHandle);
                 break;
             
             case SUSPEND_ENDCODE_MESSAGE_TASK_NOTIF:
-                // TODO remove print
-                // Serial.println("vTaskSuspend(mEncodeMessageTaskHandle);");
+                com.mpLogger->debug("Communication Main", "vTaskSuspend(com.mEncodeMessageTaskHandle);");
                 com.setLastTransmittedMessage();
                 vTaskSuspend(com.mEncodeMessageTaskHandle);
                 break;  
@@ -272,8 +279,7 @@ void Communication::communicationMainTask(void* parameters) {
                 break;
 
             default:
-                Serial.print("STATUS ERROR! In communicationMainTask() -> got unknow status. Received Status: ");
-                Serial.println(status);
+                com.mpLogger->errorv("Communication Main", "Got unknow status. Received Status:", (int)status);
                 break;
         }
         // reset notifications status 
@@ -292,7 +298,7 @@ void Communication::createCommunicationMainTask() {
             &mCommunicationMainTaskHandle
         );
     } else {
-        Serial.println("TASK CREATION ERROR! In createCommunicationMainTask() -> Can't create Communication Main task, because task already exists");
+        mpLogger->warning("Communication FreeRTOS", "Can't create Communication Main task, because task already exists.");
     }
 }
 void Communication::deleteCommunicationMainTask() {
@@ -314,7 +320,7 @@ bool Communication::isCheckSumCorrect(const uint8_t message[PROTOCOL_SIZE]) {
 }
 
 void Communication::decodeMessageTask(void *parameters) {
-    auto &com = Communication::getInstance(Communication::mspDebugLED);
+    auto &com = *mspCommunication;
 
     // timeout status/cause
     uint32_t timeoutStatus = DEFAULT_STATUS_NOTIF;
@@ -363,32 +369,20 @@ void Communication::decodeMessageTask(void *parameters) {
         if (xTaskNotifyWait(0, ULONG_MAX, &timeoutStatus, 0) == pdTRUE) {
             if (timeoutStatus == READ_RAW_MESSAGE_NOTIF) {
                 isRawMessage = true;
-                // TODO remove print
-                // Serial.println("Reading raw message");
+                com.mpLogger->debug("Communication Decode", "Reading raw message.");
             } else {
                 if (timeoutStatus == BYTE_TIMEOUT_NOTIF) {
                     xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
-                    // TODO remove print
-                    Serial.println("Byte timeout");
+                    com.mpLogger->debug("Communication Decode", "Byte timeout.");
                     resetProtocolBuffer();
                     xQueueReset(com.mReceiveByteQueue);
                 } else if (timeoutStatus == MESSAGE_TIMEOUT_NOTIF) {
                     xTimerStop(com.mReceiveByteTimeoutTimer, portMAX_DELAY);
-                    // TODO remove print
-                    Serial.println("Message timeout");
-                    // TODO change print to concatenate message before using Serial.print
-                    for (uint8_t i = 0; i < PROTOCOL_MESSAGE_MAX_NUM; i++){
-                        for (uint8_t j = 0; j < PROTOCOL_SIZE; j++) {
-                            Serial.print(protocolBuffer[i][j]);
-                            Serial.print(' ');
-                        }
-                    }
-                    Serial.println();
+                    com.mpLogger->debug("Communication Decode", "Message timeout.");
                     resetProtocolBuffer();
                     xQueueReset(com.mReceiveByteQueue);
                 } else {
-                    Serial.print("STATUS ERROR! In decodeMessageTask() -> got unknow status. Received Status: ");
-                    Serial.println(timeoutStatus);
+                    com.mpLogger->debugv("Communication Decode", "Got unknow notification status. Received Status: ", (int)timeoutStatus);
                 }
                 isRawMessage = false;
             }
@@ -414,13 +408,12 @@ void Communication::decodeMessageTask(void *parameters) {
                 const uint8_t endOfMessage = protocolBuffer[protoBuffMessageIndex][PROTOCOL_SIZE - 1];
                 if (endOfMessage != 0) {
                     handleIncorrectMessage(isRawMessage);
-                    Serial.print("BAD END OF MESSAGE ERROR! In decodeMessageTask() -> message should end with 0 (\\0 char), but got: ");
-                    Serial.println(endOfMessage);
+                    com.mpLogger->warningv("Communication Decode", "Bad end of message. Message should end with 0 (\\0 char), but got: ", endOfMessage);
                 } 
                 // if checksum is incorrect
                 else if (!com.isCheckSumCorrect(protocolBuffer[protoBuffMessageIndex])) {
                     handleIncorrectMessage(isRawMessage);
-                    Serial.println("BAD CHECKSUM ERROR! In decodeMessageTask() -> checksum incorrect");
+                    com.mpLogger->warning("Communication Decode", "Bad checksum");
                 }
                 // if MAC or IP is incorrect 
                 // TODO uncomment and implement
@@ -465,14 +458,11 @@ void Communication::decodeMessageTask(void *parameters) {
 
                     if (isRawMessage) {
                         isRawMessage = false;
-                        // TODO remove print ?
-                        Serial.print("Received raw message: ");
-                        uah::printArrayAsInt(protocolBuffer[0], PROTOCOL_SIZE);
+                        com.mpLogger->infoa("Communication Decode", "Received raw message: ", protocolBuffer[0], PROTOCOL_SIZE, false);
                         xQueueSend(com.mReceiveMessageQueue, protocolBuffer[0], portMAX_DELAY);
                     } else {
                         // TODO remove print ?
-                        Serial.print("Received message: ");
-                        uah::printArrayAsChar(messageBuffer, MESSAGE_SIZE);
+                        com.mpLogger->infoa("Communication Decode", "Received raw message: ", messageBuffer, MESSAGE_SIZE);
                         xQueueSend(com.mReceiveMessageQueue, messageBuffer, portMAX_DELAY);
                     }
 
@@ -497,7 +487,7 @@ void Communication::createDecodeMessageTask() {
             &mDecodeMessageTaskHandle
         );
     } else {
-        Serial.println("TASK CREATION ERROR! In createDecodeMessageTask() -> Can't create decode message task, because task already exists");
+        mpLogger->warning("Communication FreeRTOS", "Can't create Decode task, because task already exists.");
     }
 }
 void Communication::deleteDecodeMessageTask() {
@@ -524,7 +514,7 @@ void Communication::prepareChecksum(uint8_t protocolBuffer[PROTOCOL_SIZE]) {
 }
 
 void Communication::encodeMessageTask(void *parameters) {
-    auto &com = Communication::getInstance(Communication::mspDebugLED);
+    auto &com = *mspCommunication;
 
     // prepare protocol buffer
     // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
@@ -577,16 +567,8 @@ void Communication::encodeMessageTask(void *parameters) {
                 
                 com.mpRfModule->addMessageToTransmit(protocolBuffer);
 
-                // TODO remove print 
-                // WARNING: long message with uncommented print may cause message timeout
-                // Serial.print("protocolBuffer: ");
-                // for (int i = 0; i < PROTOCOL_SIZE; i++){
-                //     Serial.print(protocolBuffer[i]);
-                //     Serial.print(' ');
-                // }
-                // Serial.println();
-                // Serial.print("protocolBuffer message: ");
-                // uah::printArrayAsChar(&protocolBuffer[protocolMessageStartIndex], protocolMessageLength);
+                com.mpLogger->debuga("Communication Encode", "Protocol buffer: ", protocolBuffer, PROTOCOL_SIZE, false);
+                com.mpLogger->debuga("Communication Encode", "Protocol message: ", &protocolBuffer[protocolMessageStartIndex], protocolMessageLength);
             }
             if (!uah::areArraysEqual(messageBuffer, (uint8_t*)"repeat", 6)) {
                 com.setLastTransmittedMessage(messageBuffer);
@@ -608,7 +590,7 @@ void Communication::createEncodeMessageTask() {
             &mEncodeMessageTaskHandle
         );
     } else {
-        Serial.println("TASK CREATION ERROR! In createEncodeMessageTask() -> Can't create encode message task, because task already exists");
+        mpLogger->warning("Communication FreeRTOS", "Can't create Encode task, because task already exists.");
     }
 }
 
@@ -621,11 +603,12 @@ void Communication::deleteEncodeMessageTask() {
 // ================================================================
 
 // TODO consider implementation #ifdef DEBUG_MODE for below section
+// TODO change name for this task (eg. input/teminal input)
 
 // ===================== Send Custom Message ======================
 
 void Communication::sendCustomMessageTask(void *parameters) {
-    const auto &com = Communication::getInstance(Communication::mspDebugLED);
+    const auto &com = *mspCommunication;
 
     // prepare buffer
     uint8_t buffer[MESSAGE_SIZE];
@@ -645,10 +628,8 @@ void Communication::sendCustomMessageTask(void *parameters) {
             // send message to Prepare Message To Send (protocol)
             if (buffer[index - 1] == (uint8_t)'\n') {
                 buffer[index - 1] = 0;
-                
-                // TODO remove print ?
-                Serial.print("Message Ready: ");
-                uah::printArrayAsChar(buffer, MESSAGE_SIZE);
+
+                com.mpLogger->infoa("Communication Input", "Input: ", buffer, MESSAGE_SIZE);
 
                 // special debug commands
                 if (uah::areArraysEqual(buffer, (uint8_t*)"startping", 9)) {
@@ -658,7 +639,7 @@ void Communication::sendCustomMessageTask(void *parameters) {
                 }
                 #ifdef ESP32_BOARD
                 else if (uah::areArraysEqual(buffer, (uint8_t*)"reboot", 6)) {
-                    Serial.println("Rebooting...");
+                    com.mpLogger->warning("Communication Input", "Rebooting...");
                     ESP.restart();
                 }
                 #endif
@@ -699,7 +680,7 @@ void Communication::createSendCustomMessageTask() {
             &mSendCustomMessageTaskHandle
         );
     } else {
-        Serial.println("TASK CREATION ERROR! In createSendCustomMessageTask() -> Can't create send custom message task, because task already exists");
+        mpLogger->warning("Communication FreeRTOS", "Can't create Send Custom task, because task already exists.");
     }
 }
 
@@ -714,18 +695,17 @@ void Communication::deleteSendCustomMessageTask() {
 // ============================ Timers ============================
 
 void Communication::communicationTimersCallbacks(TimerHandle_t xTimer){
-    const auto &com = Communication::getInstance(Communication::mspDebugLED);
+    const auto &com = *mspCommunication;
 
     if (xTimer == com.mReceiveMessageTimeoutTimer) {
-        // TODO remove print
-        // Serial.println("message timeout callback");
+        com.mpLogger->debug("Communication Timers", "Message timeout.");
         xTaskNotify(com.mCommunicationMainTaskHandle, MESSAGE_TIMEOUT_NOTIF, eSetValueWithOverwrite);
     } else if (xTimer == com.mReceiveByteTimeoutTimer) {
-        // TODO remove print
-        // Serial.println("byte timeout callback");
+        com.mpLogger->debug("Communication Timers", "Byte timeout.");
         xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
         xTaskNotify(com.mCommunicationMainTaskHandle, BYTE_TIMEOUT_NOTIF, eSetValueWithOverwrite);
     } else if (xTimer == com.mPingTimeoutTimer) {
+        com.mpLogger->debug("Communication Timers", "Ping timeout.");
         xTaskNotify(com.mCommunicationMainTaskHandle, PING_TIMEOUT_NOTIF, eSetValueWithOverwrite);
     }
 }

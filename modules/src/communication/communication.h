@@ -1,12 +1,12 @@
 #pragma once
 
-#include <memory>
 #include <Arduino.h>
 #include <HardwareSerial.h>
+#include <memory>
 
 #include "../smart_home_config.h"
 #include "config/communication_config.h"
-#include "universal_module_system/debug_led.h"
+
 #ifdef HC12_MODULE
     #include "communication/hc12.h"
 #endif
@@ -15,6 +15,11 @@
 #else
     #include "communication/addressing/module_addressing.h"
 #endif
+
+#include "universal_module_system/debug_led.h"
+#include "utils/logger.h"
+
+namespace ul = Utils::Logging;
 
 /**
  * @class Communication
@@ -28,9 +33,10 @@ public:
     /**
      * @brief Provides access to the singleton instance of the Communication class.
      * @param debugLED Pointer to DebugLED instance.
+     * @param logger Shared pointer to the Logger instance.
      * @return Reference to the singleton Communication instance.
      */
-    static Communication& getInstance(DebugLED *debugLED);
+    static Communication& getInstance(DebugLED *debugLED, const std::shared_ptr<ul::Logger> &logger);
     
     // Delete copy constructor and assignment operator
     Communication(const Communication&) = delete;
@@ -87,8 +93,9 @@ private:
      * @brief Private constructor for singleton pattern.
      *        Initializes FreeRTOS queues, tasks, timers, semaphores necessary for all communication (internal and RF) works.
      * @param debugLED Pointer to DebugLED instance.
+     * @param logger Shared pointer to the Logger instance.
      */
-    explicit Communication(DebugLED *debugLED);
+    explicit Communication(DebugLED *debugLED, const std::shared_ptr<ul::Logger> &logger);
     /**
      * @brief Destructor. Cleans up FreeRTOS resources used by the class.
      * @warning Destructor of this class exists only for programming principles. This class should never be deleted.
@@ -247,6 +254,7 @@ private:
     void replyToPing() const;
 
     // TODO change this to nonstatic if possible
+    static Communication *mspCommunication;
     static DebugLED *mspDebugLED; ///< Pointer to debugLED class instance.
 
     #ifdef HC12_MODULE
@@ -295,4 +303,6 @@ private:
     TimerHandle_t mReceiveMessageTimeoutTimer = nullptr; ///< Handle to FreeRTOS software timer indicating timeout of the message.
     TimerHandle_t mReceiveByteTimeoutTimer = nullptr; ///< Handle to FreeRTOS software timer indicating timeout of the receiving byte for decode task.
     TimerHandle_t mPingTimeoutTimer = nullptr; ///< Handle to FreeRTOS software timer indicating timeout of "ping" message.
+
+    std::shared_ptr<ul::Logger> mpLogger;
 };

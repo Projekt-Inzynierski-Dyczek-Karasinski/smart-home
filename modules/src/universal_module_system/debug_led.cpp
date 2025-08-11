@@ -1,4 +1,8 @@
 #include "debug_led.h"
+
+#include <memory>
+
+#include "smart_home_config.h"
 #include "utils/logger.h"
 
 #define CONNECTION_BLINK_DELAY 500
@@ -16,18 +20,18 @@ TimerHandle_t DebugLED::msBlinkTimeout = nullptr;
 
 namespace ul = Utils::Logging;
 
-DebugLED* DebugLED::getInstance() {
+DebugLED* DebugLED::getInstance(const std::shared_ptr<ul::Logger> &logger) {
     if (mspInstance == nullptr) {
-        mspInstance = new DebugLED();
+        mspInstance = new DebugLED(logger);
     }
     return mspInstance;
 }
 
-DebugLED::DebugLED() {
+DebugLED::DebugLED(const std::shared_ptr<ul::Logger> &logger) {
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, LOW);
-    mLogger = ul::Logger();
-    mLogger.info("DebugLED Class", "DebugLED initialized.");
+    mpLogger = logger;
+    mpLogger->info("DebugLED Class", "DebugLED initialized.");
 }
 
 DebugLED::~DebugLED() {
@@ -80,7 +84,7 @@ void DebugLED::createPairingBlinkTask() {
             &msPairingBlinkHandle
         );
     } else {
-        mspInstance->mLogger.warning("DebugLED FreeRTOS", "Can't create Connection Blink task, because task already exists.");
+        mspInstance->mpLogger->warning("DebugLED FreeRTOS", "Can't create Connection Blink task, because task already exists.");
     }
 }
 void DebugLED::deletePairingBlinkTask() {
@@ -119,7 +123,7 @@ void DebugLED::createResetBlinkTask() {
         );
         startBlinkTimeout(MAX_RESET_BLINK_TIME);
     } else {
-        mspInstance->mLogger.warning("DebugLED FreeRTOS", "Can't create Reset Blink task, because task already exists.");
+        mspInstance->mpLogger->warning("DebugLED FreeRTOS", "Can't create Reset Blink task, because task already exists.");
     }
 }
 void DebugLED::deleteResetBlinkTask() {
@@ -147,14 +151,14 @@ void DebugLED::blinkTimeoutCallback() {
 
         deleteBlinkTimeout();
     } else {
-        mspInstance->mLogger.error("DebugLED FreeRTOS", "Can't delete Blink Timeout timer, because timer not exists.");
+        mspInstance->mpLogger->warning("DebugLED FreeRTOS", "Can't delete Blink Timeout timer, because timer not exists.");
     }
 }
 void DebugLED::startBlinkTimeoutHandle(TimerHandle_t xTimer) {
     const DebugLED* instance = static_cast<DebugLED*>(pvTimerGetTimerID(xTimer));
     instance->blinkTimeoutCallback();
 }
-void DebugLED::startBlinkTimeout(uint32_t maxBlinkTime) {
+void DebugLED::startBlinkTimeout(const uint32_t maxBlinkTime) {
     if (msBlinkTimeout == nullptr) {
         msBlinkTimeout = xTimerCreate(
             "Blink Timeout",
@@ -168,7 +172,7 @@ void DebugLED::startBlinkTimeout(uint32_t maxBlinkTime) {
     if (msBlinkTimeout != nullptr) {
         xTimerStart(msBlinkTimeout, portMAX_DELAY);
     } else {
-        mspInstance->mLogger.error("DebugLED FreeRTOS", "Can't start Blink Timeout timer, because timer not exists.");
+        mspInstance->mpLogger->error("DebugLED FreeRTOS", "Can't start Blink Timeout timer, because timer not exists.");
     }
 }
 void DebugLED::deleteBlinkTimeout() {

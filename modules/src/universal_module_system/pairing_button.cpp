@@ -1,3 +1,5 @@
+#include <memory>
+
 #include "pairing_button.h"
 #include "utils/logger.h"
 
@@ -15,21 +17,21 @@ TimerHandle_t PairingButton::msButtonPressTimer = nullptr;
 
 namespace ul = Utils::Logging;
 
-PairingButton* PairingButton::getInstance(DebugLED *debugLED, Communication *communication) {
+PairingButton* PairingButton::getInstance(DebugLED *debugLED, Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
     if (mspInstance == nullptr) {
-        mspInstance = new PairingButton(debugLED, communication);
+        mspInstance = new PairingButton(debugLED, communication, logger);
     }
     return mspInstance;
 }
 
-PairingButton::PairingButton(DebugLED *debugLED, Communication *communication) {
+PairingButton::PairingButton(DebugLED *debugLED, Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
     mspDebugLED = debugLED;
     mspCommunication = communication;
     pinMode(BUTTON_PIN, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
 
-    mLogger = ul::Logger();
-    mLogger.info("PairingButtonClass", "PairingButton initialized.");
+    mpLogger = logger;
+    mpLogger->info("PairingButton Class", "PairingButton initialized.");
 }
 
 PairingButton::~PairingButton() {
@@ -39,7 +41,7 @@ PairingButton::~PairingButton() {
 
 void IRAM_ATTR PairingButton::buttonISR() {
     detachInterrupt(digitalPinToInterrupt(BUTTON_PIN));
-    mspInstance->mLogger.debug("PairingButton ISR", "Button pressed.");
+    mspInstance->mpLogger->debug("PairingButton ISR", "Button pressed.");
     startButtonPressTimer();
 
     // Force context switch if higher priority task was woken

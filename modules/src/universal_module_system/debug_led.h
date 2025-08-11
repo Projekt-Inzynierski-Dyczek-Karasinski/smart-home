@@ -1,6 +1,8 @@
 #pragma once
 
 #include <Arduino.h>
+#include <memory>
+
 #include "utils/logger.h"
 
 // TODO change to thread-save singleton and change some methods and vars to nonstatic
@@ -22,9 +24,10 @@ class DebugLED {
 public:
     /**
      * @brief Method that initializes DebugLED and returns a pointer to the instance of DebugLED.
+     * @param logger Shared pointer to the Logger instance.
      * @return DebugLED* pointer to the instance of DebugLED.
      */
-    static DebugLED* getInstance();
+    static DebugLED* getInstance(const std::shared_ptr<ul::Logger> &logger);
     
     // Delete copy constructor and assignment operator
     DebugLED(const DebugLED&) = delete;
@@ -67,9 +70,10 @@ public:
 private:
     /**
      * @brief Constructor of DebugLED class. Sets LED_PIN to OUTPUT and its state to LOW.
+     * @param logger Shared pointer to the Logger instance.
      * @note Constructor of this class is private, because this class is a singleton.
      */
-    explicit DebugLED();
+    explicit DebugLED(const std::shared_ptr<ul::Logger> &logger);
 
     /**
      * @brief Destructor of DebugLED class. Deletes all class's tasks and timers.
@@ -150,5 +154,5 @@ private:
     static TaskHandle_t msResetBlinkHandle;
     static TimerHandle_t msBlinkTimeout;
 
-    ul::Logger mLogger;
+    std::shared_ptr<ul::Logger> mpLogger;
 };

@@ -1,5 +1,7 @@
 #pragma once
 
+#include <memory>
+
 #include "debug_led.h"
 #include "communication/communication.h"
 #include "utils/logger.h"
@@ -23,9 +25,10 @@ public:
      * @brief Method that initializes PairingButton and returns a pointer to the instance of PairingButton
      * @param debugLED Pointer to DebugLED object.
      * @param communication Pointer to Communication object.
+     * @param logger Shared pointer to the Logger instance.
      * @return PairingButton* pointer to the instance of PairingButton.
      */
-    static PairingButton* getInstance(DebugLED *debugLED, Communication *communication);
+    static PairingButton* getInstance(DebugLED *debugLED, Communication *communication, const std::shared_ptr<ul::Logger> &logger);
     
     // Delete copy constructor and assignment operator
     PairingButton(const PairingButton&) = delete;
@@ -36,9 +39,10 @@ private:
      * @brief Constructor of PairingButton class. Sets BUTTON_PIN to INPUT_PULLUP and attaches interrupt to it.
      * @param debugLED Pointer to DebugLED object.
      * @param communication Pointer to Communication object.
+     * @param logger Shared pointer to the Logger instance.
      * @note Constructor of this class is private, because this class is a singleton.
      */
-    PairingButton(DebugLED *debugLED, Communication *communication);
+    PairingButton(DebugLED *debugLED, Communication *communication, const std::shared_ptr<ul::Logger> &logger);
     
     /**
      * @brief Destructor of PairingButton class. Detaches interrupt from BUTTON_PIN and deletes Button Press Timer if exists.
@@ -96,5 +100,5 @@ private:
     static int8_t msButtonNotPressedCounter;
     static TimerHandle_t msButtonPressTimer;
 
-    ul::Logger mLogger;
+    std::shared_ptr<ul::Logger> mpLogger;
 };

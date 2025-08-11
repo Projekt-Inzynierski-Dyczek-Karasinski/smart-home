@@ -2,8 +2,6 @@
 
 #include <Arduino.h>
 
-#include "smart_home_config.h"
-
 namespace Utils {
     /**
      * @brief Namespace containing enum Level and class Logger.
@@ -40,6 +38,8 @@ namespace Utils {
             explicit Logger(Level level = static_cast<Level>(LOGGING_LEVEL));
             ~Logger() = default;
 
+            Level getLogLevel() const;
+
             /**
              * @brief Logs an <i>error</i> message.
              * @param name Name of the location/purpose of the log.
@@ -47,19 +47,22 @@ namespace Utils {
              */
             void error(const char *name, const char *message);
             /**
-             * @brief Logs an <i>error</i> message.
+             * @brief Logs an <i>error</i> message with given integer value.
              * @param name Name of the location/purpose of the log.
              * @param message The log message.
              * @param value Value to add to end of log.
              */
-            void errorWithValue(const char *name, const char *message, uint8_t value);
+            void errorv(const char *name, const char *message, int value);
             /**
-             * @brief Logs an <i>error</i> message.
+             * @brief Logs an <i>error</i> message with given uint8_t array.
              * @param name Name of the location/purpose of the log.
              * @param message The log message.
-             * @param value Array of values to add to end of log.
+             * @param values Array of values to add to end of log.
+             * @param len Length of array.
+             * @param isAscii True if values in array should be converted to chars before print, false otherwise,\n default: true
              */
-            void errorWithValue(const char *name, const char *message, const uint8_t *value);
+            void errora(const char *name, const char *message, const uint8_t *values, uint8_t len, bool isAscii = true);
+
             /**
              * @brief Logs a <i>warning</i> message.
              * @param name Name of the location/purpose of the log.
@@ -67,17 +70,67 @@ namespace Utils {
              */
             void warning(const char *name, const char *message);
             /**
+             * @brief Logs a <i>warning</i> message with given integer value.
+             * @param name Name of the location/purpose of the log.
+             * @param message The log message.
+             * @param value Value to add to end of log.
+             */
+            void warningv(const char *name, const char *message, int value);
+            /**
+             * @brief Logs a <i>warning</i> message with given uint8_t array.
+             * @param name Name of the location/purpose of the log.
+             * @param message The log message.
+             * @param values Array of values to add to end of log.
+             * @param len Length of array.
+             * @param isAscii True if values in array should be converted to chars before print, false otherwise,\n default: true
+             */
+            void warninga(const char *name, const char *message, const uint8_t *values, uint8_t len, bool isAscii = true);
+
+            /**
              * @brief Logs an <i>info</i> message.
              * @param name Name of the location/purpose of the log.
              * @param message The log message.
              */
             void info(const char *name, const char *message);
             /**
+             * @brief Logs an <i>info</i> message with given integer value.
+             * @param name Name of the location/purpose of the log.
+             * @param message The log message.
+             * @param value Value to add to end of log.
+             */
+            void infov(const char *name, const char *message, int value);
+            /**
+             * @brief Logs an <i>info</i> message with given uint8_t array.
+             * @param name Name of the location/purpose of the log.
+             * @param message The log message.
+             * @param values Array of values to add to end of log.
+             * @param len Length of array.
+             * @param isAscii True if values in array should be converted to chars before print, false otherwise,\n default: true
+             */
+            void infoa(const char *name, const char *message, const uint8_t *values, uint8_t len, bool isAscii = true);
+
+            /**
              * @brief Logs a <i>debug</i> message.
              * @param name Name of the location/purpose of the log.
              * @param message The log message.
              */
             void debug(const char *name, const char *message);
+            /**
+             * @brief Logs a <i>debug</i> message with given integer value.
+             * @param name Name of the location/purpose of the log.
+             * @param message The log message.
+             * @param value Value to add to end of log.
+             */
+            void debugv(const char *name, const char *message, int value);
+            /**
+             * @brief Logs a <i>debug</i> message with given uint8_t array.
+             * @param name Name of the location/purpose of the log.
+             * @param message The log message.
+             * @param values Array of values to add to end of log.
+             * @param len Length of array.
+             * @param isAscii True if values in array should be converted to chars before print, false otherwise,\n default: true
+             */
+            void debuga(const char *name, const char *message, const uint8_t *values, uint8_t len, bool isAscii = true);
 
         private:
             /**
@@ -97,12 +150,39 @@ namespace Utils {
             bool logLevelToString(char *buffer, Level level);
 
             /**
-             * @brief Writes a log if the given log level is less than or equal to the currently set log level.
+             * @brief Prepares a log and calls <code>writeLog()</code> to write it if level <= logging level.
              * @param level Log severity level of the message.
              * @param name Name of the location/purpose of the log.
              * @param message The log message.
              */
-            void writeLog(Level level, const char *name, const char *message);
+            void log(Level level, const char *name, const char *message);
+            /**
+             * @brief Prepares a log and calls <code>writeLog()</code> to write it if level <= logging level.
+             * @param level Log severity level of the message.
+             * @param name Name of the location/purpose of the log.
+             * @param message The log message.
+             * @param value Value to add to end of log.
+             */
+            void log(Level level, const char *name, const char *message, int value);
+            /**
+             * @brief Prepares a log and calls <code>writeLog()</code> to write it if level <= logging level.
+             * @param level Log severity level of the message.
+             * @param name Name of the location/purpose of the log.
+             * @param message The log message.
+             * @param values Array of values to add to end of log.
+             * @param len Length of array.
+             * @param isAscii True if values in array should be converted to chars before print, false otherwise.
+             */
+            void log(Level level, const char *name, const char *message, const uint8_t *values, uint8_t len, bool isAscii);
+
+            /**
+             * @brief Writes a log.
+             * @param logType String representation of log level.
+             * @param name Name of the location/purpose of the log.
+             * @param message The log message.
+             * @param newLine True if log should end with new line, false otherwise,\n default: true.
+             */
+            void writeLog(const char *logType, const char *name, const char *message, bool newLine = true) const;
 
             Level mLogLevel; ///< Currently set logging level.
 
