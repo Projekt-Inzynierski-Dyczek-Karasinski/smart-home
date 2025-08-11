@@ -1,9 +1,13 @@
-#ifndef PAIRING_BUTTON_H
-#define PAIRING_BUTTON_H
+#pragma once
 
-#include <Arduino.h>
+#include <memory>
+
 #include "debug_led.h"
 #include "communication/communication.h"
+#include "utils/logger.h"
+
+// TODO change to thread-save singleton and change some methods and vars to nonstatic
+namespace ul = Utils::Logging;
 
 /**
  * @brief Class that controls the Pairing Button by attaching interrupt to it. 
@@ -19,10 +23,12 @@ class PairingButton {
 public:
     /**
      * @brief Method that initializes PairingButton and returns a pointer to the instance of PairingButton
-     * @param DebugLED* Pointer to DebugLED object.
+     * @param debugLED Pointer to DebugLED object.
+     * @param communication Pointer to Communication object.
+     * @param logger Shared pointer to the Logger instance.
      * @return PairingButton* pointer to the instance of PairingButton.
      */
-    static PairingButton* getInstance(DebugLED *debugLED, Communication *communication);
+    static PairingButton* getInstance(DebugLED *debugLED, Communication *communication, const std::shared_ptr<ul::Logger> &logger);
     
     // Delete copy constructor and assignment operator
     PairingButton(const PairingButton&) = delete;
@@ -31,10 +37,12 @@ public:
 private:
     /**
      * @brief Constructor of PairingButton class. Sets BUTTON_PIN to INPUT_PULLUP and attaches interrupt to it.
-     * @param DebugLED* Pointer to DebugLED object.
+     * @param debugLED Pointer to DebugLED object.
+     * @param communication Pointer to Communication object.
+     * @param logger Shared pointer to the Logger instance.
      * @note Constructor of this class is private, because this class is a singleton.
      */
-    PairingButton(DebugLED *debugLED, Communication *communication);
+    PairingButton(DebugLED *debugLED, Communication *communication, const std::shared_ptr<ul::Logger> &logger);
     
     /**
      * @brief Destructor of PairingButton class. Detaches interrupt from BUTTON_PIN and deletes Button Press Timer if exists.
@@ -63,7 +71,7 @@ private:
      * @note This method exists only because is necessary for creating timer inside class in freeRTOS.
      * 
      * This method is private.
-     * @param TimerHandle_t FreeRTOS software timer.
+     * @param xTimer FreeRTOS software timer.
      */
     static void buttonPressTimerCallbackHandle(TimerHandle_t xTimer);
 
@@ -91,6 +99,6 @@ private:
     static uint8_t msButtonPressCounter;
     static int8_t msButtonNotPressedCounter;
     static TimerHandle_t msButtonPressTimer;
-};
 
-#endif
+    std::shared_ptr<ul::Logger> mpLogger;
+};

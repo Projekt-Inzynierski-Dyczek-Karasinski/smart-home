@@ -1,5 +1,9 @@
 #include "debug_led.h"
+
+#include <memory>
+
 #include "smart_home_config.h"
+#include "utils/logger.h"
 
 #define CONNECTION_BLINK_DELAY 500
 #define RESET_BLINK_DELAY 100
@@ -10,22 +14,22 @@
 
 DebugLED* DebugLED::mspInstance = nullptr;
 
-TaskHandle_t DebugLED::msPairingBlinkHandle = NULL;
-TaskHandle_t DebugLED::msResetBlinkHandle = NULL;;
-TimerHandle_t DebugLED::msBlinkTimeout = NULL;
+TaskHandle_t DebugLED::msPairingBlinkHandle = nullptr;
+TaskHandle_t DebugLED::msResetBlinkHandle = nullptr;
+TimerHandle_t DebugLED::msBlinkTimeout = nullptr;
 
-
-DebugLED* DebugLED::getInstance() {
+DebugLED* DebugLED::getInstance(const std::shared_ptr<ul::Logger> &logger) {
     if (mspInstance == nullptr) {
-        mspInstance = new DebugLED();
+        mspInstance = new DebugLED(logger);
     }
     return mspInstance;
 }
 
-DebugLED::DebugLED() {
+DebugLED::DebugLED(const std::shared_ptr<ul::Logger> &logger) {
     pinMode(LED_PIN, OUTPUT);
     digitalWrite(LED_PIN, LOW);
-    Serial.println("DebugLED initialized");
+    mpLogger = logger;
+    mpLogger->info("DebugLED Class", "DebugLED initialized.");
 }
 
 DebugLED::~DebugLED() {
@@ -47,7 +51,7 @@ TaskHandle_t DebugLED::getResetBlinkHandle() {
 }
 // ================================================================
 
-void DebugLED::blink(uint32_t ledOnDuration, uint32_t ledOffDuration) {
+void DebugLED::blink(const uint32_t ledOnDuration, const uint32_t ledOffDuration) {
     digitalWrite(LED_PIN, HIGH);
     vTaskDelay(pdMS_TO_TICKS(ledOnDuration));
     digitalWrite(LED_PIN, LOW);
@@ -62,31 +66,31 @@ void DebugLED::pairingBlink() {
     }
 }
 void DebugLED::createPairingBlinkTaskHandle(void *parameters) {
-    DebugLED* instance = static_cast<DebugLED*>(parameters);
+    const DebugLED* instance = static_cast<DebugLED*>(parameters);
     instance->pairingBlink();
 }
 void DebugLED::createPairingBlinkTask() {
-    if (msPairingBlinkHandle == NULL) {
+    if (msPairingBlinkHandle == nullptr) {
         deleteResetBlinkTask();
 
         xTaskCreate(
             createPairingBlinkTaskHandle,
             "Pairing Blink",
             1024,
-            NULL,
-            1,
+            nullptr,
+            BACKGROUND_TASK_PRIORITY,
             &msPairingBlinkHandle
         );
     } else {
-        Serial.println("void createConnectionBlinkTask() - Can't create Connection Blink task -> Connection Blink task already exists");
+        mspInstance->mpLogger->warning("DebugLED FreeRTOS", "Can't create Connection Blink task, because task already exists.");
     }
 }
 void DebugLED::deletePairingBlinkTask() {
-    if (msPairingBlinkHandle != NULL) {
+    if (msPairingBlinkHandle != nullptr) {
         deleteBlinkTimeout();
         
         vTaskDelete(msPairingBlinkHandle);
-        msPairingBlinkHandle = NULL;
+        msPairingBlinkHandle = nullptr;
         digitalWrite(LED_PIN, LOW);
     }
 }
@@ -100,32 +104,32 @@ void DebugLED::resetBlink() {
     }
 }
 void DebugLED::createResetBlinkTaskHandle(void *parameters) {
-    DebugLED* instance = static_cast<DebugLED*>(parameters);
+    const DebugLED* instance = static_cast<DebugLED*>(parameters);
     instance->resetBlink();
 }
 void DebugLED::createResetBlinkTask() {
-    if (msResetBlinkHandle == NULL) {
+    if (msResetBlinkHandle == nullptr) {
         deletePairingBlinkTask();
         
         xTaskCreate(
             createResetBlinkTaskHandle,
             "Reset Blink",
             1024,
-            NULL,
+            nullptr,
             1,
             &msResetBlinkHandle
         );
         startBlinkTimeout(MAX_RESET_BLINK_TIME);
     } else {
-        Serial.println("void createResetBlinkTask() - Can't create Reset Blink task -> Reset Blink task already exists");
+        mspInstance->mpLogger->warning("DebugLED FreeRTOS", "Can't create Reset Blink task, because task already exists.");
     }
 }
 void DebugLED::deleteResetBlinkTask() {
-    if (msResetBlinkHandle != NULL) {
+    if (msResetBlinkHandle != nullptr) {
         deleteBlinkTimeout();
         
         vTaskDelete(msResetBlinkHandle);
-        msResetBlinkHandle = NULL;
+        msResetBlinkHandle = nullptr;
         digitalWrite(LED_PIN, LOW);
     }
 }
@@ -134,45 +138,45 @@ void DebugLED::deleteResetBlinkTask() {
 // ===================== Blink Timeout Timer ======================
 
 void DebugLED::blinkTimeoutCallback() {
-    if (msBlinkTimeout != NULL) {
-        if (msPairingBlinkHandle != NULL) {
+    if (msBlinkTimeout != nullptr) {
+        if (msPairingBlinkHandle != nullptr) {
             deletePairingBlinkTask();
         }
         
-        if (msResetBlinkHandle != NULL) {
+        if (msResetBlinkHandle != nullptr) {
             deleteResetBlinkTask();
         }
 
         deleteBlinkTimeout();
     } else {
-        Serial.println("void blinkTimeoutCallback() - Can't delete blinkTimeout timer -> blinkTimeout timer not exists");
+        mspInstance->mpLogger->warning("DebugLED FreeRTOS", "Can't delete Blink Timeout timer, because timer not exists.");
     }
 }
 void DebugLED::startBlinkTimeoutHandle(TimerHandle_t xTimer) {
-    DebugLED* instance = static_cast<DebugLED*>(pvTimerGetTimerID(xTimer));
+    const DebugLED* instance = static_cast<DebugLED*>(pvTimerGetTimerID(xTimer));
     instance->blinkTimeoutCallback();
 }
-void DebugLED::startBlinkTimeout(uint32_t maxBlinkTime) {
-    if (msBlinkTimeout == NULL) {
+void DebugLED::startBlinkTimeout(const uint32_t maxBlinkTime) {
+    if (msBlinkTimeout == nullptr) {
         msBlinkTimeout = xTimerCreate(
             "Blink Timeout",
             pdMS_TO_TICKS(maxBlinkTime),
             pdFALSE,
-            NULL,
+            nullptr,
             startBlinkTimeoutHandle
         );
     }
     
-    if (msBlinkTimeout != NULL) {
+    if (msBlinkTimeout != nullptr) {
         xTimerStart(msBlinkTimeout, portMAX_DELAY);
     } else {
-        Serial.println("void startBlinkTimeout() - Can't create blinkTimeout timer -> blinkTimeout timer not created");
+        mspInstance->mpLogger->error("DebugLED FreeRTOS", "Can't start Blink Timeout timer, because timer not exists.");
     }
 }
 void DebugLED::deleteBlinkTimeout() {
-    if (msBlinkTimeout != NULL) {
+    if (msBlinkTimeout != nullptr) {
         xTimerDelete(msBlinkTimeout, portMAX_DELAY);
-        msBlinkTimeout = NULL;
+        msBlinkTimeout = nullptr;
     }
 }
 // ================================================================

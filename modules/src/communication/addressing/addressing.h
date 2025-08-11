@@ -1,10 +1,14 @@
 #pragma once
 
 #include <Arduino.h>
+#include <memory>
 
 #include "config/communication_config.h"
 #include "config/addressing_config.h"
+#include "utils/logger.h"
 
+
+namespace ul = Utils::Logging;
 class Communication; 
 
 /**
@@ -16,8 +20,9 @@ public:
     /**
      * @brief Constructs an Addressing object.
      * @param communication Pointer to the Communication object.
+     * @param logger Shared pointer to the Logger instance.
      */
-    explicit Addressing(Communication *communication);
+    Addressing(Communication *communication, const std::shared_ptr<ul::Logger> &logger);
 
     /**
      * @brief Virtual destructor for safe polymorphic deletion.
@@ -29,14 +34,14 @@ public:
      * @param macAddress Output buffer of length 6 for the MAC address.
      * @note Thread-safe.
      */
-    void getProtocolMACAddress(uint8_t macAddress[MAC_ADDRESS_LENGTH]);
+    void getProtocolMACAddress(uint8_t macAddress[MAC_ADDRESS_LENGTH]) const;
 
     /**
      * @brief Gets the currently assigned IP address for the module.
      * @return IP address.
      * @note Thread-safe.
      */
-    uint8_t getIPAddress();
+    uint8_t getIPAddress() const;
 
     /**
      * @brief Initializes addressing procedures and related FreeRTOS resources.
@@ -52,7 +57,7 @@ public:
      * @brief Adds a message to the addressing queue. Ensures that adding messages to queue is only available if queue exist.
      * @param message Array with message array to add to queue.
      */
-    void addMessage(const uint8_t message[MESSAGE_SIZE]);
+    void addMessage(const uint8_t message[MESSAGE_SIZE]) const;
 
 protected:
     /**
@@ -111,7 +116,7 @@ protected:
 
     /**
      * @brief Checks if addressing should be continued after receiving message.
-     * If received message is to abort addressing, then will handle abort.
+     * @details If received message is to abort addressing, then will handle abort.
      * If received message is to restart addressing, then it will return true.
      * Otherwise, it will return false.
      * @param receiveBuffer Received message.
@@ -128,7 +133,7 @@ protected:
          * @brief Prepares and sends HC12 command to change RF channel.
          * @param newRfChannel New RF channel.
          */
-        void changeRfChannel(uint8_t newRfChannel);
+        void changeRfChannel(uint8_t newRfChannel) const;
     #endif
     // TODO add led blinking indicating restart, success and failure of addressing 
     // void restartLedBlink();
@@ -147,11 +152,13 @@ protected:
         #error "MAC address not implemented!"
     #endif
 
-    SemaphoreHandle_t mAddressingDataMutex = NULL; ///< Handle to mutex protecting access to addressing data.
+    SemaphoreHandle_t mAddressingDataMutex = nullptr; ///< Handle to mutex protecting access to addressing data.
 
-    QueueHandle_t mAddressingQueue = NULL; ///< Handle to FreeRTOS queue for incoming addressing messages, queue length: 10x64 bytes (uint8_t).
+    QueueHandle_t mAddressingQueue = nullptr; ///< Handle to FreeRTOS queue for incoming addressing messages, queue length: 10x64 bytes (uint8_t).
 
-    TaskHandle_t mAddressingTaskHandle = NULL; ///< Handle to the addressing FreeRTOS task.
+    TaskHandle_t mAddressingTaskHandle = nullptr; ///< Handle to the addressing FreeRTOS task.
 
-    TimerHandle_t mAddressingTimeoutTimer = NULL; ///< Handle to the addressing timeout FreeRTOS software timer.
+    TimerHandle_t mAddressingTimeoutTimer = nullptr; ///< Handle to the addressing timeout FreeRTOS software timer.
+
+    std::shared_ptr<ul::Logger> mpLogger;
 };

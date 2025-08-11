@@ -1,11 +1,11 @@
 #pragma once
 
-#include <Arduino.h>
 #include <HardwareSerial.h>
+#include <memory>
 
-#include "smart_home_config.h"
-#include "config/communication_config.h"
+#include "utils/logger.h"
 
+namespace ul = Utils::Logging;
 class Communication; 
 // TODO add @pre, @post etc.
 
@@ -20,8 +20,9 @@ public:
      * queue for transmitting data and mutex. Starts HardwareSerial communication with HC12 module. 
      * Sets SET_PIN to OUTPUT and its state to HIGH. 
      * @param communication pointer to instance of Communication class.
+     * @param logger Shared pointer to the Logger instance.
      */
-    explicit HC12(Communication *communication);
+    HC12(Communication *communication, const std::shared_ptr<ul::Logger> &logger);
     /**
      * @brief Destructor of HC12 class. Deletes all FreeRTOS objects and HardwareSerial. Sets SET_PIN to LOW.
      * @warning Destructor of this class exists only for programming principles. This class should never be deleted.
@@ -32,7 +33,7 @@ public:
      * @brief Method that allows transmitting messages via HC12 module.
      * @param message message to transmit.
      */
-    void addMessageToTransmit(const uint8_t *message);
+    void addMessageToTransmit(const uint8_t *message) const;
 
     /**
      * @brief Method that allows setting up HC12 module.  
@@ -81,7 +82,7 @@ private:
      * @param isSetupHC12Working Pointer to if the setup task is sending commands to HC12.
      * @param isWaitingForSendConfirmation Pointer to variable if is being waited for confirmation from HC12.
      */
-    void hc12OutputDecider(const uint8_t *hc12Output, const bool *isSetupHC12Working, bool *isWaitingForSendConfirmation);
+    void hc12OutputDecider(const uint8_t *hc12Output, const bool *isSetupHC12Working, bool *isWaitingForSendConfirmation) const;
     /**
      * @brief Main HC12 FreeRTOS task. Reads all output from HC12 module and passes it to Communication class.
      * This task is responsible for suspending/deleting resuming/creating other HC12 tasks.
@@ -147,13 +148,15 @@ private:
         DELETE_SETUP_HC12_TASK_NOTIF,
     } mHC12MainNotifications;
 
-    SemaphoreHandle_t mSendingDataMutex = NULL; ///< Handle to FreeRTOS mutex protecting access to UART transmission to HC12 module.
+    SemaphoreHandle_t mSendingDataMutex = nullptr; ///< Handle to FreeRTOS mutex protecting access to UART transmission to HC12 module.
     
-    QueueHandle_t mTransmitQueue = NULL; ///< Handle to FreeRTOS queue for (encoded) messages to transmit, queue length: 11x16 bytes (uint8_t).
-    QueueHandle_t mSetupHC12CommandsQueue = NULL; ///< Handle to FreeRTOS queue for HC12 commands, queue length: 5x10 bytes (uint8_t).
-    QueueHandle_t mSetupHC12ReceiveQueue = NULL; ///< Handle to FreeRTOS queue for response from HC12 after sending command, queue length: 43 bytes (uint8_t).
+    QueueHandle_t mTransmitQueue = nullptr; ///< Handle to FreeRTOS queue for (encoded) messages to transmit, queue length: 11x16 bytes (uint8_t).
+    QueueHandle_t mSetupHC12CommandsQueue = nullptr; ///< Handle to FreeRTOS queue for HC12 commands, queue length: 5x10 bytes (uint8_t).
+    QueueHandle_t mSetupHC12ReceiveQueue = nullptr; ///< Handle to FreeRTOS queue for response from HC12 after sending command, queue length: 43 bytes (uint8_t).
     
-    TaskHandle_t mHC12MainTaskHandle = NULL; ///< Handle to FreeRTOS main HC12 task. 
-    TaskHandle_t mTransmitTaskHandle = NULL; ///< Handle to FreeRTOS transmission task. 
-    TaskHandle_t mSetupHC12TaskHandle = NULL; ///< Handle to FreeRTOS setup task. 
+    TaskHandle_t mHC12MainTaskHandle = nullptr; ///< Handle to FreeRTOS main HC12 task.
+    TaskHandle_t mTransmitTaskHandle = nullptr; ///< Handle to FreeRTOS transmission task.
+    TaskHandle_t mSetupHC12TaskHandle = nullptr; ///< Handle to FreeRTOS setup task.
+
+    std::shared_ptr<ul::Logger> mpLogger;
 };

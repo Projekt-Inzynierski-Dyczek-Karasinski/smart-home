@@ -1,7 +1,12 @@
-#ifndef DEBUG_LED_H
-#define DEBUG_LED_H
+#pragma once
 
 #include <Arduino.h>
+#include <memory>
+
+#include "utils/logger.h"
+
+// TODO change to thread-save singleton and change some methods and vars to nonstatic
+namespace ul = Utils::Logging;
 
 /**
  * @brief Class that controls the LED. 
@@ -19,9 +24,10 @@ class DebugLED {
 public:
     /**
      * @brief Method that initializes DebugLED and returns a pointer to the instance of DebugLED.
+     * @param logger Shared pointer to the Logger instance.
      * @return DebugLED* pointer to the instance of DebugLED.
      */
-    static DebugLED* getInstance();
+    static DebugLED* getInstance(const std::shared_ptr<ul::Logger> &logger);
     
     // Delete copy constructor and assignment operator
     DebugLED(const DebugLED&) = delete;
@@ -64,9 +70,10 @@ public:
 private:
     /**
      * @brief Constructor of DebugLED class. Sets LED_PIN to OUTPUT and its state to LOW.
+     * @param logger Shared pointer to the Logger instance.
      * @note Constructor of this class is private, because this class is a singleton.
      */
-    DebugLED();
+    explicit DebugLED(const std::shared_ptr<ul::Logger> &logger);
 
     /**
      * @brief Destructor of DebugLED class. Deletes all class's tasks and timers.
@@ -77,8 +84,8 @@ private:
 
     /**
      * @brief Make LED blink for a given times.
-     * @param uint32_t Time in milliseconds for which the LED will be on.
-     * @param uint32_t Time in milliseconds for which the LED will be off.
+     * @param ledOnDuration Time in milliseconds for which the LED will be on.
+     * @param ledOffDuration Time in milliseconds for which the LED will be off.
      * @note This method is private.
      */
     static void blink(uint32_t ledOnDuration, uint32_t ledOffDuration);
@@ -94,7 +101,7 @@ private:
      * @note This method exists only because is necessary for creating task inside class in freeRTOS.
      * 
      * This method is private.
-     * @param void* FreeRTOS task parameters.
+     * @param parameters FreeRTOS task parameters.
      */
     static void createPairingBlinkTaskHandle(void *parameters);
 
@@ -109,7 +116,7 @@ private:
      * @note This method exists only because is necessary for creating task inside class in freeRTOS.
      * 
      * This method is private.
-     * @param void* FreeRTOS task parameters.
+     * @param parameters FreeRTOS task parameters.
      */
     static void createResetBlinkTaskHandle(void *parameters);
 
@@ -124,14 +131,14 @@ private:
      * @note This method exists only because is necessary for creating timer inside class in freeRTOS.
      * 
      * This method is private.
-     * @param TimerHandle_t FreeRTOS software timer.
+     * @param xTimer FreeRTOS software timer.
      */
     static void startBlinkTimeoutHandle(TimerHandle_t xTimer);
 
     /**
      * @brief Creates and starts Blink Timeout Timer. If timer is already started, it will be restarted.
      * @note This method is private.
-     * @param uint32_t Time in milliseconds after which the timer will expire.
+     * @param maxBlinkTime Time in milliseconds after which the timer will expire.
      */
     static void startBlinkTimeout(uint32_t maxBlinkTime);
 
@@ -146,6 +153,6 @@ private:
     static TaskHandle_t msPairingBlinkHandle;
     static TaskHandle_t msResetBlinkHandle;
     static TimerHandle_t msBlinkTimeout;
-};
 
-#endif
+    std::shared_ptr<ul::Logger> mpLogger;
+};

@@ -1,18 +1,20 @@
-#include "communication/addressing/addressing.h"
+#include "addressing.h"
 
 #include <Arduino.h>
+#include <memory>
 
 #include "smart_home_config.h"
 #include "config/communication_config.h"
 #include "config/addressing_config.h"
-#include "communication/uint8_array_handlers.h"
+#include "../../utils/uint8_array_handlers.h"
 #include "communication/communication.h"
 
-namespace uah = uint8ArrayHandlers;
+namespace uah = Utils::ArrayHandlers;
+
 
 // ============================ Public ============================
 
-Addressing::Addressing(Communication *communication) 
+Addressing::Addressing(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
     : mpCommunication(communication) {
     #ifdef ESP32_BOARD
         esp_read_mac(mMACAddress, ESP_MAC_WIFI_STA);
@@ -21,18 +23,19 @@ Addressing::Addressing(Communication *communication)
         // TODO add function to get MAC address on different boards
         #error "MAC address not implemented!"
     #endif
+    mpLogger = logger;
     mAddressingDataMutex = xSemaphoreCreateMutex();
 }
 
 Addressing::~Addressing() = default;
 
-void Addressing::getProtocolMACAddress(uint8_t macAddress[MAC_ADDRESS_LENGTH]) {
+void Addressing::getProtocolMACAddress(uint8_t macAddress[MAC_ADDRESS_LENGTH]) const {
     xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
     uah::prepareBuffer(macAddress, mProtocolMACAddress, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
     xSemaphoreGive(mAddressingDataMutex);
 }
 
-uint8_t Addressing::getIPAddress() {
+uint8_t Addressing::getIPAddress() const {
     xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
     const uint8_t ipAddress = mIPAddress;
     xSemaphoreGive(mAddressingDataMutex);
@@ -52,11 +55,11 @@ void Addressing::stopAddressing() {
     deleteAddressingTimer();
 }
 
-void Addressing::addMessage(const uint8_t message[MESSAGE_SIZE]) {
-    if (mAddressingQueue != NULL) {
+void Addressing::addMessage(const uint8_t message[MESSAGE_SIZE]) const {
+    if (mAddressingQueue != nullptr) {
         xQueueSend(mAddressingQueue, message, portMAX_DELAY);
     } else {
-        Serial.println("ADDRESSING ERROR! In addMessage() -> can't add message to queue, because queue doesn't exist");
+        mpLogger->warning("Addressing FreeRTOS", "Can't add message to queue, because queue doesn't exist.");
     }
 }
 // ================================================================
@@ -64,15 +67,15 @@ void Addressing::addMessage(const uint8_t message[MESSAGE_SIZE]) {
 // ============================ Queues ============================
 
 void Addressing::createAddressingQueue() {
-    if (mAddressingQueue == NULL) {
+    if (mAddressingQueue == nullptr) {
         mAddressingQueue = xQueueCreate(MESSAGE_QUEUE_LEN, sizeof(uint8_t[MESSAGE_SIZE]));
     }
 }
 
 void Addressing::deleteAddressingQueue() {
-    if (mAddressingQueue != NULL) {
+    if (mAddressingQueue != nullptr) {
         vQueueDelete(mAddressingQueue);
-        mAddressingQueue = NULL;
+        mAddressingQueue = nullptr;
     }
 }
 // =================================================================
@@ -80,15 +83,15 @@ void Addressing::deleteAddressingQueue() {
 // ============================ Deletes ============================
 
 void Addressing::deleteAddressingTask() {
-    if (mAddressingTaskHandle != NULL) {
+    if (mAddressingTaskHandle != nullptr) {
         vTaskDelete(mAddressingTaskHandle);
-        mAddressingTaskHandle = NULL;
+        mAddressingTaskHandle = nullptr;
     }
 }
 void Addressing::deleteAddressingTimer() {
-    if (mAddressingTimeoutTimer != NULL) {
+    if (mAddressingTimeoutTimer != nullptr) {
         xTimerDelete(mAddressingTimeoutTimer, portMAX_DELAY);
-        mAddressingTimeoutTimer = NULL;
+        mAddressingTimeoutTimer = nullptr;
     }
 }
 // ================================================================
@@ -124,8 +127,7 @@ bool Addressing::isAddressingFailed(const uint8_t *receiveBuffer) {
 }
 
 #ifdef HC12_MODULE
-    void Addressing::changeRfChannel(const uint8_t newRfChannel) {
-
+    void Addressing::changeRfChannel(const uint8_t newRfChannel) const {
         uint8_t hc12Command[SETUP_COMMAND_SIZE];
         uah::prepareBuffer(hc12Command, (uint8_t*)"HC+C000", 7, SETUP_COMMAND_SIZE);
         hc12Command[6] = (newRfChannel % 10) + (uint8_t)'0';

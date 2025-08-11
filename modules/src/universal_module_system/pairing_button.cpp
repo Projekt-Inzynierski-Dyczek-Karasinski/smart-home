@@ -1,5 +1,7 @@
+#include <memory>
+
 #include "pairing_button.h"
-#include "smart_home_config.h"
+#include "utils/logger.h"
 
 #define DEBOUNCING_TIME 100
 #define DEBOUNCING_COUNTER_TO_SECONDS(value) (value * DEBOUNCING_TIME / 1000)
@@ -11,22 +13,24 @@ DebugLED* PairingButton::mspDebugLED = nullptr;
 uint8_t PairingButton::msButtonMode = 0;
 uint8_t PairingButton::msButtonPressCounter = 0;
 int8_t PairingButton::msButtonNotPressedCounter = 3;
-TimerHandle_t PairingButton::msButtonPressTimer = NULL;
+TimerHandle_t PairingButton::msButtonPressTimer = nullptr;
 
 
-PairingButton* PairingButton::getInstance(DebugLED *debugLED, Communication *communication) {
+PairingButton* PairingButton::getInstance(DebugLED *debugLED, Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
     if (mspInstance == nullptr) {
-        mspInstance = new PairingButton(debugLED, communication);
+        mspInstance = new PairingButton(debugLED, communication, logger);
     }
     return mspInstance;
 }
 
-PairingButton::PairingButton(DebugLED *debugLED, Communication *communication) {
+PairingButton::PairingButton(DebugLED *debugLED, Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
     mspDebugLED = debugLED;
     mspCommunication = communication;
     pinMode(BUTTON_PIN, INPUT_PULLUP);
     attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
-    Serial.println("PairingButton initialized");
+
+    mpLogger = logger;
+    mpLogger->info("PairingButton Class", "PairingButton initialized.");
 }
 
 PairingButton::~PairingButton() {
@@ -36,11 +40,11 @@ PairingButton::~PairingButton() {
 
 void IRAM_ATTR PairingButton::buttonISR() {
     detachInterrupt(digitalPinToInterrupt(BUTTON_PIN));
-    
+    mspInstance->mpLogger->debug("PairingButton ISR", "Button pressed.");
     startButtonPressTimer();
 
     // Force context switch if higher priority task was woken
-    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+    constexpr BaseType_t xHigherPriorityTaskWoken = pdFALSE;
     portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
 }
 
@@ -77,27 +81,27 @@ void PairingButton::buttonPressTimerCallback() {
     }
 }
 void PairingButton::buttonPressTimerCallbackHandle(TimerHandle_t xTimer) {
-    PairingButton* instance = static_cast<PairingButton*>(pvTimerGetTimerID(xTimer));
+    const PairingButton* instance = static_cast<PairingButton*>(pvTimerGetTimerID(xTimer)); 
     instance->buttonPressTimerCallback();
 }
 void PairingButton::startButtonPressTimer() {
-    if (msButtonPressTimer == NULL) {
+    if (msButtonPressTimer == nullptr) {
         msButtonPressTimer = xTimerCreate(
             "Button Press Timer",
             pdMS_TO_TICKS(DEBOUNCING_TIME),
             pdTRUE,
-            NULL,
+            nullptr,
             buttonPressTimerCallbackHandle
         );
     }
-    if (msButtonPressTimer != NULL) {
+    if (msButtonPressTimer != nullptr) {
         xTimerStart(msButtonPressTimer, portMAX_DELAY);
     }
 }
 void PairingButton::deleteButtonPressTimer() {
-    if (msButtonPressTimer != NULL) {
+    if (msButtonPressTimer != nullptr) {
         xTimerDelete(msButtonPressTimer, portMAX_DELAY);
-        msButtonPressTimer = NULL;
+        msButtonPressTimer = nullptr;
     } 
     msButtonPressCounter = 0;
     msButtonNotPressedCounter = 3;
