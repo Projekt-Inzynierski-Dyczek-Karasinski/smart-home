@@ -152,6 +152,12 @@ private:
      */
     bool isCheckSumCorrect(const uint8_t message[PROTOCOL_SIZE]);
 
+    /**
+     * @brief Extracts a message from protocolBuffer and saves it to given buffer. Checks for packet loss.
+     * @param protocolBuffer Buffer with raw message.
+     * @param messageBuffer Buffer to save extracted message.
+     * @return True if successfully extracts a message (without packet loss), false otherwise.
+     */
     bool extractMessageFromProtocolBuffer(const uint8_t protocolBuffer[][PROTOCOL_SIZE], uint8_t *messageBuffer);
 
     /**
