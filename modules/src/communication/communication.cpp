@@ -41,11 +41,13 @@ void Communication::startAddressingAlgorithm() const {
 }
 
 void Communication::stopAddressingAlgorithm() const {
-    xTaskNotify(mCommunicationMainTaskHandle, STOP_ADDRESSING_ALGORITHM_NOTIF, eSetValueWithOverwrite);
+    constexpr uint8_t notificationValue = STOP_ADDRESSING_ALGORITHM_NOTIF;
+    xQueueSendToFront(mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
 }
 
 void Communication::needRawMessage() const {
-    xTaskNotify(mCommunicationMainTaskHandle, READ_RAW_MESSAGE_NOTIF, eSetValueWithOverwrite);
+    constexpr uint8_t notificationValue = READ_RAW_MESSAGE_NOTIF;
+    xQueueSendToFront(mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
 }
 
 void Communication::resetEncodeMessageTask() {
@@ -56,7 +58,8 @@ void Communication::resetEncodeMessageTask() {
 }
 
 void Communication::startPinging() const {
-    xTaskNotify(mCommunicationMainTaskHandle, START_PINGING_NOTIF, eSetValueWithOverwrite);
+    constexpr uint8_t notificationValue = START_PINGING_NOTIF;
+    xQueueSend(mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
 }
 
 void Communication::addByteToDecode(const uint8_t data) const {
@@ -122,6 +125,9 @@ Communication::~Communication() {
 // ============================ Queues ============================
 
 void Communication::createCommunicationQueues() {
+    if (mMainNotificationsQueue == nullptr) {
+        mMainNotificationsQueue = xQueueCreate(NOTIFICATIONS_QUEUE_SIZE, sizeof(uint8_t));
+    }
     if (mReceiveMessageQueue == nullptr) {
         mReceiveMessageQueue = xQueueCreate(MESSAGE_QUEUE_LEN, sizeof(uint8_t[MESSAGE_SIZE]));
     }
@@ -134,17 +140,21 @@ void Communication::createCommunicationQueues() {
 }
 
 void Communication::deleteCommunicationQueues() {
-    if (mReceiveMessageQueue != nullptr) {
-        vQueueDelete(mReceiveMessageQueue);
-        mReceiveMessageQueue = nullptr;
+    if (mSendMessagesQueue != nullptr) {
+        vQueueDelete(mSendMessagesQueue);
+        mSendMessagesQueue = nullptr;
     }
     if (mReceiveByteQueue != nullptr) {
         vQueueDelete(mReceiveByteQueue);
         mReceiveByteQueue = nullptr;
     }
-    if (mSendMessagesQueue != nullptr) {
-        vQueueDelete(mSendMessagesQueue);
-        mSendMessagesQueue = nullptr;
+    if (mReceiveMessageQueue != nullptr) {
+        vQueueDelete(mReceiveMessageQueue);
+        mReceiveMessageQueue = nullptr;
+    }
+    if (mMainNotificationsQueue != nullptr) {
+        vQueueDelete(mMainNotificationsQueue);
+        mMainNotificationsQueue = nullptr;
     }
 }
 // ================================================================
@@ -225,54 +235,70 @@ void Communication::pingTimeoutNotifHandling(uint8_t *pingAttempts) const {
 
 void Communication::communicationMainTask(void* parameters) {
     auto &com = *mspCommunication;
+    //TODO !BEFORE PULL REQUEST! delete private logger instance
+    auto privLogger = ul::Logger(ul::Level::NONE);
 
-    uint32_t status = DEFAULT_STATUS_NOTIF;
+    uint8_t status = DEFAULT_STATUS_NOTIF;
     uint8_t pingAttempts = 0;
     bool isReadingRawMessage = false;
     for (;;) {
-        // TODO change main tasks notifications to queues (race conditions)
         // change status
-        xTaskNotifyWait(0, ULONG_MAX, &status, 0);
+        if (xQueueReceive(com.mMainNotificationsQueue, &status, 0) == pdFALSE) {
+            // reset notifications status if there is no notifications
+            status = DEFAULT_STATUS_NOTIF;
+        }
         switch (status) {
             case DEFAULT_STATUS_NOTIF:
                 com.normalOperationHandling(&isReadingRawMessage);
                 break;
                 
             case BYTE_TIMEOUT_NOTIF:
+                privLogger.debug("Com TEST", "BYTE_TIMEOUT");
                 xTaskNotify(com.mDecodeMessageTaskHandle, BYTE_TIMEOUT_NOTIF, eSetValueWithOverwrite);
                 break;
 
             case MESSAGE_TIMEOUT_NOTIF:
+                privLogger.debug("Com TEST", "MESSAGE_TIMEOUT");
                 xTaskNotify(com.mDecodeMessageTaskHandle, MESSAGE_TIMEOUT_NOTIF, eSetValueWithOverwrite);
                 break;
 
             case SUSPEND_DECODE_MESSAGE_TASK_NOTIF:
+                privLogger.debug("Com TEST", "SUSPEND_DECODE_MESSAGE_TASK");
                 com.mpLogger->debug("Communication Main", "vTaskSuspend(com.mDecodeMessageTaskHandle);");
                 vTaskSuspend(com.mDecodeMessageTaskHandle);
                 break;
             
             case SUSPEND_ENCODE_MESSAGE_TASK_NOTIF:
+                privLogger.debug("Com TEST", "SUSPEND_ENCODE_MESSAGE_TASK");
+
                 com.mpLogger->debug("Communication Main", "vTaskSuspend(com.mEncodeMessageTaskHandle);");
                 com.setLastTransmittedMessage();
                 vTaskSuspend(com.mEncodeMessageTaskHandle);
                 break;  
             
             case START_PINGING_NOTIF:
+                privLogger.debug("Com TEST", "START_PINGING");
+
                 pingAttempts = 1;
                 com.transmitPing();
                 xTimerStart(com.mPingTimeoutTimer, portMAX_DELAY);
                 break;
 
             case PING_TIMEOUT_NOTIF:
+                privLogger.debug("Com TEST", "PING_TIMEOUT_NOTIF");
+
                 com.pingTimeoutNotifHandling(&pingAttempts);
                 break;
 
             case READ_RAW_MESSAGE_NOTIF:
+                privLogger.debug("Com TEST", "READ_RAW_MESSAGE");
                 isReadingRawMessage = true;
                 xTaskNotify(com.mDecodeMessageTaskHandle, READ_RAW_MESSAGE_NOTIF, eSetValueWithOverwrite);
                 break;
 
             case STOP_ADDRESSING_ALGORITHM_NOTIF:
+                privLogger.debug("Com TEST", "STOP_ADDRESSING_ALGORITHM");
+
                 isReadingRawMessage = false;
                 mspDebugLED->deletePairingBlinkTask();
                 com.mpAddressing->stopAddressing();
@@ -282,8 +308,6 @@ void Communication::communicationMainTask(void* parameters) {
                 com.mpLogger->errorv("Communication Main", "Got unknow status. Received Status:", (int)status);
                 break;
         }
-        // reset notifications status 
-        status = DEFAULT_STATUS_NOTIF;
     }
 }
 
@@ -471,7 +495,8 @@ void Communication::decodeMessageTask(void *parameters) {
                 }
             }
         } else {
-            xTaskNotify(com.mCommunicationMainTaskHandle, SUSPEND_DECODE_MESSAGE_TASK_NOTIF, eSetValueWithOverwrite);
+            constexpr uint8_t notificationValue = SUSPEND_DECODE_MESSAGE_TASK_NOTIF;
+            xQueueSend(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
         }
     }
 }
@@ -574,7 +599,8 @@ void Communication::encodeMessageTask(void *parameters) {
                 com.setLastTransmittedMessage(messageBuffer);
             }
         } else {
-            xTaskNotify(com.mCommunicationMainTaskHandle, SUSPEND_ENCODE_MESSAGE_TASK_NOTIF, eSetValueWithOverwrite);
+            constexpr uint8_t notificationValue = SUSPEND_ENCODE_MESSAGE_TASK_NOTIF;
+            xQueueSend(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
         }
     }
 }
@@ -633,9 +659,11 @@ void Communication::sendCustomMessageTask(void *parameters) {
 
                 // special debug commands
                 if (uah::areArraysEqual(buffer, (uint8_t*)"startping", 9)) {
-                    xTaskNotify(com.mCommunicationMainTaskHandle, START_PINGING_NOTIF, eSetValueWithOverwrite);
+                    constexpr uint8_t notificationValue = START_PINGING_NOTIF;
+                    xQueueSend(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
                 } else if (uah::areArraysEqual(buffer, (uint8_t*)"readraw", 7)) {
-                    xTaskNotify(com.mCommunicationMainTaskHandle, READ_RAW_MESSAGE_NOTIF, eSetValueWithOverwrite);
+                    constexpr uint8_t notificationValue = READ_RAW_MESSAGE_NOTIF;
+                    xQueueSendToFront(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
                 }
                 #ifdef ESP32_BOARD
                 else if (uah::areArraysEqual(buffer, (uint8_t*)"reboot", 6)) {
@@ -699,14 +727,17 @@ void Communication::communicationTimersCallbacks(TimerHandle_t xTimer){
 
     if (xTimer == com.mReceiveMessageTimeoutTimer) {
         com.mpLogger->debug("Communication Timers", "Message timeout.");
-        xTaskNotify(com.mCommunicationMainTaskHandle, MESSAGE_TIMEOUT_NOTIF, eSetValueWithOverwrite);
+        constexpr uint8_t notificationValue = MESSAGE_TIMEOUT_NOTIF;
+        xQueueSend(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
     } else if (xTimer == com.mReceiveByteTimeoutTimer) {
-        com.mpLogger->debug("Communication Timers", "Byte timeout.");
         xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
-        xTaskNotify(com.mCommunicationMainTaskHandle, BYTE_TIMEOUT_NOTIF, eSetValueWithOverwrite);
+        com.mpLogger->debug("Communication Timers", "Byte timeout.");
+        constexpr uint8_t notificationValue = BYTE_TIMEOUT_NOTIF;
+        xQueueSend(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
     } else if (xTimer == com.mPingTimeoutTimer) {
         com.mpLogger->debug("Communication Timers", "Ping timeout.");
-        xTaskNotify(com.mCommunicationMainTaskHandle, PING_TIMEOUT_NOTIF, eSetValueWithOverwrite);
+        constexpr uint8_t notificationValue = PING_TIMEOUT_NOTIF;
+        xQueueSend(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
     }
 }
 

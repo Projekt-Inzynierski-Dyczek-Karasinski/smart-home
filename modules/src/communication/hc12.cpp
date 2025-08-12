@@ -152,6 +152,8 @@ void HC12::hc12OutputDecider(const uint8_t *hc12Output, const bool *isSetupHC12W
 
 void HC12::HC12MainTask(void *parameters) {
     auto &hc12 = *mspHC12;
+    //TODO !BEFORE PULL REQUEST! delete private logger instance
+    auto privLogger = ul::Logger(ul::Level::NONE);
 
     uint32_t status = DEFAULT_STATUS_NOTIF;
     bool isSetupHC12Working = false;
@@ -186,34 +188,41 @@ void HC12::HC12MainTask(void *parameters) {
                 break;
 
             case WAITING_FOR_SEND_CONFIRMATION_NOTIF:
+                privLogger.debug("HC12 TEST", "WAITING_FOR_SEND_CONFIRMATION");
                 isWaitingForSendConfirmation = true;
                 break;
 
             case CANCEL_WAITING_FOR_SEND_CONFIRMATION_NOTIF:
+                privLogger.debug("HC12 TEST", "CANCEL_WAITING_FOR_SEND_CONFIRMATION");
+
                 isWaitingForSendConfirmation = false;
                 break;
 
             case SUSPEND_TRANSMIT_TASK_NOTIF:
+                privLogger.debug("HC12 TEST", "SUSPEND_TRANSMIT_TASK");
+
                 hc12.mpLogger->debug("HC12 Main", "vTaskSuspend(hc12.mTransmitTaskHandle)");
                 vTaskSuspend(hc12.mTransmitTaskHandle);
                 break;
 
             case CREATE_SETUP_HC12_TASK_NOTIF:
+                privLogger.debug("HC12 TEST", "CREATE_SETUP_HC12_TASK");
+
                 hc12.mpLogger->debug("HC12 Main", "CREATE_SETUP_HC12_TASK_NOTIF");
                 isSetupHC12Working = true;
                 hc12.createSetupHC12Task();
                 break;
 
             case DELETE_SETUP_HC12_TASK_NOTIF:
+                privLogger.debug("HC12 TEST", "DELETE_SETUP_HC12_TASK");
+
                 hc12.mpLogger->debug("HC12 Main", "DELETE_SETUP_HC12_TASK_NOTIF");
                 isSetupHC12Working = false;
                 hc12.deleteSetupHC12Task();
                 break;
 
             default:
-                char errorMessage[40];
-                sprintf(errorMessage, "Got unknow status. Received Status: %i", status);
-                hc12.mpLogger->error("HC12 Main", errorMessage);
+                hc12.mpLogger->errorv("HC12 Main", "Got unknow status. Received Status: ", status);
                 break;
         }
 

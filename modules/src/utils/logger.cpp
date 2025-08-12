@@ -21,10 +21,7 @@ namespace Utils {
             if (getLogLevel() == Level::NONE) return;
             beginSerial();
             if (getLogLevel() == Level::DEBUG) {
-                xSemaphoreTake(smSerialMutex, portMAX_DELAY);
-                Serial.println();
                 warning("Logger Level DEBUG", "Logger is set with Level::DEBUG.\n If this is main Logger instance (that is used for all components),\n Logger will print a huge amount of messages,\n consider making new instance to debug only part of program,\n otherwise that may cause unintended behaviour (including panic core).\n");
-                xSemaphoreGive(smSerialMutex);
             }
         }
 
