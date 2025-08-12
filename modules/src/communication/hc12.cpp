@@ -271,19 +271,10 @@ void HC12::transmitTask(void *parameters) {
             // transmitting data
             hc12.mpSerial->write(transmitBuffer, PROTOCOL_SIZE);
 
-            // TODO remove?
             // TODO change?
             // wait for confirmation from HC12
             if (xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
-                if (hc12Respond != UINT8_MAX) {
-                    char warningMessage[87];
-                    sprintf(
-                        warningMessage,
-                        "HC12 module did not confirm properly. HC12 module should send 255 signal but got: %i.",
-                        hc12Respond
-                    );
-                    hc12.mpLogger->warning("HC12 Transmit", warningMessage);
-                }
+                hc12.mpLogger->warning("HC12 Transmit", "HC12 module may have insufficient power.");
             } else {
                 constexpr uint8_t notificationValue1 = CANCEL_WAITING_FOR_SEND_CONFIRMATION_NOTIF;
                 xQueueSendToFront(hc12.mMainNotificationsQueue, &notificationValue1, portMAX_DELAY);

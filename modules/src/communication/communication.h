@@ -151,6 +151,9 @@ private:
      * @return True if the checksum is correct, false otherwise.
      */
     bool isCheckSumCorrect(const uint8_t message[PROTOCOL_SIZE]);
+
+    bool extractMessageFromProtocolBuffer(const uint8_t protocolBuffer[][PROTOCOL_SIZE], uint8_t *messageBuffer);
+
     /**
      * @brief FreeRTOS task for decoding incoming messages from the byte queue.
      * @param parameters Task parameters (unused).

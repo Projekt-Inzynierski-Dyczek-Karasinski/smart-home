@@ -329,6 +329,35 @@ bool Communication::isCheckSumCorrect(const uint8_t message[PROTOCOL_SIZE]) {
     return checksum % CHECKSUM_MODULO == 0;
 }
 
+bool Communication::extractMessageFromProtocolBuffer(const uint8_t protocolBuffer[][PROTOCOL_SIZE], uint8_t *messageBuffer) {
+    // prepare received message buffer
+    uah::clearBuffer(messageBuffer, MESSAGE_SIZE);
+    uint8_t messageIndex = 0;
+    uint8_t messagesQuantity = UINT8_MAX;
+    uint8_t protoBuffMessageIndex = 0;
+
+    do {
+        for (uint8_t i = PROTOCOL_MESSAGE_START_INDEX; i < (PROTOCOL_MESSAGE_START_INDEX + PROTOCOL_MESSAGE_LENGTH); i++) {
+            messageBuffer[messageIndex] = protocolBuffer[protoBuffMessageIndex][i];
+            messageIndex++;
+            // protection against buffer overload (62 => 63 max buffer index -1 for \0)
+            if (messageIndex > MAX_MESSAGE_INDEX - 1) {
+                break;
+            }
+        }
+
+        // check packet loss
+        if (messagesQuantity != UINT8_MAX && messagesQuantity != protocolBuffer[protoBuffMessageIndex][MESSAGES_QUANTITY_INDEX] + 1) {
+            return false;
+        }
+
+        messagesQuantity = protocolBuffer[protoBuffMessageIndex][MESSAGES_QUANTITY_INDEX];
+        protoBuffMessageIndex++;
+    } while(messagesQuantity != 0);
+    return true;
+}
+
+
 void Communication::decodeMessageTask(void *parameters) {
     auto &com = *mspCommunication;
 
@@ -340,11 +369,6 @@ void Communication::decodeMessageTask(void *parameters) {
     // prepare message protocol buffer
     // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
     uint8_t protocolBuffer[PROTOCOL_MESSAGE_MAX_NUM][PROTOCOL_SIZE];
-
-    constexpr uint8_t ipIndex = 6;
-    constexpr uint8_t messagesQuantityIndex = 7;
-    constexpr uint8_t protocolMessageStartIndex = 8;
-    constexpr uint8_t protocolMessageLength = 6;
 
     uint8_t protoBuffMessageIndex = 0;
     uint8_t protoBuffByteIndex = 0;
@@ -365,7 +389,7 @@ void Communication::decodeMessageTask(void *parameters) {
         resetProtocolBuffer();
         xQueueReset(com.mReceiveByteQueue);
         if (!isReadingRawMessage) {
-            com.transmitRepeatMessage();                            
+            com.transmitRepeatMessage();
         }
     };
 
@@ -437,41 +461,27 @@ void Communication::decodeMessageTask(void *parameters) {
                     // #endif
                 }
                 // if entire message is not ready (message quantity)
-                else if (protocolBuffer[protoBuffMessageIndex][messagesQuantityIndex] != 0) {
+                else if (protocolBuffer[protoBuffMessageIndex][MESSAGES_QUANTITY_INDEX] != 0) {
                     protoBuffMessageIndex++;
                 }
                 // entire message is ready
                 else {
                     xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
-
-                    // prepare received message buffer
                     uint8_t messageBuffer[MESSAGE_SIZE];
-                    uah::clearBuffer(messageBuffer, MESSAGE_SIZE);
-                    uint8_t messageIndex = 0;
-                    uint8_t messagesQuantity;
-                    protoBuffMessageIndex = 0;
 
-                    // decode message
-                    // TODO add protection against packet loss (messageQuantity isn't decrementing only by 1) and add separate method for that
-                    do {
-                        for (uint8_t i = protocolMessageStartIndex; i < (protocolMessageStartIndex + protocolMessageLength); i++) {
-                            messageBuffer[messageIndex] = protocolBuffer[protoBuffMessageIndex][i];
-                            messageIndex++;
-                            // protection against buffer overload (62 => 63 max buffer index -1 for \0)
-                            if (messageIndex > MAX_MESSAGE_INDEX - 1) {
-                                break;
-                            }
-                        }
-                        messagesQuantity = protocolBuffer[protoBuffMessageIndex][messagesQuantityIndex];
-                        protoBuffMessageIndex++;
-                    } while(messagesQuantity != 0);
+                    // if packet loss
+                    if (!com.extractMessageFromProtocolBuffer(protocolBuffer, messageBuffer)) {
+                        com.mpLogger->warning("Communication Decode", "Lost packet.");
+                        handleIncorrectMessage(isRawMessage);
+                        continue;
+                    }
 
+                    // send decoded message to queue
                     if (isRawMessage) {
                         isRawMessage = false;
                         com.mpLogger->infoa("Communication Decode", "Received raw message: ", protocolBuffer[0], PROTOCOL_SIZE, false);
                         xQueueSend(com.mReceiveMessageQueue, protocolBuffer[0], portMAX_DELAY);
                     } else {
-                        // TODO remove print ?
                         com.mpLogger->infoa("Communication Decode", "Received message: ", messageBuffer, MESSAGE_SIZE);
                         xQueueSend(com.mReceiveMessageQueue, messageBuffer, portMAX_DELAY);
                     }
@@ -512,16 +522,14 @@ void Communication::deleteDecodeMessageTask() {
 // ======================== Encode Message ========================
 
 void Communication::prepareChecksum(uint8_t protocolBuffer[PROTOCOL_SIZE]) {
-    static constexpr uint8_t checksumIndex = 14;
-
-    protocolBuffer[checksumIndex] = 0;
+    protocolBuffer[PROTOCOL_CHECKSUM_INDEX] = 0;
     uint16_t checkSum = 0;
     for (uint8_t i = 0; i < PROTOCOL_SIZE; i++) {
         checkSum += (uint16_t)protocolBuffer[i];
     }
     checkSum = (CHECKSUM_MODULO - (checkSum % CHECKSUM_MODULO)) % CHECKSUM_MODULO;
 
-    protocolBuffer[checksumIndex] = checkSum;
+    protocolBuffer[PROTOCOL_CHECKSUM_INDEX] = checkSum;
 }
 
 void Communication::encodeMessageTask(void *parameters) {
@@ -531,21 +539,16 @@ void Communication::encodeMessageTask(void *parameters) {
     // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
     uint8_t protocolBuffer[PROTOCOL_SIZE];
     
-    static constexpr uint8_t ipIndex = 6;
-    static constexpr uint8_t messagesQuantityIndex = 7;
-    static constexpr uint8_t protocolMessageStartIndex = 8;
-    static constexpr uint8_t protocolMessageLength = 6;
-    
     // TODO implement setting IP address for central unit
     // prepare MAC address in protocol buffer and clear rest of buffer
     uint8_t macAddress[6];
     com.mpAddressing->getProtocolMACAddress(macAddress);
     uah::prepareBuffer(protocolBuffer, macAddress, MAC_ADDRESS_LENGTH, PROTOCOL_SIZE);
     // prepare place for IP address
-    protocolBuffer[ipIndex] = com.mpAddressing->getIPAddress();
+    protocolBuffer[PROTOCOL_IP_INDEX] = com.mpAddressing->getIPAddress();
 
     // prepare place for message
-    for (uint8_t i = protocolMessageStartIndex; i < (protocolMessageStartIndex + protocolMessageLength); i++) {
+    for (uint8_t i = PROTOCOL_MESSAGE_START_INDEX; i < (PROTOCOL_MESSAGE_START_INDEX + PROTOCOL_MESSAGE_LENGTH); i++) {
         protocolBuffer[i] = BLANK_CHARACTER;
     }   
 
@@ -561,25 +564,24 @@ void Communication::encodeMessageTask(void *parameters) {
             uint8_t messageIndex = 0;
             // calc messageQuantity
             const uint8_t messageLen = uah::calcLenOfDataInArray(messageBuffer, MESSAGE_SIZE);
-            messagesQuantity = messageLen / protocolMessageLength;
-            if (messageLen % protocolMessageLength == 0) {
+            messagesQuantity = messageLen / PROTOCOL_MESSAGE_LENGTH;
+            if (messageLen % PROTOCOL_MESSAGE_LENGTH == 0) {
                 messagesQuantity--;
             }
 
             // put part of message in protocolBuffer and send it to transmitting task
             for (messagesQuantity; messagesQuantity >= 0; messagesQuantity--) {
-                protocolBuffer[messagesQuantityIndex] = messagesQuantity;
-                for (uint8_t i = 0; i < protocolMessageLength; i++) {
-                    protocolBuffer[protocolMessageStartIndex + i] = messageBuffer[messageIndex] != 0 ? messageBuffer[messageIndex] : BLANK_CHARACTER;
+                protocolBuffer[MESSAGES_QUANTITY_INDEX] = messagesQuantity;
+                for (uint8_t i = 0; i < PROTOCOL_MESSAGE_LENGTH; i++) {
+                    protocolBuffer[PROTOCOL_MESSAGE_START_INDEX + i] = messageBuffer[messageIndex] != 0 ? messageBuffer[messageIndex] : BLANK_CHARACTER;
                     messageIndex++;
                 }
                 // calculate and set checksum
                 com.prepareChecksum(protocolBuffer);
-                
                 com.mpRfModule->addMessageToTransmit(protocolBuffer);
 
                 com.mpLogger->debuga("Communication Encode", "Protocol buffer: ", protocolBuffer, PROTOCOL_SIZE, false);
-                com.mpLogger->debuga("Communication Encode", "Protocol message: ", &protocolBuffer[protocolMessageStartIndex], protocolMessageLength);
+                com.mpLogger->debuga("Communication Encode", "Protocol message: ", &protocolBuffer[PROTOCOL_MESSAGE_START_INDEX], PROTOCOL_MESSAGE_LENGTH);
             }
             if (!uah::areArraysEqual(messageBuffer, (uint8_t*)"repeat", 6)) {
                 com.setLastTransmittedMessage(messageBuffer);
@@ -781,7 +783,6 @@ void Communication::setLastTransmittedMessage() {
 void Communication::setLastTransmittedMessage(const uint8_t message[MESSAGE_SIZE]) {
     xSemaphoreTake(mLastTransmittedMessageMutex, portMAX_DELAY);
     uah::prepareBuffer(mLastTransmittedMessage, message, MESSAGE_SIZE, MESSAGE_SIZE);
-    mLastTransmittedMessageAttempts = 0;
     xSemaphoreGive(mLastTransmittedMessageMutex);
 }
 
