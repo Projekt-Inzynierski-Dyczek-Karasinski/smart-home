@@ -59,13 +59,13 @@ public:
 
 private:
     /**
-     * @brief Create a FreeRTOS Queue for transmitting messages.
+     * @brief Create a FreeRTOS Queues used in HC12 class.
      */
-    void createQueue();
+    void createQueues();
     /**
-     * @brief Delete a FreeRTOS Queue for transmitting messages.
+     * @brief Delete a FreeRTOS Queues used in HC12 class.
      */
-    void deleteQueue();
+    void deleteQueues();
     /**
      * @brief Create a FreeRTOS Queues for setup HC12.
      */
@@ -137,7 +137,7 @@ private:
     unsigned long mBaudRate; // TODO remove?
 
     // Notifications for Main HC12 task
-    typedef enum : uint32_t {
+    typedef enum : uint8_t {
         DEFAULT_STATUS_NOTIF = 0,
         WAITING_FOR_SEND_CONFIRMATION_NOTIF,
         CANCEL_WAITING_FOR_SEND_CONFIRMATION_NOTIF,
@@ -150,6 +150,7 @@ private:
 
     SemaphoreHandle_t mSendingDataMutex = nullptr; ///< Handle to FreeRTOS mutex protecting access to UART transmission to HC12 module.
     
+    QueueHandle_t mMainNotificationsQueue = nullptr; ///< Handle to FreeRTOS queue for notifications for the Main task, queue length: 5 bytes (uint8_t).
     QueueHandle_t mTransmitQueue = nullptr; ///< Handle to FreeRTOS queue for (encoded) messages to transmit, queue length: 11x16 bytes (uint8_t).
     QueueHandle_t mSetupHC12CommandsQueue = nullptr; ///< Handle to FreeRTOS queue for HC12 commands, queue length: 5x10 bytes (uint8_t).
     QueueHandle_t mSetupHC12ReceiveQueue = nullptr; ///< Handle to FreeRTOS queue for response from HC12 after sending command, queue length: 43 bytes (uint8_t).
