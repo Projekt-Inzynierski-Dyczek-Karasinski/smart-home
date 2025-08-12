@@ -151,6 +151,15 @@ private:
      * @return True if the checksum is correct, false otherwise.
      */
     bool isCheckSumCorrect(const uint8_t message[PROTOCOL_SIZE]);
+
+    /**
+     * @brief Extracts a message from protocolBuffer and saves it to given buffer. Checks for packet loss.
+     * @param protocolBuffer Buffer with raw message.
+     * @param messageBuffer Buffer to save extracted message.
+     * @return True if successfully extracts a message (without packet loss), false otherwise.
+     */
+    bool extractMessageFromProtocolBuffer(const uint8_t protocolBuffer[][PROTOCOL_SIZE], uint8_t *messageBuffer);
+
     /**
      * @brief FreeRTOS task for decoding incoming messages from the byte queue.
      * @param parameters Task parameters (unused).
@@ -268,7 +277,7 @@ private:
         std::unique_ptr<ModuleAddressing> mpAddressing; ///< Pointer to ModuleAddressing class instance.
     #endif
 
-    typedef enum : uint32_t {
+    typedef enum : uint8_t {
         DEFAULT_STATUS_NOTIF = 0,
         // rf communication timeouts
         BYTE_TIMEOUT_NOTIF,
@@ -291,6 +300,7 @@ private:
 
     SemaphoreHandle_t mLastTransmittedMessageMutex = nullptr; ///< Handle to FreeRTOS mutex protecting the last transmitted message and last transmitted counter.
 
+    QueueHandle_t mMainNotificationsQueue = nullptr; ///< Handle to FreeRTOS queue for notifications for the Main task, queue length: 5 bytes (uint8_t).
     QueueHandle_t mReceiveMessageQueue = nullptr; ///< Handle to FreeRTOS queue for received (decoded and internal) messages, queue length: 10x64 bytes (uint8_t).
     QueueHandle_t mReceiveByteQueue = nullptr; ///< Handle to FreeRTOS queue for bytes to decode get from RF transmission, queue length: 128 bytes (uint8_t).
     QueueHandle_t mSendMessagesQueue = nullptr; ///< Handle to FreeRTOS queue for messages to encode and RF transmission, queue length: 10x64 bytes (uint8_t).

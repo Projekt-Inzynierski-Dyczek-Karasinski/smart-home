@@ -26,7 +26,7 @@ HC12::HC12(Communication *communication, const std::shared_ptr<ul::Logger> &logg
 
     mSendingDataMutex = xSemaphoreCreateMutex();
 
-    createQueue();
+    createQueues();
     
     mBaudRate = (unsigned long)BAUD_RATE;
     mpSerial = new HardwareSerial(HARDWARE_SERIAL_UART_NR);
@@ -43,7 +43,7 @@ HC12::~HC12() {
     deleteTransmitTask();
     deleteSetupHC12Task();
 
-    deleteQueue();
+    deleteQueues();
     deleteSetupHC12Queues();
 
     digitalWrite(SET_PIN, LOW);
@@ -92,24 +92,31 @@ void HC12::setupHC12(const uint8_t *commands) {
                 xQueueSend(mSetupHC12CommandsQueue, commandBuffer, portMAX_DELAY);
             }
         }
-
-        xTaskNotify(mHC12MainTaskHandle, CREATE_SETUP_HC12_TASK_NOTIF, eSetValueWithOverwrite);
+        constexpr uint8_t notificationValue = CREATE_SETUP_HC12_TASK_NOTIF;
+        xQueueSend(mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
     }
 }
 // ================================================================
 
 // ============================ Queues ============================
 
-void HC12::createQueue() { 
+void HC12::createQueues() {
+    if (mMainNotificationsQueue == nullptr) {
+        mMainNotificationsQueue = xQueueCreate(NOTIFICATIONS_QUEUE_SIZE, sizeof(uint8_t));
+    }
     if (mTransmitQueue == nullptr) {
         mTransmitQueue = xQueueCreate(PROTOCOL_MESSAGE_MAX_NUM, sizeof(uint8_t[PROTOCOL_SIZE]));
     }
 }
 
-void HC12::deleteQueue() {
+void HC12::deleteQueues() {
     if (mTransmitQueue != nullptr) {
         vQueueDelete(mTransmitQueue);
         mTransmitQueue = nullptr;
+    }
+    if (mMainNotificationsQueue != nullptr) {
+        vQueueDelete(mMainNotificationsQueue);
+        mMainNotificationsQueue = nullptr;
     }
 }
 
@@ -117,7 +124,6 @@ void HC12::createSetupHC12Queues() {
     if (mSetupHC12CommandsQueue == nullptr) {
         mSetupHC12CommandsQueue = xQueueCreate(SETUP_MAX_NUM_OF_COMMANDS, sizeof(uint8_t[SETUP_COMMAND_SIZE]));
     }
-
     if (mSetupHC12ReceiveQueue == nullptr) {
         mSetupHC12ReceiveQueue = xQueueCreate(SETUP_MAX_LEN_OF_RESPONSE, sizeof(uint8_t));
     }
@@ -128,7 +134,6 @@ void HC12::deleteSetupHC12Queues() {
         vQueueDelete(mSetupHC12CommandsQueue);
         mSetupHC12CommandsQueue = nullptr;
     }
-
     if (mSetupHC12ReceiveQueue != nullptr) {
         vQueueDelete(mSetupHC12ReceiveQueue);
         mSetupHC12ReceiveQueue = nullptr;
@@ -153,7 +158,7 @@ void HC12::hc12OutputDecider(const uint8_t *hc12Output, const bool *isSetupHC12W
 void HC12::HC12MainTask(void *parameters) {
     auto &hc12 = *mspHC12;
 
-    uint32_t status = DEFAULT_STATUS_NOTIF;
+    uint8_t status = DEFAULT_STATUS_NOTIF;
     bool isSetupHC12Working = false;
     bool isWaitingForSendConfirmation = false;
 
@@ -164,9 +169,11 @@ void HC12::HC12MainTask(void *parameters) {
     }
 
     for (;;) {
-        // TODO change this to queue (race conditions)
         // change status
-        xTaskNotifyWait(0, ULONG_MAX, &status, 0);
+        if (xQueueReceive(hc12.mMainNotificationsQueue, &status, 0) == pdFALSE) {
+            // reset notifications status if there is no notifications
+            status = DEFAULT_STATUS_NOTIF;
+        }
         
         uint8_t hc12Output;
         switch (status) {
@@ -211,14 +218,9 @@ void HC12::HC12MainTask(void *parameters) {
                 break;
 
             default:
-                char errorMessage[40];
-                sprintf(errorMessage, "Got unknow status. Received Status: %i", status);
-                hc12.mpLogger->error("HC12 Main", errorMessage);
+                hc12.mpLogger->errorv("HC12 Main", "Got unknow status. Received Status: ", status);
                 break;
         }
-
-        // reset notifications status 
-        status = DEFAULT_STATUS_NOTIF;        
     }
 }
 
@@ -247,7 +249,7 @@ void HC12::deleteHC12MainTask() {
 // ========================== Send Task ===========================
 
 void HC12::transmitTask(void *parameters) {
-    auto &hc12 = *mspHC12;
+    const auto &hc12 = *mspHC12;
 
     uint8_t transmitBuffer[PROTOCOL_SIZE];
     
@@ -263,33 +265,25 @@ void HC12::transmitTask(void *parameters) {
             uint32_t hc12Respond;
             // clearing old notification (if exist)
             xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, 0);
-            xTaskNotify(hc12.mHC12MainTaskHandle, WAITING_FOR_SEND_CONFIRMATION_NOTIF, eSetValueWithOverwrite);
-            
+            constexpr uint8_t notificationValue = WAITING_FOR_SEND_CONFIRMATION_NOTIF;
+            xQueueSendToFront(hc12.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
+
             // transmitting data
             hc12.mpSerial->write(transmitBuffer, PROTOCOL_SIZE);
 
-            // TODO remove?
+            // TODO change?
             // wait for confirmation from HC12
             if (xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
-                if (hc12Respond != UINT8_MAX) {
-                    char warningMessage[87];
-                    sprintf(
-                        warningMessage,
-                        "HC12 module did not confirm properly. HC12 module should send 255 signal but got: %i.",
-                        hc12Respond
-                    );
-                    hc12.mpLogger->warning("HC12 Transmit", warningMessage);
-                }
+                hc12.mpLogger->warning("HC12 Transmit", "HC12 module may have insufficient power.");
             } else {
-                xTaskNotify(hc12.mHC12MainTaskHandle, CANCEL_WAITING_FOR_SEND_CONFIRMATION_NOTIF, eSetValueWithOverwrite);
-                // TODO change
-                // Serial.println("TRANSMITTING ERROR! In transmitTask() -> hc12 module is not responding.");
-                // Serial.println("HC12 NT");
+                constexpr uint8_t notificationValue1 = CANCEL_WAITING_FOR_SEND_CONFIRMATION_NOTIF;
+                xQueueSendToFront(hc12.mMainNotificationsQueue, &notificationValue1, portMAX_DELAY);
             }
 
             xSemaphoreGive(hc12.mSendingDataMutex);
         } else {
-            xTaskNotify(hc12.mHC12MainTaskHandle, SUSPEND_TRANSMIT_TASK_NOTIF, eSetValueWithOverwrite);
+            constexpr uint8_t notificationValue2 = SUSPEND_TRANSMIT_TASK_NOTIF;
+            xQueueSend(hc12.mMainNotificationsQueue, &notificationValue2, portMAX_DELAY);
         }
     }
 }
@@ -320,7 +314,7 @@ void HC12::deleteTransmitTask() {
 // ========================== Setup HC12 ==========================
 
 void HC12::setupHC12Task(void *parameters) {
-    const auto hc12 = mspHC12;
+    const auto &hc12 = *mspHC12;
 
     // prepare commandBuffer
     uint8_t commandBuffer[SETUP_COMMAND_SIZE];
@@ -329,25 +323,25 @@ void HC12::setupHC12Task(void *parameters) {
     }
 
     for (;;) {
-        if (xQueueReceive(hc12->mSetupHC12CommandsQueue, commandBuffer, 0) == pdTRUE) {
-            hc12->mpLogger->infoa("HC12 Setup", "Received command: ", commandBuffer, SETUP_COMMAND_SIZE);
+        if (xQueueReceive(hc12.mSetupHC12CommandsQueue, commandBuffer, 0) == pdTRUE) {
+            hc12.mpLogger->infoa("HC12 Setup", "Received command: ", commandBuffer, SETUP_COMMAND_SIZE);
 
             // TODO add better protection against bad commands
             if (!(commandBuffer[0] == (uint8_t)'H' && commandBuffer[1] == (uint8_t)'C')) {
-                hc12->mpLogger->error("HC12 Setup", "Received array is not hc12 command.");
+                hc12.mpLogger->error("HC12 Setup", "Received array is not hc12 command.");
             } else {
                 const uint8_t lenOfCommand = uah::calcLenOfDataInArray(commandBuffer, SETUP_COMMAND_SIZE);
                 commandBuffer[0] = (uint8_t)'A';
                 commandBuffer[1] = (uint8_t)'T';
                 
-                hc12->mpSerial->write(commandBuffer, lenOfCommand);
+                hc12.mpSerial->write(commandBuffer, lenOfCommand);
 
                 uint8_t hc12Response[SETUP_MAX_LEN_OF_RESPONSE];
                 uint8_t index = 0;
                 uah::clearBuffer(hc12Response, SETUP_MAX_LEN_OF_RESPONSE);
 
                 for (;;) {
-                    if (xQueueReceive(hc12->mSetupHC12ReceiveQueue, &hc12Response[index], pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
+                    if (xQueueReceive(hc12.mSetupHC12ReceiveQueue, &hc12Response[index], pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
                         index++;
                     } else {
                         break;
@@ -355,18 +349,18 @@ void HC12::setupHC12Task(void *parameters) {
                 }
 
                 if (index == 0) {
-                    hc12->mpLogger->error("HC12 Setup", "HC12 module is not responding.");
+                    hc12.mpLogger->error("HC12 Setup", "HC12 module is not responding.");
                 } else {
-                    hc12->mpLogger->infoa("HC12 Setup", "HC12 response: ", hc12Response, SETUP_MAX_LEN_OF_RESPONSE);
+                    hc12.mpLogger->infoa("HC12 Setup", "HC12 response: ", hc12Response, SETUP_MAX_LEN_OF_RESPONSE);
                 }
             }
         } else {
-            xTaskNotify(hc12->mHC12MainTaskHandle, DELETE_SETUP_HC12_TASK_NOTIF, eSetValueWithOverwrite);
+            constexpr uint8_t notificationValue = DELETE_SETUP_HC12_TASK_NOTIF;
+            xQueueSend(hc12.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
             for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
         }
     }
 }
-
 
 void HC12::createSetupHC12Task() {
     xSemaphoreTake(mSendingDataMutex, portMAX_DELAY);
@@ -383,7 +377,7 @@ void HC12::createSetupHC12Task() {
             &mSetupHC12TaskHandle
         );
     } else {
-        Serial.println("TASK CREATION ERROR! In createSetupHC12Task() -> Can't create setup HC12 task, because task already exists");
+        mpLogger->warning("HC12 FreeRTOS", "Can't create setup HC12 task, because task already exist.");
     }
 }
 void HC12::deleteSetupHC12Task() {
@@ -402,8 +396,4 @@ void HC12::deleteSetupHC12Task() {
     }
     xSemaphoreGive(mSendingDataMutex);
 }
-// ================================================================
-
-// ============================ Other =============================
-
 // ================================================================
