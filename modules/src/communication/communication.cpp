@@ -235,8 +235,6 @@ void Communication::pingTimeoutNotifHandling(uint8_t *pingAttempts) const {
 
 void Communication::communicationMainTask(void* parameters) {
     auto &com = *mspCommunication;
-    //TODO !BEFORE PULL REQUEST! delete private logger instance
-    auto privLogger = ul::Logger(ul::Level::NONE);
 
     uint8_t status = DEFAULT_STATUS_NOTIF;
     uint8_t pingAttempts = 0;
@@ -253,52 +251,40 @@ void Communication::communicationMainTask(void* parameters) {
                 break;
                 
             case BYTE_TIMEOUT_NOTIF:
-                privLogger.debug("Com TEST", "BYTE_TIMEOUT");
                 xTaskNotify(com.mDecodeMessageTaskHandle, BYTE_TIMEOUT_NOTIF, eSetValueWithOverwrite);
                 break;
 
             case MESSAGE_TIMEOUT_NOTIF:
-                privLogger.debug("Com TEST", "MESSAGE_TIMEOUT");
                 xTaskNotify(com.mDecodeMessageTaskHandle, MESSAGE_TIMEOUT_NOTIF, eSetValueWithOverwrite);
                 break;
 
             case SUSPEND_DECODE_MESSAGE_TASK_NOTIF:
-                privLogger.debug("Com TEST", "SUSPEND_DECODE_MESSAGE_TASK");
                 com.mpLogger->debug("Communication Main", "vTaskSuspend(com.mDecodeMessageTaskHandle);");
                 vTaskSuspend(com.mDecodeMessageTaskHandle);
                 break;
             
             case SUSPEND_ENCODE_MESSAGE_TASK_NOTIF:
-                privLogger.debug("Com TEST", "SUSPEND_ENCODE_MESSAGE_TASK");
-
                 com.mpLogger->debug("Communication Main", "vTaskSuspend(com.mEncodeMessageTaskHandle);");
                 com.setLastTransmittedMessage();
                 vTaskSuspend(com.mEncodeMessageTaskHandle);
                 break;  
             
             case START_PINGING_NOTIF:
-                privLogger.debug("Com TEST", "START_PINGING");
-
                 pingAttempts = 1;
                 com.transmitPing();
                 xTimerStart(com.mPingTimeoutTimer, portMAX_DELAY);
                 break;
 
             case PING_TIMEOUT_NOTIF:
-                privLogger.debug("Com TEST", "PING_TIMEOUT_NOTIF");
-
                 com.pingTimeoutNotifHandling(&pingAttempts);
                 break;
 
             case READ_RAW_MESSAGE_NOTIF:
-                privLogger.debug("Com TEST", "READ_RAW_MESSAGE");
                 isReadingRawMessage = true;
                 xTaskNotify(com.mDecodeMessageTaskHandle, READ_RAW_MESSAGE_NOTIF, eSetValueWithOverwrite);
                 break;
 
             case STOP_ADDRESSING_ALGORITHM_NOTIF:
-                privLogger.debug("Com TEST", "STOP_ADDRESSING_ALGORITHM");
-
                 isReadingRawMessage = false;
                 mspDebugLED->deletePairingBlinkTask();
                 com.mpAddressing->stopAddressing();
