@@ -14,7 +14,7 @@ namespace SmartHome::Service {
         if (getenv("NOTIFY_SOCKET")) {
             mIsWatchdogEnabled = sd_watchdog_enabled(0, &mWatchdogInterval) > 0;
             if (mIsWatchdogEnabled) {
-                mWatchdogTimer.emplace(mCore.getCoreIoContext());
+                mWatchdogTimer.emplace(Core::Instance().getCoreIoContext());
             }
             return true;
         }
