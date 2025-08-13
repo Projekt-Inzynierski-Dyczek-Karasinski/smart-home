@@ -38,9 +38,30 @@ public:
         uint8_t getRfChannel() const;
     #endif
 
+    /**
+     * @brief Checks if given MAC address is propper.
+     * @details If module is not addressed yet (IP address is <code>NULL_IP</code>) accepts any MAC address,
+     * otherwise MAC address is propper if is same as <code>mProtocolMACAddress</code>.
+     * @param mac MAC address to check.
+     * @return True if MAC address is propper, false otherwise.
+     * @note Threat-safe.
+     */
+    bool isMACPropper(const uint8_t *mac) override;
+
+    /**
+     * @brief Checks if given IP address is propper.
+     * @details IP address is propper if is same as saved IP address
+     * or in case when there is no IP address assigned (IP address is <code>NULL_IP</code>)
+     * if IP address is <code>CENTRAL_UNIT_IP</code>.
+     * @param ip IP address to check.
+     * @return True if IP address is propper, false otherwise.
+     * @note Threat-safe.
+     */
+    bool isIpPropper(uint8_t ip) override;
+
 private:
     /**
-     * @brief Static FreeRTOS task function. Handles message exchanges and addressing logic for the module.
+     * @brief Static FreeRTOS task function. Handles message exchanges and addressing logic for the module.
      * @param parameters Task parameters (unused).
      */
     static void addressingTask(void* parameters);

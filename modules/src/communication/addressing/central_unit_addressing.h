@@ -36,6 +36,10 @@ public:
      */
     ~CentralUnitAddressing() override;
 
+    bool isMACPropper(const uint8_t *mac) override;
+
+    bool isIpPropper(uint8_t ip) override;
+
 private:
     /**
      * @brief Structure holding addressing data for a module.

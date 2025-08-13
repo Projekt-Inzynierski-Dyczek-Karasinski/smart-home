@@ -44,6 +44,22 @@ public:
     uint8_t getIPAddress() const;
 
     /**
+     * @brief Pure virtual function checking if given mac address is propper.
+     * @param mac MAC address to check.
+     * @return True if MAC address is propper, false otherwise.
+     * @warning Must be implemented by derived class.
+     */
+    virtual bool isMACPropper(const uint8_t* mac) = 0;
+
+    /**
+     * @brief Pure virtual function checking if given IP address is propper.
+     * @param ip IP address to check.
+     * @return True if IP address is propper, false otherwise.
+     * @warning Must be implemented by derived class.
+     */
+    virtual bool isIpPropper(uint8_t ip) = 0;
+
+    /**
      * @brief Initializes addressing procedures and related FreeRTOS resources.
      */
     void startAddressing();

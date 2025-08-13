@@ -41,6 +41,27 @@ uint8_t ModuleAddressing::getRfChannel() const {
     return rfChannel;
 }
 #endif
+
+bool ModuleAddressing::isMACPropper(const uint8_t *mac) {
+    bool result = false;
+    xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
+    if (mIPAddress == NULL_IP || uah::areArraysEqual(mac, mProtocolMACAddress, MAC_ADDRESS_LENGTH)) {
+        result = true;
+    }
+    xSemaphoreGive(mAddressingDataMutex);
+    return result;
+}
+
+bool ModuleAddressing::isIpPropper(const uint8_t ip) {
+    bool result = false;
+    xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
+    if ((mIPAddress == NULL_IP && ip == CENTRAL_UNIT_IP) || ip == mIPAddress) {
+        result = true;
+    }
+    xSemaphoreGive(mAddressingDataMutex);
+    return result;
+}
+
 // ================================================================
 
 // ===================== Addressing Algorithm =====================

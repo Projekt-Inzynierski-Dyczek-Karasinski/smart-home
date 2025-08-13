@@ -39,6 +39,15 @@ CentralUnitAddressing::~CentralUnitAddressing() {
     deleteAddressingTimer();
 }
 
+bool CentralUnitAddressing::isMACPropper(const uint8_t *mac) {
+    return true;
+}
+
+bool CentralUnitAddressing::isIpPropper(const uint8_t ip) {
+    return true;
+}
+
+
 // ================================================================
 
 // ===================== Addressing Algorithm =====================
@@ -98,7 +107,9 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
                     if (uah::areArraysEqual(&receiveBuffer[8], (uint8_t*)ADDRESSING_NC_REAL_MAC_RF_CHANNELS, ADDRESSING_API_LEN)) {
                         uint8_t moduleMAC[MAC_ADDRESS_LENGTH];
                         uah::prepareBuffer(moduleMAC, receiveBuffer, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
-                        moduleNewIP = ad.addModule(moduleMAC, true);
+                        // TODO !BEFORE PULL REQUEST! undo this:
+                        ad.mpLogger->warning("CentralUnitAddressing TMP", "rf channel is forced to 1st");
+                        moduleNewIP = ad.addModule(moduleMAC, true, 1);
                         const uint8_t moduleNewRfChannel = ad.getModuleRfChannel(moduleNewIP);
 
                         // send module information about module's new IP address and rf channel
