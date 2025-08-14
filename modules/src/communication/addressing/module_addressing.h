@@ -40,7 +40,7 @@ public:
 
     /**
      * @brief Checks if given MAC address is propper.
-     * @details If module is not addressed yet (IP address is <code>NULL_IP</code>) accepts any MAC address,
+     * @details If module is not addressed yet (IP address is <code>NULL_IP</code>), it will accept any MAC address,
      * otherwise MAC address is propper if is same as <code>mProtocolMACAddress</code>.
      * @param mac MAC address to check.
      * @return True if MAC address is propper, false otherwise.

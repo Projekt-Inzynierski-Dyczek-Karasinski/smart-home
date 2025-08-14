@@ -36,8 +36,24 @@ public:
      */
     ~CentralUnitAddressing() override;
 
+    /**
+     * @brief Checks if given MAC address is propper.
+     * @details If central unit is waiting for new connection message, it will accept any MAC address,
+     * otherwise checks if given mac is same as <code>mProtocolMACAddress</code>.
+     * @param mac MAC address to check.
+     * @return True if MAC address is propper, false otherwise.
+     * @note Threat-safe.
+     */
     bool isMACPropper(const uint8_t *mac) override;
 
+    /**
+     * @brief Checks if given IP address is propper.
+     * @details If central unit is waiting for new connection message, it will accept only IP address = <code>NULL_IP</code>,
+     * otherwise it accepts any IP address that isn't <code>NULL_IP</code> or <code>CENTRAL_UNIT_IP</code>.
+     * @param ip IP address to check.
+     * @return True if IP address is propper, false otherwise.
+     * @note Threat-safe.
+     */
     bool isIpPropper(uint8_t ip) override;
 
 private:
@@ -139,12 +155,27 @@ private:
      * @brief Completely aborts the addressing process and calls the clearNewConnectionData() method.
      */
     void abortAddressing() override;
+
+    /**
+     * @brief Getter for <code>mIsStartOfAddressing</code>.
+     * @return Value of <code>mIsStartOfAddressing</code>.
+     * @note Thread-safe.
+     */
+    bool getIsStartOfAddressing() const;
+
+    /**
+     * @brief Setter for <code>mIsStartOfAddressing</code>.
+     * @param value Value to set <code>mIsStartOfAddressing</code>.
+     * @note Thread-safe.
+     */
+    void setIsStartOfAddressing(bool value);
     
     static CentralUnitAddressing *mspAddressing; ///< Static pointer to a CentralUnitAddressing instance.
 
     AddressingData mModulesAddressingData[MAX_NUM_OF_MODULES]; ///< Array containing addressing data for all registered modules.
     uint8_t mNumOFModulesOnRfChannel[MAX_NUM_OF_CHANNEL]{}; ///< Array containing the number of modules assigned to each RF channel.
     uint8_t mTmpModuleIp = NULL_IP; ///< IP address of the module currently being addressed. // TODO remember to clear that after end of new connection
+    bool mIsStartOfAddressing = false; ///< Flag indicating that is waiting for new connection message, so will accept any MAC address.
 
     SemaphoreHandle_t mModulesAddressingDataMutex = nullptr; ///< Handle to mutex protecting access to modules addressing data.
 };

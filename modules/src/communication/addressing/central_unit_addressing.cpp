@@ -40,13 +40,24 @@ CentralUnitAddressing::~CentralUnitAddressing() {
 }
 
 bool CentralUnitAddressing::isMACPropper(const uint8_t *mac) {
-    return true;
+    bool result = false;
+    if (getIsStartOfAddressing()) {
+        result = true;
+    } else {
+        xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
+        result = uah::areArraysEqual(mac, mProtocolMACAddress, MAC_ADDRESS_LENGTH);
+        xSemaphoreGive(mAddressingDataMutex);
+    }
+    return result;
 }
 
 bool CentralUnitAddressing::isIpPropper(const uint8_t ip) {
-    return true;
+    bool result = true;
+    if ((getIsStartOfAddressing() && ip != NULL_IP) || ip == CENTRAL_UNIT_IP || ip == NULL_IP) {
+        result = false;
+    }
+    return result;
 }
-
 
 // ================================================================
 
@@ -88,7 +99,8 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
     
     for (uint8_t absoluteAttemptCounter = 0; absoluteAttemptCounter < ADDRESSING_ABSOLUTE_MAX_ATTEMPTS; absoluteAttemptCounter++) {
         uint8_t addressingState = START_ADDRESSING;
-        
+
+        ad.setIsStartOfAddressing(true);
         ad.mpCommunication->needRawMessage();
         xQueueReceive(ad.mAddressingQueue, receiveBuffer, portMAX_DELAY);
         
@@ -101,6 +113,7 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
             bool isRestarting = false;
             switch (addressingState) {
                 case START_ADDRESSING:
+                    ad.setIsStartOfAddressing(false);
                     // NOTE: receiveBuffer contains raw message!
                     // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
                     // TODO implement for other new connection messages
@@ -360,6 +373,7 @@ uint8_t CentralUnitAddressing::addModule(const uint8_t *macAddress, const bool i
             break;
         }
     }
+    mIsStartOfAddressing = false;
     xSemaphoreGive(mModulesAddressingDataMutex);
 
     if (chosenIP == NULL_IP) {
@@ -379,6 +393,7 @@ void CentralUnitAddressing::removeModule(const uint8_t ipAddress) {
     mModulesAddressingData[index].rfChannel = DEFAULT_CHANNEL;
     uah::clearBuffer(mModulesAddressingData[index].macAddress, MAC_ADDRESS_LENGTH);
     mTmpModuleIp = NULL_IP;
+    mIsStartOfAddressing = false;
 
     xSemaphoreGive(mModulesAddressingDataMutex);
 }
@@ -413,4 +428,18 @@ void CentralUnitAddressing::abortAddressing() {
     
     mpCommunication->stopAddressingAlgorithm();
 }
+
+bool CentralUnitAddressing::getIsStartOfAddressing() const {
+    xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
+    const bool result = mIsStartOfAddressing;
+    xSemaphoreGive(mModulesAddressingDataMutex);
+    return result;
+}
+
+void CentralUnitAddressing::setIsStartOfAddressing(const bool value) {
+    xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
+    mIsStartOfAddressing = value;
+    xSemaphoreGive(mModulesAddressingDataMutex);
+}
+
 // ================================================================
