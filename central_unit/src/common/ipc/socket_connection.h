@@ -141,7 +141,7 @@ namespace SmartHome::IPC {
         std::string getMessageFromBuffer(const size_t &bytesTransferred);
 
         Type mType; ///< Socket type
-        ba::io_context &mIoContext; ///< IO context reference
+        ba::io_context::strand mStrand; ///< IO context strand for serialization
         std::shared_ptr<Utils::Logger> mpLogger; ///< Logger instance shared pointer
         ba::streambuf mStreamBuf; ///< Buffer for async read operations
 

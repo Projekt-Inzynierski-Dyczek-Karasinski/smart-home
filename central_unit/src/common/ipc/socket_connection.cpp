@@ -1,8 +1,10 @@
 #include "socket_connection.h"
 
 namespace SmartHome::IPC {
-    SocketConnection::SocketConnection(ba::io_context &ioContext, const Type socketType, const std::shared_ptr<Utils::Logger> &logger)
-        : mSocket(createSocket(ioContext, socketType)), mType(socketType), mIoContext(ioContext), mpLogger(logger) {
+    SocketConnection::SocketConnection(ba::io_context &ioContext,
+                                       const Type socketType,
+                                       const std::shared_ptr<Utils::Logger> &logger)
+        : mSocket(createSocket(ioContext, socketType)), mType(socketType), mStrand(ioContext), mpLogger(logger) {
     };
 
     SocketConnection::~SocketConnection() {
@@ -37,8 +39,10 @@ namespace SmartHome::IPC {
             }
         };
 
-        std::visit([this, callback](auto &socket) {
-            ba::async_read_until(socket, mStreamBuf, ms_DELIMITER_REGEX, callback);
+        auto strandWrapper = ba::bind_executor(mStrand, callback);
+
+        std::visit([this, strandWrapper](auto &socket) {
+            ba::async_read_until(socket, mStreamBuf, ms_DELIMITER_REGEX, strandWrapper);
         }, mSocket);
     }
 
@@ -47,7 +51,7 @@ namespace SmartHome::IPC {
         if (!isOpen()) return;
 
         try {
-            std::visit([this, message](auto &socket) {
+            std::visit([message](auto &socket) {
                 ba::write(socket, ba::buffer(message + ms_MESSAGE_DELIMITER));
             }, mSocket);
         } catch (bs::system_error &e) {
@@ -66,8 +70,10 @@ namespace SmartHome::IPC {
             }
         };
 
-        std::visit([this, message, callback](auto &socket) {
-            ba::async_write(socket, ba::buffer(message + ms_MESSAGE_DELIMITER), callback);
+        auto strandWrapper = ba::bind_executor(mStrand, callback);
+
+        std::visit([message, strandWrapper](auto &socket) {
+            ba::async_write(socket, ba::buffer(message + ms_MESSAGE_DELIMITER), strandWrapper);
         }, mSocket);
     }
 
@@ -117,6 +123,7 @@ namespace SmartHome::IPC {
                 mpLogger->info("[SOCKET_CONNECTION] IPC operation aborted");
                 break;
             case ba::error::eof:
+                //FIXME SH-206 Logging to terminal with timestamp
                 mpLogger->info("[SOCKET_CONNECTION] IPC connection read EOF");
                 close();
                 break;
