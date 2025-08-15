@@ -113,7 +113,7 @@ namespace SmartHome {
         mpService->onStart();
 
         // Start signal handling
-        mSignals.emplace(mCoreIoContext, SIGINT, SIGTERM); //TODO add more signals
+        mSignals.emplace(mCoreIoContext, SIGINT, SIGTERM, SIGHUP); //TODO add more signals
         mSignals->async_wait([this](const bs::error_code &ec, const int sig) {
             signalHandler(ec, sig);
         });
@@ -202,6 +202,11 @@ namespace SmartHome {
         } else {
             // Handle signal error
             mLogger->errorf("[CORE] Signal handler error: %s", ec.message().c_str());
+        }
+        if (isRunning()) {
+            mSignals->async_wait([this](const bs::error_code &e, const int sig) {
+               signalHandler(e, sig);
+           });
         }
     }
 
