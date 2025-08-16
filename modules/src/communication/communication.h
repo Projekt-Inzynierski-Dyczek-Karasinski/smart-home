@@ -7,6 +7,11 @@
 #include "../smart_home_config.h"
 #include "config/communication_config.h"
 
+#include "universal_module_system/debug_led.h"
+#include "utils/logger.h"
+
+#include "connection/module_connection.h"
+
 #ifdef HC12_MODULE
     #include "communication/hc12.h"
 #endif
@@ -16,8 +21,6 @@
     #include "communication/addressing/module_addressing.h"
 #endif
 
-#include "universal_module_system/debug_led.h"
-#include "utils/logger.h"
 
 namespace ul = Utils::Logging;
 
@@ -265,6 +268,8 @@ private:
     // TODO change this to nonstatic if possible
     static Communication *mspCommunication;
     static DebugLED *mspDebugLED; ///< Pointer to debugLED class instance.
+
+    std::unique_ptr<ModuleConnection> mpConnection;
 
     #ifdef HC12_MODULE
         std::unique_ptr<HC12> mpRfModule; ///< Pointer to class instance responsible for transmitting and receiving RF messages.

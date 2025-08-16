@@ -37,11 +37,11 @@ public:
     void getProtocolMACAddress(uint8_t macAddress[MAC_ADDRESS_LENGTH]) const;
 
     /**
-     * @brief Gets the currently assigned IP address for the module.
+     * @brief Pure virtual getter for IP address.
      * @return IP address.
-     * @note Thread-safe.
+     * @warning Must be implemented by derived class.
      */
-    uint8_t getIPAddress() const;
+    virtual uint8_t getIPAddress() = 0;
 
     /**
      * @brief Pure virtual function checking if given mac address is propper.
@@ -158,8 +158,8 @@ protected:
 
     Communication *mpCommunication; ///< Pointer to the Communication class instance (owner class).
 
-    uint8_t mMACAddress[MAC_ADDRESS_LENGTH]; ///< Module's own MAC address.
-    uint8_t mProtocolMACAddress[MAC_ADDRESS_LENGTH]; ///< Central unit's MAC address (or module's own MAC if unknown).
+    uint8_t mMACAddress[MAC_ADDRESS_LENGTH]{}; ///< Module's own MAC address.
+    uint8_t mProtocolMACAddress[MAC_ADDRESS_LENGTH]{}; ///< Central unit's MAC address (or module's own MAC if unknown).
     uint8_t mIPAddress = NULL_IP; ///< Current assigned IP address (0 = NULL, 1 = central unit's IP).
 
     #ifdef ESP32_BOARD

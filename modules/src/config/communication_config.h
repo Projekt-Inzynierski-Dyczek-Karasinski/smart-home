@@ -17,7 +17,7 @@
 #define CHECKSUM_MODULO 256
 // TODO assign final value
 #define RECEIVE_BYTE_QUEUE_LEN 128
-#define BLANK_CHARACTER ' '
+#define BLANK_CHARACTER 0
 // TODO assign final value
 #define SUSPEND_TASK_TIME_SHORT 200 // 0.2s
 // TODO assign final value

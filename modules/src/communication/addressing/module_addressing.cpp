@@ -14,7 +14,6 @@
 
 namespace uah = Utils::ArrayHandlers;
 
-
 ModuleAddressing* ModuleAddressing::mspAddressing = nullptr;
 
 // ============================ Public ============================
@@ -22,7 +21,13 @@ ModuleAddressing* ModuleAddressing::mspAddressing = nullptr;
 ModuleAddressing::ModuleAddressing(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
     : Addressing(communication, logger) {
     mspAddressing = this;
-    mIPAddress = NULL_IP;     
+    mIPAddress = NULL_IP;
+
+    // TODO !BEFORE PULL REQUEST! remove
+    #ifdef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
+        mIPAddress = 2;
+        mpLogger->warningv("Addressing TMP", "IP is forced: ", mIPAddress);
+    #endif
 
     mpLogger->info("ModuleAddressing Class", "ModuleAddressing initialized.");
 }
@@ -41,6 +46,15 @@ uint8_t ModuleAddressing::getRfChannel() const {
     return rfChannel;
 }
 #endif
+
+
+uint8_t ModuleAddressing::getIPAddress() {
+    xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
+    const uint8_t ipAddress = mIPAddress;
+    xSemaphoreGive(mAddressingDataMutex);
+
+    return ipAddress;
+}
 
 bool ModuleAddressing::isMACPropper(const uint8_t *mac) {
     bool result = false;
@@ -87,9 +101,9 @@ void ModuleAddressing::addressingTask(void* parameters) {
 
         // variables for data passed in PROCESS_SUMMARY
         uint8_t ipToCheck = NULL_IP;
-        uint8_t rfChannelToCheck;
+        uint8_t rfChannelToCheck = 0;
         uint8_t macToCheck[6];
-        bool isMacRealToCheck;
+        bool isMacRealToCheck = false;
 
         while (attemptCounter < ADDRESSING_MAX_ATTEMPTS) {
             // sending
@@ -126,10 +140,15 @@ void ModuleAddressing::addressingTask(void* parameters) {
                         ) {
                             uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_SUMMARY_OK, ADDRESSING_API_LEN, MESSAGE_SIZE);
                             ad.mpCommunication->sendMessage(sendBuffer);
-                            // TODO add saving data in flash memory
+
                             ad.mpLogger->info("ModuleAddressing Main", "Addressing complete." );
-                            // TODO remove clearing data 
-                            ad.abortAddressing();
+                            // TODO remove #ifndef directive and #else section before merge with main
+                            #ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
+                                // TODO add saving data in flash memory
+                                ad.mpCommunication->stopAddressingAlgorithm();
+                            #else
+                                ad.abortAddressing();
+                            #endif
                             for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
                         } else {
                             ad.mpLogger->warning("ModuleAddressing Main", "Central unit send bad data in summary." );

@@ -28,6 +28,8 @@ namespace uah = Utils::ArrayHandlers;
 Communication* Communication::mspCommunication = nullptr;
 DebugLED* Communication::mspDebugLED = nullptr;
 
+// TODO !BEFORE PULL REQUEST! add new namespace for Communication (eg. Comms)
+
 // ============================ Public ============================
 
 Communication &Communication::getInstance(DebugLED *debugLED, const std::shared_ptr<ul::Logger> &logger) {
@@ -81,6 +83,7 @@ void Communication::sendInternalMessage(const uint8_t message[MESSAGE_SIZE]) con
 // ================== Constructor and Destructor ==================
 
 Communication::Communication(DebugLED *debugLED, const std::shared_ptr<ul::Logger> &logger) :
+    mpConnection(new ModuleConnection(this, logger)),
     #ifdef HC12_MODULE
         mpRfModule(new HC12(this, logger)),
     #else
@@ -449,17 +452,34 @@ void Communication::decodeMessageTask(void *parameters) {
                     handleIncorrectMessage(isRawMessage);
                     com.mpLogger->warning("Communication Decode", "Bad checksum");
                 }
-                // if MAC or IP is incorrect 
-                // TODO uncomment and implement
-                // else if (!isProperMACAndIP(protocolBuffer[protoBuffMessageIndex], protocolBuffer[protoBuffMessageIndex][6])) {
-                else if (false) {
-                    // #ifdef CENTRAL_UNIT
-                    //     Serial.println("CRITICAL ERROR! In decodeMessageTask() -> isProperMACAndIP() must never return false for CENTRAL_UNIT"); 
-                    // #else
-                    //     xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
-                    //     resetProtocolBuffer();
-                    // #endif
+                // TODO remove #ifndef directive before merge with main
+                #ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
+                // if MAC is incorrect wait for possible rest of message and ignore it
+                else if (!com.mpAddressing->isMACPropper(protocolBuffer[protoBuffMessageIndex])) {
+                    xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
+                    // TODO !BEFORE PULL REQUEST! consider changing log to debug or info
+                    com.mpLogger->warning("Communication Decode", "Bad MAC");
+                    vTaskDelay(pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT));
+                    resetProtocolBuffer();
+                    xQueueReset(com.mReceiveByteQueue);
                 }
+                // TODO consider changing that approach (and "repeat" message logic in general) due to potential spam with multiple modules on one channel
+                // if IP is incorrect, check if is "repeat" message,
+                // if not wait for possible rest of message and ignore it, otherwise resend last message
+                else if (!com.mpAddressing->isIpPropper(protocolBuffer[protoBuffMessageIndex][PROTOCOL_IP_INDEX])) {
+                    xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
+                    if (uah::areArraysEqual(&protocolBuffer[protoBuffMessageIndex][PROTOCOL_MESSAGE_START_INDEX], (uint8_t*)"repeat", 6)) {
+                        resetProtocolBuffer();
+                        com.repeatLastTransmittedMessage();
+                    } else {
+                        // TODO !BEFORE PULL REQUEST! consider changing log to debug or info
+                        com.mpLogger->warning("Communication Decode", "Bad IP");
+                        vTaskDelay(pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT));
+                        resetProtocolBuffer();
+                        xQueueReset(com.mReceiveByteQueue);
+                    }
+                }
+                #endif
                 // if entire message is not ready (message quantity)
                 else if (protocolBuffer[protoBuffMessageIndex][MESSAGES_QUANTITY_INDEX] != 0) {
                     protoBuffMessageIndex++;
@@ -560,6 +580,12 @@ void Communication::encodeMessageTask(void *parameters) {
     for (;;) {
         // wait until the message appears in the queue and save message in local messageBuffer
         if (xQueueReceive(com.mSendMessagesQueue, &messageBuffer, pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG)) == pdTRUE) {
+            // only for central unit, because modules IP is constant
+            #ifdef CENTRAL_UNIT
+                // prepare place for IP address
+                protocolBuffer[PROTOCOL_IP_INDEX] = com.mpAddressing->getIPAddress();
+            #endif
+
             int8_t messagesQuantity = 0;
             uint8_t messageIndex = 0;
             // calc messageQuantity

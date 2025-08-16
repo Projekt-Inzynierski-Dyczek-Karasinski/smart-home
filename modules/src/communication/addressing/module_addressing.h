@@ -39,6 +39,13 @@ public:
     #endif
 
     /**
+     * @brief Gets the currently assigned IP address for the module.
+     * @return IP address.
+     * @note Thread-safe.
+     */
+    uint8_t getIPAddress() override;
+
+    /**
      * @brief Checks if given MAC address is propper.
      * @details If module is not addressed yet (IP address is <code>NULL_IP</code>), it will accept any MAC address,
      * otherwise MAC address is propper if is same as <code>mProtocolMACAddress</code>.

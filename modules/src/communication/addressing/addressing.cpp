@@ -24,6 +24,14 @@ Addressing::Addressing(Communication *communication, const std::shared_ptr<ul::L
         #error "MAC address not implemented!"
     #endif
     mpLogger = logger;
+
+    // TODO !BEFORE PULL REQUEST! remove
+    #ifdef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
+        const uint8_t tmpMAC[] = {1,1,1,1,1,1};
+        uah::prepareBuffer(mProtocolMACAddress, tmpMAC, 6,6);
+        mpLogger->warninga("Addressing TMP", "Protocol mac is forced: ", mProtocolMACAddress, 6, false);
+    #endif
+
     mAddressingDataMutex = xSemaphoreCreateMutex();
 }
 
@@ -33,14 +41,6 @@ void Addressing::getProtocolMACAddress(uint8_t macAddress[MAC_ADDRESS_LENGTH]) c
     xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
     uah::prepareBuffer(macAddress, mProtocolMACAddress, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
     xSemaphoreGive(mAddressingDataMutex);
-}
-
-uint8_t Addressing::getIPAddress() const {
-    xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
-    const uint8_t ipAddress = mIPAddress;
-    xSemaphoreGive(mAddressingDataMutex);
-
-    return ipAddress;
 }
 
 void Addressing::startAddressing() {

@@ -37,6 +37,13 @@ public:
     ~CentralUnitAddressing() override;
 
     /**
+     * @brief Gets the IP address of module which is currently communicating with central unit (or cental unit's IP if is start of addressing).
+     * @return IP address.
+     * @note Thread-safe.
+     */
+    uint8_t getIPAddress() override;
+
+    /**
      * @brief Checks if given MAC address is propper.
      * @details If central unit is waiting for new connection message, it will accept any MAC address,
      * otherwise checks if given mac is same as <code>mProtocolMACAddress</code>.
@@ -144,6 +151,13 @@ private:
      * @note Thread-safe.
      */
     uint8_t getTmpModuleIp() const;
+
+    /**
+     * @brief Sets the temporary IP address assigned to the module currently being addressed.
+     * @param ip IP to set.
+     * @note Thread-safe.
+     */
+    void setTmpModuleIp(uint8_t ip);
 
     /**
      * @brief Clears all data related to a new connection attempt.

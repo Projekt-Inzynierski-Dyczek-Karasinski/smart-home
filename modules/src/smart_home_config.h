@@ -34,3 +34,6 @@
     #endif
     #include "config/basic_esp32_s3_wroom_config.h"
 #endif
+
+// TODO remove this before merge with main
+#define COMMUNICATION_WITHOUT_SAVING_ADDRESSING

@@ -39,6 +39,19 @@ CentralUnitAddressing::~CentralUnitAddressing() {
     deleteAddressingTimer();
 }
 
+uint8_t CentralUnitAddressing::getIPAddress() {
+    uint8_t result;
+    xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
+    if (mIsStartOfAddressing) {
+        result = CENTRAL_UNIT_IP;
+    } else {
+        result = mTmpModuleIp;
+    }
+    xSemaphoreGive(mModulesAddressingDataMutex);
+    return result;
+}
+
+
 bool CentralUnitAddressing::isMACPropper(const uint8_t *mac) {
     bool result = false;
     if (getIsStartOfAddressing()) {
@@ -193,9 +206,15 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
                         if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_SUMMARY_OK, ADDRESSING_API_LEN)) {
                             isReceivedPropperMessage = true;
                             ad.mpLogger->info("CentralUnitAddressing Main", "Addressing complete." );
-                            // TODO remove clearing data 
-                            // uint8_t mTmpModuleIp = NULL_IP; // TODO remember to clear that after end of new connection
-                            ad.abortAddressing();
+                            // TODO remove #ifndef directive and #else section before merge with main
+                            #ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
+                                // TODO add saving data in flash memory
+                                ad.setTmpModuleIp(NULL_IP);
+                                ad.mpCommunication->stopAddressingAlgorithm();
+                            #else
+                                // TODO remove clearing data
+                                ad.abortAddressing();
+                            #endif
                             for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
                         } else if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_SUMMARY_BAD, ADDRESSING_API_LEN)) {
                             isReceivedPropperMessage = true;
@@ -404,7 +423,14 @@ uint8_t CentralUnitAddressing::getTmpModuleIp() const {
     xSemaphoreGive(mModulesAddressingDataMutex);
 
     return tmpModuleIp;
-} 
+}
+
+void CentralUnitAddressing::setTmpModuleIp(const uint8_t ip) {
+    xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
+    mTmpModuleIp = ip;
+    xSemaphoreGive(mModulesAddressingDataMutex);
+}
+
 
 // ================================================================
 
