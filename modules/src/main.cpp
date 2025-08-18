@@ -12,7 +12,8 @@
 namespace ul = Utils::Logging;
 
 void setup() {
-    // TODO remove delay before merge with main
+    // TODO before merge with main check in entire project for not deleted freeRTOS items in destructors
+    // TODO before merge with main remove delay
     vTaskDelay(pdTICKS_TO_MS(1000));
     const auto logger = std::make_shared<ul::Logger>();
 

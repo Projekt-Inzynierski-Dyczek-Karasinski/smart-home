@@ -10,15 +10,15 @@
 #include "universal_module_system/debug_led.h"
 #include "utils/logger.h"
 
-#include "connection/module_connection.h"
-
 #ifdef HC12_MODULE
     #include "communication/hc12.h"
 #endif
 #ifdef CENTRAL_UNIT 
     #include "communication/addressing/central_unit_addressing.h"
+    #include "connection/central_unit_connection.h"
 #else
     #include "communication/addressing/module_addressing.h"
+    #include "connection/module_connection.h"
 #endif
 
 
@@ -269,8 +269,6 @@ private:
     static Communication *mspCommunication;
     static DebugLED *mspDebugLED; ///< Pointer to debugLED class instance.
 
-    std::unique_ptr<ModuleConnection> mpConnection;
-
     #ifdef HC12_MODULE
         std::unique_ptr<HC12> mpRfModule; ///< Pointer to class instance responsible for transmitting and receiving RF messages.
     #else
@@ -278,8 +276,10 @@ private:
     #endif
     #ifdef CENTRAL_UNIT
         std::unique_ptr<CentralUnitAddressing> mpAddressing; ///< Pointer to CentralUnitAddressing class instance.
+        std::unique_ptr<CentralUnitConnection> mpConnection;
     #else
         std::unique_ptr<ModuleAddressing> mpAddressing; ///< Pointer to ModuleAddressing class instance.
+        std::unique_ptr<ModuleConnection> mpConnection;
     #endif
 
     typedef enum : uint8_t {

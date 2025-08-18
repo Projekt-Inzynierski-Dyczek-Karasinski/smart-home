@@ -83,16 +83,17 @@ void Communication::sendInternalMessage(const uint8_t message[MESSAGE_SIZE]) con
 // ================== Constructor and Destructor ==================
 
 Communication::Communication(DebugLED *debugLED, const std::shared_ptr<ul::Logger> &logger) :
-    mpConnection(new ModuleConnection(this, logger)),
     #ifdef HC12_MODULE
         mpRfModule(new HC12(this, logger)),
     #else
         #error "Not implemented" 
     #endif
     #ifdef CENTRAL_UNIT 
-        mpAddressing(new CentralUnitAddressing(this, logger))
+        mpAddressing(new CentralUnitAddressing(this, logger)),
+        mpConnection(new CentralUnitConnection(this, logger))
     #else
-        mpAddressing(new ModuleAddressing(this, logger))
+        mpAddressing(new ModuleAddressing(this, logger)),
+        mpConnection(new ModuleConnection(this, logger))
     #endif
 {
     mspCommunication = this;
