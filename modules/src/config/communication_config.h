@@ -33,6 +33,7 @@
 // TODO assign final value
 #define DELAY_BETWEEN_MESSAGES 40
 
+#define ACK_NUMBER_INDEX 0
 #define START_ACK_NUMBER 1
 // TODO assign final value
 #define CONNECTION_REQUEST_TIMEOUT 30000 // 30s
