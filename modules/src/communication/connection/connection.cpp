@@ -27,36 +27,40 @@ Connection::~Connection() {
     vSemaphoreDelete(mTransmittingSemaphore);
 }
 
-// TODO add suspending and resuming connection task
-void Connection::handleReceivedMessage(const uint8_t message[MESSAGE_SIZE]) {
-    // xQueueSend(mReceiveQueue, message, portMAX_DELAY);
-
-    const uint8_t lenOfMessage = uah::calcLenOfDataInArray(message, MESSAGE_SIZE);
-    // if is not special message
-    if (message[ACK_NUMBER_INDEX] != 0) {
-        xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
-        if (message[ACK_NUMBER_INDEX] == mAckNumber) {
-            mAckNumber += lenOfMessage;
-            if (mIsConnected && lenOfMessage == 1) {
-                if (mIsPossibleEndOfConnection) {
-                    mIsConnected = false;
-                } else {
-                    mIsPossibleEndOfConnection = true;
-                }
-            }
-        }
-        // TODO add else with sending "repeat" message
-        xSemaphoreGive(mConnectionDataMutex);
+// TODO add logic for receiving message when mIsConnected == false
+bool Connection::handleReceivedMessage(const uint8_t message[MESSAGE_SIZE]) {
+    // if is special message
+    if (message[ACK_NUMBER_INDEX] == 0) {
+        return true;
     }
 
-    // TODO consider better handling this
-    uint8_t newMessage[MESSAGE_SIZE];
-    uah::prepareBuffer(newMessage, &message[1], lenOfMessage - 1, MESSAGE_SIZE);
-    mpCommunication->sendInternalMessage(newMessage);
+    xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+    bool isAckNumberCorrect;
+    if (message[ACK_NUMBER_INDEX] == mAckNumber) {
+        isAckNumberCorrect = true;
+        const uint8_t lenOfMessage = uah::calcLenOfDataInArray(message, MESSAGE_SIZE);
+        mAckNumber += lenOfMessage;
+        if (mIsConnected && lenOfMessage == 1) {
+            if (mIsPossibleEndOfConnection) {
+                mIsConnected = false;
+                mIsPossibleEndOfConnection = false;
+            } else {
+                mIsPossibleEndOfConnection = true;
+            }
+        }
+    } else {
+        isAckNumberCorrect = false;
+    }
+    xSemaphoreGive(mConnectionDataMutex);
+
+    return isAckNumberCorrect;
 }
 
 void Connection::handleMessageToSend(const uint8_t message[MESSAGE_SIZE]) {
-    if (getIsConnected()) {
+    // if is special message
+    if (message[ACK_NUMBER_INDEX] == 0) {
+
+    } else if (getIsConnected()) {
         // wait for mTransmittingSemaphore and send data, but add first ack number
         // if fails send last transmitted message
     } else {

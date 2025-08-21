@@ -113,13 +113,13 @@ void Addressing::abortAddressingWithAbortMessage() {
 
 bool Addressing::isAddressingFailed(const uint8_t *receiveBuffer) {
     // if received message to abort addressing
-    if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_ABORT, ADDRESSING_API_LEN)) {
+    if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_ABORT, SPECIAL_MESSAGE_LEN)) {
         abortAddressing();
         for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
         return true;
     } 
     // if received message to restart addressing
-    if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_RESTART, ADDRESSING_API_LEN)) {
+    if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_RESTART, SPECIAL_MESSAGE_LEN)) {
         return true;
     }
 

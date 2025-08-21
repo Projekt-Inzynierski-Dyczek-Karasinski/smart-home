@@ -37,3 +37,9 @@
 #define START_ACK_NUMBER 1
 // TODO assign final value
 #define CONNECTION_REQUEST_TIMEOUT 30000 // 30s
+
+// special messages
+#define SPECIAL_MESSAGE_LEN 6
+#define REPEAT_MESSAGE "\0repea"
+#define PING_MESSAGE "\0ping\0"
+#define RE_PING_MESSAGE "\0repin"

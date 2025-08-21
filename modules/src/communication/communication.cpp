@@ -170,24 +170,26 @@ void Communication::receivedMessageDecider(bool *isReadingRawMessage) {
     // TODO consider changing if else statements to switch case
     if (xQueueReceive(mReceiveMessageQueue, buffer, 0) == pdTRUE) {
         // if it is "repeat" message repeat last transmitted message
-        if (uah::areArraysEqual(buffer, (uint8_t*)"repeat", 6)) {
+        if (uah::areArraysEqual(buffer, (uint8_t*)REPEAT_MESSAGE, SPECIAL_MESSAGE_LEN)) {
             repeatLastTransmittedMessage();
         } 
         // if it is "ping", reply to ping
-        else if (uah::areArraysEqual(buffer, (uint8_t*)"ping", 4)) {
+        else if (uah::areArraysEqual(buffer, (uint8_t*)PING_MESSAGE, SPECIAL_MESSAGE_LEN)) {
             replyToPing();
         }
         // if it is "reping", reply to ping
-        else if (uah::areArraysEqual(buffer, (uint8_t*)"reping", 6)) {
+        else if (uah::areArraysEqual(buffer, (uint8_t*)SPECIAL_MESSAGE_LEN, SPECIAL_MESSAGE_LEN)) {
             xTimerStop(mPingTimeoutTimer, portMAX_DELAY);
             mpLogger->info("Communication Main", "Ping Success");
         }
+        // TODO !BEFORE PULL REQUEST! check if addressing work properly after changing API
         // if is addressing message
-        else if ((buffer[0] == (uint8_t)'A' && buffer[1] == (uint8_t)'D') || *isReadingRawMessage) {
+        else if ((buffer[1] == (uint8_t)'A' && buffer[2] == (uint8_t)'D') || *isReadingRawMessage) {
             *isReadingRawMessage = false;
             mpAddressing->addMessage(buffer);
         }
         // if is HC12 command
+        // TODO !BEFORE PULL REQUEST! decide what to do with HC12 commands and tcp
         #ifdef HC12_MODULE
         else if (buffer[0] == (uint8_t)'H' && buffer[1] == (uint8_t)'C') {
             mpRfModule->setupHC12(buffer);
@@ -469,7 +471,7 @@ void Communication::decodeMessageTask(void *parameters) {
                 // if not wait for possible rest of message and ignore it, otherwise resend last message
                 else if (!com.mpAddressing->isIpPropper(protocolBuffer[protoBuffMessageIndex][PROTOCOL_IP_INDEX])) {
                     xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
-                    if (uah::areArraysEqual(&protocolBuffer[protoBuffMessageIndex][PROTOCOL_MESSAGE_START_INDEX], (uint8_t*)"repeat", 6)) {
+                    if (uah::areArraysEqual(&protocolBuffer[protoBuffMessageIndex][PROTOCOL_MESSAGE_START_INDEX], (uint8_t*)REPEAT_MESSAGE, SPECIAL_MESSAGE_LEN)) {
                         resetProtocolBuffer();
                         com.repeatLastTransmittedMessage();
                     } else {
@@ -496,6 +498,11 @@ void Communication::decodeMessageTask(void *parameters) {
                         handleIncorrectMessage(isRawMessage);
                         continue;
                     }
+
+                    if (!com.mpConnection->handleReceivedMessage(messageBuffer)) {
+
+                    }
+
 
                     // send decoded message to queue
                     if (isRawMessage) {
@@ -610,7 +617,7 @@ void Communication::encodeMessageTask(void *parameters) {
                 com.mpLogger->debuga("Communication Encode", "Protocol buffer: ", protocolBuffer, PROTOCOL_SIZE, false);
                 com.mpLogger->debuga("Communication Encode", "Protocol message: ", &protocolBuffer[PROTOCOL_MESSAGE_START_INDEX], PROTOCOL_MESSAGE_LENGTH);
             }
-            if (!uah::areArraysEqual(messageBuffer, (uint8_t*)"repeat", 6)) {
+            if (!uah::areArraysEqual(messageBuffer, (uint8_t*)REPEAT_MESSAGE, SPECIAL_MESSAGE_LEN)) {
                 com.setLastTransmittedMessage(messageBuffer);
             }
         } else {
@@ -815,7 +822,7 @@ void Communication::setLastTransmittedMessage(const uint8_t message[MESSAGE_SIZE
 
 void Communication::transmitRepeatMessage() const {
     uint8_t buffer[MESSAGE_SIZE];
-    uah::prepareBuffer(buffer, (uint8_t*)"repeat", 6, MESSAGE_SIZE);
+    uah::prepareBuffer(buffer, (uint8_t*)REPEAT_MESSAGE, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
     xQueueSend(mSendMessagesQueue, buffer, portMAX_DELAY);
 }
 
@@ -834,13 +841,13 @@ void Communication::repeatLastTransmittedMessage() {
 
 void Communication::transmitPing() const {
     uint8_t buffer[MESSAGE_SIZE];
-    uah::prepareBuffer(buffer, (uint8_t*)"ping", 4, MESSAGE_SIZE);
+    uah::prepareBuffer(buffer, (uint8_t*)PING_MESSAGE, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
     xQueueSend(mSendMessagesQueue, buffer, portMAX_DELAY);
 }
 
 void Communication::replyToPing() const {
     uint8_t buffer[MESSAGE_SIZE];
-    uah::prepareBuffer(buffer, (uint8_t*)"reping", 6, MESSAGE_SIZE);
+    uah::prepareBuffer(buffer, (uint8_t*)RE_PING_MESSAGE, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
     xQueueSend(mSendMessagesQueue, buffer, portMAX_DELAY);
 }
 // ================================================================

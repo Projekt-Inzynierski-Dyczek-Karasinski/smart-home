@@ -79,7 +79,7 @@ bool CentralUnitAddressing::isIpPropper(const uint8_t ip) {
 void CentralUnitAddressing::prepareSummary(uint8_t *sendBuffer, const AddressingData *moduleData) {
     // TODO change API Calls to numeric values
     // prepare summary data (data without mac)
-    const uint8_t summaryData[] = {
+    const uint8_t summaryData[] = { // TODO !BEFORE PULL REQUEST! check if addressing work properly after changing API
         (uint8_t)'i',
         moduleData->ipAddress,
         (uint8_t)'c',
@@ -91,7 +91,7 @@ void CentralUnitAddressing::prepareSummary(uint8_t *sendBuffer, const Addressing
     constexpr uint8_t summaryDataLen = 7;
 
     // prepare sendBuffer
-    uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_SUMMARY, ADDRESSING_API_LEN, ADDRESSING_API_LEN);
+    uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_SUMMARY, SPECIAL_MESSAGE_LEN, SPECIAL_MESSAGE_LEN);
     uah::prepareBuffer(&sendBuffer[6], summaryData, summaryDataLen, summaryDataLen);
     uah::prepareBuffer(&sendBuffer[13], moduleData->macAddress, MAC_ADDRESS_LENGTH, (MESSAGE_SIZE - 13));     
 }
@@ -130,7 +130,7 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
                     // NOTE: receiveBuffer contains raw message!
                     // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
                     // TODO implement for other new connection messages
-                    if (uah::areArraysEqual(&receiveBuffer[8], (uint8_t*)ADDRESSING_NC_REAL_MAC_RF_CHANNELS, ADDRESSING_API_LEN)) {
+                    if (uah::areArraysEqual(&receiveBuffer[8], (uint8_t*)ADDRESSING_NC_REAL_MAC_RF_CHANNELS, SPECIAL_MESSAGE_LEN)) {
                         uint8_t moduleMAC[MAC_ADDRESS_LENGTH];
                         uah::prepareBuffer(moduleMAC, receiveBuffer, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
                         // TODO !BEFORE PULL REQUEST! undo this:
@@ -139,8 +139,8 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
                         const uint8_t moduleNewRfChannel = ad.getModuleRfChannel(moduleNewIP);
 
                         // send module information about module's new IP address and rf channel
-                        uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_NEW_IP_NEW_RF_CHANNEL, ADDRESSING_API_LEN, MESSAGE_SIZE);
-                        sendBuffer[3] = moduleNewIP;
+                        uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_NEW_IP_NEW_RF_CHANNEL, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
+                        sendBuffer[3] = moduleNewIP; // TODO !BEFORE PULL REQUEST! check if addressing work properly after changing API
                         sendBuffer[5] = moduleNewRfChannel;
                         ad.mpCommunication->sendMessage(sendBuffer);
 
@@ -161,7 +161,7 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
 
                 case PINGING:
                     // send ping 
-                    uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_PING, ADDRESSING_API_LEN, ADDRESSING_API_LEN);
+                    uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_PING, SPECIAL_MESSAGE_LEN, SPECIAL_MESSAGE_LEN);
                     ad.mpCommunication->sendMessage(sendBuffer);
                     ad.mpLogger->debug("CentralUnitAddressing Main", "Sending ping.");
                     break;
@@ -196,14 +196,14 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
                         break;
 
                     case PINGING:
-                        if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_REPING, ADDRESSING_API_LEN)) {
+                        if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_REPING, SPECIAL_MESSAGE_LEN)) {
                             isReceivedPropperMessage = true;
                             addressingState = PROCESS_SUMMARY;
                         }
                         break;
 
                     case PROCESS_SUMMARY:
-                        if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_SUMMARY_OK, ADDRESSING_API_LEN)) {
+                        if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_SUMMARY_OK, SPECIAL_MESSAGE_LEN)) {
                             isReceivedPropperMessage = true;
                             ad.mpLogger->info("CentralUnitAddressing Main", "Addressing complete." );
                             // TODO remove #ifndef directive and #else section before merge with main
@@ -216,7 +216,7 @@ void CentralUnitAddressing::addressingTask(void* parameters) {
                                 ad.abortAddressing();
                             #endif
                             for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
-                        } else if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_SUMMARY_BAD, ADDRESSING_API_LEN)) {
+                        } else if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_SUMMARY_BAD, SPECIAL_MESSAGE_LEN)) {
                             isReceivedPropperMessage = true;
                             ad.mpLogger->warning("CentralUnitAddressing Main", "Module rejects summary.");
                             isRestarting = true;

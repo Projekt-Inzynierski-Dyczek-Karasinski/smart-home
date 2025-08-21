@@ -112,7 +112,7 @@ void ModuleAddressing::addressingTask(void* parameters) {
                 case ADDRESSING_STATES::START_ADDRESSING:
                     #ifdef ESP32_BOARD
                         #ifdef RF_CHANNELS
-                            uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_NC_REAL_MAC_RF_CHANNELS, ADDRESSING_API_LEN, MESSAGE_SIZE);
+                            uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_NC_REAL_MAC_RF_CHANNELS, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
                         #else 
                             uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_NC_REAL_MAC_NO_RF_CHANNELS, ADDRESSING_API_LEN, MESSAGE_SIZE);
                         #endif
@@ -125,7 +125,7 @@ void ModuleAddressing::addressingTask(void* parameters) {
 
                 case ADDRESSING_STATES::REPLY_PING:
                     // send reping 
-                    uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_REPING, ADDRESSING_API_LEN, ADDRESSING_API_LEN);
+                    uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_REPING, SPECIAL_MESSAGE_LEN, SPECIAL_MESSAGE_LEN);
                     ad.mpCommunication->sendMessage(sendBuffer);
                     addressingState = ADDRESSING_STATES::PROCESS_SUMMARY;
                     break;
@@ -138,7 +138,7 @@ void ModuleAddressing::addressingTask(void* parameters) {
                             isMacRealToCheck == ad.m_IS_MAC_ADDRESS_REAL &&
                             uah::areArraysEqual(ad.mMACAddress, macToCheck, MAC_ADDRESS_LENGTH)
                         ) {
-                            uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_SUMMARY_OK, ADDRESSING_API_LEN, MESSAGE_SIZE);
+                            uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_SUMMARY_OK, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
                             ad.mpCommunication->sendMessage(sendBuffer);
 
                             ad.mpLogger->info("ModuleAddressing Main", "Addressing complete." );
@@ -152,7 +152,7 @@ void ModuleAddressing::addressingTask(void* parameters) {
                             for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
                         } else {
                             ad.mpLogger->warning("ModuleAddressing Main", "Central unit send bad data in summary." );
-                            uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_SUMMARY_BAD, ADDRESSING_API_LEN, MESSAGE_SIZE);
+                            uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_SUMMARY_BAD, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
                             ad.mpCommunication->sendMessage(sendBuffer);
                             isRestarting = true;
                         }
@@ -179,8 +179,8 @@ void ModuleAddressing::addressingTask(void* parameters) {
                     // !remember in receiveBuffer is raw message!
                     // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
                     #ifdef RF_CHANNELS
-                        // check is received propper message (ADi?c?), indexes are offset due to reading raw message
-                        if (receiveBuffer[10] == (uint8_t)'i' && receiveBuffer[12] == (uint8_t)'c') {
+                        // check is received propper message (AD?c?), indexes are offset due to reading raw message
+                        if (receiveBuffer[12] == (uint8_t)'c') { // TODO !BEFORE PULL REQUEST! check if addressing work properly after changing API
                             isReceivedPropperMessage = true;
                             const uint8_t newRfChannel = receiveBuffer[13];
 
@@ -190,8 +190,8 @@ void ModuleAddressing::addressingTask(void* parameters) {
                             addressingState = ADDRESSING_STATES::WAIT_FOR_PING;
                         }
                     #else 
-                        // check is received propper message (ADi?)
-                        if (receiveBuffer[10] == (uint8_t)'i' && receiveBuffer[12] == (uint8_t)BLANK_CHARACTER) {
+                        // check is received propper message (AD?)
+                        if (receiveBuffer[12] == (uint8_t)BLANK_CHARACTER) { // TODO !BEFORE PULL REQUEST! check if addressing work properly after changing API
                             isReceivedPropperMessage = true;
                             ad.updateAddressingData(receiveBuffer, receiveBuffer[11]);
                             addressingState = PROCESS_SUMMARY;
@@ -200,7 +200,7 @@ void ModuleAddressing::addressingTask(void* parameters) {
                     break;
 
                 case ADDRESSING_STATES::WAIT_FOR_PING:
-                    if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_PING, ADDRESSING_API_LEN)) {
+                    if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_PING, SPECIAL_MESSAGE_LEN)) {
                         isReceivedPropperMessage = true;
                         ad.mpLogger->debug("ModuleAddressing Main", "Got ping.");
                         addressingState = ADDRESSING_STATES::REPLY_PING;
@@ -209,10 +209,10 @@ void ModuleAddressing::addressingTask(void* parameters) {
 
                 case ADDRESSING_STATES::PROCESS_SUMMARY:
                     // if central unit is still sending ping
-                    if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_PING, ADDRESSING_API_LEN)) {
+                    if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_PING, SPECIAL_MESSAGE_LEN)) {
                         addressingState = ADDRESSING_STATES::REPLY_PING;
                     } else if (
-                        uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_SUMMARY, ADDRESSING_API_LEN) &&
+                        uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_SUMMARY, SPECIAL_MESSAGE_LEN) &&
                         receiveBuffer[6]  == (uint8_t)'i' &&
                         receiveBuffer[8]  == (uint8_t)'c' &&
                         receiveBuffer[10] == (uint8_t)'r' &&

@@ -31,22 +31,21 @@
 #endif
 
 // TODO change API Calls to numeric values
+// TODO !BEFORE PULL REQUEST! check if addressing work properly after changing API
 
 // ===================== Addressing API Calls =====================
 
-#define ADDRESSING_API_LEN 6
-
-#define ADDRESSING_ABORT "ADabor"
-#define ADDRESSING_RESTART "ADrest"
-#define ADDRESSING_NC_REAL_MAC_RF_CHANNELS "ADncry"
-#define ADDRESSING_NC_REAL_MAC_NO_RF_CHANNELS "ADncrn"
-#define ADDRESSING_NC_FAKE_MAC_RF_CHANNELS "ADncfy"
-#define ADDRESSING_NC_FAKE_MAC_NO_RF_CHANNELS "ADncfn"
-#define ADDRESSING_NEW_IP_NEW_RF_CHANNEL "ADi?c?"
-#define ADDRESSING_NEW_IP_NEW_NO_RF_CHANNEL "ADi?\0\0"
-#define ADDRESSING_SUMMARY "ADsumm"
-#define ADDRESSING_SUMMARY_OK "ADsuok"
-#define ADDRESSING_SUMMARY_BAD "ADsuba"
-#define ADDRESSING_PING "ADping"
-#define ADDRESSING_REPING "ADrepi"
+#define ADDRESSING_ABORT "\0ADabo"
+#define ADDRESSING_RESTART "\0ADres"
+#define ADDRESSING_NC_REAL_MAC_RF_CHANNELS "\0ADnry"
+#define ADDRESSING_NC_REAL_MAC_NO_RF_CHANNELS "\0ADnrn"
+#define ADDRESSING_NC_FAKE_MAC_RF_CHANNELS "\0ADnfy"
+#define ADDRESSING_NC_FAKE_MAC_NO_RF_CHANNELS "\0ADnfn"
+#define ADDRESSING_NEW_IP_NEW_RF_CHANNEL "\0AD?c?"
+#define ADDRESSING_NEW_IP_NEW_NO_RF_CHANNEL "\0AD?\0\0"
+#define ADDRESSING_SUMMARY "\0ADsum"
+#define ADDRESSING_SUMMARY_OK "\0ADsok"
+#define ADDRESSING_SUMMARY_BAD "\0ADsba"
+#define ADDRESSING_PING "\0ADpin"
+#define ADDRESSING_REPING "\0ADrep"
 // ================================================================

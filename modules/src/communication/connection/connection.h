@@ -19,7 +19,7 @@ public:
 
     virtual ~Connection();
 
-    void handleReceivedMessage(const uint8_t message[MESSAGE_SIZE]);
+    bool handleReceivedMessage(const uint8_t message[MESSAGE_SIZE]);
     void handleMessageToSend(const uint8_t message[MESSAGE_SIZE]);
 
 protected:
