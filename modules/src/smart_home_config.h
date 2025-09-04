@@ -1,5 +1,7 @@
 #pragma once
 
+#define DEBUG_MODE
+
 #define BACKGROUND_TASK_PRIORITY 1
 #define LOW_TASK_PRIORITY 2
 #define MEDIUM_TASK_PRIORITY 3
@@ -10,8 +12,13 @@
 #ifndef TERMINAL_BAUD_RATE
     #define TERMINAL_BAUD_RATE 9600
 #endif
+
 #ifndef LOGGING_LEVEL
-    #define LOGGING_LEVEL 3 // INFO
+    #ifdef DEBUG_MODE
+        #define LOGGING_LEVEL 3 // INFO
+    #else
+        #define LOGGING_LEVEL 0 // NONE
+    #endif
 #endif
 
 #ifdef ESP32_WROOM_BOARD_TYPE

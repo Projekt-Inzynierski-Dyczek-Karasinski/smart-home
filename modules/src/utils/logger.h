@@ -36,7 +36,11 @@ namespace Utils {
              * @note Thread-safe.
              */
             explicit Logger(Level level = static_cast<Level>(LOGGING_LEVEL));
-            ~Logger() = default;
+
+            /**
+             * @brief Cleans up FreeRTOS resources used by the class.
+             */
+            ~Logger();
 
             /**
              * @brief Getter returning currently set log level.

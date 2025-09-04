@@ -1,8 +1,6 @@
 #pragma once
 #include <Arduino.h>
 
-// TODO add @example tags
-
 namespace Utils {
     /**
      * @brief Namespace containing utility functions for arrays.

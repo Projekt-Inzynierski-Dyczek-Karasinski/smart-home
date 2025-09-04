@@ -7,7 +7,7 @@
 #define DEBOUNCING_COUNTER_TO_SECONDS(value) (value * DEBOUNCING_TIME / 1000)
 
 PairingButton* PairingButton::mspInstance = nullptr;
-Communication* PairingButton::mspCommunication = nullptr;
+Comms::Communication* PairingButton::mspCommunication = nullptr;
 DebugLED* PairingButton::mspDebugLED = nullptr;
 
 uint8_t PairingButton::msButtonMode = 0;
@@ -16,14 +16,14 @@ int8_t PairingButton::msButtonNotPressedCounter = 3;
 TimerHandle_t PairingButton::msButtonPressTimer = nullptr;
 
 
-PairingButton* PairingButton::getInstance(DebugLED *debugLED, Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
+PairingButton* PairingButton::getInstance(DebugLED *debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
     if (mspInstance == nullptr) {
         mspInstance = new PairingButton(debugLED, communication, logger);
     }
     return mspInstance;
 }
 
-PairingButton::PairingButton(DebugLED *debugLED, Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
+PairingButton::PairingButton(DebugLED *debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
     mspDebugLED = debugLED;
     mspCommunication = communication;
     pinMode(BUTTON_PIN, INPUT_PULLUP);

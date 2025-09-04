@@ -1,25 +1,26 @@
 #include "module_connection.h"
 
+namespace Comms {
+    ModuleConnection::ModuleConnection(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
+        : Connection(communication, logger) {
 
-ModuleConnection::ModuleConnection(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
-    : Connection(communication, logger) {
+        // createConnectionTask(connectionTask);
 
-    createConnectionTask(connectionTask);
+        mpLogger->info("ModuleConnection Class", "ModuleConnection initialized.");
+    }
 
-    mpLogger->info("ModuleConnection Class", "ModuleConnection initialized.");
-}
+    ModuleConnection::~ModuleConnection() {
 
-ModuleConnection::~ModuleConnection() {
+    }
 
-}
+    void ModuleConnection::connectionTask(void* parameters) {
+        const auto &con = *mspConnection;
 
-void ModuleConnection::connectionTask(void* parameters) {
-    const auto &con = *mspConnection;
+        bool isConnected = false;
 
-    bool isConnected = false;
+        for (;;) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
 
-    for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(1000));
-
+        }
     }
 }

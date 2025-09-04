@@ -12,13 +12,12 @@
 namespace ul = Utils::Logging;
 
 void setup() {
-    // TODO before merge with main check in entire project for not deleted freeRTOS items in destructors
     // TODO before merge with main remove delay
     vTaskDelay(pdTICKS_TO_MS(1000));
     const auto logger = std::make_shared<ul::Logger>();
 
     DebugLED* debugLed = DebugLED::getInstance(logger);
-    Communication& communication = Communication::getInstance(debugLed, logger);
+    Comms::Communication& communication = Comms::Communication::getInstance(debugLed, logger);
     PairingButton* pairingButton = PairingButton::getInstance(debugLed, &communication, logger);
 
     logger->info("Main", "Deleting functions setup() and loop().");

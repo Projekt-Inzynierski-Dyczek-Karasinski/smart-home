@@ -25,6 +25,10 @@ namespace Utils {
             }
         }
 
+        Logger::~Logger() {
+            vSemaphoreDelete(mLogLevelMutex);
+        }
+
         Level Logger::getLogLevel() const {
             xSemaphoreTake(mLogLevelMutex, portMAX_DELAY);
             const Level level = mLogLevel;
