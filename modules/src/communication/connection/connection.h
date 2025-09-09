@@ -16,27 +16,26 @@ namespace Comms {
     // TODO consider making this class singleton
     class Connection {
     public:
-        Connection(Communication *communication, const std::shared_ptr<ul::Logger> &logger);
+        static Connection& getInstance(Communication *communication, const std::shared_ptr<ul::Logger> &logger);
 
-        virtual ~Connection();
+        // Delete copy constructor and assignment operator
+        Connection(const Connection&) = delete;
+        Connection& operator = (const Connection&) = delete;
 
         bool handleReceivedMessage(const uint8_t message[MESSAGE_SIZE]);
         void handleMessageToSend(const uint8_t message[MESSAGE_SIZE]);
 
-    protected:
-        // void createConnectionQueues();
-        // void deleteConnectionQueues();
+    private:
+        Connection(Communication *communication, const std::shared_ptr<ul::Logger> &logger);
+        ~Connection();
 
         uint8_t getAckNumber() const;
         void setAckNumber(uint8_t number);
-        bool isAckNumberCorrect(uint8_t ackNumber);
+        uint8_t calculateNewAckNumber(const uint8_t *message, uint8_t lastAckNumber) const;
 
         bool getIsConnected() const;
 
         void sendConnectionRequest();
-
-        // void createConnectionTask(TaskFunction_t task);
-        // void deleteConnectionTask();
 
         static void connectionTimersCallbacks(TimerHandle_t xTimer);
         void createConnectionTimers();
@@ -52,11 +51,6 @@ namespace Comms {
 
         xSemaphoreHandle mConnectionDataMutex = nullptr;
         xSemaphoreHandle mTransmittingSemaphore = nullptr;
-
-        // QueueHandle_t mReceiveQueue = nullptr;
-        // QueueHandle_t mSendQueue = nullptr;
-
-        // TaskHandle_t mConnectionTaskHandle = nullptr;
 
         TimerHandle_t mConnectionRequestTimeoutTimer = nullptr;
     };

@@ -1,6 +1,9 @@
 #pragma once
 
 #define RF_CHANNELS
+#define DEFAULT_CHANNEL 1
+#define MAX_CHANNEL 127
+
 #define SETUP_COMMAND_SIZE 10
 #define SETUP_MAX_NUM_OF_COMMANDS 5
 #define SETUP_MAX_LEN_OF_RESPONSE 43

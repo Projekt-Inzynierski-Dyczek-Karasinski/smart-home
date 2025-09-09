@@ -99,10 +99,22 @@ namespace Comms {
             xQueueSend(mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
         }
     }
+
+    void HC12::changeRFChannel(uint8_t channel) {
+        if (channel < DEFAULT_CHANNEL || channel > MAX_CHANNEL) {
+            mpLogger->errorv("HC12 Method", "RF channel on HC12 module must be set between 1 - 127, but got:", channel);
+            channel = DEFAULT_CHANNEL;
+        }
+
+        uint8_t commandBuffer[7];
+        char messageBuffer[7];
+        sprintf(messageBuffer, "HC+%03u", channel);
+        uah::prepareBuffer(commandBuffer, (uint8_t*)messageBuffer, 6, SETUP_COMMAND_SIZE);
+        setupHC12(commandBuffer);
+    }
 // ================================================================
 
 // ============================ Queues ============================
-
     void HC12::createQueues() {
         if (mMainNotificationsQueue == nullptr) {
             mMainNotificationsQueue = xQueueCreate(NOTIFICATIONS_QUEUE_SIZE, sizeof(uint8_t));

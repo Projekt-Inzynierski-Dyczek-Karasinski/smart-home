@@ -5,30 +5,13 @@
 #include <memory>
 
 #include "../utils/uint8_array_handlers.h"
-#include "universal_module_system/debug_led.h"
 
-#include "smart_home_config.h"
-#include "config/communication_config.h"
 #include "config/addressing_config.h"
-
-#ifdef HC12_MODULE
-    #include "hc12.h"
-#else
-    #error "Not implemented" 
-#endif
-
-#ifdef CENTRAL_UNIT 
-    #include "communication/addressing/central_unit_addressing.h"
-#else
-    #include "addressing/module_addressing.h"
-#endif
 
 namespace uah = Utils::ArrayHandlers;
 
 namespace Comms {
     Communication* Communication::mspCommunication = nullptr;
-
-    // TODO !BEFORE PULL REQUEST! add new namespace for Communication (eg. Comms)
 
     // ============================ Public ============================
 
@@ -83,17 +66,16 @@ namespace Comms {
     // ================== Constructor and Destructor ==================
 
     Communication::Communication(DebugLED *debugLED, const std::shared_ptr<ul::Logger> &logger) :
+        mpConnection(&Connection::getInstance(this, logger)),
         #ifdef HC12_MODULE
             mpRfModule(new HC12(this, logger)),
         #else
             #error "Not implemented"
         #endif
         #ifdef CENTRAL_UNIT
-            mpAddressing(new CentralUnitAddressing(this, logger)),
-            mpConnection(new CentralUnitConnection(this, logger))
+            mpAddressing(new CentralUnitAddressing(this, logger))
         #else
-            mpAddressing(new ModuleAddressing(this, logger)),
-            mpConnection(new ModuleConnection(this, logger))
+            mpAddressing(new ModuleAddressing(this, logger))
         #endif
     {
         mspCommunication = this;
@@ -180,7 +162,7 @@ namespace Comms {
                 replyToPing();
             }
             // if it is "reping", reply to ping
-            else if (uah::areArraysEqual(buffer, (uint8_t*)SPECIAL_MESSAGE_LEN, SPECIAL_MESSAGE_LEN)) {
+            else if (uah::areArraysEqual(buffer, (uint8_t*)RE_PING_MESSAGE, SPECIAL_MESSAGE_LEN)) {
                 xTimerStop(mPingTimeoutTimer, portMAX_DELAY);
                 mpLogger->info("Communication Main", "Ping Success");
             }
@@ -192,11 +174,11 @@ namespace Comms {
             }
             // if is HC12 command
             // TODO !BEFORE PULL REQUEST! decide what to do with HC12 commands and tcp
-#ifdef HC12_MODULE
-            else if (buffer[0] == (uint8_t)'H' && buffer[1] == (uint8_t)'C') {
-                mpRfModule->setupHC12(buffer);
-            }
-#endif
+            #ifdef HC12_MODULE
+                else if (buffer[0] == (uint8_t)'H' && buffer[1] == (uint8_t)'C') {
+                    mpRfModule->setupHC12(buffer);
+                }
+            #endif
             else {
                 mpLogger->warninga(
                     "Communication Main",
@@ -456,7 +438,7 @@ namespace Comms {
                         com.mpLogger->warning("Communication Decode", "Bad checksum");
                     }
                     // TODO remove #ifndef directive before merge with main
-#ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
+                    #ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
                     // if MAC is incorrect wait for possible rest of message and ignore it
                     else if (!com.mpAddressing->isMACPropper(protocolBuffer[protoBuffMessageIndex])) {
                         xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
@@ -482,7 +464,7 @@ namespace Comms {
                             xQueueReset(com.mReceiveByteQueue);
                         }
                     }
-#endif
+                    #endif
                     // if entire message is not ready (message quantity)
                     else if (protocolBuffer[protoBuffMessageIndex][MESSAGES_QUANTITY_INDEX] != 0) {
                         protoBuffMessageIndex++;
@@ -499,10 +481,11 @@ namespace Comms {
                             continue;
                         }
 
+                        // if ack number is not correct
                         if (!com.mpConnection->handleReceivedMessage(messageBuffer)) {
-
+                            handleIncorrectMessage(isRawMessage);
+                            com.mpLogger->warning("Communication Decode", "Bad ack number");
                         }
-
 
                         // send decoded message to queue
                         if (isRawMessage) {
@@ -589,10 +572,10 @@ namespace Comms {
             // wait until the message appears in the queue and save message in local messageBuffer
             if (xQueueReceive(com.mSendMessagesQueue, &messageBuffer, pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG)) == pdTRUE) {
                 // only for central unit, because modules IP is constant
-#ifdef CENTRAL_UNIT
-                // prepare place for IP address
-                protocolBuffer[PROTOCOL_IP_INDEX] = com.mpAddressing->getIPAddress();
-#endif
+                #ifdef CENTRAL_UNIT
+                    // prepare place for IP address
+                    protocolBuffer[PROTOCOL_IP_INDEX] = com.mpAddressing->getIPAddress();
+                #endif
 
                 int8_t messagesQuantity = 0;
                 uint8_t messageIndex = 0;
@@ -649,8 +632,6 @@ namespace Comms {
         }
     }
 // ================================================================
-
-// TODO change name for this task (eg. input/terminal input)
 
 // =================== Terminal Input Message =====================
     #ifdef DEBUG_MODE

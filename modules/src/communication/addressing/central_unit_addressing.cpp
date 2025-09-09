@@ -26,7 +26,7 @@ namespace Comms {
 
         // prepare array counting modules on rf channels and reserve place for central unit
         xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
-        uah::clearBuffer(mNumOFModulesOnRfChannel, MAX_NUM_OF_CHANNEL);
+        uah::clearBuffer(mNumOFModulesOnRfChannel, MAX_CHANNEL);
         mNumOFModulesOnRfChannel[0] = 1;
         xSemaphoreGive(mModulesAddressingDataMutex);
 
@@ -315,7 +315,7 @@ namespace Comms {
 
         mpLogger->warning("CentralUnitAddressing Class", "Debug method printNumOFModulesOnRfChannels() call - not thread-safe print.");
         xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
-        for (uint8_t i = 0; i < MAX_NUM_OF_CHANNEL; i++) {
+        for (uint8_t i = 0; i < MAX_CHANNEL; i++) {
             if (mNumOFModulesOnRfChannel[i] != 0) {
                 char buffer[20];
                 sprintf(
@@ -361,7 +361,7 @@ namespace Comms {
                 if (rfChannel == 0) {
                     uint8_t minNum = UINT8_MAX;
                     uint8_t tmpChannel;
-                    for (uint8_t channelIndex = 0; channelIndex < MAX_NUM_OF_CHANNEL; channelIndex++) {
+                    for (uint8_t channelIndex = 0; channelIndex < MAX_CHANNEL; channelIndex++) {
                         if (mNumOFModulesOnRfChannel[channelIndex] == 0) {
                             tmpChannel = channelIndex;
                             break;

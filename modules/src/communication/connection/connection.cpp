@@ -6,6 +6,11 @@
 namespace Comms {
     Connection *Connection::mspConnection = nullptr;
 
+    Connection &Connection::getInstance(Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
+        static Connection instance(communication, logger);
+        return instance;
+    }
+
     // TODO !BEFORE PULL REQUEST! remove new instance of logger
     Connection::Connection(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
         : mpCommunication(communication), mpLogger(logger) {
@@ -16,8 +21,9 @@ namespace Comms {
         const auto tmpLogger = std::make_shared<ul::Logger>(ul::Level::DEBUG);
         mpLogger = tmpLogger;
 
-        // createConnectionQueues();
         createConnectionTimers();
+
+        mpLogger->info("Connection Class", "Connection initialized.");
     }
 
     Connection::~Connection() {
@@ -28,36 +34,28 @@ namespace Comms {
         vSemaphoreDelete(mTransmittingSemaphore);
     }
 
-    // TODO add logic for receiving message when mIsConnected == false
     bool Connection::handleReceivedMessage(const uint8_t message[MESSAGE_SIZE]) {
         // if is special message
         if (message[ACK_NUMBER_INDEX] == 0) {
             return true;
         }
 
+        bool isAckNumberCorrect = false;
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
-        bool isAckNumberCorrect;
         if (message[ACK_NUMBER_INDEX] == mAckNumber) {
             isAckNumberCorrect = true;
-            const uint8_t lenOfMessage = uah::calcLenOfDataInArray(message, MESSAGE_SIZE);
-            mAckNumber += lenOfMessage;
-            if (mIsConnected && lenOfMessage == 1) {
-                if (mIsPossibleEndOfConnection) {
-                    mIsConnected = false;
-                    mIsPossibleEndOfConnection = false;
-                } else {
-                    mIsPossibleEndOfConnection = true;
-                }
-            }
-        } else {
-            isAckNumberCorrect = false;
+            mAckNumber = calculateNewAckNumber(message, mAckNumber);
         }
         xSemaphoreGive(mConnectionDataMutex);
 
+        // signalize that now can transmit again
+        xSemaphoreGive(mTransmittingSemaphore);
         return isAckNumberCorrect;
     }
 
     void Connection::handleMessageToSend(const uint8_t message[MESSAGE_SIZE]) {
+        
+        xSemaphoreTake(mTransmittingSemaphore, pdMS_TO_TICKS(CONNECTION_REQUEST_TIMEOUT));
         // if is special message
         if (message[ACK_NUMBER_INDEX] == 0) {
 
@@ -69,27 +67,6 @@ namespace Comms {
         }
         // xQueueSend(mSendQueue, message, portMAX_DELAY);
     }
-
-    // TODO consider changing length of queues to 1
-    // void Connection::createConnectionQueues() {
-    //     if (mReceiveQueue == nullptr) {
-    //         mReceiveQueue = xQueueCreate(MESSAGE_QUEUE_LEN, sizeof(uint8_t[MESSAGE_SIZE]));
-    //     }
-    //     if (mSendQueue == nullptr) {
-    //         mSendQueue = xQueueCreate(MESSAGE_QUEUE_LEN, sizeof(uint8_t[MESSAGE_SIZE]));
-    //     }
-    // }
-
-    // void Connection::deleteConnectionQueues() {
-    //     if (mReceiveQueue != nullptr) {
-    //         vQueueDelete(mReceiveQueue);
-    //         mReceiveQueue = nullptr;
-    //     }
-    //     if (mSendQueue != nullptr) {
-    //         vQueueDelete(mSendQueue);
-    //         mSendQueue = nullptr;
-    //     }
-    // }
 
     uint8_t Connection::getAckNumber() const {
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
@@ -104,16 +81,15 @@ namespace Comms {
         xSemaphoreGive(mConnectionDataMutex);
     }
 
-    // TODO remove if not used
-    bool Connection::isAckNumberCorrect(const uint8_t ackNumber) {
-        bool result = false;
-        xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
-        if (ackNumber == mAckNumber + 1) {
-            mAckNumber++;
-            result = true;
+    uint8_t Connection::calculateNewAckNumber(const uint8_t *message, const uint8_t lastAckNumber) const {
+        uint8_t index = 0;
+        uint16_t result = lastAckNumber;
+        while (message[index] != 0) {
+            result += message[index];
+            index++;
         }
-        xSemaphoreGive(mConnectionDataMutex);
-        return result;
+        result = (result % 254) + 1;
+        return (uint8_t)result;
     }
 
     bool Connection::getIsConnected() const {
@@ -131,29 +107,6 @@ namespace Comms {
 
         mpCommunication->sendMessage(buffer);
     }
-
-
-    // void Connection::createConnectionTask(const TaskFunction_t task) {
-    //     if (mConnectionTaskHandle == nullptr) {
-    //         xTaskCreate(
-    //             task,
-    //             "Connection Task",
-    //             2048,
-    //             nullptr,
-    //             MEDIUM_TASK_PRIORITY,
-    //             &mConnectionTaskHandle
-    //         );
-    //     } else {
-    //         mpLogger->warning("Connection FreeRTOS", "Can't create Connection task, because task already exists.");
-    //     }
-    // }
-    //
-    // void Connection::deleteConnectionTask() {
-    //     if (mConnectionTaskHandle != nullptr) {
-    //         vTaskDelete(mConnectionTaskHandle);
-    //         mConnectionTaskHandle = nullptr;
-    //     }
-    // }
 
     void Connection::connectionTimersCallbacks(const TimerHandle_t xTimer) {
         auto &con = *mspConnection;

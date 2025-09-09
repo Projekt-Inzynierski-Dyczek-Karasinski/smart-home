@@ -26,8 +26,7 @@
 #define rfChannelToIndex(value) (uint8_t)(value - 1)
 #define indexToRfChannel(value) (uint8_t)(value + 1)
 #ifdef HC12_MODULE
-    #define DEFAULT_CHANNEL 1
-    #define MAX_NUM_OF_CHANNEL 127
+    #include "config/hc12_common_config.h"
 #endif
 
 // TODO change API Calls to numeric values

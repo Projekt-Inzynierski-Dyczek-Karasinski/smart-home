@@ -59,6 +59,13 @@ namespace Comms {
          */
         void setupHC12(const uint8_t *commands);
 
+        // TODO !BEFORE PULL REQUEST! check this comment
+        /**
+         * @brief Shortcut method for changing RF channel on HC12.
+         * @param channel Channel to change (<b>1 - 127</b>).
+         */
+        void changeRFChannel(uint8_t channel);
+
     private:
         /**
          * @brief Create a FreeRTOS Queues used in HC12 class.
