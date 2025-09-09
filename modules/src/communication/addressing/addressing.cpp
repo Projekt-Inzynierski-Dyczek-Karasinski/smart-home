@@ -49,6 +49,10 @@ namespace Comms {
         xSemaphoreGive(mAddressingDataMutex);
     }
 
+    void Addressing::setIPAddress(uint8_t ip) {
+        mpLogger->debug("Addressing Method", "Called setIPAddress()");
+    }
+
     void Addressing::startAddressing() {
         createAddressingTimer();
         createAddressingQueue();

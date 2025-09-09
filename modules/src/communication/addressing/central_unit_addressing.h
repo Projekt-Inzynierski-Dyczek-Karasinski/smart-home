@@ -46,12 +46,19 @@ namespace Comms {
         uint8_t getIPAddress() override;
 
         /**
+         * @brief Checks if a module with the passed IP address is addressed and sets the protocol IP if it is addressed.
+         * @param ip IP address to set, 0 to clear.
+         * @note Thread-safe.
+         */
+        void setIPAddress(uint8_t ip) override;
+
+        /**
          * @brief Checks if given MAC address is propper.
          * @details If central unit is waiting for new connection message, it will accept any MAC address,
          * otherwise checks if given mac is same as <code>mProtocolMACAddress</code>.
          * @param mac MAC address to check.
          * @return True if MAC address is propper, false otherwise.
-         * @note Threat-safe.
+         * @note Thread-safe.
          */
         bool isMACPropper(const uint8_t *mac) override;
 
@@ -61,7 +68,7 @@ namespace Comms {
          * otherwise it accepts any IP address that isn't <code>NULL_IP</code> or <code>CENTRAL_UNIT_IP</code>.
          * @param ip IP address to check.
          * @return True if IP address is propper, false otherwise.
-         * @note Threat-safe.
+         * @note Thread-safe.
          */
         bool isIpPropper(uint8_t ip) override;
 

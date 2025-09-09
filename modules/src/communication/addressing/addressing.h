@@ -47,6 +47,14 @@ namespace Comms {
         virtual uint8_t getIPAddress() = 0;
 
         /**
+         * @brief Virtual setter for IP address.
+         * @return IP address.
+         * @warning Must be implemented by CentralUnitAddressing class.
+         * @note By default, this method does nothing.
+         */
+        virtual void setIPAddress(uint8_t ip);
+
+        /**
          * @brief Pure virtual function checking if given mac address is propper.
          * @param mac MAC address to check.
          * @return True if MAC address is propper, false otherwise.

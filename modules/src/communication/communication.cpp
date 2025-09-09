@@ -483,7 +483,7 @@ namespace Comms {
 
                         // if ack number is not correct
                         if (!com.mpConnection->handleReceivedMessage(messageBuffer)) {
-                            handleIncorrectMessage(isRawMessage);
+                            // handleIncorrectMessage(isRawMessage);
                             com.mpLogger->warning("Communication Decode", "Bad ack number");
                         }
 
@@ -673,6 +673,22 @@ namespace Comms {
                             ESP.restart();
                         }
                     #endif
+                    else if (uah::areArraysEqual(buffer, (uint8_t*)"ip=", 3)) {
+                        if (buffer[6] != '\0') {
+                            com.mpLogger->error("Communication Input", "Bad IP");
+                        } else {
+                            uint16_t ip = 0;
+                            ip += (buffer[3] - (uint8_t)'0') * 100;
+                            ip += (buffer[4] - (uint8_t)'0') * 10;
+                            ip += (buffer[5] - (uint8_t)'0');
+                            if (ip > 255) {
+                                com.mpLogger->error("Communication Input", "Bad IP");
+                            } else {
+                                com.mpLogger->infov("Communication Input", "IP: ", ip);
+                                com.mpAddressing->setIPAddress((uint8_t)ip);
+                            }
+                        }
+                    }
                     // rest
                     else {
                         // check if is HC_12 command

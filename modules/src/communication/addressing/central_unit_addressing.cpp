@@ -30,6 +30,10 @@ namespace Comms {
         mNumOFModulesOnRfChannel[0] = 1;
         xSemaphoreGive(mModulesAddressingDataMutex);
 
+        // TODO !BEFORE PULL REQUEST! remove
+        uint8_t tmpMAC[] = {1,1,1,1,1,1};
+        addModule(tmpMAC, true, 1);
+
         mpLogger->info("CentralUnitAddressing Class", "CentralUnitAddressing initialized.");
     }
 
@@ -40,13 +44,30 @@ namespace Comms {
     uint8_t CentralUnitAddressing::getIPAddress() {
         uint8_t result;
         xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
-        if (mIsStartOfAddressing) {
+        if (mTmpModuleIp == NULL_IP) {
             result = CENTRAL_UNIT_IP;
         } else {
             result = mTmpModuleIp;
         }
         xSemaphoreGive(mModulesAddressingDataMutex);
         return result;
+    }
+
+    void CentralUnitAddressing::setIPAddress(const uint8_t ip) {
+        if (ip == NULL_IP) {
+            setTmpModuleIp(NULL_IP);
+            mpLogger->info("CentralUnitAddressing Method", "Cleared protocol IP");
+            return;
+        }
+        AddressingData moduleData;
+        getModuleData(&moduleData, ip);
+        if (moduleData.ipAddress != NULL_IP) {
+            setTmpModuleIp(ip);
+            mpLogger->infov("CentralUnitAddressing Method", "Changed protocol IP to: ", ip);
+        } else {
+            setTmpModuleIp(NULL_IP);
+            mpLogger->errorv("CentralUnitAddressing Method", "Not found module of IP address: ", ip);
+        }
     }
 
     bool CentralUnitAddressing::isMACPropper(const uint8_t *mac) {
