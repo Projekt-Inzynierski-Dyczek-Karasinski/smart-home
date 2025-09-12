@@ -39,6 +39,22 @@ namespace Comms {
          */
         void getProtocolMACAddress(uint8_t macAddress[MAC_ADDRESS_LENGTH]) const;
 
+        // TODO !BEFORE PULL REQUEST! check comment
+        /**
+         * @brief Pure virtual getter for rf channel when device starts new connection.
+         * @return RF Channel.
+         * @warning Must be implemented by derived class.
+         */
+        virtual uint8_t getConnectionRFChannel() = 0;
+
+        // TODO !BEFORE PULL REQUEST! check comment
+        /**
+         * @brief Pure virtual getter for rf channel when device is listening.
+         * @return RF Channel.
+         * @warning Must be implemented by derived class.
+         */
+        virtual uint8_t getDefaultRFChannel() = 0;
+
         /**
          * @brief Pure virtual getter for IP address.
          * @return IP address.
@@ -52,7 +68,7 @@ namespace Comms {
          * @warning Must be implemented by CentralUnitAddressing class.
          * @note By default, this method does nothing.
          */
-        virtual void setIPAddress(uint8_t ip);
+        virtual void setProtocolIPAddress(uint8_t ip);
 
         /**
          * @brief Pure virtual function checking if given mac address is propper.

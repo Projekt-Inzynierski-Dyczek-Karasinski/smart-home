@@ -27,14 +27,18 @@ namespace Comms {
          */
         ModuleAddressing(Communication *communication, const std::shared_ptr<ul::Logger> &logger);
 
-        #ifdef RF_CHANNELS
-            /**
-             * @brief Returns the current RF channel used by the module.
-             * @return The current RF channel number.
-             * @note Thread-safe.
-             */
-            uint8_t getRfChannel() const;
-        #endif
+        /**
+         * @brief Gets default central unit's rf channel.
+         * @return RF Channel.
+         */
+        uint8_t getConnectionRFChannel() override;
+
+        /**
+         * @brief Returns the current RF channel used by the module.
+         * @return The current RF channel number (if macro <code>RF_CHANNELS</code> is not defined return 0).
+         * @note Thread-safe.
+         */
+        uint8_t getDefaultRFChannel() override;
 
         /**
          * @brief Gets the currently assigned IP address for the module.

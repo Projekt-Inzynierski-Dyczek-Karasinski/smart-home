@@ -78,11 +78,16 @@ namespace Comms {
          */
         void addByteToDecode(uint8_t data) const;
 
+        // TODO !BEFORE PULL REQUEST! update comment
         /**
         * @brief Add a message that needs to be transmitted to the encoding queue.
         * @param message Message to transmit.
         */
         void sendMessage(const uint8_t message[MESSAGE_SIZE]) const;
+        // TODO !BEFORE PULL REQUEST! update comment
+        void encodeMessage(const uint8_t message[MESSAGE_SIZE]) const;
+        // TODO !BEFORE PULL REQUEST! update comment
+        void suspendConnectionTask() const;
 
         /**
          * @brief Add a message to received queue (omitting decoding process).
@@ -270,15 +275,15 @@ namespace Comms {
         Connection *mpConnection;
 
         #ifdef HC12_MODULE
-                std::unique_ptr<HC12> mpRfModule; ///< Pointer to class instance responsible for transmitting and receiving RF messages.
+            std::shared_ptr<HC12> mpRfModule; ///< Pointer to class instance responsible for transmitting and receiving RF messages.
         #else
             #error "Not implemented"
         #endif
 
         #ifdef CENTRAL_UNIT
-            std::unique_ptr<CentralUnitAddressing> mpAddressing; ///< Pointer to CentralUnitAddressing class instance.
+            std::shared_ptr<CentralUnitAddressing> mpAddressing; ///< Pointer to CentralUnitAddressing class instance.
         #else
-            std::unique_ptr<ModuleAddressing> mpAddressing; ///< Pointer to ModuleAddressing class instance.
+            std::shared_ptr<ModuleAddressing> mpAddressing; ///< Pointer to ModuleAddressing class instance.
         #endif
 
         typedef enum : uint8_t {
@@ -289,6 +294,7 @@ namespace Comms {
             // suspending notifications
             SUSPEND_DECODE_MESSAGE_TASK_NOTIF,
             SUSPEND_ENCODE_MESSAGE_TASK_NOTIF,
+            SUSPEND_CONNECTION_TASK_NOTIF,
             // ping notifications
             START_PINGING_NOTIF,
             PING_TIMEOUT_NOTIF,
@@ -307,7 +313,8 @@ namespace Comms {
         QueueHandle_t mMainNotificationsQueue = nullptr; ///< Handle to FreeRTOS queue for notifications for the Main task, queue length: 5 bytes (uint8_t).
         QueueHandle_t mReceiveMessageQueue = nullptr; ///< Handle to FreeRTOS queue for received (decoded and internal) messages, queue length: 10x64 bytes (uint8_t).
         QueueHandle_t mReceiveByteQueue = nullptr; ///< Handle to FreeRTOS queue for bytes to decode get from RF transmission, queue length: 128 bytes (uint8_t).
-        QueueHandle_t mSendMessagesQueue = nullptr; ///< Handle to FreeRTOS queue for messages to encode and RF transmission, queue length: 10x64 bytes (uint8_t).
+        // TODO !BEFORE PULL REQUEST! update comment
+        QueueHandle_t mEncodeMessagesQueue = nullptr; ///< Handle to FreeRTOS queue for messages to encode and RF transmission, queue length: 10x64 bytes (uint8_t).
 
         TaskHandle_t mCommunicationMainTaskHandle = nullptr; ///< Handle to FreeRTOS main communication task.
         TaskHandle_t mDecodeMessageTaskHandle = nullptr; ///< Handle to FreeRTOS decode task.

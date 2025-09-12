@@ -49,8 +49,8 @@ namespace Comms {
         xSemaphoreGive(mAddressingDataMutex);
     }
 
-    void Addressing::setIPAddress(uint8_t ip) {
-        mpLogger->debug("Addressing Method", "Called setIPAddress()");
+    void Addressing::setProtocolIPAddress(uint8_t ip) {
+        mpLogger->debug("Addressing Method", "Called setProtocolIPAddress()");
     }
 
     void Addressing::startAddressing() {

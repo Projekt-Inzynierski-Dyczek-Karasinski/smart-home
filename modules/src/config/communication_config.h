@@ -36,7 +36,9 @@
 #define ACK_NUMBER_INDEX 0
 #define START_ACK_NUMBER 1
 // TODO assign final value
-#define CONNECTION_REQUEST_TIMEOUT 30000 // 30s
+#define CONNECTION_TIMEOUT 10000 // 10s
+// TODO assign final value
+#define CONNECTION_MAX_ATTEMPTS 3
 
 // special messages
 #define SPECIAL_MESSAGE_LEN 6

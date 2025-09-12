@@ -53,7 +53,11 @@ namespace Comms {
     }
 
     void Communication::sendMessage(const uint8_t message[MESSAGE_SIZE]) const {
-        xQueueSend(mSendMessagesQueue, message, portMAX_DELAY);
+        mpConnection->sendMessage(message);
+    }
+
+    void Communication::encodeMessage(const uint8_t message[MESSAGE_SIZE]) const {
+        xQueueSend(mEncodeMessagesQueue, message, portMAX_DELAY);
         vTaskResume(mEncodeMessageTaskHandle);
     }
 
@@ -61,12 +65,17 @@ namespace Comms {
         xQueueSend(mReceiveMessageQueue, message, portMAX_DELAY);
     }
 
+    void Communication::suspendConnectionTask() const {
+        constexpr uint8_t notificationValue = SUSPEND_CONNECTION_TASK_NOTIF;
+        xQueueSend(mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
+    }
+
+
     // ================================================================
 
     // ================== Constructor and Destructor ==================
 
     Communication::Communication(DebugLED *debugLED, const std::shared_ptr<ul::Logger> &logger) :
-        mpConnection(&Connection::getInstance(this, logger)),
         #ifdef HC12_MODULE
             mpRfModule(new HC12(this, logger)),
         #else
@@ -81,6 +90,7 @@ namespace Comms {
         mspCommunication = this;
         mpDebugLED = debugLED;
         mpLogger = logger;
+        mpConnection = &Connection::getInstance(this, mpAddressing, mpRfModule, logger);
 
         mLastTransmittedMessageMutex = xSemaphoreCreateMutex();
         setLastTransmittedMessage();
@@ -122,15 +132,15 @@ namespace Comms {
         if (mReceiveByteQueue == nullptr) {
             mReceiveByteQueue = xQueueCreate(RECEIVE_BYTE_QUEUE_LEN, sizeof(uint8_t));
         }
-        if (mSendMessagesQueue == nullptr) {
-            mSendMessagesQueue = xQueueCreate(MESSAGE_QUEUE_LEN, sizeof(uint8_t[MESSAGE_SIZE]));
+        if (mEncodeMessagesQueue == nullptr) {
+            mEncodeMessagesQueue = xQueueCreate(1, sizeof(uint8_t[MESSAGE_SIZE]));
         }
     }
 
     void Communication::deleteCommunicationQueues() {
-        if (mSendMessagesQueue != nullptr) {
-            vQueueDelete(mSendMessagesQueue);
-            mSendMessagesQueue = nullptr;
+        if (mEncodeMessagesQueue != nullptr) {
+            vQueueDelete(mEncodeMessagesQueue);
+            mEncodeMessagesQueue = nullptr;
         }
         if (mReceiveByteQueue != nullptr) {
             vQueueDelete(mReceiveByteQueue);
@@ -197,7 +207,7 @@ namespace Comms {
             mpLogger->debug("Communication Main", "vTaskResume(mDecodeMessageTaskHandle);");
             vTaskResume(mDecodeMessageTaskHandle);
         }
-        if (uxQueueMessagesWaiting(mSendMessagesQueue) != 0) {
+        if (uxQueueMessagesWaiting(mEncodeMessagesQueue) != 0) {
             mpLogger->debug("Communication Main", "vTaskResume(mEncodeMessageTaskHandle);");
             vTaskResume(mEncodeMessageTaskHandle);
         }
@@ -256,6 +266,10 @@ namespace Comms {
                     com.mpLogger->debug("Communication Main", "vTaskSuspend(com.mEncodeMessageTaskHandle);");
                     com.setLastTransmittedMessage();
                     vTaskSuspend(com.mEncodeMessageTaskHandle);
+                    break;
+
+                case SUSPEND_CONNECTION_TASK_NOTIF:
+                    com.mpConnection->suspendConnectionTask();
                     break;
 
                 case START_PINGING_NOTIF:
@@ -570,7 +584,9 @@ namespace Comms {
         // task loop
         for (;;) {
             // wait until the message appears in the queue and save message in local messageBuffer
-            if (xQueueReceive(com.mSendMessagesQueue, &messageBuffer, pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG)) == pdTRUE) {
+            if (xQueueReceive(com.mEncodeMessagesQueue, &messageBuffer, pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG)) == pdTRUE) {
+                com.mpConnection->handleMessageToSend(messageBuffer);
+
                 // only for central unit, because modules IP is constant
                 #ifdef CENTRAL_UNIT
                     // prepare place for IP address
@@ -684,8 +700,7 @@ namespace Comms {
                             if (ip > 255) {
                                 com.mpLogger->error("Communication Input", "Bad IP");
                             } else {
-                                com.mpLogger->infov("Communication Input", "IP: ", ip);
-                                com.mpAddressing->setIPAddress((uint8_t)ip);
+                                com.mpAddressing->setProtocolIPAddress((uint8_t)ip);
                             }
                         }
                     }
@@ -698,7 +713,8 @@ namespace Comms {
                                 buffer[1] = 'C';
                                 xQueueSend(com.mReceiveMessageQueue, &buffer, portMAX_DELAY);
                             } else {
-                                xQueueSend(com.mSendMessagesQueue, &buffer, portMAX_DELAY);
+                                com.sendMessage(buffer);
+                                // xQueueSend(com.mSendMessagesQueue, &buffer, portMAX_DELAY);
                             }
                         #else
                             #error "not implemented"
@@ -825,13 +841,15 @@ namespace Comms {
     void Communication::transmitRepeatMessage() const {
         uint8_t buffer[MESSAGE_SIZE];
         uah::prepareBuffer(buffer, (uint8_t*)REPEAT_MESSAGE, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
-        xQueueSend(mSendMessagesQueue, buffer, portMAX_DELAY);
+        sendMessage(buffer);
+        // xQueueSend(mSendMessagesQueue, buffer, portMAX_DELAY);
     }
 
     void Communication::repeatLastTransmittedMessage() {
         xSemaphoreTake(mLastTransmittedMessageMutex, portMAX_DELAY);
         if (mLastTransmittedMessage[0] != 0) {
-            xQueueSend(mSendMessagesQueue, mLastTransmittedMessage, portMAX_DELAY);
+            sendMessage(mLastTransmittedMessage);
+            // xQueueSend(mSendMessagesQueue, mLastTransmittedMessage, portMAX_DELAY);
         }
         mLastTransmittedMessageAttempts++;
         xSemaphoreGive(mLastTransmittedMessageMutex);
@@ -844,13 +862,15 @@ namespace Comms {
     void Communication::transmitPing() const {
         uint8_t buffer[MESSAGE_SIZE];
         uah::prepareBuffer(buffer, (uint8_t*)PING_MESSAGE, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
-        xQueueSend(mSendMessagesQueue, buffer, portMAX_DELAY);
+        // xQueueSend(mSendMessagesQueue, buffer, portMAX_DELAY);
+        sendMessage(buffer);
     }
 
     void Communication::replyToPing() const {
         uint8_t buffer[MESSAGE_SIZE];
         uah::prepareBuffer(buffer, (uint8_t*)RE_PING_MESSAGE, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
-        xQueueSend(mSendMessagesQueue, buffer, portMAX_DELAY);
+        // xQueueSend(mSendMessagesQueue, buffer, portMAX_DELAY);
+        sendMessage(buffer);
     }
 // ================================================================
 }

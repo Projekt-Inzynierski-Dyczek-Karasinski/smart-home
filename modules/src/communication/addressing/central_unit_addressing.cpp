@@ -41,6 +41,24 @@ namespace Comms {
         vSemaphoreDelete(mModulesAddressingDataMutex);
     }
 
+    // TODO !BEFORE PULL REQUEST! check if works correctly
+    uint8_t CentralUnitAddressing::getConnectionRFChannel() {
+        uint8_t rfChannel = DEFAULT_CHANNEL;
+        xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
+        if (mTmpModuleIp != NULL_IP) {
+            const AddressingData moduleData = mModulesAddressingData[ipToIndex(mTmpModuleIp)];
+            rfChannel = moduleData.rfChannel;
+        } else {
+            mpLogger->warning("CentralUnitAddressing getConnectionRFChannel()", "No module selected, returning DEFAULT_CHANNEL.");
+        }
+        xSemaphoreGive(mModulesAddressingData);
+        return rfChannel;
+    }
+
+    uint8_t CentralUnitAddressing::getDefaultRFChannel() {
+        return DEFAULT_CHANNEL;
+    }
+
     uint8_t CentralUnitAddressing::getIPAddress() {
         uint8_t result;
         xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
@@ -53,7 +71,7 @@ namespace Comms {
         return result;
     }
 
-    void CentralUnitAddressing::setIPAddress(const uint8_t ip) {
+    void CentralUnitAddressing::setProtocolIPAddress(const uint8_t ip) {
         if (ip == NULL_IP) {
             setTmpModuleIp(NULL_IP);
             mpLogger->info("CentralUnitAddressing Method", "Cleared protocol IP");

@@ -32,14 +32,20 @@ namespace Comms {
         mpLogger->info("ModuleAddressing Class", "ModuleAddressing initialized.");
     }
 
-    #ifdef RF_CHANNELS
-        uint8_t ModuleAddressing::getRfChannel() const {
+    // TODO !BEFORE PULL REQUEST! check if works correctly
+    uint8_t ModuleAddressing::getConnectionRFChannel() {
+        return DEFAULT_CHANNEL;
+    }
+
+    uint8_t ModuleAddressing::getDefaultRFChannel() {
+        uint8_t rfChannel = 0;
+        #ifdef RF_CHANNELS
             xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
-            const uint8_t rfChannel = mRfChannel;
+            rfChannel = mRfChannel;
             xSemaphoreGive(mAddressingDataMutex);
-            return rfChannel;
-        }
-    #endif
+        #endif
+        return rfChannel;
+    }
 
     uint8_t ModuleAddressing::getIPAddress() {
         xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
@@ -125,7 +131,7 @@ namespace Comms {
                         if (ipToCheck != NULL_IP) {
                             if (
                                 ipToCheck == ad.getIPAddress() &&
-                                rfChannelToCheck == ad.getRfChannel() &&
+                                rfChannelToCheck == ad.getDefaultRFChannel() &&
                                 isMacRealToCheck == ad.m_IS_MAC_ADDRESS_REAL &&
                                 uah::areArraysEqual(ad.mMACAddress, macToCheck, MAC_ADDRESS_LENGTH)
                             ) {

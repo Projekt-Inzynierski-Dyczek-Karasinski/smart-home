@@ -38,6 +38,21 @@ namespace Comms {
          */
         ~CentralUnitAddressing() override;
 
+        // TODO !BEFORE PULL REQUEST! check comment
+        /**
+         * @brief Gets rf channel of the module which central unit is trying to connect.
+         * @return RF Channel.
+         * @note Thread-safe.
+         */
+        uint8_t getConnectionRFChannel() override;
+
+        // TODO !BEFORE PULL REQUEST! check comment
+        /**
+         * @brief Gets default rf channel.
+         * @return RF channel.
+         */
+        uint8_t getDefaultRFChannel() override;
+
         /**
          * @brief Gets the IP address of module which is currently communicating with central unit (or cental unit's IP if is start of addressing).
          * @return IP address.
@@ -50,7 +65,7 @@ namespace Comms {
          * @param ip IP address to set, 0 to clear.
          * @note Thread-safe.
          */
-        void setIPAddress(uint8_t ip) override;
+        void setProtocolIPAddress(uint8_t ip) override;
 
         /**
          * @brief Checks if given MAC address is propper.
