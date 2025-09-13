@@ -34,6 +34,7 @@
 #define DELAY_BETWEEN_MESSAGES 40
 
 #define ACK_NUMBER_INDEX 0
+#define SPECIAL_ACK_NUMBER 255
 #define START_ACK_NUMBER 1
 // TODO assign final value
 #define CONNECTION_TIMEOUT 10000 // 10s
@@ -42,6 +43,6 @@
 
 // special messages
 #define SPECIAL_MESSAGE_LEN 6
-#define REPEAT_MESSAGE "\0repea"
-#define PING_MESSAGE "\0ping\0"
-#define RE_PING_MESSAGE "\0repin"
+#define REPEAT_MESSAGE "\255repea"
+#define PING_MESSAGE "\255ping\0"
+#define RE_PING_MESSAGE "\255repin"

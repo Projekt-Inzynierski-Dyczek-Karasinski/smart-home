@@ -51,7 +51,7 @@ namespace Comms {
         } else {
             mpLogger->warning("CentralUnitAddressing getConnectionRFChannel()", "No module selected, returning DEFAULT_CHANNEL.");
         }
-        xSemaphoreGive(mModulesAddressingData);
+        xSemaphoreGive(mModulesAddressingDataMutex);
         return rfChannel;
     }
 

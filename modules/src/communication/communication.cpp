@@ -498,7 +498,7 @@ namespace Comms {
                         // if ack number is not correct
                         if (!com.mpConnection->handleReceivedMessage(messageBuffer)) {
                             // handleIncorrectMessage(isRawMessage);
-                            com.mpLogger->warning("Communication Decode", "Bad ack number");
+                            com.mpLogger->warningv("Communication Decode", "Bad ack number: ", messageBuffer[ACK_NUMBER_INDEX]);
                         }
 
                         // send decoded message to queue
@@ -506,7 +506,7 @@ namespace Comms {
                             isRawMessage = false;
                             com.mpLogger->infoa("Communication Decode", "Received raw message: ", protocolBuffer[0], PROTOCOL_SIZE, false);
                             xQueueSend(com.mReceiveMessageQueue, protocolBuffer[0], portMAX_DELAY);
-                        } else {
+                        } else if (uah::calcLenOfDataInArray(messageBuffer, 2) != 1) {
                             com.mpLogger->infoa("Communication Decode", "Received message: ", messageBuffer, MESSAGE_SIZE);
                             xQueueSend(com.mReceiveMessageQueue, messageBuffer, portMAX_DELAY);
                         }
@@ -585,7 +585,7 @@ namespace Comms {
         for (;;) {
             // wait until the message appears in the queue and save message in local messageBuffer
             if (xQueueReceive(com.mEncodeMessagesQueue, &messageBuffer, pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG)) == pdTRUE) {
-                com.mpConnection->handleMessageToSend(messageBuffer);
+                // com.mpConnection->handleMessageToSend(messageBuffer); // TODO remove?
 
                 // only for central unit, because modules IP is constant
                 #ifdef CENTRAL_UNIT
@@ -713,6 +713,9 @@ namespace Comms {
                                 buffer[1] = 'C';
                                 xQueueSend(com.mReceiveMessageQueue, &buffer, portMAX_DELAY);
                             } else {
+                                uint8_t bufferWithAckNumber[MESSAGE_SIZE];
+                                bufferWithAckNumber[ACK_NUMBER_INDEX] = START_ACK_NUMBER;
+                                uah::prepareBuffer(&bufferWithAckNumber[1], buffer, MESSAGE_SIZE - 1, MESSAGE_SIZE);
                                 com.sendMessage(buffer);
                                 // xQueueSend(com.mSendMessagesQueue, &buffer, portMAX_DELAY);
                             }
