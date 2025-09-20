@@ -135,11 +135,14 @@ namespace SmartHome {
         mpService->onStart();
 
         // Start signal handling
-        mSignals.emplace(mCoreIoContext, SIGINT, SIGTERM, SIGHUP); //TODO add more signals
+        mSignals.emplace(mCoreUtilityIoContext); //TODO add more signals
+        for (const auto &sig: ms_SIGNALS_TO_HANDLE) {
+            mSignals->add(sig);
+        }
+
         mSignals->async_wait([this](const bs::error_code &ec, const int sig) {
             signalHandler(ec, sig);
         });
-
 
         auto &socketServer = IPC::SocketServer::Instance();
         IPC::SocketServer::Config config = {mConfig.tcp, mConfig.uds};
@@ -231,31 +234,38 @@ namespace SmartHome {
         return mCoreIoContext;
     }
 
-
     void Core::signalHandler(const boost::system::error_code &ec, const int signal) {
+        mLogger->debug("[CORE] signalHandler called");
         if (!ec) {
             // Handle signal
             switch (signal) {
                 case SIGINT:
                 case SIGTERM:
-                    shutdown();
-                    break;
+                    ba::post(mCoreUtilityIoContext, [this] {
+                        shutdown();
+                    });
+                    return;
                 case SIGHUP:
                     mLogger->debug("[CORE] Not implemented");
                     //TODO implement reload
                     break;
                 default:
+                    mLogger->debug("[CORE] Undefined signal");
                     //TODO handle default
                     break;
             }
         } else {
             // Handle signal error
-            mLogger->errorf("[CORE] Signal handler error: %s", ec.message().c_str());
+            if (ec.value() == ba::error::operation_aborted) {
+                mLogger->debug("Signal handler aborted");
+            } else {
+                mLogger->errorf("[CORE] Signal handler error: %s", ec.message().c_str());
+            }
         }
         if (isRunning()) {
             mSignals->async_wait([this](const bs::error_code &e, const int sig) {
-               signalHandler(e, sig);
-           });
+                signalHandler(e, sig);
+            });
         }
     }
 
