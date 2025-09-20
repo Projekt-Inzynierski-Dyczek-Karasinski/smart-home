@@ -99,6 +99,13 @@ namespace SmartHome::IPC {
         std::visit(socketVisitor, mSocket);
     }
 
+    void SocketConnection::shutdownSocket(ba::socket_base::shutdown_type mode) {
+        std::visit([mode](auto &socket) {
+            socket.shutdown(mode);
+            //TODO Sockets do not close for incoming traffic consistently - more testing needed
+        },mSocket);
+    }
+
     bool SocketConnection::isOpen() const {
         const bool isSocketOpen = std::visit([](const auto &socket) { return socket.is_open(); }, mSocket);
         return !mIsClosing && isSocketOpen;

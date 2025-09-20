@@ -193,6 +193,30 @@ namespace SmartHome::IPC {
     void SocketServer::stopSocketServer() {
         mIsSocketServerRunning.store(false);
 
+        if (mIsAcceptingNewConnections) {
+            stopAcceptors();
+        }
+        stopIncomingTraffic();
+
+        // Make a vector of all active connection
+        std::vector<std::shared_ptr<SocketServerConnection> > connectionsToClose; {
+            std::lock_guard lock(mActiveConnectionsMutex);
+
+            for (auto &weakConnection: mActiveConnections | std::views::values) {
+                if (auto connection = weakConnection.lock()) {
+                    connectionsToClose.push_back(connection);
+                }
+            }
+            mActiveConnections.clear();
+        }
+
+        // Close all active connections
+        for (const auto &connection: connectionsToClose) {
+            connection->close();
+        }
+    }
+
+    void SocketServer::stopAcceptors() {
         // Close TCP acceptor
         if (mpTcpAcceptor) {
             mpLogger->debug("[SOCKET_SERVER] Stopping TCP acceptor");
@@ -225,22 +249,16 @@ namespace SmartHome::IPC {
             mpUdsAcceptor.reset();
         }
 
-        // Make a vector of all active connection
-        std::vector<std::shared_ptr<SocketServerConnection> > connectionsToClose;
-        {
-            std::lock_guard lock(mActiveConnectionsMutex);
+        mIsAcceptingNewConnections.store(false);
+    }
 
-            for (auto &weakConnection: mActiveConnections | std::views::values) {
-                if (auto connection = weakConnection.lock()) {
-                    connectionsToClose.push_back(connection);
-                }
+    void SocketServer::stopIncomingTraffic() {
+        std::scoped_lock lock(mActiveConnectionsMutex);
+        for (auto &weakConnection: mActiveConnections | std::views::values) {
+            if (auto connection = weakConnection.lock()) {
+                connection->shutdownSocket(ba::socket_base::shutdown_receive);
+                //TODO Sockets do not close for incoming traffic consistently - more testing needed
             }
-            mActiveConnections.clear();
-        }
-
-        // Close all active connections
-        for (const auto &connection: connectionsToClose) {
-            connection->close();
         }
     }
 

@@ -102,6 +102,17 @@ namespace SmartHome::IPC {
         void stopSocketServer();
 
         /**
+         * @brief Stops acceptors and signals end of accepting new connections.
+         */
+        void stopAcceptors();
+
+        //TODO Sockets do not close for incoming traffic consistently - more testing needed
+        /**
+         * @brief Closes connections sockets for incoming traffic.
+         */
+        void stopIncomingTraffic();
+
+        /**
          * @brief Check if server is running.
          *
          * @return true if actively accepting connections.
@@ -218,5 +229,6 @@ namespace SmartHome::IPC {
         // State flags
         std::atomic<bool> mIsSocketServerInitialized{false}; ///< Server initialized state.
         std::atomic<bool> mIsSocketServerRunning{false}; ///< Server running state.
+        std::atomic<bool> mIsAcceptingNewConnections{false};
     };
 }

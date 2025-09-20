@@ -101,6 +101,14 @@ namespace SmartHome::IPC {
         */
         virtual void close();
 
+        //TODO Sockets do not close for incoming traffic consistently - more testing needed
+        /**
+         * @brief Shutdowns connection socket according to passed mode.
+         *
+         * @param mode boost.asio socket shutdown mode.
+         */
+        void shutdownSocket(ba::socket_base::shutdown_type mode);
+
         /**
         * @brief Check if socket is open.
         *
