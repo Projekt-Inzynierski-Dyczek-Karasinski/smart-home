@@ -5,13 +5,13 @@ namespace SmartHome::IPC {
                                        const Type socketType,
                                        const std::shared_ptr<Utils::Logger> &logger)
         : mSocket(createSocket(ioContext, socketType)), mType(socketType), mStrand(ioContext), mpLogger(logger) {
-    };
+    }
 
     SocketConnection::~SocketConnection() {
         SocketConnection::close();
-    };
+    }
 
-    const boost::regex SocketConnection::ms_DELIMITER_REGEX(SocketConnection::ms_MESSAGE_DELIMITER);
+    const boost::regex SocketConnection::ms_DELIMITER_REGEX(ms_MESSAGE_DELIMITER);
 
     std::string SocketConnection::read() {
         if (isOpen()) {
@@ -101,7 +101,7 @@ namespace SmartHome::IPC {
 
     bool SocketConnection::isOpen() const {
         const bool isSocketOpen = std::visit([](const auto &socket) { return socket.is_open(); }, mSocket);
-        return (!mIsClosing && isSocketOpen);
+        return !mIsClosing && isSocketOpen;
     }
 
     std::variant<bai::tcp::socket, bal::stream_protocol::socket> SocketConnection::createSocket(

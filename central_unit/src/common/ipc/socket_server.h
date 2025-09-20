@@ -2,6 +2,7 @@
 
 #include "socket_server_connection.h"
 #include "async_logger.h"
+#include "api.h"
 
 #include <utility>
 #include <unordered_map>
@@ -14,6 +15,7 @@ namespace ba = boost::asio;
 namespace bai = boost::asio::ip;
 
 namespace SmartHome::IPC {
+
     /**
      * @brief Multi-protocol socket server for Smart Home IPC.
      *
@@ -68,6 +70,7 @@ namespace SmartHome::IPC {
          *
          * @param ioContext Boost::Asio IO context for async operations.
          * @param config Server configuration.
+         * @param api Reference to an API class implementation instance.
          * @param logger Logger shared pointer instance pointer.
          *
          * @return true if at least one protocol initialized successfully.
@@ -76,6 +79,7 @@ namespace SmartHome::IPC {
          */
         bool initializeSocketServer(ba::io_context *ioContext,
                                     const Config &config,
+                                    const std::shared_ptr<API::Api> &api,
                                     const std::shared_ptr<Utils::Logger> &logger);
 
         /**
@@ -84,11 +88,10 @@ namespace SmartHome::IPC {
          * @details Begins asynchronous accept loops for enabled protocols.
          *          Must be called after successful initialization.
          *
-         * @param ioContext Boost::Asio IO context for async operations.
          *
          * @pre initializeSocketServer() must be called successfully.
          */
-        void runSocketServer(ba::io_context *ioContext);
+        void runSocketServer();
 
         /**
          * @brief Stop server and close all connections.
@@ -104,6 +107,21 @@ namespace SmartHome::IPC {
          * @return true if actively accepting connections.
          */
         bool isRunning() const;
+
+        /**
+         * @brief Connection getter.
+         *
+         * @param connectionId Connection to get.
+         * @return Shared pointer to SocketServerConnection instance.
+         */
+        std::shared_ptr<SocketServerConnection> getConnection(connectionId_t connectionId);
+
+        /**
+         * @brief IO context getter.
+         *
+         * @return SocketServer IO context pointer.
+         */
+        ba::io_context *getIoContext() const;
 
     private:
         /**
@@ -127,31 +145,25 @@ namespace SmartHome::IPC {
          * @brief Common accept handler for both protocols.
          *
          * @param connection Connection instance shared pointer reference.
-         * @param ioContext Boost::Asio IO context for async operations.
          * @param ec Boost::System error code.
          * @param type Acceptor type.
          */
         void acceptorHandler(const std::shared_ptr<SocketServerConnection> &connection,
-                             ba::io_context *ioContext,
                              const bs::error_code &ec,
                              SocketConnection::Type type);
 
         /**
          * @brief Start asynchronous TCP accept loop.
          *
-         * @param ioContext Boost::Asio IO context for async operations.
-         *
          */
-        void startTcpAcceptor(ba::io_context *ioContext);
+        void startTcpAcceptor();
 
 
         /**
          * @brief Start asynchronous UDS accept loop.
          *
-         * @param ioContext Boost::Asio IO context for async operations.
-         *
          */
-        void startUdsAcceptor(ba::io_context *ioContext);
+        void startUdsAcceptor();
 
         /**
          * @brief Handles newly accepted connection.
@@ -160,11 +172,10 @@ namespace SmartHome::IPC {
          *          Schedules next accept operation to continue accepting new connections.
          *
          * @param connection Newly accepted connection.
-         * @param ioContext Boost::Asio IO context for async operations.
          *
          * @note Called from async_accept completion handler (acceptorHandler).
          */
-        void onAccept(const std::shared_ptr<SocketServerConnection> &connection, ba::io_context *ioContext);
+        void onAccept(const std::shared_ptr<SocketServerConnection> &connection);
 
         /**
          * @brief Get next available connection ID.
@@ -175,7 +186,7 @@ namespace SmartHome::IPC {
          * @return Unique connection identifier.
          * @throw std::runtime_error if no free IDs available.
          */
-        uint32_t getNextConnectionId();
+        connectionId_t getNextConnectionId();
 
         /**
          * @brief Remove connection from active connections map.
@@ -185,13 +196,15 @@ namespace SmartHome::IPC {
          * @note Thread-safe via mutex.
          *       Called by TcpConnection close callback.
          */
-        void removeActiveConnection(uint32_t connectionId);
+        void removeActiveConnection(connectionId_t connectionId);
 
+        ba::io_context *mpIoContext;
         Config mConfig;
         std::shared_ptr<Utils::Logger> mpLogger; ///< Logger instance shared pointer
+        std::shared_ptr<API::Api> mpApi;
 
         /// Map of active connections (ID: weak_ptr)
-        std::unordered_map<uint32_t, std::weak_ptr<SocketServerConnection> > mActiveConnections;
+        std::unordered_map<connectionId_t, std::weak_ptr<SocketServerConnection> > mActiveConnections;
         std::mutex mActiveConnectionsMutex;
 
         // TCP

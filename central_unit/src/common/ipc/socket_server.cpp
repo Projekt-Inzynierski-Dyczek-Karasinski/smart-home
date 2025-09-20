@@ -22,10 +22,13 @@ namespace SmartHome::IPC {
 
     bool SocketServer::initializeSocketServer(ba::io_context *ioContext,
                                               const Config &config,
+                                              const std::shared_ptr<API::Api> &api,
                                               const std::shared_ptr<Utils::Logger> &logger) {
+        mpIoContext = ioContext;
         mConfig = config;
         bool isIpcLaunchSuccessful = false;
         mpLogger = logger;
+        mpApi = api;
 
         // Create endpoint and acceptor for TCP connections if enabled
         if (mConfig.tcp.isEnabled) {
@@ -84,45 +87,46 @@ namespace SmartHome::IPC {
     }
 
     void SocketServer::acceptorHandler(const std::shared_ptr<SocketServerConnection> &connection,
-                                       ba::io_context *ioContext,
                                        const bs::error_code &ec,
                                        const SocketConnection::Type type) {
-        if (!ec && mIsSocketServerRunning.load()) {
-            onAccept(connection, ioContext);
+        if (!ec && mIsSocketServerRunning.load() && mIsAcceptingNewConnections.load()) {
+            onAccept(connection);
             if (type == SocketConnection::Type::TCP) {
-                startTcpAcceptor(ioContext);
+                startTcpAcceptor();
             } else {
-                startUdsAcceptor(ioContext);
+                startUdsAcceptor();
             }
         } else if (ec) {
             onAcceptError(ec);
         }
-    };
+    }
 
 
-    void SocketServer::startTcpAcceptor(ba::io_context *ioContext) {
+    void SocketServer::startTcpAcceptor() {
         auto newTcpConnection = std::make_shared<SocketServerConnection>(
-            *ioContext, SocketServerConnection::Type::TCP, mpLogger);
+            *mpIoContext, SocketServerConnection::Type::TCP, mpLogger);
         auto &socket = std::get<bai::tcp::socket>(newTcpConnection->mSocket);
 
-        mpTcpAcceptor->async_accept(socket, [this, newTcpConnection, ioContext](const bs::error_code ec) {
-            acceptorHandler(newTcpConnection, ioContext, ec, SocketConnection::Type::TCP);
+        mIsAcceptingNewConnections.store(true);
+        mpTcpAcceptor->async_accept(socket, [this, newTcpConnection](const bs::error_code ec) {
+            acceptorHandler(newTcpConnection, ec, SocketConnection::Type::TCP);
         });
     }
 
-    void SocketServer::startUdsAcceptor(ba::io_context *ioContext) {
+    void SocketServer::startUdsAcceptor() {
         auto newUdsConnection = std::make_shared<SocketServerConnection>(
-            *ioContext, SocketServerConnection::Type::UDS, mpLogger);
+            *mpIoContext, SocketServerConnection::Type::UDS, mpLogger);
         auto &socket = std::get<bal::stream_protocol::socket>(newUdsConnection->mSocket);
 
-        mpUdsAcceptor->async_accept(socket, [this, newUdsConnection, ioContext](const bs::error_code ec) {
-            acceptorHandler(newUdsConnection, ioContext, ec, SocketConnection::Type::UDS);
+        mIsAcceptingNewConnections.store(true);
+        mpUdsAcceptor->async_accept(socket, [this, newUdsConnection](const bs::error_code ec) {
+            acceptorHandler(newUdsConnection, ec, SocketConnection::Type::UDS);
         });
     }
 
-    void SocketServer::onAccept(const std::shared_ptr<SocketServerConnection> &connection, ba::io_context *ioContext) {
+    void SocketServer::onAccept(const std::shared_ptr<SocketServerConnection> &connection) {
         // Try fetching unused connection id
-        uint32_t connectionId;
+        connectionId_t connectionId;
         try {
             connectionId = getNextConnectionId();
         } catch (std::exception &e) {
@@ -136,7 +140,7 @@ namespace SmartHome::IPC {
         // TODO add active connections limit
         // New connection setup
         connection->setId(connectionId);
-        connection->setCloseCallback([this](const uint32_t id) {
+        connection->setCloseCallback([this](const connectionId_t id) {
             removeActiveConnection(id);
         });
 
@@ -151,21 +155,17 @@ namespace SmartHome::IPC {
         }, connection->mSocket);
 
         // Start reading incoming messages
-        connection->asyncReadLoop([this, connection, connectionId](const std::string &message) {
+        connection->asyncReadLoop([this, connectionId](const std::string &message) {
             mpLogger->debugf("[SOCKET_SERVER] Message received: %s", message.c_str());
-
-            //TODO implement api integration and change line below for an api call
-            connection->writeAsync(message, [message, this]() {
-                mpLogger->debugf("[SOCKET_SERVER] Message sent: %s", message.c_str());
-            });
+            mpApi->handleRequest(connectionId, message.data());
         });
     }
 
-    uint32_t SocketServer::getNextConnectionId() {
+    connectionId_t SocketServer::getNextConnectionId() {
         std::lock_guard lock(mActiveConnectionsMutex);
 
         // TODO consider using another method then iteration from 1
-        for (uint32_t id = 1; id < UINT32_MAX; ++id) {
+        for (connectionId_t id = 1; id < std::numeric_limits<decltype(id)>::max(); ++id) {
             if (!mActiveConnections.contains(id)) {
                 return id;
             }
@@ -174,17 +174,17 @@ namespace SmartHome::IPC {
         throw std::runtime_error("Could not find free connection id");
     }
 
-    void SocketServer::removeActiveConnection(const uint32_t connectionId) {
+    void SocketServer::removeActiveConnection(const connectionId_t connectionId) {
         std::lock_guard lock(mActiveConnectionsMutex);
         mActiveConnections.erase(connectionId);
     }
 
-    void SocketServer::runSocketServer(ba::io_context *ioContext) {
+    void SocketServer::runSocketServer() {
         // Start accepting connections if socket server is initialized
         if (mIsSocketServerInitialized) {
             mIsSocketServerRunning.store(true);
-            if (mpTcpAcceptor) startTcpAcceptor(ioContext);
-            if (mpUdsAcceptor) startUdsAcceptor(ioContext);
+            if (mpTcpAcceptor) startTcpAcceptor();
+            if (mpUdsAcceptor) startUdsAcceptor();
         } else {
             mpLogger->errorf("[SOCKET_SERVER] IPC server not initialized");
         }
@@ -246,5 +246,18 @@ namespace SmartHome::IPC {
 
     bool SocketServer::isRunning() const {
         return mIsSocketServerRunning.load();
+    }
+
+    std::shared_ptr<SocketServerConnection> SocketServer::getConnection(const connectionId_t connectionId) {
+        std::scoped_lock lock(mActiveConnectionsMutex);
+        auto iter = mActiveConnections.find(connectionId);
+        if (iter == mActiveConnections.end()) {
+            return nullptr;
+        }
+        return std::shared_ptr(iter->second);
+    }
+
+    ba::io_context *SocketServer::getIoContext() const {
+        return mpIoContext;
     }
 }
