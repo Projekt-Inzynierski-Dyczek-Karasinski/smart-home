@@ -3,6 +3,7 @@
 #include "socket_server.h"
 #include "service/service_manager.h"
 #include "async_logger.h"
+#include "api/internal_api.h"
 
 #include <atomic>
 #include <memory>
@@ -33,12 +34,32 @@ namespace SmartHome {
          */
         struct Config {
             enum IpcServerThreadCount : int {
+                QUARTER_CPU_CORES = -3,
+                THIRD_CPU_CORES = -2,
                 HALF_CPU_CORES = -1,
                 ALL_CPU_CORES = 0,
+                SINGLE_THREAD = 1,
+                TWO_THREADS = 2,
             };
 
-            /// Number of TCP server threads (-1: half CPU cores, 0: all CPU cores, n >= 1: exact thread count).
-            int ipcServerThreads = HALF_CPU_CORES;
+            /** Number of TCP server threads
+             * \li value < 0: ceil(all CPU cores / (|value| + 1))
+             * \li value == 0: all CPU cores
+             * \li value >= 1: exact thread count
+             */
+            int ipcServerThreads = TWO_THREADS;
+            /** Number of Core main threads
+             * \li value < 0: ceil(all CPU cores / (|value| + 1))
+             * \li value == 0: all CPU cores
+             * \li value >= 1: exact thread count
+             */
+            int coreMainThreads = TWO_THREADS;
+            /** Number of Core worker threads
+             * \li value < 0: ceil(all CPU cores / (|value| + 1))
+             * \li value == 0: all CPU cores
+             * \li value >= 1: exact thread count
+             */
+            int coreWorkerThreads = SINGLE_THREAD;
 
             /// Default TCP config from socket server
             IPC::SocketServer::Config::Tcp tcp;
@@ -99,9 +120,23 @@ namespace SmartHome {
         bool isRunning() const;
 
         /**
-         * @brief Core IO context getter
+         * @brief Core utility IO context getter.
          *
-         * @return core IO context
+         * @return Core utility IO context.
+         */
+        ba::io_context &getCoreUtilityIoContext();
+
+        /**
+         * @brief Core worker IO context getter.
+         *
+         * @return Core worker IO context.
+         */
+        ba::io_context &getCoreWorkerIoContext();
+
+        /**
+         * @brief Core IO context getter.
+         *
+         * @return Core IO context.
          */
         ba::io_context &getCoreIoContext();
 
@@ -129,12 +164,27 @@ namespace SmartHome {
         /**
          * @brief Stops core thread.
          */
-        void stopCoreThread();
+        void stopCoreUtilityThread();
+
+        /**
+         * @brief Parse thread count value from config to usable value for initializing thread pools.
+         *
+         * @details Parses values accordingly:
+         *          \li value < 0: ceil(all CPU cores / (|value| + 1))
+         *          \li value == 0: all CPU cores
+         *          \li value >= 1: exact thread count
+         *
+         * @param threadCountConfigValue Thread count value read from config file.
+         *
+         * @return Parsed thread count value.
+         */
+        static uint getThreadCount(int threadCountConfigValue);
 
         // Configuration
         Config mConfig;
 
         std::unique_ptr<Service::ServiceManager> mpService;
+        std::shared_ptr<API::InternalApi> mpApi;
 
         // Socket server resources
         ba::io_context mSocketServerIoContext;
@@ -142,10 +192,28 @@ namespace SmartHome {
         std::optional<ba::executor_work_guard<ba::io_context::executor_type> > mSocketServerGuard;
         static constexpr uint ms_HIGH_THREAD_COUNT_LIMIT = 128; ///< Limit for high thread count warning
 
-        // Signal handling resources
-        ba::io_context mCoreIoContext;
-        std::optional<std::thread> mCoreThread;
+        // Core utilities
+        /// Utility worker IO_context used for handling signals, logging and timeout timers.
+        ba::io_context mCoreUtilityIoContext;
+        /// Thread running utility IO_context
+        std::optional<std::thread> mCoreUtilityThread;
+        std::optional<ba::executor_work_guard<ba::io_context::executor_type> > mCoreUtilityGuard;
         std::optional<ba::signal_set> mSignals;
+        /// Signals defined to handle in signalHandler
+        static constexpr std::array ms_SIGNALS_TO_HANDLE = {SIGINT, SIGTERM, SIGHUP};
+        /// Shutdown timeout timer value in ms
+        static constexpr uint ms_SHUTDOWN_TIMEOUT = 5000;
+
+        //Core workers
+        ba::io_context mCoreWorkerIoContext;
+        std::optional<ba::thread_pool> mCoreWorkerThreadPool;
+        std::optional<ba::executor_work_guard<ba::io_context::executor_type> > mCoreWorkerGuard;
+
+        // Core main loop
+        /// Main event loop used for async operations, request routing, dispatching work
+        ba::io_context mCoreIoContext;
+        /// Thread pool running main event loop IO_context
+        std::optional<ba::thread_pool> mCoreThreadPool;
         std::optional<ba::executor_work_guard<ba::io_context::executor_type> > mCoreGuard;
 
         // State flags

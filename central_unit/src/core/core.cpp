@@ -1,6 +1,7 @@
 #include "core.h"
 #include "config_manager.h"
 #include "service/service_manager.h"
+#include "core_actions.h"
 
 #include <chrono>
 #include <cmath>
@@ -32,23 +33,23 @@ namespace SmartHome {
             return false;
         }
 
-
         // Initialize AsyncLogger, using Logger for further initialization
-        mLogger = std::make_shared<Utils::AsyncLogger>(logger, mCoreIoContext);
+        mLogger = std::make_shared<Utils::AsyncLogger>(logger, mCoreUtilityIoContext);
 
-        mpService = Service::ServiceManager::create(logger, Utils::ServiceType::AUTO);
+        mpService = Service::ServiceManager::create(mLogger, Utils::ServiceType::AUTO);
         if (!mpService->onInitialize()) {
             logger->error("[CORE] Failed to initialize service");
-            stopCoreThread();
+            stopCoreUtilityThread();
             return false;
         }
         // Enable file logging after service init to avoid overwriting logs of already running instance
         logger->enableFileLoggingIfConfigured();
 
         // Create thread running io context for signal handling and service manager
-        mCoreGuard.emplace(ba::make_work_guard(mCoreIoContext));
-        mCoreThread = std::thread([this] {
-            mCoreIoContext.run();
+        mCoreUtilityGuard.emplace(ba::make_work_guard(mCoreUtilityIoContext));
+        mCoreUtilityThread = std::thread([this] {
+            // Unblock signals for utility thread
+            mCoreUtilityIoContext.run();
         });
 
 
@@ -56,40 +57,61 @@ namespace SmartHome {
         // Save config
         mConfig = configStruct;
 
-        // Set IPC server thread count
-        uint threadCount;
-
-        switch (mConfig.ipcServerThreads) {
-            case Config::HALF_CPU_CORES:
-                threadCount = std::ceil(std::thread::hardware_concurrency() / 2);
-                break;
-            case Config::ALL_CPU_CORES:
-                threadCount = std::thread::hardware_concurrency();
-                break;
-            default:
-                if (mConfig.ipcServerThreads > ms_HIGH_THREAD_COUNT_LIMIT) {
-                    logger->warningf("[CORE] IPC server thread count exceeds recommended limit (%d active threads)",
-                                    mConfig.ipcServerThreads);
-                }
-                threadCount = mConfig.ipcServerThreads;
-                break;
+        // get IPC server thread count
+        uint ipcThreadCount = getThreadCount(mConfig.ipcServerThreads);
+        if (ipcThreadCount > ms_HIGH_THREAD_COUNT_LIMIT) {
+            mLogger->warningf("[CORE] IPC server thread count exceeds recommended limit (%d active threads)",
+                              ipcThreadCount);
         }
-
-        if (threadCount < 1) {
-            logger->error("[CORE] IPC server thread count less than 1, setting value to 1");
-            threadCount = 1;
+        if (ipcThreadCount < 1) {
+            mLogger->error("[CORE] Invalid IPC server thread count value (less than 1), setting value to default");
+            ipcThreadCount = Config::TWO_THREADS;
         }
-
         //Create TCP server threads with io context
-        mSocketServerThreadPool.emplace(threadCount);
+        mSocketServerThreadPool.emplace(ipcThreadCount);
         mSocketServerGuard.emplace(ba::make_work_guard(mSocketServerIoContext));
-        for (size_t i = 0; i < threadCount; i++) {
+        for (size_t i = 0; i < ipcThreadCount; i++) {
             ba::post(*mSocketServerThreadPool, [this] {
                 mSocketServerIoContext.run();
             });
         }
-        IPC::SocketServer::Instance();
 
+        // get Core main thread count
+        uint coreThreadCount = getThreadCount(mConfig.coreMainThreads);
+        if (coreThreadCount > ms_HIGH_THREAD_COUNT_LIMIT) {
+            mLogger->warningf("[CORE] Core main thread count exceeds recommended limit (%d active threads)",
+                              coreThreadCount);
+        }
+        if (coreThreadCount < 1) {
+            mLogger->error("[CORE] Invalid Core main thread count value (less than 1), setting value to default");
+            coreThreadCount = Config::TWO_THREADS;
+        }
+        // Create Core main thread pool with io context
+        mCoreThreadPool.emplace(coreThreadCount);
+        mCoreGuard.emplace(ba::make_work_guard(mCoreIoContext));
+        for (size_t i = 0; i < coreThreadCount; i++) {
+            ba::post(*mCoreThreadPool, [this] { mCoreIoContext.run(); });
+        }
+
+        // get Core worker thread count
+        uint coreWorkerThreadCount = getThreadCount(mConfig.coreWorkerThreads);
+        if (coreWorkerThreadCount > ms_HIGH_THREAD_COUNT_LIMIT) {
+            mLogger->warningf("[CORE] Core worker thread count exceeds recommended limit (%d active threads)",
+                              coreWorkerThreadCount);
+        }
+        if (coreWorkerThreadCount < 1) {
+            mLogger->error("[CORE] Invalid Core worker thread count value (less than 1), setting value to default");
+            coreWorkerThreadCount = Config::SINGLE_THREAD;
+        }
+        // Create Core worker thread pool with io context
+        mCoreWorkerThreadPool.emplace(coreWorkerThreadCount);
+        mCoreWorkerGuard.emplace(ba::make_work_guard(mCoreWorkerIoContext));
+        for (size_t i = 0; i < coreWorkerThreadCount; i++) {
+            ba::post(*mCoreWorkerThreadPool, [this] { mCoreWorkerIoContext.run(); });
+        }
+
+        logger->debugf("[TEST] Thread count ipc: %d, main: %d, worker %d", ipcThreadCount, coreThreadCount, coreWorkerThreadCount);
+        logger->debugf("[TEST] Config thread count values ipc: %d, main: %d, worker %d", mConfig.ipcServerThreads, mConfig.coreMainThreads, mConfig.coreWorkerThreads);
 
         mIsInitialized.store(true);
         logger->debug("[CORE] Core successfully initialized");
@@ -121,49 +143,67 @@ namespace SmartHome {
 
         auto &socketServer = IPC::SocketServer::Instance();
         IPC::SocketServer::Config config = {mConfig.tcp, mConfig.uds};
+        mpApi = std::make_shared<API::InternalApi>();
 
-        if (!socketServer.initializeSocketServer(&mSocketServerIoContext, config, mLogger)) {
+        if (!socketServer.initializeSocketServer(&mSocketServerIoContext, config, mpApi, mLogger)) {
             mLogger->critical("[CORE] Failed to initialize IPC socket server");
             shutdown();
             return;
         }
-        socketServer.runSocketServer(&mSocketServerIoContext);
+        socketServer.runSocketServer();
 
+        //TODO implement watchdog working in CoreThread
+        mCoreThreadPool->join();
+        mCoreThreadPool.reset();
 
-        // Main loop
-        while (mIsRunning.load()) {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            //TODO implement watchdog
-        }
         mLogger->debug("[CORE] Exiting");
-        stopCoreThread();
+        stopCoreUtilityThread();
     }
 
     void Core::shutdown() {
         //TODO add is shutting down check
         mLogger->debug("[CORE] Starting core shutdown");
 
-        // Stop core main loop
+        // Signal and initialize shutdown
         mIsRunning.store(false);
+        auto &ipcServer = IPC::SocketServer::Instance();
+        ipcServer.stopAcceptors();
 
-        mpService->onStop();
+        CoreActions::onCoreShutdown();
 
-        // Stop TCP server
-        if (mConfig.tcp.isEnabled) {
+        // Start shutdown timeout timer
+        ba::steady_timer shutdownTimeout(mCoreUtilityIoContext, std::chrono::milliseconds(ms_SHUTDOWN_TIMEOUT));
+        shutdownTimeout.async_wait([this](const bs::error_code &ec) {
+            if (!ec) {
+                mCoreWorkerThreadPool->stop();
+                mCoreThreadPool->stop();
+                mSocketServerThreadPool->stop();
+            }
+        });
+
+        // Join worker thread
+        mCoreWorkerGuard.reset();
+        mCoreWorkerThreadPool->join();
+
+        // Disable core thread guard for later join
+        mCoreGuard->reset();
+
+        // Stop IPC server
+        if (mConfig.tcp.isEnabled || mConfig.uds.isEnabled) {
             mLogger->debug("[CORE] Shutting down IPC socket server");
-            auto &tcpServer = IPC::SocketServer::Instance();
-            if (tcpServer.isRunning()) {
-                tcpServer.stopSocketServer();
+            if (ipcServer.isRunning()) {
+                ipcServer.stopSocketServer();
             }
         }
 
         // Waiting for IPC server threads to finish
         if (mSocketServerThreadPool.has_value()) {
             mSocketServerGuard.reset();
-            mSocketServerThreadPool->stop();
             mSocketServerThreadPool->join();
             mSocketServerThreadPool.reset();
         }
+
+        mpService->onStop();
 
         // Stop handling signals
         if (mSignals.has_value()) {
@@ -176,6 +216,15 @@ namespace SmartHome {
 
     bool Core::isRunning() const {
         return mIsRunning.load();
+    }
+
+    ba::io_context &Core::getCoreUtilityIoContext() {
+        return mCoreUtilityIoContext;
+    }
+
+
+    ba::io_context &Core::getCoreWorkerIoContext() {
+        return mCoreWorkerIoContext;
     }
 
     ba::io_context &Core::getCoreIoContext() {
@@ -210,11 +259,25 @@ namespace SmartHome {
         }
     }
 
-    void Core::stopCoreThread() {
-        if (mCoreThread.has_value()) {
-            mCoreGuard.reset();
-            mCoreThread->join();
-            mCoreThread.reset();
+    void Core::stopCoreUtilityThread() {
+        if (mCoreUtilityThread.has_value()) {
+            mCoreUtilityGuard.reset();
+            mCoreUtilityThread->join();
+            mCoreUtilityThread.reset();
         }
+    }
+
+    uint Core::getThreadCount(const int threadCountConfigValue) {
+        static const uint coreCount = std::thread::hardware_concurrency();
+
+        if (threadCountConfigValue == Config::ALL_CPU_CORES) {
+            return coreCount;
+        }
+        if (threadCountConfigValue < 0) {
+            // For negative values divide coreCount by |value| + 1
+            return std::ceil(coreCount / static_cast<double>(abs(threadCountConfigValue) + 1));
+        }
+
+        return threadCountConfigValue;
     }
 }
