@@ -123,7 +123,6 @@ namespace SmartHome::IPC {
                 mpLogger->info("[SOCKET_CONNECTION] IPC operation aborted");
                 break;
             case ba::error::eof:
-                //FIXME SH-206 Logging to terminal with timestamp
                 mpLogger->info("[SOCKET_CONNECTION] IPC connection read EOF");
                 close();
                 break;

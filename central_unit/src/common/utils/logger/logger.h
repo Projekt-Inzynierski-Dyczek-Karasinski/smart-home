@@ -75,9 +75,6 @@ namespace SmartHome::Utils {
      *          Supports printf-style formating through template methods.
      *
      * @warning Not thread-safe, use AsyncLogger for thread-safe logging.
-     *
-     * @note Pre-allocates internal buffer for reduced write times.
-     *
      */
     class Logger {
     public:
@@ -99,7 +96,7 @@ namespace SmartHome::Utils {
         /**
          * @brief Construct logger with default setting.
          *
-         * @note Pre-allocates internal buffer. Console logging enabled and file logging disabled by default.
+         * @note Console logging enabled and file logging disabled by default.
          */
         Logger();
 
@@ -348,13 +345,14 @@ namespace SmartHome::Utils {
         /**
          * @brief Prepare log message with level prefix.
          *
-         * @details Formats message as "[LEVEL] message\n" and stores in mBuffer.
+         * @details Formats message as "[LEVEL] message\n".
          *
          * @param level Message verbosity level.
          * @param message Raw message text.
          *
+         * @return String containing formated message.
          */
-        void prepareLogMessage(LogLevels::Level level, std::string_view message);
+        static std::string prepareLogMessage(LogLevels::Level level, std::string_view message);
 
         /**
          * @brief Format message using printf-style formatting.
@@ -367,10 +365,6 @@ namespace SmartHome::Utils {
          */
         template<typename... Args>
         static std::string formatMessage(const char *format, Args... args);
-
-        // Log message buffer
-        static constexpr uint16_t ms_BUFFER_RESERVED_CHARS = 256; ///< Number of chars reserved for mBuffer
-        std::string mBuffer; ///< Log message buffer with space reserved in constructor
 
         /// Logger level, enables logging messages of set level and levels bellow it.
         LogLevels::Level mLevel = LogLevels::defaultLevel;

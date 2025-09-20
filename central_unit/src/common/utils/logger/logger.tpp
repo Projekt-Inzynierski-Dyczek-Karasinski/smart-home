@@ -14,8 +14,7 @@ namespace SmartHome::Utils {
 
     template<typename... Args>
     void Logger::logf(const LogLevels::Level level, const char *format, Args... args) {
-        if (level > mLevel) return;
-        Logger::writeLog(level, Logger::formatMessage(format, args...));
+        log(level,formatMessage(format, args...));
     }
 
     template<typename... Args>
