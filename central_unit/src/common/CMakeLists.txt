@@ -23,6 +23,17 @@ target_link_libraries(smarthome_logger PRIVATE
         Boost::system
 )
 
+# SMARTHOME API
+add_library(smarthome_api STATIC
+        api/api.cpp
+)
+
+add_library(smarthome::api ALIAS smarthome_api)
+
+target_include_directories(smarthome_api PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/api>
+)
+
 # SMARTHOME IPC
 add_library(smarthome_ipc STATIC
         ipc/socket_connection.cpp
@@ -40,6 +51,7 @@ target_link_libraries(smarthome_ipc PRIVATE
         Boost::system
         Boost::regex
         smarthome::logger
+        smarthome::api
 )
 
 # SMARTHOME UTILITY
