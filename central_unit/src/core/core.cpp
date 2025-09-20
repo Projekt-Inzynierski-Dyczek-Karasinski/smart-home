@@ -109,10 +109,7 @@ namespace SmartHome {
         for (size_t i = 0; i < coreWorkerThreadCount; i++) {
             ba::post(*mCoreWorkerThreadPool, [this] { mCoreWorkerIoContext.run(); });
         }
-
-        logger->debugf("[TEST] Thread count ipc: %d, main: %d, worker %d", ipcThreadCount, coreThreadCount, coreWorkerThreadCount);
-        logger->debugf("[TEST] Config thread count values ipc: %d, main: %d, worker %d", mConfig.ipcServerThreads, mConfig.coreMainThreads, mConfig.coreWorkerThreads);
-
+        
         mIsInitialized.store(true);
         logger->debug("[CORE] Core successfully initialized");
 
