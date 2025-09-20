@@ -8,33 +8,38 @@
 
 #include <nlohmann/json.hpp>
 
-// TODO !pr add docs to namespace
 namespace SmartHome::JsonRpcStrings {
+    /// JSON-RPC 2.0 protocol constants
     namespace Constants {
         inline constexpr std::string_view VERSION = "2.0";
         inline constexpr std::string_view NULL_VALUE = "null";
     }
 
+    /// Common JSON-RPC keys
     namespace Keys {
         inline constexpr std::string_view JSONRPC = "jsonrpc";
         inline constexpr std::string_view ID = "id";
     }
 
+    /// JSON-RPC request-specific keys
     namespace RequestKeys {
         inline constexpr std::string_view METHOD = "method";
         inline constexpr std::string_view PARAMS = "params";
     }
 
+    /// Custom parameter keys for SmartHome API
     namespace ParamsKeys {
         inline constexpr std::string_view TARGET = "target";
         inline constexpr std::string_view METHOD_PARAMS = "method_params";
     }
 
+    /// JSON-RPC response-specific keys
     namespace ResponseKeys {
         inline constexpr std::string_view RESULT = "result";
         inline constexpr std::string_view ERROR = "error";
     }
 
+    /// JSON-RPC error object keys
     namespace ErrorKeys {
         inline constexpr std::string_view CODE = "code";
         inline constexpr std::string_view MESSAGE = "message";
