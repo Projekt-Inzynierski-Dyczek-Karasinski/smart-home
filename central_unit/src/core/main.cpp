@@ -32,6 +32,10 @@ namespace SmartHome {
         configManager.getValue(root + ".config_path", mediatorConfig.configPath);
 
         // Core config
+        root = "core";
+        configManager.getValue(root +".main_threads", coreConfig.coreMainThreads);
+        configManager.getValue(root +".worker_threads", coreConfig.coreWorkerThreads);
+
         root = "core.ipc";
         configManager.getValue(root + ".threads", coreConfig.ipcServerThreads);
 
@@ -92,7 +96,7 @@ namespace SmartHome {
             logTmpOpt.isVerbositySet = true;
         }
 
-        if (logTmpOpt.isVerbositySet) logger->setLevel(Utils::LogLevels::toLevel(logTmpOpt.verboseLevel));;
+        if (logTmpOpt.isVerbositySet) logger->setLevel(Utils::LogLevels::toLevel(logTmpOpt.verboseLevel));
 
         // Load YAML config
         auto configManager = Utils::ConfigManager(logger);
@@ -158,7 +162,7 @@ int main(int argc, char *argv[]) {
     // Define instances
     auto &core = Core::Instance();
     bp::child mediator;
-    auto logger = std::make_shared<SmartHome::Utils::Logger>();
+    auto logger = std::make_shared<Utils::Logger>();
 
     // Define config structs with default values
     Core::Config coreConfig;
