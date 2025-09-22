@@ -89,7 +89,7 @@ namespace SmartHome::API {
         bool isUndefined() const;
 
         /**
-         * @brief Check if ID is null
+         * @brief Check if ID is null.
          *
          * @return true if ID has null value, false otherwise.
          */
@@ -203,7 +203,7 @@ namespace SmartHome::API {
         /**
          * @brief Setter for struct variables.
          *
-         * @param json Json object to parse.
+         * @param json JSON object to parse.
          * @throws std::invalid_argument Throws invalid argument when passed JSON object is not in JSON-RPC 2.0 error format
          */
         void setValues(nlohmann::json json);
@@ -240,8 +240,7 @@ namespace SmartHome::API {
          * @param value JSON string or raw command string.
          *
          * @throws nlohmann::json::parse_error Throws parse error on failed parse.
-         * @throws std::invalid_argument Throws invalid argument when passed JSON string is not in JSON-RPC 2.0 format.
-         *          or raw string formated request does not contain target and method.
+         * @throws std::invalid_argument Throws invalid argument when passed JSON string is not in JSON-RPC 2.0 format or raw string formated request does not contain target and method.
          */
         explicit ApiRequest(std::string_view value);
 
@@ -310,7 +309,7 @@ namespace SmartHome::API {
         /**
          * @brief Setter for struct variables.
          *
-         * @param json Json object to parse.
+         * @param json JSON object to parse.
          * @throws std::invalid_argument Throws invalid argument when passed JSON object is not in JSON-RPC 2.0 format.
          */
         void setValues(const nlohmann::json &json);
