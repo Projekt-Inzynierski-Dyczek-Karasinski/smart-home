@@ -48,7 +48,6 @@ namespace SmartHome {
         // Create thread running io context for signal handling and service manager
         mCoreUtilityGuard.emplace(ba::make_work_guard(mCoreUtilityIoContext));
         mCoreUtilityThread = std::thread([this] {
-            // Unblock signals for utility thread
             mCoreUtilityIoContext.run();
         });
 
