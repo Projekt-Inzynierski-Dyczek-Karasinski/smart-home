@@ -240,7 +240,8 @@ namespace SmartHome::API {
          * @param value JSON string or raw command string.
          *
          * @throws nlohmann::json::parse_error Throws parse error on failed parse.
-         * @throws std::invalid_argument Throws invalid argument when passed JSON string is not in JSON-RPC 2.0 format or raw string formated request does not contain target and method.
+         * @throws std::invalid_argument Throws invalid argument when passed JSON string is not in JSON-RPC 2.0 format
+         *         or raw string formated request does not contain target and method.
          */
         explicit ApiRequest(std::string_view value);
 
