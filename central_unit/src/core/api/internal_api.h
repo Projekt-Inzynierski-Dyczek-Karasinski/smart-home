@@ -204,7 +204,7 @@ namespace SmartHome::API {
             /// Vector storing parsed commands from ApiRequest structs
             std::vector<Command> commands;
             /// Flag representing if result must be sent in JSON-RPC-like structured response
-            bool structuredResult;
+            bool isResultStructured;
         };
 
         /**
@@ -218,7 +218,7 @@ namespace SmartHome::API {
             /// Vector of ApiResponse structs to be converted into string before sending
             std::vector<ApiResponse> apiResponses;
             /// Flag representing if result will be formated into JSON-RPC like object before conversion to string
-            bool structuredResult;
+            bool isResultStructured;
         };
 
         InternalApi() = default;

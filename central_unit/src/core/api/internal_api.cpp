@@ -160,7 +160,7 @@ namespace SmartHome::API {
         ApiError e;
         if (nlohmann::json::accept(requestView)) {
             //Setting structured result when trimmedRequest contains json object
-            requestStruct.structuredResult = true;
+            requestStruct.isResultStructured = true;
             nlohmann::json requestJson = nlohmann::json::parse(requestView);
 
             if (requestJson.is_array()) {
@@ -215,7 +215,7 @@ namespace SmartHome::API {
             e.message = errorCodeToString(e.code);
             std::string result;
 
-            if (requestStruct.structuredResult) {
+            if (requestStruct.isResultStructured) {
                 ApiResponse errorResponse;
                 errorResponse.error = e;
                 result = errorResponse.to_string();

@@ -41,7 +41,7 @@ namespace SmartHome {
                 requestId,
                 request.connectionId,
                 std::vector<API::ApiResponse>{},
-                request.structuredResult
+                request.isResultStructured
             );
 
             if (!inserted) {
@@ -447,7 +447,7 @@ namespace SmartHome {
             }
             const auto &internalResponse = iter->second;
             responsesVector = internalResponse.apiResponses;
-            isStructured = internalResponse.structuredResult;
+            isStructured = internalResponse.isResultStructured;
         }
 
         if (responsesVector.empty()) return;
