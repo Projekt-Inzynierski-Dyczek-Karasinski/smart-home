@@ -10,13 +10,7 @@ namespace SmartHome::Utils {
     using LL = LogLevels;
     //TODO add advanced logging options (log file rotation, compression, etc)
 
-    Logger::Logger() {
-        try {
-            mBuffer.reserve(ms_BUFFER_RESERVED_CHARS);
-        } catch (std::exception &e) {
-            std::cerr << "[LOGGER_ERROR] " << e.what() << std::flush;
-        }
-    }
+    Logger::Logger() = default;
 
     Logger::~Logger() {
         if (mIsFileLoggingEnabled && mFileStream.is_open()) {
@@ -114,8 +108,8 @@ namespace SmartHome::Utils {
         // Open empty file in append mode
         mFileStream.open(mFilePath, std::ios::app);
         // Add header
-        mBuffer = "Log started at " + getTimeStamp() + "\n\n";
-        mFileStream << mBuffer << std::flush;
+        const std::string logFileHeader = "Log started at " + getTimeStamp() + "\n\n";
+        mFileStream << logFileHeader << std::flush;
         info("[Logger] New log file created");
     }
 
@@ -172,20 +166,19 @@ namespace SmartHome::Utils {
 
     void Logger::writeLog(const LogLevels::Level level,
                           const std::string &message) {
-        prepareLogMessage(level, message);
-
+        std::string preparedMessage = prepareLogMessage(level, message);
 
         if (mEnableConsoleLogOutput) {
             if (level == LL::Level::CRITICAL || level == LL::Level::ERROR) {
-                std::cerr << mBuffer << std::flush;
+                std::cerr << preparedMessage << std::flush;
             } else if (level == LogLevels::Level::WARNING || level == LL::Level::INFO || level == LL::Level::DEBUG) {
-                std::cout << mBuffer << std::flush;
+                std::cout << preparedMessage << std::flush;
             }
         }
 
         if (mIsFileLoggingEnabled && mFileStream.is_open()) {
-            mBuffer = getTimeStamp() + ' ' + mBuffer;
-            mFileStream << mBuffer << std::flush;
+            preparedMessage = getTimeStamp() + ' ' + preparedMessage;
+            mFileStream << preparedMessage << std::flush;
         }
     }
 
@@ -198,8 +191,7 @@ namespace SmartHome::Utils {
         return ss.str();
     }
 
-    void Logger::prepareLogMessage(const LL::Level level, const std::string_view message) {
-        mBuffer.clear();
-        mBuffer += '[' + std::string(LL::toString(level)) + "] " + std::string(message) + '\n';
+    inline std::string Logger::prepareLogMessage(const LL::Level level, const std::string_view message) {
+        return '[' + std::string(LL::toString(level)) + "] " + message.data() + '\n';
     }
 }

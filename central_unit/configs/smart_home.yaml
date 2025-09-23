@@ -1,7 +1,11 @@
 preset_values:
-  ipc_server_thread_count:
+  thread_count_values:
+    quarter_cpu_cores: &quarter_cpu_cores -3
+    third_cpu_cores: &third_cpu_cores -2
     half_cpu_cores: &half_cpu_cores -1
     all_cpu_cores: &all_cpu_cores 0
+    single_thread: &single_thread 1
+    two_threads: &two_threads 2
   log_levels:
     none: &none 0
     critical: &critical 1
@@ -10,9 +14,15 @@ preset_values:
     info: &info 4
     debug: &debug 5
 
+# Rule for thread count values:
+#   value < 0: ceil(all CPU cores / (|value| + 1))
+#   value == 0: all CPU cores
+#   value >= 1: exact thread count
 
 core:
   mode: "headless"  #TODO add kiosk gui
+  main_threads: *two_threads # Recommended setting value >= 2
+  worker_threads: *single_thread  # Recommended setting value >= 1
   logging:
     log_level: *warning
     enable_console_log_output: true
@@ -22,7 +32,7 @@ core:
       archive_old: true
       path: "/var/log/smarthome/core.log"
   ipc:
-    threads: *half_cpu_cores # Exact thread count if value > 0, possible preset values: *all_cpu_cores, *half_cpu_cores
+    threads: *two_threads # Recommended setting value >= 2
     tcp:
       enabled: true
       address: "127.0.0.1"

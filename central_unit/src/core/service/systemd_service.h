@@ -64,8 +64,6 @@ namespace SmartHome::Service {
          */
         void notifyWatchdog();
 
-        Core &mCore = Core::Instance();
-
         // Watchdog variables
         std::optional<ba::steady_timer> mWatchdogTimer; ///< Watchdog timer for periodic notifications
         uint64_t mWatchdogInterval = 0; ///< Watchdog interval in microseconds

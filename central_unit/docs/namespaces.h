@@ -30,6 +30,35 @@ namespace SmartHome::Service {
 }
 
 /**
+ * @namespace SmartHome::JsonRpcStrings
+ * @brief String constants for JSON-RPC protocol implementation.
+ *
+ * @details Contains compile-time string constants organized by purpose:
+ * - Protocol version and common values
+ * - JSON-RPC standard field names
+ * - Custom SmartHome-specific parameter keys
+ *
+ * @note All constants are defined as constexpr string_view for zero-overhead access.
+ */
+namespace SmartHome::JsonRpcStrings {
+}
+
+/**
+ * @namespace SmartHome::API
+ * @brief API layer for internal and external communication.
+ *
+ * @details Implements JSON-RPC 2.0 based API protocol for communication between
+ * SmartHome components and external interfaces:
+ * - JSON-RPC request/response structures
+ * - Internal API for component-to-component communication
+ * - Command routing and execution framework
+ * - Error handling with standard JSON-RPC error codes
+ * - Support for both structured (JSON) and raw command formats
+ */
+namespace SmartHome::API {
+}
+
+/**
  * @namespace SmartHome::IPC
  * @brief Inter-Process Communication layer.
  *

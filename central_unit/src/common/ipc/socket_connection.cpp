@@ -1,15 +1,17 @@
 #include "socket_connection.h"
 
 namespace SmartHome::IPC {
-    SocketConnection::SocketConnection(ba::io_context &ioContext, const Type socketType, const std::shared_ptr<Utils::Logger> &logger)
-        : mSocket(createSocket(ioContext, socketType)), mType(socketType), mIoContext(ioContext), mpLogger(logger) {
-    };
+    SocketConnection::SocketConnection(ba::io_context &ioContext,
+                                       const Type socketType,
+                                       const std::shared_ptr<Utils::Logger> &logger)
+        : mSocket(createSocket(ioContext, socketType)), mType(socketType), mStrand(ioContext), mpLogger(logger) {
+    }
 
     SocketConnection::~SocketConnection() {
         SocketConnection::close();
-    };
+    }
 
-    const boost::regex SocketConnection::ms_DELIMITER_REGEX(SocketConnection::ms_MESSAGE_DELIMITER);
+    const boost::regex SocketConnection::ms_DELIMITER_REGEX(ms_MESSAGE_DELIMITER);
 
     std::string SocketConnection::read() {
         if (isOpen()) {
@@ -37,8 +39,10 @@ namespace SmartHome::IPC {
             }
         };
 
-        std::visit([this, callback](auto &socket) {
-            ba::async_read_until(socket, mStreamBuf, ms_DELIMITER_REGEX, callback);
+        auto strandWrapper = ba::bind_executor(mStrand, callback);
+
+        std::visit([this, strandWrapper](auto &socket) {
+            ba::async_read_until(socket, mStreamBuf, ms_DELIMITER_REGEX, strandWrapper);
         }, mSocket);
     }
 
@@ -47,7 +51,7 @@ namespace SmartHome::IPC {
         if (!isOpen()) return;
 
         try {
-            std::visit([this, message](auto &socket) {
+            std::visit([message](auto &socket) {
                 ba::write(socket, ba::buffer(message + ms_MESSAGE_DELIMITER));
             }, mSocket);
         } catch (bs::system_error &e) {
@@ -66,8 +70,10 @@ namespace SmartHome::IPC {
             }
         };
 
-        std::visit([this, message, callback](auto &socket) {
-            ba::async_write(socket, ba::buffer(message + ms_MESSAGE_DELIMITER), callback);
+        auto strandWrapper = ba::bind_executor(mStrand, callback);
+
+        std::visit([message, strandWrapper](auto &socket) {
+            ba::async_write(socket, ba::buffer(message + ms_MESSAGE_DELIMITER), strandWrapper);
         }, mSocket);
     }
 
@@ -93,9 +99,16 @@ namespace SmartHome::IPC {
         std::visit(socketVisitor, mSocket);
     }
 
+    void SocketConnection::shutdownSocket(ba::socket_base::shutdown_type mode) {
+        std::visit([mode](auto &socket) {
+            socket.shutdown(mode);
+            //TODO Sockets do not close for incoming traffic consistently - more testing needed
+        },mSocket);
+    }
+
     bool SocketConnection::isOpen() const {
         const bool isSocketOpen = std::visit([](const auto &socket) { return socket.is_open(); }, mSocket);
-        return (!mIsClosing && isSocketOpen);
+        return !mIsClosing && isSocketOpen;
     }
 
     std::variant<bai::tcp::socket, bal::stream_protocol::socket> SocketConnection::createSocket(

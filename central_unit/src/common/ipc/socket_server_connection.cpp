@@ -12,7 +12,7 @@ namespace SmartHome::IPC {
             handleMessage(message);
 
             if (isOpen()) {
-                ba::post(mIoContext, [this, self, handleMessage]() {
+                ba::post(mStrand, [this, self, handleMessage] {
                     asyncReadLoop(handleMessage);
                 });
             }
