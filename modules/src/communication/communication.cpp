@@ -161,6 +161,7 @@ namespace Comms {
 
     void Communication::receivedMessageDecider(bool *isReadingRawMessage) {
         uint8_t buffer[MESSAGE_SIZE];
+
         // TODO consider changing if else statements to switch case
         if (xQueueReceive(mReceiveMessageQueue, buffer, 0) == pdTRUE) {
             // if it is "repeat" message repeat last transmitted message
@@ -324,7 +325,7 @@ namespace Comms {
 
     // ======================== Decode Message ========================
 
-    bool Communication::isCheckSumCorrect(const uint8_t message[PROTOCOL_SIZE]) {
+    bool Communication::isCheckSumCorrect(const uint8_t message[PROTOCOL_SIZE]) const {
         uint16_t checksum = 0;
         for (uint8_t i = 0; i < PROTOCOL_SIZE; i++) {
             checksum += message[i];
@@ -332,7 +333,7 @@ namespace Comms {
         return checksum % CHECKSUM_MODULO == 0;
     }
 
-    bool Communication::extractMessageFromProtocolBuffer(const uint8_t protocolBuffer[][PROTOCOL_SIZE], uint8_t *messageBuffer) {
+    bool Communication::extractMessageFromProtocolBuffer(const uint8_t protocolBuffer[][PROTOCOL_SIZE], uint8_t *messageBuffer) const {
         // prepare received message buffer
         uah::clearBuffer(messageBuffer, MESSAGE_SIZE);
         uint8_t messageIndex = 0;
@@ -472,7 +473,7 @@ namespace Comms {
                             com.repeatLastTransmittedMessage();
                         } else {
                             // TODO !BEFORE PULL REQUEST! change log to debug or info
-                            com.mpLogger->warning("Communication Decode", "Bad IP");
+                            com.mpLogger->warningv("Communication Decode", "Bad IP: ", protocolBuffer[protoBuffMessageIndex][PROTOCOL_IP_INDEX]);
                             vTaskDelay(pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT));
                             resetProtocolBuffer();
                             xQueueReset(com.mReceiveByteQueue);
@@ -683,6 +684,13 @@ namespace Comms {
                         constexpr uint8_t notificationValue = READ_RAW_MESSAGE_NOTIF;
                         xQueueSendToFront(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
                     }
+                    // TODO !BEFORE PULL REQUEST! remove
+                    else if (uah::areArraysEqual(buffer, (uint8_t*)"test", 4)) {
+                        uint8_t test[MESSAGE_SIZE];
+                        uah::prepareBuffer(test, (uint8_t*)ADDRESSING_NC_REAL_MAC_RF_CHANNELS, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
+                        uah::printArrayAsInt(test, MESSAGE_SIZE);
+                        // com.mpRfModule->changeRFChannel(1);
+                    }
                     #ifdef ESP32_BOARD
                         else if (uah::areArraysEqual(buffer, (uint8_t*)"reboot", 6)) {
                             com.mpLogger->warning("Communication Input", "Rebooting...");
@@ -715,8 +723,8 @@ namespace Comms {
                             } else {
                                 uint8_t bufferWithAckNumber[MESSAGE_SIZE];
                                 bufferWithAckNumber[ACK_NUMBER_INDEX] = START_ACK_NUMBER;
-                                uah::prepareBuffer(&bufferWithAckNumber[1], buffer, MESSAGE_SIZE - 1, MESSAGE_SIZE);
-                                com.sendMessage(buffer);
+                                uah::prepareBuffer(&bufferWithAckNumber[1], buffer, MESSAGE_SIZE - 1, MESSAGE_SIZE - 1);
+                                com.sendMessage(bufferWithAckNumber);
                                 // xQueueSend(com.mSendMessagesQueue, &buffer, portMAX_DELAY);
                             }
                         #else

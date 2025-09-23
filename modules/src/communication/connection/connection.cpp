@@ -34,6 +34,7 @@ namespace Comms {
     ): mpCommunication(communication), mpAddressing(addressing), mpRfModule(rfModule), mpLogger(logger) {
         mConnectionDataMutex = xSemaphoreCreateMutex();
         mTransmittingSemaphore = xSemaphoreCreateBinary();
+        xSemaphoreGive(mTransmittingSemaphore);
 
         mspConnection = this;
         // TODO !BEFORE PULL REQUEST! remove new instance of logger
@@ -85,6 +86,7 @@ namespace Comms {
                         mIsPossibleEndOfConnection = true;
                     }
                 }
+                //TODO add sending empty message (with only ack number) if there is no messages to send / add message to receivedMessageDecider and there add handling to it
                 xSemaphoreGive(mTransmittingSemaphore); // signalize that now can transmit
             }
         } else {
@@ -166,9 +168,9 @@ namespace Comms {
         mConnectionStatus = ConnectionStatus::DISCONNECTED;
         xSemaphoreGive(mConnectionDataMutex);
 
-        mpAddressing->setProtocolIPAddress(CENTRAL_UNIT_IP); // do anything only for Central Unit
+        mpAddressing->setProtocolIPAddress(NULL_IP); // do anything only for Central Unit
         #ifdef RF_CHANNELS
-            mpRfModule->changeRFChannel(mpAddressing->getDefaultRFChannel());
+            // mpRfModule->changeRFChannel(mpAddressing->getDefaultRFChannel());
         #endif
         xSemaphoreGive(mTransmittingSemaphore);
     }
@@ -198,8 +200,7 @@ namespace Comms {
         uint8_t messageBuffer[MESSAGE_SIZE];
         constexpr uint8_t message[] = {START_ACK_NUMBER};
         #ifdef RF_CHANNELS
-
-            mpRfModule->changeRFChannel(mpAddressing->getConnectionRFChannel());
+            // mpRfModule->changeRFChannel(mpAddressing->getConnectionRFChannel());
         #endif
         uah::prepareBuffer(messageBuffer, message, 1, MESSAGE_SIZE);
         for (uint8_t attempt = 0; attempt < CONNECTION_MAX_ATTEMPTS; attempt++) {
@@ -218,25 +219,8 @@ namespace Comms {
 
             xSemaphoreGive(mConnectionDataMutex);
             mpCommunication->encodeMessage(messageBuffer);
-
         }
         return false;
-
-        // uint8_t attemptCounter = 0;
-        // uint8_t messageBuffer[MESSAGE_SIZE];
-        // constexpr uint8_t message[] = {START_ACK_NUMBER};
-        // while (!getIsConnected() && attemptCounter < CONNECTION_MAX_ATTEMPTS) {
-        //     if (attemptCounter == 0) {
-        //         mpAddressing->getConnectionRFChannel();
-        //         uah::prepareBuffer(messageBuffer, message, 1, MESSAGE_SIZE);
-        //     }
-        //     attemptCounter++;
-        //     setAckNumber(START_ACK_NUMBER);
-        //     mpCommunication->encodeMessage(messageBuffer);
-        //     xSemaphoreTake(mTransmittingSemaphore, pdMS_TO_TICKS(CONNECTION_TIMEOUT));
-        //     mpLogger->warning("Connection Task", "New connection attempt failed.");
-        // }
-        // return attemptCounter >= CONNECTION_MAX_ATTEMPTS;
     }
 
     void Connection::connectionTask(void *parameters) {
@@ -253,7 +237,7 @@ namespace Comms {
                     con.mpCommunication->encodeMessage(messageBuffer);
                     continue;
                 }
-                
+
                 if (!con.handleNewConnection()) {
                     con.mpLogger->error("Connection Task", "Exited max number of connection attempts.");
                     // xSemaphoreGive(con.mTransmittingSemaphore);

@@ -111,7 +111,7 @@ namespace Comms {
                             #ifdef RF_CHANNELS
                                 uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_NC_REAL_MAC_RF_CHANNELS, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
                             #else
-                                uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_NC_REAL_MAC_NO_RF_CHANNELS, ADDRESSING_API_LEN, MESSAGE_SIZE);
+                                uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_NC_REAL_MAC_NO_RF_CHANNELS, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
                             #endif
                         #else
                             #error "Not implemented"
@@ -246,7 +246,7 @@ namespace Comms {
             xTaskCreate(
                 addressingTask,
                 "Addressing Task",
-                2048,
+                4096,
                 nullptr,
                 MEDIUM_TASK_PRIORITY,
                 &mAddressingTaskHandle

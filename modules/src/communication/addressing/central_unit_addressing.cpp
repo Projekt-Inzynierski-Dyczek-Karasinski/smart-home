@@ -30,9 +30,12 @@ namespace Comms {
         mNumOFModulesOnRfChannel[0] = 1;
         xSemaphoreGive(mModulesAddressingDataMutex);
 
+
         // TODO !BEFORE PULL REQUEST! remove
-        uint8_t tmpMAC[] = {1,1,1,1,1,1};
-        addModule(tmpMAC, true, 1);
+        #ifdef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
+            uint8_t tmpMAC[] = {1,1,1,1,1,1};
+            // addModule(tmpMAC, true, 1);
+        #endif
 
         mpLogger->info("CentralUnitAddressing Class", "CentralUnitAddressing initialized.");
     }
@@ -62,7 +65,7 @@ namespace Comms {
     uint8_t CentralUnitAddressing::getIPAddress() {
         uint8_t result;
         xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
-        if (mTmpModuleIp == NULL_IP) {
+        if (mTmpModuleIp == NULL_IP || getIsStartOfAddressing()) {
             result = CENTRAL_UNIT_IP;
         } else {
             result = mTmpModuleIp;
@@ -102,7 +105,7 @@ namespace Comms {
 
     bool CentralUnitAddressing::isIpPropper(const uint8_t ip) {
         bool result = true;
-        if ((getIsStartOfAddressing() && ip != NULL_IP) || ip == CENTRAL_UNIT_IP || ip == NULL_IP) {
+        if ((getIsStartOfAddressing() && ip != NULL_IP) || (!getIsStartOfAddressing() && (ip == CENTRAL_UNIT_IP || ip == NULL_IP))) {
             result = false;
         }
         return result;
@@ -176,6 +179,9 @@ namespace Comms {
                             uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_NEW_IP_NEW_RF_CHANNEL, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
                             sendBuffer[3] = moduleNewIP; // TODO !BEFORE PULL REQUEST! check if addressing work properly after changing API
                             sendBuffer[5] = moduleNewRfChannel;
+                            //TODO remove
+                            uah::printArrayAsInt(sendBuffer, MESSAGE_SIZE);
+
                             ad.mpCommunication->sendMessage(sendBuffer);
 
                             // wait for "repeat" message and
@@ -291,7 +297,7 @@ namespace Comms {
             xTaskCreate(
                 addressingTask,
                 "Addressing Task",
-                2048,
+                4096,
                 nullptr,
                 MEDIUM_TASK_PRIORITY,
                 &mAddressingTaskHandle

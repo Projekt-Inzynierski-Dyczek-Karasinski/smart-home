@@ -158,7 +158,7 @@ namespace Comms {
          * @param message The protocol message array to verify checksum.
          * @return True if the checksum is correct, false otherwise.
          */
-        bool isCheckSumCorrect(const uint8_t message[PROTOCOL_SIZE]);
+        bool isCheckSumCorrect(const uint8_t message[PROTOCOL_SIZE]) const;
 
         /**
          * @brief Extracts a message from protocolBuffer and saves it to given buffer. Checks for packet loss.
@@ -166,7 +166,7 @@ namespace Comms {
          * @param messageBuffer Buffer to save extracted message.
          * @return True if successfully extracts a message (without packet loss), false otherwise.
          */
-        bool extractMessageFromProtocolBuffer(const uint8_t protocolBuffer[][PROTOCOL_SIZE], uint8_t *messageBuffer);
+        bool extractMessageFromProtocolBuffer(const uint8_t protocolBuffer[][PROTOCOL_SIZE], uint8_t *messageBuffer) const;
 
         /**
          * @brief FreeRTOS task for decoding incoming messages from the byte queue.

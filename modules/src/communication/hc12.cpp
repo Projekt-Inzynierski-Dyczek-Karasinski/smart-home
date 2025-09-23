@@ -106,10 +106,10 @@ namespace Comms {
             channel = DEFAULT_CHANNEL;
         }
 
-        uint8_t commandBuffer[7];
-        char messageBuffer[7];
-        sprintf(messageBuffer, "HC+%03u", channel);
-        uah::prepareBuffer(commandBuffer, (uint8_t*)messageBuffer, 6, SETUP_COMMAND_SIZE);
+        uint8_t commandBuffer[8];
+        char messageBuffer[8];
+        sprintf(messageBuffer, "HC+C%03u", channel);
+        uah::prepareBuffer(commandBuffer, (uint8_t*)messageBuffer, 7, SETUP_COMMAND_SIZE);
         setupHC12(commandBuffer);
     }
 // ================================================================

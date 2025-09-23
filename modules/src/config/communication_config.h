@@ -43,6 +43,6 @@
 
 // special messages
 #define SPECIAL_MESSAGE_LEN 6
-#define REPEAT_MESSAGE "\255repea"
-#define PING_MESSAGE "\255ping\0"
-#define RE_PING_MESSAGE "\255repin"
+#define REPEAT_MESSAGE "repeat"
+#define PING_MESSAGE "ping\0\0"
+#define RE_PING_MESSAGE "reping"

@@ -17,6 +17,7 @@ void setup() {
     const auto logger = std::make_shared<ul::Logger>();
 
     DebugLED* debugLed = DebugLED::getInstance(logger);
+
     Comms::Communication& communication = Comms::Communication::getInstance(debugLed, logger);
     PairingButton* pairingButton = PairingButton::getInstance(debugLed, &communication, logger);
 
