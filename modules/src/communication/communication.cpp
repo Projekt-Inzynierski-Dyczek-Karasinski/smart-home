@@ -53,10 +53,6 @@ namespace Comms {
     }
 
     void Communication::sendMessage(const uint8_t message[MESSAGE_SIZE]) const {
-        mpConnection->sendMessage(message);
-    }
-
-    void Communication::encodeMessage(const uint8_t message[MESSAGE_SIZE]) const {
         xQueueSend(mEncodeMessagesQueue, message, portMAX_DELAY);
         vTaskResume(mEncodeMessageTaskHandle);
     }
@@ -65,10 +61,10 @@ namespace Comms {
         xQueueSend(mReceiveMessageQueue, message, portMAX_DELAY);
     }
 
-    void Communication::suspendConnectionTask() const {
-        constexpr uint8_t notificationValue = SUSPEND_CONNECTION_TASK_NOTIF;
-        xQueueSend(mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
-    }
+    // void Communication::suspendConnectionTask() const {
+    //     constexpr uint8_t notificationValue = SUSPEND_CONNECTION_TASK_NOTIF;
+    //     xQueueSend(mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
+    // }
 
 
     // ================================================================
@@ -90,7 +86,8 @@ namespace Comms {
         mspCommunication = this;
         mpDebugLED = debugLED;
         mpLogger = logger;
-        mpConnection = &Connection::getInstance(this, mpAddressing, mpRfModule, logger);
+        // TODO !BEFORE PULL REQUEST! remove/update
+        // mpConnection = &Connection::getInstance(this, mpAddressing, mpRfModule, logger);
 
         mLastTransmittedMessageMutex = xSemaphoreCreateMutex();
         setLastTransmittedMessage();
@@ -133,7 +130,7 @@ namespace Comms {
             mReceiveByteQueue = xQueueCreate(RECEIVE_BYTE_QUEUE_LEN, sizeof(uint8_t));
         }
         if (mEncodeMessagesQueue == nullptr) {
-            mEncodeMessagesQueue = xQueueCreate(1, sizeof(uint8_t[MESSAGE_SIZE]));
+            mEncodeMessagesQueue = xQueueCreate(MESSAGE_QUEUE_LEN, sizeof(uint8_t[MESSAGE_SIZE]));
         }
     }
 
@@ -179,7 +176,7 @@ namespace Comms {
             }
             // TODO !BEFORE PULL REQUEST! check if addressing work properly after changing API
             // if is addressing message
-            else if ((buffer[1] == (uint8_t)'A' && buffer[2] == (uint8_t)'D') || *isReadingRawMessage) {
+            else if ((buffer[0] == (uint8_t)'A' && buffer[1] == (uint8_t)'D') || *isReadingRawMessage) {
                 *isReadingRawMessage = false;
                 mpAddressing->addMessage(buffer);
             }
@@ -269,9 +266,9 @@ namespace Comms {
                     vTaskSuspend(com.mEncodeMessageTaskHandle);
                     break;
 
-                case SUSPEND_CONNECTION_TASK_NOTIF:
-                    com.mpConnection->suspendConnectionTask();
-                    break;
+                // case SUSPEND_CONNECTION_TASK_NOTIF:
+                //     com.mpConnection->suspendConnectionTask();
+                //     break;
 
                 case START_PINGING_NOTIF:
                     pingAttempts = 1;
@@ -497,10 +494,10 @@ namespace Comms {
                         }
 
                         // if ack number is not correct
-                        if (!com.mpConnection->handleReceivedMessage(messageBuffer)) {
-                            // handleIncorrectMessage(isRawMessage);
-                            com.mpLogger->warningv("Communication Decode", "Bad ack number: ", messageBuffer[ACK_NUMBER_INDEX]);
-                        }
+                        // if (!com.mpConnection->handleReceivedMessage(messageBuffer)) {
+                        //     // handleIncorrectMessage(isRawMessage);
+                        //     com.mpLogger->warningv("Communication Decode", "Bad ack number: ", messageBuffer[ACK_NUMBER_INDEX]);
+                        // }
 
                         // send decoded message to queue
                         if (isRawMessage) {
@@ -586,8 +583,6 @@ namespace Comms {
         for (;;) {
             // wait until the message appears in the queue and save message in local messageBuffer
             if (xQueueReceive(com.mEncodeMessagesQueue, &messageBuffer, pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG)) == pdTRUE) {
-                // com.mpConnection->handleMessageToSend(messageBuffer); // TODO remove?
-
                 // only for central unit, because modules IP is constant
                 #ifdef CENTRAL_UNIT
                     // prepare place for IP address
@@ -614,7 +609,8 @@ namespace Comms {
                     com.prepareChecksum(protocolBuffer);
                     com.mpRfModule->addMessageToTransmit(protocolBuffer);
 
-                    com.mpLogger->debuga("Communication Encode", "Protocol buffer: ", protocolBuffer, PROTOCOL_SIZE, false);
+                    // TODO change to debuga
+                    com.mpLogger->infoa("Communication Encode", "Protocol buffer: ", protocolBuffer, PROTOCOL_SIZE, false);
                     com.mpLogger->debuga("Communication Encode", "Protocol message: ", &protocolBuffer[PROTOCOL_MESSAGE_START_INDEX], PROTOCOL_MESSAGE_LENGTH);
                 }
                 if (!uah::areArraysEqual(messageBuffer, (uint8_t*)REPEAT_MESSAGE, SPECIAL_MESSAGE_LEN)) {
@@ -721,11 +717,7 @@ namespace Comms {
                                 buffer[1] = 'C';
                                 xQueueSend(com.mReceiveMessageQueue, &buffer, portMAX_DELAY);
                             } else {
-                                uint8_t bufferWithAckNumber[MESSAGE_SIZE];
-                                bufferWithAckNumber[ACK_NUMBER_INDEX] = START_ACK_NUMBER;
-                                uah::prepareBuffer(&bufferWithAckNumber[1], buffer, MESSAGE_SIZE - 1, MESSAGE_SIZE - 1);
-                                com.sendMessage(bufferWithAckNumber);
-                                // xQueueSend(com.mSendMessagesQueue, &buffer, portMAX_DELAY);
+                                xQueueSend(com.mEncodeMessagesQueue, &buffer, portMAX_DELAY);
                             }
                         #else
                             #error "not implemented"

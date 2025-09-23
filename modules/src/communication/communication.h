@@ -78,16 +78,11 @@ namespace Comms {
          */
         void addByteToDecode(uint8_t data) const;
 
-        // TODO !BEFORE PULL REQUEST! update comment
         /**
         * @brief Add a message that needs to be transmitted to the encoding queue.
         * @param message Message to transmit.
         */
         void sendMessage(const uint8_t message[MESSAGE_SIZE]) const;
-        // TODO !BEFORE PULL REQUEST! update comment
-        void encodeMessage(const uint8_t message[MESSAGE_SIZE]) const;
-        // TODO !BEFORE PULL REQUEST! update comment
-        void suspendConnectionTask() const;
 
         /**
          * @brief Add a message to received queue (omitting decoding process).
@@ -272,7 +267,7 @@ namespace Comms {
 
         static Communication *mspCommunication;
         DebugLED *mpDebugLED; ///< Pointer to debugLED class instance.
-        Connection *mpConnection;
+        // Connection *mpConnection;
 
         #ifdef HC12_MODULE
             std::shared_ptr<HC12> mpRfModule; ///< Pointer to class instance responsible for transmitting and receiving RF messages.
@@ -294,7 +289,7 @@ namespace Comms {
             // suspending notifications
             SUSPEND_DECODE_MESSAGE_TASK_NOTIF,
             SUSPEND_ENCODE_MESSAGE_TASK_NOTIF,
-            SUSPEND_CONNECTION_TASK_NOTIF,
+            // SUSPEND_CONNECTION_TASK_NOTIF,
             // ping notifications
             START_PINGING_NOTIF,
             PING_TIMEOUT_NOTIF,

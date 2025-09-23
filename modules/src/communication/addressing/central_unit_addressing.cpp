@@ -34,7 +34,8 @@ namespace Comms {
         // TODO !BEFORE PULL REQUEST! remove
         #ifdef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
             uint8_t tmpMAC[] = {1,1,1,1,1,1};
-            // addModule(tmpMAC, true, 1);
+            addModule(tmpMAC, true, 1);
+            mpLogger->warning("CentralUnitAddressing TMP", "Hardcoded module");
         #endif
 
         mpLogger->info("CentralUnitAddressing Class", "CentralUnitAddressing initialized.");
@@ -65,7 +66,7 @@ namespace Comms {
     uint8_t CentralUnitAddressing::getIPAddress() {
         uint8_t result;
         xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
-        if (mTmpModuleIp == NULL_IP || getIsStartOfAddressing()) {
+        if (mTmpModuleIp == NULL_IP || mIsStartOfAddressing) {
             result = CENTRAL_UNIT_IP;
         } else {
             result = mTmpModuleIp;
@@ -163,25 +164,19 @@ namespace Comms {
                 bool isRestarting = false;
                 switch (addressingState) {
                     case START_ADDRESSING:
-                        ad.setIsStartOfAddressing(false);
                         // NOTE: receiveBuffer contains raw message!
                         // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
                         // TODO implement for other new connection messages
                         if (uah::areArraysEqual(&receiveBuffer[8], (uint8_t*)ADDRESSING_NC_REAL_MAC_RF_CHANNELS, SPECIAL_MESSAGE_LEN)) {
                             uint8_t moduleMAC[MAC_ADDRESS_LENGTH];
                             uah::prepareBuffer(moduleMAC, receiveBuffer, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
-                            // TODO !BEFORE PULL REQUEST! undo this:
-                            ad.mpLogger->warning("CentralUnitAddressing TMP", "rf channel is forced to 1st");
-                            moduleNewIP = ad.addModule(moduleMAC, true, 1);
+                            moduleNewIP = ad.addModule(moduleMAC, true);
                             const uint8_t moduleNewRfChannel = ad.getModuleRfChannel(moduleNewIP);
 
                             // send module information about module's new IP address and rf channel
                             uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_NEW_IP_NEW_RF_CHANNEL, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
                             sendBuffer[3] = moduleNewIP; // TODO !BEFORE PULL REQUEST! check if addressing work properly after changing API
                             sendBuffer[5] = moduleNewRfChannel;
-                            //TODO remove
-                            uah::printArrayAsInt(sendBuffer, MESSAGE_SIZE);
-
                             ad.mpCommunication->sendMessage(sendBuffer);
 
                             // wait for "repeat" message and
@@ -201,6 +196,7 @@ namespace Comms {
 
                     case PINGING:
                         // send ping
+                        ad.setIsStartOfAddressing(false);
                         uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_PING, SPECIAL_MESSAGE_LEN, SPECIAL_MESSAGE_LEN);
                         ad.mpCommunication->sendMessage(sendBuffer);
                         ad.mpLogger->debug("CentralUnitAddressing Main", "Sending ping.");
@@ -389,15 +385,18 @@ namespace Comms {
 
     uint8_t CentralUnitAddressing::getModuleRfChannel(const uint8_t ipAddress) const {
         xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
+
         const uint8_t index = ipToIndex(ipAddress);
         const uint8_t rfChannel = mModulesAddressingData[index].rfChannel;
         xSemaphoreGive(mModulesAddressingDataMutex);
+
 
         return rfChannel;
     }
 
     uint8_t CentralUnitAddressing::addModule(const uint8_t *macAddress, const bool isMACAddressReal, uint8_t rfChannel) {
         xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
+
         // choose ip address
         uint8_t chosenIP = NULL_IP;
         for (uint8_t i = 0; i < MAX_NUM_OF_MODULES; i++) {
@@ -431,7 +430,6 @@ namespace Comms {
                 break;
             }
         }
-        mIsStartOfAddressing = false;
         xSemaphoreGive(mModulesAddressingDataMutex);
 
         if (chosenIP == NULL_IP) {

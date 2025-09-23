@@ -3,7 +3,6 @@
 #include <Arduino.h>
 #include <memory>
 
-#include "smart_home_config.h"
 #include "config/addressing_config.h"
 
 #include "communication/addressing/addressing.h"

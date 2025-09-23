@@ -176,10 +176,14 @@ namespace Comms {
                             // !remember in receiveBuffer is raw message!
                             // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
                             #ifdef RF_CHANNELS
-                                // check is received propper message (AD?c?), indexes are offset due to reading raw message
-                                if (receiveBuffer[12] == (uint8_t)'c') { // TODO !BEFORE PULL REQUEST! check if addressing work properly after changing API
+                                // check is received propper message (ADi?c?), indexes are offset due to reading raw message
+                                ad.mpLogger->errorv("ModuleAddressing TMP", "i: ", (char)receiveBuffer[10]);
+                                ad.mpLogger->errorv("ModuleAddressing TMP", "c: ", (char)receiveBuffer[12]);
+                                if (receiveBuffer[10] == (uint8_t)'i' && receiveBuffer[12] == (uint8_t)'c') { // TODO !BEFORE PULL REQUEST! check if addressing work properly after changing API
                                     isReceivedPropperMessage = true;
                                     const uint8_t newRfChannel = receiveBuffer[13];
+                                    ad.mpLogger->errorv("ModuleAddressing TMP", "newRfChannel: ", newRfChannel);
+                                    ad.mpLogger->errorv("ModuleAddressing TMP", "newIp: ", receiveBuffer[11]);
 
                                     ad.updateAddressingData(receiveBuffer, receiveBuffer[11], newRfChannel);
                                     ad.changeRfChannel(newRfChannel);

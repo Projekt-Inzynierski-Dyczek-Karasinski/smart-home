@@ -43,4 +43,4 @@
 #endif
 
 // TODO remove this before merge with main
-#define COMMUNICATION_WITHOUT_SAVING_ADDRESSINGS
+// #define COMMUNICATION_WITHOUT_SAVING_ADDRESSING
