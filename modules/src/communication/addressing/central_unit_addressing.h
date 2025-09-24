@@ -62,7 +62,7 @@ namespace Comms {
 
         /**
          * @brief Checks if a module with the passed IP address is addressed and sets the protocol IP if it is addressed.
-         * @param ip IP address to set, 0 to clear.
+         * @param ip IP address to set, <code>NULL_IP</code> to clear.
          * @note Thread-safe.
          */
         void setProtocolIPAddress(uint8_t ip) override;

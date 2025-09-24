@@ -97,6 +97,13 @@ namespace Comms {
         void stopAddressing();
 
         /**
+         * @brief Getter for <code>mIsAddressingWorking</code>.
+         * @return True if addressing algorithm is in progress, false otherwise.
+         * @note Thread-safe.
+         */
+        bool getIsAddressingWorking() const;
+
+        /**
          * @brief Adds a message to the addressing queue. Ensures that adding messages to queue is only available if queue exist.
          * @param message Array with message array to add to queue.
          */
@@ -185,6 +192,7 @@ namespace Comms {
 
         Communication *mpCommunication; ///< Pointer to the Communication class instance (owner class).
 
+        bool mIsAddressingWorking = false; ///< Indicates if addressing algorithm is in progress.
         uint8_t mMACAddress[MAC_ADDRESS_LENGTH]{}; ///< Module's own MAC address.
         uint8_t mProtocolMACAddress[MAC_ADDRESS_LENGTH]{}; ///< Central unit's MAC address (or module's own MAC if unknown).
         uint8_t mIPAddress = NULL_IP; ///< Current assigned IP address (0 = NULL, 1 = central unit's IP).

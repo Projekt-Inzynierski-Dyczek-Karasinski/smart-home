@@ -54,6 +54,10 @@ namespace Comms {
     }
 
     void Addressing::startAddressing() {
+        xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
+        mIsAddressingWorking = true;
+        xSemaphoreGive(mAddressingDataMutex);
+
         createAddressingTimer();
         createAddressingQueue();
         createAddressingTask();
@@ -63,7 +67,19 @@ namespace Comms {
         deleteAddressingTask();
         deleteAddressingQueue();
         deleteAddressingTimer();
+
+        xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
+        mIsAddressingWorking = false;
+        xSemaphoreGive(mAddressingDataMutex);
     }
+
+    bool Addressing::getIsAddressingWorking() const {
+        xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
+        const bool result = mIsAddressingWorking;
+        xSemaphoreGive(mAddressingDataMutex);
+        return result;
+    }
+
 
     void Addressing::addMessage(const uint8_t message[MESSAGE_SIZE]) const {
         if (mAddressingQueue != nullptr) {

@@ -267,7 +267,7 @@ namespace Comms {
 
         static Communication *mspCommunication;
         DebugLED *mpDebugLED; ///< Pointer to debugLED class instance.
-        // Connection *mpConnection;
+        Connection *mpConnection;
 
         #ifdef HC12_MODULE
             std::shared_ptr<HC12> mpRfModule; ///< Pointer to class instance responsible for transmitting and receiving RF messages.

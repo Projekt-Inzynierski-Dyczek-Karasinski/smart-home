@@ -86,8 +86,7 @@ namespace Comms {
         mspCommunication = this;
         mpDebugLED = debugLED;
         mpLogger = logger;
-        // TODO !BEFORE PULL REQUEST! remove/update
-        // mpConnection = &Connection::getInstance(this, mpAddressing, mpRfModule, logger);
+        mpConnection = &Connection::getInstance(this, mpAddressing, mpRfModule, logger);
 
         mLastTransmittedMessageMutex = xSemaphoreCreateMutex();
         setLastTransmittedMessage();
@@ -493,11 +492,7 @@ namespace Comms {
                             continue;
                         }
 
-                        // if ack number is not correct
-                        // if (!com.mpConnection->handleReceivedMessage(messageBuffer)) {
-                        //     // handleIncorrectMessage(isRawMessage);
-                        //     com.mpLogger->warningv("Communication Decode", "Bad ack number: ", messageBuffer[ACK_NUMBER_INDEX]);
-                        // }
+                        com.mpConnection->receivingHandle(protocolBuffer[0][PROTOCOL_IP_INDEX]);
 
                         // send decoded message to queue
                         if (isRawMessage) {
@@ -583,6 +578,8 @@ namespace Comms {
         for (;;) {
             // wait until the message appears in the queue and save message in local messageBuffer
             if (xQueueReceive(com.mEncodeMessagesQueue, &messageBuffer, pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG)) == pdTRUE) {
+                com.mpConnection->sendingHandle();
+                // com.mpLogger->error("Communication TMP", "tmp.");
                 // only for central unit, because modules IP is constant
                 #ifdef CENTRAL_UNIT
                     // prepare place for IP address
@@ -609,8 +606,7 @@ namespace Comms {
                     com.prepareChecksum(protocolBuffer);
                     com.mpRfModule->addMessageToTransmit(protocolBuffer);
 
-                    // TODO change to debuga
-                    com.mpLogger->infoa("Communication Encode", "Protocol buffer: ", protocolBuffer, PROTOCOL_SIZE, false);
+                    com.mpLogger->debuga("Communication Encode", "Protocol buffer: ", protocolBuffer, PROTOCOL_SIZE, false);
                     com.mpLogger->debuga("Communication Encode", "Protocol message: ", &protocolBuffer[PROTOCOL_MESSAGE_START_INDEX], PROTOCOL_MESSAGE_LENGTH);
                 }
                 if (!uah::areArraysEqual(messageBuffer, (uint8_t*)REPEAT_MESSAGE, SPECIAL_MESSAGE_LEN)) {
