@@ -100,8 +100,8 @@ namespace Utils {
 
         bool Logger::logLevelToString(char *buffer, const Level level) {
             switch (level) {
-                case Level::ERROR: strcpy(buffer, "[ERROR]"); return true;
-                case Level::WARNING: strcpy(buffer, "[WARNING]"); return true;
+                case Level::ERROR: strcpy(buffer, "<ERROR>"); return true;
+                case Level::WARNING: strcpy(buffer, "<WARNING>"); return true;
                 case Level::INFO: strcpy(buffer, "[INFO]"); return true;
                 case Level::DEBUG: strcpy(buffer, "[DEBUG]"); return true;
                 default:
