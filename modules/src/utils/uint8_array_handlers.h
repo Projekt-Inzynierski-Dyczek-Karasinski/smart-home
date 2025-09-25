@@ -2,15 +2,6 @@
 #include <Arduino.h>
 
 namespace Utils {
-    /**
-     * @brief Namespace containing utility functions for arrays.
-     * @note Available functions:\n
-     * void printArrayAsChar()\n
-     * void printArrayAsInt()\n
-     * void prepareBuffer()\n
-     * uint8_t calcLenOfDataInArray()\n
-     * bool areArraysEqual()\n
-     */
     namespace ArrayHandlers {
         /**
          * @brief Prints given uint8_t array as a char array.

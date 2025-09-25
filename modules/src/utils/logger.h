@@ -3,9 +3,6 @@
 #include <Arduino.h>
 
 namespace Utils {
-    /**
-     * @brief Namespace containing enum Level and class Logger.
-     */
     namespace Logging {
         /**
          * @brief Enumeration of available log levels.
