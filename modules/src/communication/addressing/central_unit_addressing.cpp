@@ -34,7 +34,7 @@ namespace Comms {
         // TODO !BEFORE PULL REQUEST! remove
         #ifdef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
             uint8_t tmpMAC[] = {1,1,1,1,1,1};
-            addModule(tmpMAC, true, 1);
+            addModule(tmpMAC, true, 2);
             mpLogger->warning("CentralUnitAddressing TMP", "Hardcoded module");
         #endif
 
@@ -247,6 +247,7 @@ namespace Comms {
                                     // TODO add saving data in flash memory
                                     ad.setTmpModuleIp(NULL_IP);
                                     ad.mpCommunication->stopAddressingAlgorithm();
+                                    ad.changeRfChannel(DEFAULT_CHANNEL);
                                 #else
                                     // TODO remove clearing data
                                     ad.abortAddressing();

@@ -26,6 +26,8 @@ namespace Comms {
         vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_HIGH));
 
         mSendingDataMutex = xSemaphoreCreateMutex();
+        mFirstSetupSemaphore = xSemaphoreCreateBinary();
+        xSemaphoreGive(mFirstSetupSemaphore);
 
         createQueues();
 
@@ -48,6 +50,7 @@ namespace Comms {
         deleteSetupHC12Queues();
 
         vSemaphoreDelete(mSendingDataMutex);
+        vSemaphoreDelete(mFirstSetupSemaphore);
 
         digitalWrite(SET_PIN, LOW);
 
@@ -100,11 +103,13 @@ namespace Comms {
         }
     }
 
-    void HC12::changeRFChannel(uint8_t channel) {
+    void HC12::firstChangeRFChannel(uint8_t channel) {
         if (channel < DEFAULT_CHANNEL || channel > MAX_CHANNEL) {
             mpLogger->errorv("HC12 Method", "RF channel on HC12 module must be set between 1 - 127, but got:", channel);
             channel = DEFAULT_CHANNEL;
         }
+
+        xSemaphoreTake(mFirstSetupSemaphore, portMAX_DELAY);
 
         uint8_t commandBuffer[8];
         char messageBuffer[8];
@@ -270,6 +275,14 @@ namespace Comms {
 
         for (;;) {
             if (xQueueReceive(hc12.mTransmitQueue, transmitBuffer, pdMS_TO_TICKS(SUSPEND_TASK_TIME_SHORT)) == pdTRUE) {
+                // if semaphore is signalizing that setup should be done first, wait until semaphore is back
+                if (uxSemaphoreGetCount(hc12.mFirstSetupSemaphore) == 0) {
+                    if (xSemaphoreTake(hc12.mFirstSetupSemaphore, pdMS_TO_TICKS(FIRST_SETUP_SEMAPHORE_TIMEOUT)) == pdFALSE) {
+                        hc12.mpLogger->warning("HC12 FreeRTOS", "mFirstSetupSemaphore timeout");
+                    }
+                    xSemaphoreGive(hc12.mFirstSetupSemaphore);
+                }
+
                 xSemaphoreTake(hc12.mSendingDataMutex, portMAX_DELAY);
 
                 // TODO consider making this delay more "intelligent" (eg. by cooldown timer)
@@ -379,6 +392,10 @@ namespace Comms {
 
     void HC12::createSetupHC12Task() {
         xSemaphoreTake(mSendingDataMutex, portMAX_DELAY);
+
+        // signalize that setup has started working (if setup isn't forced to be done first, it will do nothing)
+        xSemaphoreGive(mFirstSetupSemaphore);
+
         digitalWrite(SET_PIN, LOW);
         vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_LOW));
 

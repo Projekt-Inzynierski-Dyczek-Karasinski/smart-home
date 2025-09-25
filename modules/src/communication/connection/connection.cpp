@@ -32,6 +32,7 @@ namespace Comms {
         const std::shared_ptr<ul::Logger> &logger
     ) : mpCommunication(communication), mpAddressing(addressing), mpRfModule(rfModule), mpLogger(logger) {
         mConnectionDataMutex = xSemaphoreCreateMutex();
+        // mReadyToTransmit = xSemaphoreCreateBinary();
         mspConnection = this;
         // TODO !BEFORE PULL REQUEST! remove new instance of logger
         // const auto tmpLogger = std::make_shared<ul::Logger>(ul::Level::DEBUG);
@@ -47,6 +48,37 @@ namespace Comms {
         // deleteConnectionQueues();
         deleteConnectionTimers();
         vSemaphoreDelete(mConnectionDataMutex);
+        // vSemaphoreDelete(mReadyToTransmit);
+    }
+
+    void Connection::messageDecider(const uint8_t receivedMessage[MESSAGE_SIZE]) {
+        uint8_t sendBuffer[MESSAGE_SIZE];
+        // TODO consider changing if else statements to switch case
+        // TODO remove test messages before merge with main
+        if (uah::areArraysEqual(receivedMessage, (uint8_t*)CONNECTION_END, 5)) {
+            endConnection();
+        } else if (uah::areArraysEqual(receivedMessage, (uint8_t*)CONNECTION_AFFIRM, 4)) {
+            uah::prepareBuffer(sendBuffer, (uint8_t*)CONNECTION_END, 5, MESSAGE_SIZE);
+            mpCommunication->sendMessage(sendBuffer);
+            endConnection();
+        } else if (uah::areArraysEqual(receivedMessage, (uint8_t*)CONNECTION_TEST_EXECUTE, 5)) {
+            uah::prepareBuffer(sendBuffer, (uint8_t*)CONNECTION_AFFIRM, 4, MESSAGE_SIZE);
+            mpCommunication->sendMessage(sendBuffer);
+        } else if (uah::areArraysEqual(receivedMessage, (uint8_t*)CONNECTION_TEST_GET, 6)) {
+            uah::prepareBuffer(sendBuffer, (uint8_t*)CONNECTION_RE_TEST_GET, 26, MESSAGE_SIZE);
+            mpCommunication->sendMessage(sendBuffer);
+        } else if (uah::areArraysEqual(receivedMessage, (uint8_t*)CONNECTION_RE_TEST_GET, 26)) {
+            uah::prepareBuffer(sendBuffer, (uint8_t*)CONNECTION_END, 5, MESSAGE_SIZE);
+            mpCommunication->sendMessage(sendBuffer);
+            endConnection();
+        } else {
+            mpLogger->warninga(
+                    "Connection Message Decider",
+                    "Received custom receivedMessage.\nIgnored receivedMessage: ",
+                    receivedMessage,
+                    MESSAGE_SIZE
+                );
+        }
     }
 
     void Connection::receivingHandle(const uint8_t ip) {
@@ -70,10 +102,17 @@ namespace Comms {
         if (!mIsConnected) {
             mpLogger->debug("Connection Class", "Connection start.");
             mIsConnected = true;
-            mpRfModule->changeRFChannel(mpAddressing->getConnectionRFChannel());
+            // reset semaphore
+            // xSemaphoreTake(mReadyToTransmit, 0);
+            mpRfModule->firstChangeRFChannel(mpAddressing->getConnectionRFChannel());
+
+            // if (xSemaphoreTake(mReadyToTransmit, pdMS_TO_TICKS(CONNECTION_SEMAPHORE_TIMEOUT)) == pdFALSE) {
+            //     mpLogger->warning("Connection FreeRTOS", "Did not get notification after changing rf channel.");
+            // }
         }
         xSemaphoreGive(mConnectionDataMutex);
         mpLogger->debug("Connection Class", "tmp.");
+        // vTaskDelay(pdMS_TO_TICKS(200));
     }
 
     void Connection::endConnection() {
@@ -89,7 +128,7 @@ namespace Comms {
 
         mpAddressing->setProtocolIPAddress(NULL_IP); // do anything only for Central Unit
         #ifdef RF_CHANNELS
-            mpRfModule->changeRFChannel(mpAddressing->getDefaultRFChannel());
+            mpRfModule->firstChangeRFChannel(mpAddressing->getDefaultRFChannel());
         #else
            #error "Not implemented"
         #endif

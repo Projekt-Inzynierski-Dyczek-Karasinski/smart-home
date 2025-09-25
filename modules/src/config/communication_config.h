@@ -38,6 +38,7 @@
 #define START_ACK_NUMBER 1
 // TODO assign final value
 #define CONNECTION_TIMEOUT 10000 // 10s
+#define CONNECTION_SEMAPHORE_TIMEOUT 100 // 0.1s
 // TODO assign final value
 #define CONNECTION_MAX_ATTEMPTS 3
 
@@ -46,3 +47,11 @@
 #define REPEAT_MESSAGE "repeat"
 #define PING_MESSAGE "ping\0\0"
 #define RE_PING_MESSAGE "reping"
+
+// connection messages
+#define CONNECTION_END "COend"
+#define CONNECTION_AFFIRM "COok"
+#define CONNECTION_TEST_EXECUTE "COexe"
+#define CONNECTION_TEST_GET "COtest"
+#define CONNECTION_RE_TEST_GET "COsending_some_data_123..."
+

@@ -61,12 +61,6 @@ namespace Comms {
         xQueueSend(mReceiveMessageQueue, message, portMAX_DELAY);
     }
 
-    // void Communication::suspendConnectionTask() const {
-    //     constexpr uint8_t notificationValue = SUSPEND_CONNECTION_TASK_NOTIF;
-    //     xQueueSend(mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
-    // }
-
-
     // ================================================================
 
     // ================== Constructor and Destructor ==================
@@ -160,8 +154,12 @@ namespace Comms {
 
         // TODO consider changing if else statements to switch case
         if (xQueueReceive(mReceiveMessageQueue, buffer, 0) == pdTRUE) {
+            // if it is connection message
+            if (buffer[0] == (uint8_t)'C' && buffer[1] == (uint8_t)'O') {
+                mpConnection->messageDecider(buffer);
+            }
             // if it is "repeat" message repeat last transmitted message
-            if (uah::areArraysEqual(buffer, (uint8_t*)REPEAT_MESSAGE, SPECIAL_MESSAGE_LEN)) {
+            else if (uah::areArraysEqual(buffer, (uint8_t*)REPEAT_MESSAGE, SPECIAL_MESSAGE_LEN)) {
                 repeatLastTransmittedMessage();
             }
             // if it is "ping", reply to ping
@@ -173,8 +171,8 @@ namespace Comms {
                 xTimerStop(mPingTimeoutTimer, portMAX_DELAY);
                 mpLogger->info("Communication Main", "Ping Success");
             }
-            // TODO !BEFORE PULL REQUEST! check if addressing work properly after changing API
-            // if is addressing message
+            // TODO consider changing isReadingRawMessage flag to mpAddressing->getIsAddressingWorking()
+            // if it is addressing message
             else if ((buffer[0] == (uint8_t)'A' && buffer[1] == (uint8_t)'D') || *isReadingRawMessage) {
                 *isReadingRawMessage = false;
                 mpAddressing->addMessage(buffer);
@@ -606,6 +604,7 @@ namespace Comms {
                     com.prepareChecksum(protocolBuffer);
                     com.mpRfModule->addMessageToTransmit(protocolBuffer);
 
+                    // TODO change to debug
                     com.mpLogger->debuga("Communication Encode", "Protocol buffer: ", protocolBuffer, PROTOCOL_SIZE, false);
                     com.mpLogger->debuga("Communication Encode", "Protocol message: ", &protocolBuffer[PROTOCOL_MESSAGE_START_INDEX], PROTOCOL_MESSAGE_LENGTH);
                 }
@@ -681,7 +680,7 @@ namespace Comms {
                         uint8_t test[MESSAGE_SIZE];
                         uah::prepareBuffer(test, (uint8_t*)ADDRESSING_NC_REAL_MAC_RF_CHANNELS, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
                         uah::printArrayAsInt(test, MESSAGE_SIZE);
-                        // com.mpRfModule->changeRFChannel(1);
+                        // com.mpRfModule->firstChangeRFChannel(1);
                     }
                     #ifdef ESP32_BOARD
                         else if (uah::areArraysEqual(buffer, (uint8_t*)"reboot", 6)) {

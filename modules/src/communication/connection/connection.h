@@ -45,6 +45,8 @@ namespace Comms {
         Connection(const Connection&) = delete;
         Connection& operator = (const Connection&) = delete;
 
+        void messageDecider(const uint8_t receivedMessage[MESSAGE_SIZE]);
+
         void receivingHandle(uint8_t ip);
         void sendingHandle();
         void endConnection();
@@ -81,7 +83,8 @@ namespace Comms {
 
         bool mIsConnected = false;
 
-        xSemaphoreHandle mConnectionDataMutex = nullptr;
+        SemaphoreHandle_t mConnectionDataMutex = nullptr;
+        // xSemaphoreHandle mReadyToTransmit = nullptr;
 
         TimerHandle_t mConnectionTimeoutTimer = nullptr;
     };
