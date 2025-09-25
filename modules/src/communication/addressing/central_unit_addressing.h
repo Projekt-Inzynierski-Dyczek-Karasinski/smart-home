@@ -24,7 +24,7 @@ namespace Comms {
      * Ensures thread-safe updates and provides centralized management of addressing data.
      * Inherits addressing utilities from the Addressing base class.
     */
-    class CentralUnitAddressing final : public Addressing{
+    class CentralUnitAddressing final : public Addressing {
     public:
         /**
          * @brief Constructs a CentralUnitAddressing object and sets default values for addressing variables.
@@ -38,7 +38,6 @@ namespace Comms {
          */
         ~CentralUnitAddressing() override;
 
-        // TODO !BEFORE PULL REQUEST! check comment
         /**
          * @brief Gets rf channel of the module which central unit is trying to connect.
          * @return RF Channel.
@@ -46,7 +45,6 @@ namespace Comms {
          */
         uint8_t getConnectionRFChannel() override;
 
-        // TODO !BEFORE PULL REQUEST! check comment
         /**
          * @brief Gets default rf channel.
          * @return RF channel.
@@ -68,24 +66,24 @@ namespace Comms {
         void setProtocolIPAddress(uint8_t ip) override;
 
         /**
-         * @brief Checks if given MAC address is propper.
-         * @details If central unit is waiting for new connection message, it will accept any MAC address,
-         * otherwise checks if given mac is same as <code>mProtocolMACAddress</code>.
+         * @brief Checks if given MAC address is proper.
+         * @details If the central unit is waiting for a new connection message, it will accept any MAC address,
+         * otherwise checks if the given MAC address is the same as <code>mProtocolMACAddress</code>.
          * @param mac MAC address to check.
-         * @return True if MAC address is propper, false otherwise.
+         * @return True if MAC address is proper, false otherwise.
          * @note Thread-safe.
          */
-        bool isMACPropper(const uint8_t *mac) override;
+        bool isMACProper(const uint8_t *mac) override;
 
         /**
-         * @brief Checks if given IP address is propper.
-         * @details If central unit is waiting for new connection message, it will accept only IP address = <code>NULL_IP</code>,
+         * @brief Checks if the given IP address is proper.
+         * @details If the central unit is waiting for a new connection message, it will accept only IP address = <code>NULL_IP</code>,
          * otherwise it accepts any IP address that isn't <code>NULL_IP</code> or <code>CENTRAL_UNIT_IP</code>.
          * @param ip IP address to check.
-         * @return True if IP address is propper, false otherwise.
+         * @return True if IP address is proper, false otherwise.
          * @note Thread-safe.
          */
-        bool isIpPropper(uint8_t ip) override;
+        bool isIpProper(uint8_t ip) override;
 
     private:
         /**
@@ -124,7 +122,6 @@ namespace Comms {
          */
         void createAddressingTimer() override;
 
-        // TODO consider changing this:
         /**
          * @brief Prints information about all modules' addressing data to the serial output.
          * @warning This is special debug method that prints by its own. That print is <b>not</b> thread-safe, (only printing is not thread-safe).
@@ -212,8 +209,8 @@ namespace Comms {
 
         AddressingData mModulesAddressingData[MAX_NUM_OF_MODULES]; ///< Array containing addressing data for all registered modules.
         uint8_t mNumOFModulesOnRfChannel[MAX_CHANNEL]{}; ///< Array containing the number of modules assigned to each RF channel.
-        uint8_t mTmpModuleIp = NULL_IP; ///< IP address of the module currently being addressed. // TODO remember to clear that after end of new connection
-        bool mIsStartOfAddressing = false; ///< Flag indicating that is waiting for new connection message, so will accept any MAC address.
+        uint8_t mTmpModuleIp = NULL_IP; ///< IP address of the module currently being addressed.
+        bool mIsStartOfAddressing = false; ///< Flag indicating that it is waiting for a new connection message, so will accept any MAC address.
 
         SemaphoreHandle_t mModulesAddressingDataMutex = nullptr; ///< Handle to mutex protecting access to modules addressing data.
     };

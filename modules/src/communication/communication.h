@@ -91,6 +91,12 @@ namespace Comms {
          */
         void sendInternalMessage(const uint8_t message[MESSAGE_SIZE]) const;
 
+        /**
+         * @brief Call rf module's method <code>firstChangeRFChannel()</code>.
+         * @param channel Channel to change.
+         */
+        void changeRFChannel(uint8_t channel) const;
+
     private:
         /**
          * @brief Private constructor for singleton pattern.
@@ -267,7 +273,7 @@ namespace Comms {
 
         static Communication *mspCommunication;
         DebugLED *mpDebugLED; ///< Pointer to debugLED class instance.
-        Connection *mpConnection;
+        Connection *mpConnection; ///< Pointer to Connection class instance.
 
         #ifdef HC12_MODULE
             std::shared_ptr<HC12> mpRfModule; ///< Pointer to class instance responsible for transmitting and receiving RF messages.
@@ -308,7 +314,6 @@ namespace Comms {
         QueueHandle_t mMainNotificationsQueue = nullptr; ///< Handle to FreeRTOS queue for notifications for the Main task, queue length: 5 bytes (uint8_t).
         QueueHandle_t mReceiveMessageQueue = nullptr; ///< Handle to FreeRTOS queue for received (decoded and internal) messages, queue length: 10x64 bytes (uint8_t).
         QueueHandle_t mReceiveByteQueue = nullptr; ///< Handle to FreeRTOS queue for bytes to decode get from RF transmission, queue length: 128 bytes (uint8_t).
-        // TODO !BEFORE PULL REQUEST! update comment
         QueueHandle_t mEncodeMessagesQueue = nullptr; ///< Handle to FreeRTOS queue for messages to encode and RF transmission, queue length: 10x64 bytes (uint8_t).
 
         TaskHandle_t mCommunicationMainTaskHandle = nullptr; ///< Handle to FreeRTOS main communication task.

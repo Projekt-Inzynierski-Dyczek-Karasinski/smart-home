@@ -33,14 +33,8 @@
 // TODO assign final value
 #define DELAY_BETWEEN_MESSAGES 40
 
-#define ACK_NUMBER_INDEX 0
-#define SPECIAL_ACK_NUMBER 255
-#define START_ACK_NUMBER 1
-// TODO assign final value
 #define CONNECTION_TIMEOUT 10000 // 10s
 #define CONNECTION_SEMAPHORE_TIMEOUT 100 // 0.1s
-// TODO assign final value
-#define CONNECTION_MAX_ATTEMPTS 3
 
 // special messages
 #define SPECIAL_MESSAGE_LEN 6

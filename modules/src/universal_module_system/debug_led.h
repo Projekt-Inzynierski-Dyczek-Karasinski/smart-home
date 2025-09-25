@@ -6,6 +6,7 @@
 #include "utils/logger.h"
 
 // TODO change to thread-save singleton and change some methods and vars to nonstatic
+// TODO consider adding namespace for universal module system
 namespace ul = Utils::Logging;
 
 /**

@@ -7,13 +7,15 @@ namespace Utils {
          * @brief Prints given uint8_t array as a char array.
          * @param array Array to be printed.
          * @param len Length of the array.
+         * @warning This function is <b>not</b> thread-safe, use it only for debugging.
          */
         void printArrayAsChar(const uint8_t *array, uint8_t len);
 
         /**
-         * @brief Prints given uint8_t array as a int array.
+         * @brief Prints given uint8_t array as an int array.
          * @param array Array to be printed.
          * @param len Length of the array.
+         * @warning This function is <b>not</b> thread-safe, use it only for debugging.
          */
         void printArrayAsInt(const uint8_t *array, uint8_t len);
 

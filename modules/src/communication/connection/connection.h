@@ -27,12 +27,7 @@ namespace Comms {
         #error "Not implemented"
     #endif
 
-    // enum class ConnectionStatus : uint8_t {
-    //     DISCONNECTED = 0,
-    //     TRYING_TO_CONNECT,
-    //     CONNECTED,
-    // };
-
+    // TODO !BEFORE PULL REQUEST! add comments
     class Connection {
     public:
         #ifdef CENTRAL_UNIT
@@ -49,7 +44,6 @@ namespace Comms {
 
         void receivingHandle(uint8_t ip);
         void sendingHandle();
-        void endConnection();
 
     private:
         #ifdef CENTRAL_UNIT
@@ -59,11 +53,11 @@ namespace Comms {
         #endif
         ~Connection();
 
-        void startConnection();
-
         static void connectionTimersCallbacks(TimerHandle_t xTimer);
         void createConnectionTimers();
         void deleteConnectionTimers();
+
+        void endConnection();
 
         static Connection *mspConnection;
         Communication *mpCommunication; ///< Pointer to the Communication class instance.
@@ -84,7 +78,6 @@ namespace Comms {
         bool mIsConnected = false;
 
         SemaphoreHandle_t mConnectionDataMutex = nullptr;
-        // xSemaphoreHandle mReadyToTransmit = nullptr;
 
         TimerHandle_t mConnectionTimeoutTimer = nullptr;
     };

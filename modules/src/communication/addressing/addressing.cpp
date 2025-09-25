@@ -13,7 +13,7 @@ namespace uah = Utils::ArrayHandlers;
 
 
 namespace Comms {
-// ============================ Public ============================
+    // ============================ Public ============================
     Addressing::Addressing(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
         : mpCommunication(communication) {
         #ifdef ESP32_BOARD
@@ -25,7 +25,7 @@ namespace Comms {
         #endif
         mpLogger = logger;
 
-        // TODO !BEFORE PULL REQUEST! remove
+        // TODO merge with main remove
         #ifdef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
             const uint8_t tmpMAC[] = {1,1,1,1,1,1};
             uah::prepareBuffer(mProtocolMACAddress, tmpMAC, 6,6);
@@ -88,10 +88,8 @@ namespace Comms {
             mpLogger->warning("Addressing FreeRTOS", "Can't add message to queue, because queue doesn't exist.");
         }
     }
-// ================================================================
 
-// ============================ Queues ============================
-
+    // ============================ Queues ============================
     void Addressing::createAddressingQueue() {
         if (mAddressingQueue == nullptr) {
             mAddressingQueue = xQueueCreate(MESSAGE_QUEUE_LEN, sizeof(uint8_t[MESSAGE_SIZE]));
@@ -104,10 +102,8 @@ namespace Comms {
             mAddressingQueue = nullptr;
         }
     }
-// =================================================================
 
-// ============================ Deletes ============================
-
+    // ============================ Deletes ============================
     void Addressing::deleteAddressingTask() {
         if (mAddressingTaskHandle != nullptr) {
             vTaskDelete(mAddressingTaskHandle);
@@ -120,10 +116,8 @@ namespace Comms {
             mAddressingTimeoutTimer = nullptr;
         }
     }
-// ================================================================
 
-// ============================ Other =============================
-
+    // ============================ Other =============================
     void Addressing::sendRestartMessage() {
         mpCommunication->sendMessage((uint8_t*)ADDRESSING_RESTART);
         clearNewConnectionData();
@@ -151,15 +145,4 @@ namespace Comms {
 
         return false;
     }
-
-    #ifdef HC12_MODULE
-        void Addressing::changeRfChannel(const uint8_t newRfChannel) const {
-            uint8_t hc12Command[SETUP_COMMAND_SIZE];
-            uah::prepareBuffer(hc12Command, (uint8_t*)"HC+C000", 7, SETUP_COMMAND_SIZE);
-            hc12Command[6] = (newRfChannel % 10) + (uint8_t)'0';
-            hc12Command[5] = ((newRfChannel / 10) % 10) + (uint8_t)'0';
-            hc12Command[4] = (newRfChannel / 100) + (uint8_t)'0';
-            mpCommunication->sendInternalMessage(hc12Command);
-        }
-    #endif
 }

@@ -30,7 +30,6 @@
 #endif
 
 // TODO change API Calls to numeric values
-// TODO !BEFORE PULL REQUEST! check if addressing work properly after changing API
 
 // ===================== Addressing API Calls =====================
 

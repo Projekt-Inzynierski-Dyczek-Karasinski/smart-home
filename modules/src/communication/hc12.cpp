@@ -14,8 +14,7 @@ namespace uah = Utils::ArrayHandlers;
 namespace Comms {
     HC12* HC12::mspHC12 = nullptr;
 
-// ============================ Public ============================
-
+    // ============================ Public ============================
     HC12::HC12(Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
         mpCommunication = communication;
         mspHC12 = this;
@@ -117,9 +116,8 @@ namespace Comms {
         uah::prepareBuffer(commandBuffer, (uint8_t*)messageBuffer, 7, SETUP_COMMAND_SIZE);
         setupHC12(commandBuffer);
     }
-// ================================================================
 
-// ============================ Queues ============================
+    // ============================ Queues ============================
     void HC12::createQueues() {
         if (mMainNotificationsQueue == nullptr) {
             mMainNotificationsQueue = xQueueCreate(NOTIFICATIONS_QUEUE_SIZE, sizeof(uint8_t));
@@ -160,10 +158,7 @@ namespace Comms {
         }
     }
 
-// ================================================================
-
-// ========================== HC12 Main ===========================
-
+    // ========================== HC12 Main ===========================
     void HC12::hc12OutputDecider(const uint8_t *hc12Output, const bool *isSetupHC12Working, bool *isWaitingForSendConfirmation) const {
         if (*isWaitingForSendConfirmation) {
             *isWaitingForSendConfirmation = false;
@@ -264,10 +259,8 @@ namespace Comms {
             mHC12MainTaskHandle = nullptr;
         }
     }
-// ================================================================
 
-// ========================== Send Task ===========================
-
+    // ========================== Send Task ===========================
     void HC12::transmitTask(void *parameters) {
         const auto &hc12 = *mspHC12;
 
@@ -337,10 +330,8 @@ namespace Comms {
             mTransmitTaskHandle = nullptr;
         }
     }
-// ================================================================
 
-// ========================== Setup HC12 ==========================
-
+    // ========================== Setup HC12 ==========================
     void HC12::setupHC12Task(void *parameters) {
         const auto &hc12 = *mspHC12;
 

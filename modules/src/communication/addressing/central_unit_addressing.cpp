@@ -31,7 +31,7 @@ namespace Comms {
         xSemaphoreGive(mModulesAddressingDataMutex);
 
 
-        // TODO !BEFORE PULL REQUEST! remove
+        // TODO before merge with main remove
         #ifdef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
             uint8_t tmpMAC[] = {1,1,1,1,1,1};
             addModule(tmpMAC, true, 2);
@@ -45,7 +45,6 @@ namespace Comms {
         vSemaphoreDelete(mModulesAddressingDataMutex);
     }
 
-    // TODO !BEFORE PULL REQUEST! check if works correctly
     uint8_t CentralUnitAddressing::getConnectionRFChannel() {
         uint8_t rfChannel = DEFAULT_CHANNEL;
         xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
@@ -53,7 +52,7 @@ namespace Comms {
             const AddressingData moduleData = mModulesAddressingData[ipToIndex(mTmpModuleIp)];
             rfChannel = moduleData.rfChannel;
         } else {
-            mpLogger->warning("CentralUnitAddressing getConnectionRFChannel()", "No module selected, returning DEFAULT_CHANNEL.");
+            mpLogger->warning("CentralUnitAddressing Method", "No module selected.");
         }
         xSemaphoreGive(mModulesAddressingDataMutex);
         return rfChannel;
@@ -92,7 +91,7 @@ namespace Comms {
         }
     }
 
-    bool CentralUnitAddressing::isMACPropper(const uint8_t *mac) {
+    bool CentralUnitAddressing::isMACProper(const uint8_t *mac) {
         bool result = false;
         if (getIsStartOfAddressing()) {
             result = true;
@@ -104,20 +103,19 @@ namespace Comms {
         return result;
     }
 
-    bool CentralUnitAddressing::isIpPropper(const uint8_t ip) {
+    bool CentralUnitAddressing::isIpProper(const uint8_t ip) {
         bool result = true;
         if ((getIsStartOfAddressing() && ip != NULL_IP) || (!getIsStartOfAddressing() && (ip == CENTRAL_UNIT_IP || ip == NULL_IP))) {
             result = false;
         }
         return result;
     }
-    // ================================================================
 
     // ===================== Addressing Algorithm =====================
     void CentralUnitAddressing::prepareSummary(uint8_t *sendBuffer, const AddressingData *moduleData) {
         // TODO change API Calls to numeric values
         // prepare summary data (data without mac)
-        const uint8_t summaryData[] = { // TODO !BEFORE PULL REQUEST! check if addressing work properly after changing API
+        const uint8_t summaryData[] = {
             (uint8_t)'i',
             moduleData->ipAddress,
             (uint8_t)'c',
@@ -175,14 +173,14 @@ namespace Comms {
 
                             // send module information about module's new IP address and rf channel
                             uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_NEW_IP_NEW_RF_CHANNEL, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
-                            sendBuffer[3] = moduleNewIP; // TODO !BEFORE PULL REQUEST! check if addressing work properly after changing API
+                            sendBuffer[3] = moduleNewIP;
                             sendBuffer[5] = moduleNewRfChannel;
                             ad.mpCommunication->sendMessage(sendBuffer);
 
                             // wait for "repeat" message and
                             vTaskDelay(pdMS_TO_TICKS(ADDRESSING_MESSAGE_TIMEOUT/4));
                             // change rf channel
-                            ad.changeRfChannel(moduleNewRfChannel);
+                            ad.mpCommunication->changeRFChannel(moduleNewRfChannel);
                             // give module time to switch rf channel
                             vTaskDelay(pdMS_TO_TICKS(ADDRESSING_MESSAGE_TIMEOUT/4));
                             // go to next stage
@@ -242,12 +240,12 @@ namespace Comms {
                             if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_SUMMARY_OK, SPECIAL_MESSAGE_LEN)) {
                                 isReceivedPropperMessage = true;
                                 ad.mpLogger->info("CentralUnitAddressing Main", "Addressing complete." );
-                                // TODO remove #ifndef directive and #else section before merge with main
+                                // TODO before merge with main remove #ifndef directive and #else section
                                 #ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
                                     // TODO add saving data in flash memory
                                     ad.setTmpModuleIp(NULL_IP);
                                     ad.mpCommunication->stopAddressingAlgorithm();
-                                    ad.changeRfChannel(DEFAULT_CHANNEL);
+                                    ad.mpCommunication->changeRFChannel(DEFAULT_CHANNEL);
                                 #else
                                     // TODO remove clearing data
                                     ad.abortAddressing();
@@ -304,10 +302,7 @@ namespace Comms {
         }
     }
 
-    // ================================================================
-
     // ============================ Timers ============================
-
     void CentralUnitAddressing::addressingTimersCallbacks(TimerHandle_t xTimer) {
         auto &ad = *mspAddressing;
 
@@ -327,7 +322,6 @@ namespace Comms {
             );
         }
     }
-    // ================================================================
 
     // =================== Modules Addressing Data ====================
     void CentralUnitAddressing::printModulesAddressingData() const {
@@ -468,7 +462,6 @@ namespace Comms {
         mTmpModuleIp = ip;
         xSemaphoreGive(mModulesAddressingDataMutex);
     }
-    // ================================================================
 
     // ============================ Other =============================
     void CentralUnitAddressing::clearNewConnectionData() {
@@ -478,7 +471,7 @@ namespace Comms {
             removeModule(tmpModuleIp);
         }
 
-        mpCommunication->sendInternalMessage((uint8_t*)"HC+DEFAULT");
+        mpCommunication->changeRFChannel(DEFAULT_CHANNEL);
         vTaskDelay(pdMS_TO_TICKS(ADDRESSING_DELAY_BETWEEN_ATTEMPTS));
         xQueueReset(mAddressingQueue);
     }

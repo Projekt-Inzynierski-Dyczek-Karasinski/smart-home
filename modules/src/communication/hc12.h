@@ -59,10 +59,10 @@ namespace Comms {
          */
         void setupHC12(const uint8_t *commands);
 
-        // TODO !BEFORE PULL REQUEST! check this comment
         /**
          * @brief Shortcut method for changing RF channel on HC12.
          * @param channel Channel to change (<b>1 - 127</b>).
+         * @note Ensures that after calling this method, the RF channel will be changed first, and only then will messages be transmitted.
          */
         void firstChangeRFChannel(uint8_t channel);
 
@@ -158,7 +158,7 @@ namespace Comms {
         } mHC12MainNotifications;
 
         SemaphoreHandle_t mSendingDataMutex = nullptr; ///< Handle to FreeRTOS mutex protecting access to UART transmission to HC12 module.
-        SemaphoreHandle_t mFirstSetupSemaphore = nullptr;
+        SemaphoreHandle_t mFirstSetupSemaphore = nullptr; ///< Handle to FreeRTOS binary semaphore indicating that setup should be done first.
 
         QueueHandle_t mMainNotificationsQueue = nullptr; ///< Handle to FreeRTOS queue for notifications for the Main task, queue length: 5 bytes (uint8_t).
         QueueHandle_t mTransmitQueue = nullptr; ///< Handle to FreeRTOS queue for (encoded) messages to transmit, queue length: 11x16 bytes (uint8_t).

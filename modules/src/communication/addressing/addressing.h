@@ -39,7 +39,6 @@ namespace Comms {
          */
         void getProtocolMACAddress(uint8_t macAddress[MAC_ADDRESS_LENGTH]) const;
 
-        // TODO !BEFORE PULL REQUEST! check comment
         /**
          * @brief Pure virtual getter for rf channel when device starts new connection.
          * @return RF Channel.
@@ -47,7 +46,6 @@ namespace Comms {
          */
         virtual uint8_t getConnectionRFChannel() = 0;
 
-        // TODO !BEFORE PULL REQUEST! check comment
         /**
          * @brief Pure virtual getter for rf channel when device is listening.
          * @return RF Channel.
@@ -71,20 +69,20 @@ namespace Comms {
         virtual void setProtocolIPAddress(uint8_t ip);
 
         /**
-         * @brief Pure virtual function checking if given mac address is propper.
+         * @brief Pure virtual function checking if given mac address is proper.
          * @param mac MAC address to check.
-         * @return True if MAC address is propper, false otherwise.
+         * @return True if MAC address is proper, false otherwise.
          * @warning Must be implemented by derived class.
          */
-        virtual bool isMACPropper(const uint8_t* mac) = 0;
+        virtual bool isMACProper(const uint8_t* mac) = 0;
 
         /**
-         * @brief Pure virtual function checking if given IP address is propper.
+         * @brief Pure virtual function checking if given IP address is proper.
          * @param ip IP address to check.
-         * @return True if IP address is propper, false otherwise.
+         * @return True if IP address is proper, false otherwise.
          * @warning Must be implemented by derived class.
          */
-        virtual bool isIpPropper(uint8_t ip) = 0;
+        virtual bool isIpProper(uint8_t ip) = 0;
 
         /**
          * @brief Initializes addressing procedures and related FreeRTOS resources.
@@ -177,14 +175,6 @@ namespace Comms {
          */
         bool isAddressingFailed(const uint8_t *receiveBuffer);
 
-        // TODO move this method to HC12 class when adding handling with propper mac and ip in decoding message task
-        #ifdef HC12_MODULE
-            /**
-             * @brief Prepares and sends HC12 command to change RF channel.
-             * @param newRfChannel New RF channel.
-             */
-            void changeRfChannel(uint8_t newRfChannel) const;
-        #endif
         // TODO add led blinking indicating restart, success and failure of addressing
         // void restartLedBlink();
         // void successLedBlink();

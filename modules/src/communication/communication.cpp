@@ -14,7 +14,6 @@ namespace Comms {
     Communication* Communication::mspCommunication = nullptr;
 
     // ============================ Public ============================
-
     Communication &Communication::getInstance(DebugLED *debugLED, const std::shared_ptr<ul::Logger> &logger) {
         static Communication instance(debugLED, logger);
         return instance;
@@ -61,10 +60,11 @@ namespace Comms {
         xQueueSend(mReceiveMessageQueue, message, portMAX_DELAY);
     }
 
-    // ================================================================
+    void Communication::changeRFChannel(uint8_t channel) const {
+        mpRfModule->firstChangeRFChannel(channel);
+    }
 
     // ================== Constructor and Destructor ==================
-
     Communication::Communication(DebugLED *debugLED, const std::shared_ptr<ul::Logger> &logger) :
         #ifdef HC12_MODULE
             mpRfModule(new HC12(this, logger)),
@@ -108,10 +108,7 @@ namespace Comms {
         vSemaphoreDelete(mLastTransmittedMessageMutex);
     }
 
-    // ================================================================
-
     // ============================ Queues ============================
-
     void Communication::createCommunicationQueues() {
         if (mMainNotificationsQueue == nullptr) {
             mMainNotificationsQueue = xQueueCreate(NOTIFICATIONS_QUEUE_SIZE, sizeof(uint8_t));
@@ -145,10 +142,8 @@ namespace Comms {
             mMainNotificationsQueue = nullptr;
         }
     }
-    // ================================================================
 
     // ====================== Communication Main ======================
-
     void Communication::receivedMessageDecider(bool *isReadingRawMessage) {
         uint8_t buffer[MESSAGE_SIZE];
 
@@ -178,7 +173,6 @@ namespace Comms {
                 mpAddressing->addMessage(buffer);
             }
             // if is HC12 command
-            // TODO !BEFORE PULL REQUEST! decide what to do with HC12 commands and tcp
             #ifdef HC12_MODULE
                 else if (buffer[0] == (uint8_t)'H' && buffer[1] == (uint8_t)'C') {
                     mpRfModule->setupHC12(buffer);
@@ -263,10 +257,6 @@ namespace Comms {
                     vTaskSuspend(com.mEncodeMessageTaskHandle);
                     break;
 
-                // case SUSPEND_CONNECTION_TASK_NOTIF:
-                //     com.mpConnection->suspendConnectionTask();
-                //     break;
-
                 case START_PINGING_NOTIF:
                     pingAttempts = 1;
                     com.transmitPing();
@@ -315,10 +305,8 @@ namespace Comms {
             mCommunicationMainTaskHandle = nullptr;
         }
     }
-    // ================================================================
 
     // ======================== Decode Message ========================
-
     bool Communication::isCheckSumCorrect(const uint8_t message[PROTOCOL_SIZE]) const {
         uint16_t checksum = 0;
         for (uint8_t i = 0; i < PROTOCOL_SIZE; i++) {
@@ -446,28 +434,26 @@ namespace Comms {
                         handleIncorrectMessage(isRawMessage);
                         com.mpLogger->warning("Communication Decode", "Bad checksum");
                     }
-                    // TODO remove #ifndef directive before merge with main
+                    // TODO before merge with main remove #ifndef directive
                     #ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
                     // if MAC is incorrect wait for possible rest of message and ignore it
-                    else if (!com.mpAddressing->isMACPropper(protocolBuffer[protoBuffMessageIndex])) {
+                    else if (!com.mpAddressing->isMACProper(protocolBuffer[protoBuffMessageIndex])) {
                         xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
-                        // TODO !BEFORE PULL REQUEST! change log to debug or info
-                        com.mpLogger->warning("Communication Decode", "Bad MAC");
+                        com.mpLogger->debug("Communication Decode", "Bad MAC");
                         vTaskDelay(pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT));
                         resetProtocolBuffer();
                         xQueueReset(com.mReceiveByteQueue);
                     }
-                    // TODO consider changing that approach (and "repeat" message logic in general) due to potential spam with multiple modules on one channel
+                    // TODO !BEFORE PULL REQUEST! move repeat message logic to Connection class, remember about "repeat" in addressing
                     // if IP is incorrect, check if is "repeat" message,
                     // if not wait for possible rest of message and ignore it, otherwise resend last message
-                    else if (!com.mpAddressing->isIpPropper(protocolBuffer[protoBuffMessageIndex][PROTOCOL_IP_INDEX])) {
+                    else if (!com.mpAddressing->isIpProper(protocolBuffer[protoBuffMessageIndex][PROTOCOL_IP_INDEX])) {
                         xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
                         if (uah::areArraysEqual(&protocolBuffer[protoBuffMessageIndex][PROTOCOL_MESSAGE_START_INDEX], (uint8_t*)REPEAT_MESSAGE, SPECIAL_MESSAGE_LEN)) {
                             resetProtocolBuffer();
                             com.repeatLastTransmittedMessage();
                         } else {
-                            // TODO !BEFORE PULL REQUEST! change log to debug or info
-                            com.mpLogger->warningv("Communication Decode", "Bad IP: ", protocolBuffer[protoBuffMessageIndex][PROTOCOL_IP_INDEX]);
+                            com.mpLogger->debugv("Communication Decode", "Bad IP: ", protocolBuffer[protoBuffMessageIndex][PROTOCOL_IP_INDEX]);
                             vTaskDelay(pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT));
                             resetProtocolBuffer();
                             xQueueReset(com.mReceiveByteQueue);
@@ -533,10 +519,8 @@ namespace Comms {
             mDecodeMessageTaskHandle = nullptr;
         }
     }
-    // ================================================================
 
     // ======================== Encode Message ========================
-
     void Communication::prepareChecksum(uint8_t protocolBuffer[PROTOCOL_SIZE]) {
         protocolBuffer[PROTOCOL_CHECKSUM_INDEX] = 0;
         uint16_t checkSum = 0;
@@ -639,9 +623,8 @@ namespace Comms {
             mEncodeMessageTaskHandle = nullptr;
         }
     }
-// ================================================================
 
-// =================== Terminal Input Message =====================
+    // =================== Terminal Input Message =====================
     #ifdef DEBUG_MODE
     void Communication::terminalInputTask(void *parameters) {
         const auto &com = *mspCommunication;
@@ -674,13 +657,6 @@ namespace Comms {
                     } else if (uah::areArraysEqual(buffer, (uint8_t*)"readraw", 7)) {
                         constexpr uint8_t notificationValue = READ_RAW_MESSAGE_NOTIF;
                         xQueueSendToFront(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
-                    }
-                    // TODO !BEFORE PULL REQUEST! remove
-                    else if (uah::areArraysEqual(buffer, (uint8_t*)"test", 4)) {
-                        uint8_t test[MESSAGE_SIZE];
-                        uah::prepareBuffer(test, (uint8_t*)ADDRESSING_NC_REAL_MAC_RF_CHANNELS, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
-                        uah::printArrayAsInt(test, MESSAGE_SIZE);
-                        // com.mpRfModule->firstChangeRFChannel(1);
                     }
                     #ifdef ESP32_BOARD
                         else if (uah::areArraysEqual(buffer, (uint8_t*)"reboot", 6)) {
@@ -754,9 +730,8 @@ namespace Comms {
         void Communication::createSendCustomMessageTask() {}
         void Communication::deleteSendCustomMessageTask() {}
     #endif
-// ================================================================
 
-// ============================ Timers ============================
+    // ============================ Timers ============================
     void Communication::communicationTimersCallbacks(TimerHandle_t xTimer){
         const auto &com = *mspCommunication;
 
@@ -820,9 +795,8 @@ namespace Comms {
             mReceiveMessageTimeoutTimer = nullptr;
         }
     }
-// ================================================================
 
-// ============================ Other =============================
+    // ============================ Other =============================
     void Communication::setLastTransmittedMessage() {
         xSemaphoreTake(mLastTransmittedMessageMutex, portMAX_DELAY);
         uah::clearBuffer(mLastTransmittedMessage, MESSAGE_SIZE);
@@ -870,5 +844,4 @@ namespace Comms {
         // xQueueSend(mSendMessagesQueue, buffer, portMAX_DELAY);
         sendMessage(buffer);
     }
-// ================================================================
 }

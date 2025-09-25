@@ -1,11 +1,7 @@
 #include "module_addressing.h"
 
-#include <Arduino.h>
-#include <memory>
-
 #include "smart_home_config.h"
 #include "config/communication_config.h"
-#include "config/addressing_config.h"
 
 #include "../../utils/uint8_array_handlers.h"
 #include "../../utils/logger.h"
@@ -17,13 +13,13 @@ namespace uah = Utils::ArrayHandlers;
 namespace Comms {
     ModuleAddressing* ModuleAddressing::mspAddressing = nullptr;
 
-// ============================ Public ============================
+    // ============================ Public ============================
     ModuleAddressing::ModuleAddressing(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
         : Addressing(communication, logger) {
         mspAddressing = this;
         mIPAddress = NULL_IP;
 
-        // TODO !BEFORE PULL REQUEST! remove
+        // TODO before merge with main remove
         #ifdef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
             mIPAddress = 2;
             mRfChannel = 2;
@@ -33,7 +29,6 @@ namespace Comms {
         mpLogger->info("ModuleAddressing Class", "ModuleAddressing initialized.");
     }
 
-    // TODO !BEFORE PULL REQUEST! check if works correctly
     uint8_t ModuleAddressing::getConnectionRFChannel() {
         return DEFAULT_CHANNEL;
     }
@@ -56,7 +51,7 @@ namespace Comms {
         return ipAddress;
     }
 
-    bool ModuleAddressing::isMACPropper(const uint8_t *mac) {
+    bool ModuleAddressing::isMACProper(const uint8_t *mac) {
         bool result = false;
         xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
         if (mIPAddress == NULL_IP || uah::areArraysEqual(mac, mProtocolMACAddress, MAC_ADDRESS_LENGTH)) {
@@ -66,7 +61,7 @@ namespace Comms {
         return result;
     }
 
-    bool ModuleAddressing::isIpPropper(const uint8_t ip) {
+    bool ModuleAddressing::isIpProper(const uint8_t ip) {
         bool result = false;
         xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
         if ((mIPAddress == NULL_IP && ip == CENTRAL_UNIT_IP) || ip == mIPAddress) {
@@ -75,9 +70,8 @@ namespace Comms {
         xSemaphoreGive(mAddressingDataMutex);
         return result;
     }
-// ================================================================
 
-// ===================== Addressing Algorithm =====================
+    // ===================== Addressing Algorithm =====================
     void ModuleAddressing::addressingTask(void* parameters) {
         auto &ad = *mspAddressing;
 
@@ -140,12 +134,12 @@ namespace Comms {
                                 ad.mpCommunication->sendMessage(sendBuffer);
 
                                 ad.mpLogger->info("ModuleAddressing Main", "Addressing complete." );
-                                // TODO remove #ifndef directive and #else section before merge with main
+                                // TODO before merge with main remove #ifndef directive and #else section
                                 #ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
-                                // TODO add saving data in flash memory
-                                ad.mpCommunication->stopAddressingAlgorithm();
+                                    // TODO add saving data in flash memory
+                                    ad.mpCommunication->stopAddressingAlgorithm();
                                 #else
-                                ad.abortAddressing();
+                                    ad.abortAddressing();
                                 #endif
                                 for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
                             } else {
@@ -178,22 +172,18 @@ namespace Comms {
                             // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
                             #ifdef RF_CHANNELS
                                 // check is received propper message (ADi?c?), indexes are offset due to reading raw message
-                                ad.mpLogger->errorv("ModuleAddressing TMP", "i: ", (char)receiveBuffer[10]);
-                                ad.mpLogger->errorv("ModuleAddressing TMP", "c: ", (char)receiveBuffer[12]);
-                                if (receiveBuffer[10] == (uint8_t)'i' && receiveBuffer[12] == (uint8_t)'c') { // TODO !BEFORE PULL REQUEST! check if addressing work properly after changing API
+                                if (receiveBuffer[10] == (uint8_t)'i' && receiveBuffer[12] == (uint8_t)'c') {
                                     isReceivedPropperMessage = true;
                                     const uint8_t newRfChannel = receiveBuffer[13];
-                                    ad.mpLogger->errorv("ModuleAddressing TMP", "newRfChannel: ", newRfChannel);
-                                    ad.mpLogger->errorv("ModuleAddressing TMP", "newIp: ", receiveBuffer[11]);
 
                                     ad.updateAddressingData(receiveBuffer, receiveBuffer[11], newRfChannel);
-                                    ad.changeRfChannel(newRfChannel);
+                                    ad.mpCommunication->changeRFChannel(newRfChannel);
 
                                     addressingState = ADDRESSING_STATES::WAIT_FOR_PING;
                                 }
                             #else
                                 // check is received propper message (AD?)
-                                if (receiveBuffer[12] == (uint8_t)BLANK_CHARACTER) { // TODO !BEFORE PULL REQUEST! check if addressing work properly after changing API
+                                if (receiveBuffer[12] == (uint8_t)BLANK_CHARACTER) {
                                     isReceivedPropperMessage = true;
                                     ad.updateAddressingData(receiveBuffer, receiveBuffer[11]);
                                     addressingState = PROCESS_SUMMARY;
@@ -260,9 +250,8 @@ namespace Comms {
             mpLogger->warning("ModuleAddressing FreeRTOS", "Can't create addressing task, because task already exists.");
         }
     }
-// ================================================================
 
-// ============================ Timers ============================
+    // ============================ Timers ============================
     void ModuleAddressing::addressingTimersCallbacks(TimerHandle_t xTimer){
         auto &ad = *mspAddressing;
 
@@ -282,9 +271,8 @@ namespace Comms {
             );
         }
     }
-// ================================================================
 
-// ============================ Other =============================
+    // ============================ Other =============================
     void ModuleAddressing::updateAddressingData(const uint8_t *newMAC, const uint8_t newIP) {
         xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
         uah::prepareBuffer(mProtocolMACAddress, newMAC, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
@@ -314,20 +302,14 @@ namespace Comms {
             updateAddressingData(mMACAddress, NULL_IP);
         #endif
 
-        // TODO change it to HC12 method (maybe add methods for more often used commands), consider adding pointer directly to RF module
-        #ifdef HC12_MODULE
-            mpCommunication->sendInternalMessage((uint8_t*)"HC+DEFAULT");
-        #endif
+        mpCommunication->changeRFChannel(DEFAULT_CHANNEL);
         vTaskDelay(pdMS_TO_TICKS(ADDRESSING_DELAY_BETWEEN_ATTEMPTS));
         xQueueReset(mAddressingQueue);
     }
 
-
     void ModuleAddressing::abortAddressing() {
         mpLogger->warning("ModuleAddressing Main", "Aborting addressing.");
-
         clearNewConnectionData();
-
         mpCommunication->stopAddressingAlgorithm();
     }
 }

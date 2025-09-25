@@ -47,25 +47,25 @@ namespace Comms {
         uint8_t getIPAddress() override;
 
         /**
-         * @brief Checks if given MAC address is propper.
-         * @details If module is not addressed yet (IP address is <code>NULL_IP</code>), it will accept any MAC address,
-         * otherwise MAC address is propper if is same as <code>mProtocolMACAddress</code>.
+         * @brief Checks if the given MAC address is proper.
+         * @details If the module is not addressed yet (IP address is <code>NULL_IP</code>), it will accept any MAC address,
+         * otherwise MAC address is proper if it is the same as <code>mProtocolMACAddress</code>.
          * @param mac MAC address to check.
-         * @return True if MAC address is propper, false otherwise.
-         * @note Threat-safe.
+         * @return True if MAC address is proper, false otherwise.
+         * @note Thread-safe.
          */
-        bool isMACPropper(const uint8_t *mac) override;
+        bool isMACProper(const uint8_t *mac) override;
 
         /**
-         * @brief Checks if given IP address is propper.
-         * @details IP address is propper if is same as saved IP address
+         * @brief Checks if the given IP address is proper.
+         * @details IP address is proper if it is the same as saved IP address
          * or in case when there is no IP address assigned (IP address is <code>NULL_IP</code>)
          * if IP address is <code>CENTRAL_UNIT_IP</code>.
          * @param ip IP address to check.
-         * @return True if IP address is propper, false otherwise.
-         * @note Threat-safe.
+         * @return True if IP address is proper, false otherwise.
+         * @note Thread-safe.
          */
-        bool isIpPropper(uint8_t ip) override;
+        bool isIpProper(uint8_t ip) override;
 
     private:
         /**
