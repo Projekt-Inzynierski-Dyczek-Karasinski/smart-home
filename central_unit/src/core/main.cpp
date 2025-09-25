@@ -6,6 +6,8 @@
 #include <iostream>
 #include <filesystem>
 
+using namespace std::chrono_literals;
+
 namespace SmartHome {
     void loadLoggerYamlConfig(Utils::ConfigManager &configManager, Utils::Logger::Config &config) {
         std::string root = "core.logging";
@@ -212,7 +214,7 @@ int main(int argc, char *argv[]) {
         logger->debug("[MAIN] Waiting for mediator shutdown");
         if (mediatorConfig.serviceType == Utils::ServiceType::STANDALONE) {
             mediator.terminate(); //SIGTERM
-            if (!mediator.wait_for(std::chrono::seconds(15))) {
+            if (!mediator.wait_for(15s)) {
                 kill(mediator.id(), SIGKILL);
                 mediator.wait();
             }

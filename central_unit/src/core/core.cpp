@@ -171,7 +171,7 @@ namespace SmartHome {
         CoreActions::onCoreShutdown();
 
         // Start shutdown timeout timer
-        ba::steady_timer shutdownTimeout(mCoreUtilityIoContext, std::chrono::milliseconds(ms_SHUTDOWN_TIMEOUT));
+        ba::steady_timer shutdownTimeout(mCoreUtilityIoContext, ms_SHUTDOWN_TIMEOUT);
         shutdownTimeout.async_wait([this](const bs::error_code &ec) {
             if (!ec) {
                 mCoreWorkerThreadPool->stop();

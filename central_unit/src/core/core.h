@@ -15,6 +15,7 @@
 
 namespace ba = boost::asio;
 namespace bs = boost::system;
+using namespace std::chrono_literals;
 
 namespace SmartHome {
     /**
@@ -202,7 +203,7 @@ namespace SmartHome {
         /// Signals defined to handle in signalHandler
         static constexpr std::array ms_SIGNALS_TO_HANDLE = {SIGINT, SIGTERM, SIGHUP};
         /// Shutdown timeout timer value in ms
-        static constexpr uint ms_SHUTDOWN_TIMEOUT = 5000;
+        static constexpr auto ms_SHUTDOWN_TIMEOUT = 5000ms;
 
         //Core workers
         ba::io_context mCoreWorkerIoContext;

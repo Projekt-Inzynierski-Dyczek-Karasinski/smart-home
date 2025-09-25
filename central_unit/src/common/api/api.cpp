@@ -6,10 +6,10 @@
 #include <boost/algorithm/string/classification.hpp>
 
 namespace SmartHome::API {
-    ApiId::ApiId(const apiId_t value): mState(State::HAS_VALUE), mValue(value) {
+    ApiId::ApiId(const apiId_t value) : mState(State::HAS_VALUE), mValue(value) {
     }
 
-    ApiId::ApiId(std::nullptr_t): mState(State::NULL_VALUE) {
+    ApiId::ApiId(std::nullptr_t) : mState(State::NULL_VALUE) {
     }
 
     bool ApiId::isUndefined() const { return mState == State::UNDEFINED; }
@@ -23,7 +23,7 @@ namespace SmartHome::API {
             return mValue;
         }
         throw std::runtime_error("No value specified");
-    };
+    }
 
     nlohmann::json ApiId::toJson() const {
         if (mState == State::UNDEFINED)
@@ -300,7 +300,8 @@ namespace SmartHome::API {
         // Check int
         if (std::ranges::all_of(value, isdigit)) {
             try {
-                return std::stoi(value.data());
+                long result = std::stoi(value.data());
+                return result;
             } catch (...) {
                 // Value is not a valid int, continuing parsing attempts
             }
