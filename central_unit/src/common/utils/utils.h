@@ -1,5 +1,7 @@
 #pragma once
 
+#include"exceptions.hpp"
+
 #include <optional>
 #include <string>
 #include <stdexcept>

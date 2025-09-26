@@ -29,26 +29,33 @@ namespace SmartHome::Utils {
         if (std::filesystem::exists(mLockFilePath)) {
             const auto oldPid = readPidFromFile();
             if (oldPid.has_value() && isProcessRunning(oldPid.value())) {
-                throw std::runtime_error("Another instance is already running PID " + std::to_string(oldPid.value()));
+                throw Exceptions::Exception(Exceptions::ExceptionCodes::INSTANCE_ALREADY_EXISTS,
+                                            "Another instance is already running PID " + std::to_string(
+                                                oldPid.value()));
             }
 
             std::error_code ec;
             std::filesystem::remove(mLockFilePath, ec);
             if (ec) {
-               throw std::runtime_error("Failed to remove old lock file. Try: sudo rm " + mLockFilePath);
+                throw Exceptions::Exception(Exceptions::ExceptionCodes::FILE_LOCK_REMOVE_FAILED,
+                                            "Failed to remove old lock file. Try: sudo rm " + mLockFilePath);
             }
         }
 
         // Create new lock file or lock already existing file
         mLockFd = open(mLockFilePath.c_str(), O_RDWR | O_CREAT, 0666);
 
-        if (mLockFd < 0) throw std::runtime_error("Failed to open lock file (" + mLockFilePath + ")");
+        if (mLockFd < 0)
+            throw Exceptions::Exception(Exceptions::ExceptionCodes::FILE_LOCK_OPEN_FAILED,
+                                        "Failed to open lock file (" + mLockFilePath + ")");
         if (flock(mLockFd, LOCK_EX | LOCK_NB) != 0) {
-           close(mLockFd);
-            throw std::runtime_error("Failed to lock file (" + mLockFilePath + ")");
+            close(mLockFd);
+            throw Exceptions::Exception(Exceptions::ExceptionCodes::FILE_LOCK_FAILED,
+                                        "Failed to lock file (" + mLockFilePath + ")");
         }
         if (!writePidToFile()) {
-            throw std::runtime_error("Failed to write pid to file (" + mLockFilePath + ")");
+            throw Exceptions::Exception(Exceptions::ExceptionCodes::FILE_LOCK_WRITE_FAILED,
+                                        "Failed to write pid to file (" + mLockFilePath + ")");
         }
     }
 
