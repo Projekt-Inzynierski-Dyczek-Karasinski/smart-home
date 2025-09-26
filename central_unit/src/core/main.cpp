@@ -142,7 +142,7 @@ int main(int argc, char *argv[]) {
             ("no-archive", bpo::bool_switch()->default_value(false), "Disables archiving old log files")
             ("no-log-file", "Disable file logging")
 
-            ("port,p", bpo::value<unsigned short>(), "TCP IPC port")
+            ("port,p", bpo::value<int>(), "TCP IPC port")
             ("ipv4,4", bpo::value<std::string>(), "TCP IPC ipv4 address");
 
 
