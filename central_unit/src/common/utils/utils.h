@@ -1,10 +1,9 @@
 #pragma once
 
-#include"exceptions.hpp"
+#include "exceptions.hpp"
 
 #include <optional>
 #include <string>
-#include <stdexcept>
 
 namespace SmartHome::Utils {
     /**
@@ -40,7 +39,7 @@ namespace SmartHome::Utils {
          * @brief Construct and acquire lock on file.
          *
          * @param lockFilePath Path to lock file.
-         * @throw std::runtime_error if opening, locking or writing operations fail.
+         * @throw Exceptions::Exception if opening, locking or writing operations fail.
          */
         explicit FileLock(const std::string &lockFilePath);
 
