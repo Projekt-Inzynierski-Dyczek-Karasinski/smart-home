@@ -57,20 +57,14 @@ namespace SmartHome::Utils {
 
         FileLock &operator=(FileLock &&) = delete;
 
-    private:
-        /**
-         * @brief Writes PID to lock file.
-         *
-         * @return true if write operation was successful, false otherwise.
-         */
-        bool writePidToFile() const;
-
         /**
          * @brief Helper function for reading PID from lockfile.
          *
+         * @param lockFilePath Path to lock file.
+         *
          * @return PID written in lock file if preset, nullopt otherwise.
          */
-        std::optional<pid_t> readPidFromFile() const;
+        static std::optional<pid_t> readPidFromFile(std::string_view lockFilePath);
 
         /**
          * @brief Helper function for checking if process is currently running.
@@ -79,6 +73,14 @@ namespace SmartHome::Utils {
          * @return True if process is running, false otherwise
          */
         static bool isProcessRunning(const pid_t &pid);
+
+    private:
+        /**
+         * @brief Writes PID to lock file.
+         *
+         * @return true if write operation was successful, false otherwise.
+         */
+        bool writePidToFile() const;
 
         int mLockFd = -1; ///< File descriptor for lock file
         std::string mLockFilePath;

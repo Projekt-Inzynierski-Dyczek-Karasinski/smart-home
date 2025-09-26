@@ -27,7 +27,7 @@ namespace SmartHome::Utils {
 
         // Check if lock file exists, and if process that created it is currently running.
         if (std::filesystem::exists(mLockFilePath)) {
-            const auto oldPid = readPidFromFile();
+            const auto oldPid = readPidFromFile(mLockFilePath);
             if (oldPid.has_value() && isProcessRunning(oldPid.value())) {
                 throw Exceptions::Exception(Exceptions::ExceptionCodes::INSTANCE_ALREADY_EXISTS,
                                             "Another instance is already running PID " + std::to_string(
@@ -78,8 +78,8 @@ namespace SmartHome::Utils {
         return write(mLockFd, pidStr.c_str(), pidStr.length()) == pidStr.length();
     }
 
-    std::optional<pid_t> FileLock::readPidFromFile() const {
-        std::ifstream file(mLockFilePath);
+    std::optional<pid_t> FileLock::readPidFromFile(const std::string_view lockFilePath) {
+        std::ifstream file(lockFilePath.data());
         pid_t pid;
         if (file >> pid) {
             return std::make_optional(pid); // Return PID on successful read
