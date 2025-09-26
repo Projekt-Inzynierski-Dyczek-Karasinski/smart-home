@@ -25,6 +25,8 @@ option(BUILD_MEDIATOR "Build module mediator" ON)
 
 option(BUILD_CLI "Build SmartHome CLI" ON)
 
+option(BUILD_GUI "Build SmartHome GUI" ON)
+
 # Boost config
 set(Boost_NO_WARN_NEW_VERSIONS ON)
 set(Boost_USE_MULTITHREADED ON)
@@ -62,6 +64,9 @@ if (BUILD_CLI)
     add_subdirectory(src/cli)
 endif ()
 
+if (BUILD_GUI)
+    add_subdirectory(src/gui)
+endif ()
 
 # Platform based compile config
 if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
