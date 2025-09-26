@@ -23,6 +23,7 @@ namespace Comms {
         #ifdef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
             mIPAddress = 2;
             mRfChannel = 2;
+            mpCommunication->changeRFChannel(2);
             mpLogger->warningv("Addressing TMP", "IP is forced: ", mIPAddress);
         #endif
 

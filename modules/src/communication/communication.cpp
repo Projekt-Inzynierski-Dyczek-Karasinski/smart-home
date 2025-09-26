@@ -52,7 +52,12 @@ namespace Comms {
     }
 
     void Communication::sendMessage(const uint8_t message[MESSAGE_SIZE]) const {
-        xQueueSend(mEncodeMessagesQueue, message, portMAX_DELAY);
+        xQueueSend(mEncodeMessagesQueue, message , portMAX_DELAY);
+        vTaskResume(mEncodeMessageTaskHandle);
+    }
+
+    void Communication::sendPriorityMessage(const uint8_t message[MESSAGE_SIZE]) const {
+        xQueueSendToFront(mEncodeMessagesQueue, message, portMAX_DELAY);
         vTaskResume(mEncodeMessageTaskHandle);
     }
 
@@ -82,9 +87,6 @@ namespace Comms {
         mpLogger = logger;
         mpConnection = &Connection::getInstance(this, mpAddressing, mpRfModule, logger);
 
-        mLastTransmittedMessageMutex = xSemaphoreCreateMutex();
-        setLastTransmittedMessage();
-
         createCommunicationQueues();
         createCommunicationTimers();
 
@@ -104,8 +106,6 @@ namespace Comms {
 
         deleteCommunicationQueues();
         deleteCommunicationTimers();
-
-        vSemaphoreDelete(mLastTransmittedMessageMutex);
     }
 
     // ============================ Queues ============================
@@ -153,10 +153,6 @@ namespace Comms {
             if (buffer[0] == (uint8_t)'C' && buffer[1] == (uint8_t)'O') {
                 mpConnection->messageDecider(buffer);
             }
-            // if it is "repeat" message repeat last transmitted message
-            else if (uah::areArraysEqual(buffer, (uint8_t*)REPEAT_MESSAGE, SPECIAL_MESSAGE_LEN)) {
-                repeatLastTransmittedMessage();
-            }
             // if it is "ping", reply to ping
             else if (uah::areArraysEqual(buffer, (uint8_t*)PING_MESSAGE, SPECIAL_MESSAGE_LEN)) {
                 replyToPing();
@@ -165,6 +161,7 @@ namespace Comms {
             else if (uah::areArraysEqual(buffer, (uint8_t*)RE_PING_MESSAGE, SPECIAL_MESSAGE_LEN)) {
                 xTimerStop(mPingTimeoutTimer, portMAX_DELAY);
                 mpLogger->info("Communication Main", "Ping Success");
+                mpConnection->endConnection();
             }
             // TODO consider changing isReadingRawMessage flag to mpAddressing->getIsAddressingWorking()
             // if it is addressing message
@@ -208,19 +205,6 @@ namespace Comms {
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 
-    void Communication::pingTimeoutNotifHandling(uint8_t *pingAttempts) const {
-        mpLogger->info("Communication Main", "Ping Timeout");
-        *pingAttempts++;
-
-        if (*pingAttempts > PING_MAX_ATTEMPTS) {
-            xTimerStop(mPingTimeoutTimer, portMAX_DELAY);
-            *pingAttempts = 0;
-            mpLogger->info("Communication Main", "No response to ping.");
-        } else {
-            transmitPing();
-        }
-    }
-
     void Communication::communicationMainTask(void* parameters) {
         auto &com = *mspCommunication;
 
@@ -253,18 +237,22 @@ namespace Comms {
 
                 case SUSPEND_ENCODE_MESSAGE_TASK_NOTIF:
                     com.mpLogger->debug("Communication Main", "vTaskSuspend(com.mEncodeMessageTaskHandle);");
-                    com.setLastTransmittedMessage();
                     vTaskSuspend(com.mEncodeMessageTaskHandle);
                     break;
 
                 case START_PINGING_NOTIF:
-                    pingAttempts = 1;
                     com.transmitPing();
                     xTimerStart(com.mPingTimeoutTimer, portMAX_DELAY);
                     break;
 
+                case STOP_PINGING_NOTIF:
+                    com.mpConnection->endConnection();
+                    xTimerStop(com.mPingTimeoutTimer, portMAX_DELAY);
+                    break;
+
                 case PING_TIMEOUT_NOTIF:
-                    com.pingTimeoutNotifHandling(&pingAttempts);
+                    com.mpLogger->info("Communication Main", "Ping Timeout");
+                    com.transmitPing();
                     break;
 
                 case READ_RAW_MESSAGE_NOTIF:
@@ -373,8 +361,9 @@ namespace Comms {
             vTaskDelay(RECEIVE_MESSAGE_TIMEOUT);
             resetProtocolBuffer();
             xQueueReset(com.mReceiveByteQueue);
+            // TODO change?
             if (!isReadingRawMessage) {
-                com.transmitRepeatMessage();
+                com.mpConnection->transmitRepeatMessage();
             }
         };
 
@@ -444,20 +433,13 @@ namespace Comms {
                         resetProtocolBuffer();
                         xQueueReset(com.mReceiveByteQueue);
                     }
-                    // TODO !BEFORE PULL REQUEST! move repeat message logic to Connection class, remember about "repeat" in addressing
-                    // if IP is incorrect, check if is "repeat" message,
-                    // if not wait for possible rest of message and ignore it, otherwise resend last message
+                    // if IP is incorrect wait for possible rest of message and ignore it
                     else if (!com.mpAddressing->isIpProper(protocolBuffer[protoBuffMessageIndex][PROTOCOL_IP_INDEX])) {
                         xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
-                        if (uah::areArraysEqual(&protocolBuffer[protoBuffMessageIndex][PROTOCOL_MESSAGE_START_INDEX], (uint8_t*)REPEAT_MESSAGE, SPECIAL_MESSAGE_LEN)) {
-                            resetProtocolBuffer();
-                            com.repeatLastTransmittedMessage();
-                        } else {
-                            com.mpLogger->debugv("Communication Decode", "Bad IP: ", protocolBuffer[protoBuffMessageIndex][PROTOCOL_IP_INDEX]);
-                            vTaskDelay(pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT));
-                            resetProtocolBuffer();
-                            xQueueReset(com.mReceiveByteQueue);
-                        }
+                        com.mpLogger->debugv("Communication Decode", "Bad IP: ", protocolBuffer[protoBuffMessageIndex][PROTOCOL_IP_INDEX]);
+                        vTaskDelay(pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT));
+                        resetProtocolBuffer();
+                        xQueueReset(com.mReceiveByteQueue);
                     }
                     #endif
                     // if entire message is not ready (message quantity)
@@ -527,6 +509,7 @@ namespace Comms {
         for (uint8_t i = 0; i < PROTOCOL_SIZE; i++) {
             checkSum += (uint16_t)protocolBuffer[i];
         }
+
         checkSum = (CHECKSUM_MODULO - (checkSum % CHECKSUM_MODULO)) % CHECKSUM_MODULO;
 
         protocolBuffer[PROTOCOL_CHECKSUM_INDEX] = checkSum;
@@ -560,8 +543,7 @@ namespace Comms {
         for (;;) {
             // wait until the message appears in the queue and save message in local messageBuffer
             if (xQueueReceive(com.mEncodeMessagesQueue, &messageBuffer, pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG)) == pdTRUE) {
-                com.mpConnection->sendingHandle();
-                // com.mpLogger->error("Communication TMP", "tmp.");
+                com.mpConnection->sendingHandle(messageBuffer);
                 // only for central unit, because modules IP is constant
                 #ifdef CENTRAL_UNIT
                     // prepare place for IP address
@@ -588,12 +570,8 @@ namespace Comms {
                     com.prepareChecksum(protocolBuffer);
                     com.mpRfModule->addMessageToTransmit(protocolBuffer);
 
-                    // TODO change to debug
                     com.mpLogger->debuga("Communication Encode", "Protocol buffer: ", protocolBuffer, PROTOCOL_SIZE, false);
                     com.mpLogger->debuga("Communication Encode", "Protocol message: ", &protocolBuffer[PROTOCOL_MESSAGE_START_INDEX], PROTOCOL_MESSAGE_LENGTH);
-                }
-                if (!uah::areArraysEqual(messageBuffer, (uint8_t*)REPEAT_MESSAGE, SPECIAL_MESSAGE_LEN)) {
-                    com.setLastTransmittedMessage(messageBuffer);
                 }
             } else {
                 constexpr uint8_t notificationValue = SUSPEND_ENCODE_MESSAGE_TASK_NOTIF;
@@ -653,6 +631,9 @@ namespace Comms {
                     // special debug commands
                     if (uah::areArraysEqual(buffer, (uint8_t*)"startping", 9)) {
                         constexpr uint8_t notificationValue = START_PINGING_NOTIF;
+                        xQueueSend(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
+                    } else if (uah::areArraysEqual(buffer, (uint8_t*)"stopping", 9)) {
+                        constexpr uint8_t notificationValue = STOP_PINGING_NOTIF;
                         xQueueSend(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
                     } else if (uah::areArraysEqual(buffer, (uint8_t*)"readraw", 7)) {
                         constexpr uint8_t notificationValue = READ_RAW_MESSAGE_NOTIF;
@@ -797,51 +778,16 @@ namespace Comms {
     }
 
     // ============================ Other =============================
-    void Communication::setLastTransmittedMessage() {
-        xSemaphoreTake(mLastTransmittedMessageMutex, portMAX_DELAY);
-        uah::clearBuffer(mLastTransmittedMessage, MESSAGE_SIZE);
-        mLastTransmittedMessageAttempts = 0;
-        xSemaphoreGive(mLastTransmittedMessageMutex);
-    }
-
-    void Communication::setLastTransmittedMessage(const uint8_t message[MESSAGE_SIZE]) {
-        xSemaphoreTake(mLastTransmittedMessageMutex, portMAX_DELAY);
-        uah::prepareBuffer(mLastTransmittedMessage, message, MESSAGE_SIZE, MESSAGE_SIZE);
-        xSemaphoreGive(mLastTransmittedMessageMutex);
-    }
-
-    void Communication::transmitRepeatMessage() const {
-        uint8_t buffer[MESSAGE_SIZE];
-        uah::prepareBuffer(buffer, (uint8_t*)REPEAT_MESSAGE, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
-        sendMessage(buffer);
-        // xQueueSend(mSendMessagesQueue, buffer, portMAX_DELAY);
-    }
-
-    void Communication::repeatLastTransmittedMessage() {
-        xSemaphoreTake(mLastTransmittedMessageMutex, portMAX_DELAY);
-        if (mLastTransmittedMessage[0] != 0) {
-            sendMessage(mLastTransmittedMessage);
-            // xQueueSend(mSendMessagesQueue, mLastTransmittedMessage, portMAX_DELAY);
-        }
-        mLastTransmittedMessageAttempts++;
-        xSemaphoreGive(mLastTransmittedMessageMutex);
-
-        if (mLastTransmittedMessageAttempts > REPEAT_LAST_MESSAGE_MAX_ATTEMPTS) {
-            setLastTransmittedMessage();
-        }
-    }
-
+    // TODO fix: getting no reply to ping cause connection timeout and strange behaviour
     void Communication::transmitPing() const {
         uint8_t buffer[MESSAGE_SIZE];
         uah::prepareBuffer(buffer, (uint8_t*)PING_MESSAGE, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
-        // xQueueSend(mSendMessagesQueue, buffer, portMAX_DELAY);
         sendMessage(buffer);
     }
 
     void Communication::replyToPing() const {
         uint8_t buffer[MESSAGE_SIZE];
         uah::prepareBuffer(buffer, (uint8_t*)RE_PING_MESSAGE, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
-        // xQueueSend(mSendMessagesQueue, buffer, portMAX_DELAY);
         sendMessage(buffer);
     }
 }

@@ -23,14 +23,17 @@ namespace Comms {
     void Connection::messageDecider(const uint8_t receivedMessage[MESSAGE_SIZE]) {
         uint8_t sendBuffer[MESSAGE_SIZE];
 
-        // TODO consider changing if else statements to switch case
         // TODO before merge with main remove test messages
-        if (uah::areArraysEqual(receivedMessage, (uint8_t*)CONNECTION_END, 5)) {
+        // TODO consider ignoring 2 first letters in if statements (these letters are already checked)
+        // TODO consider changing if else statements to switch case
+        if (uah::areArraysEqual(receivedMessage, (uint8_t*)CONNECTION_END, SPECIAL_MESSAGE_LEN)) {
             endConnection();
-        } else if (uah::areArraysEqual(receivedMessage, (uint8_t*)CONNECTION_AFFIRM, 4)) {
+        } else if (uah::areArraysEqual(receivedMessage, (uint8_t*)CONNECTION_AFFIRM, SPECIAL_MESSAGE_LEN)) {
             uah::prepareBuffer(sendBuffer, (uint8_t*)CONNECTION_END, 5, MESSAGE_SIZE);
             mpCommunication->sendMessage(sendBuffer);
             endConnection();
+        } else if (uah::areArraysEqual(receivedMessage, (uint8_t*)CONNECTION_REPEAT_MESSAGE, SPECIAL_MESSAGE_LEN)) {
+            repeatLastTransmittedMessage();
         } else if (uah::areArraysEqual(receivedMessage, (uint8_t*)CONNECTION_TEST_EXECUTE, 5)) {
             uah::prepareBuffer(sendBuffer, (uint8_t*)CONNECTION_AFFIRM, 4, MESSAGE_SIZE);
             mpCommunication->sendMessage(sendBuffer);
@@ -54,6 +57,7 @@ namespace Comms {
     void Connection::receivingHandle(const uint8_t ip) {
         if (mpAddressing->getIsAddressingWorking()) return;
 
+        createConnectionTimer();
         xTimerStart(mConnectionTimeoutTimer, portMAX_DELAY);
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
         if (!mIsConnected) {
@@ -64,16 +68,51 @@ namespace Comms {
         xSemaphoreGive(mConnectionDataMutex);
     }
 
-    void Connection::sendingHandle() {
+    void Connection::sendingHandle(const uint8_t message[MESSAGE_SIZE]) {
         // TODO add handling for failed connection
+        if (!uah::areArraysEqual(message, (uint8_t*)CONNECTION_REPEAT_MESSAGE, SPECIAL_MESSAGE_LEN)) {
+            mpLogger->debug("Connection Method", "setLastTransmittedMessage(message)");
+            setLastTransmittedMessage(message);
+        }
         if (mpAddressing->getIsAddressingWorking()) return;
 
-        xTimerStart(mConnectionTimeoutTimer, portMAX_DELAY);
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
         if (!mIsConnected) {
             mpLogger->debug("Connection Class", "Connection start.");
             mIsConnected = true;
             mpRfModule->firstChangeRFChannel(mpAddressing->getConnectionRFChannel());
+
+            createConnectionTimer();
+            xTimerStart(mConnectionTimeoutTimer, portMAX_DELAY);
+        }
+        xSemaphoreGive(mConnectionDataMutex);
+    }
+
+    void Connection::endConnection() {
+        xTimerStop(mConnectionTimeoutTimer, portMAX_DELAY);
+        deleteConnectionTimer();
+        mpLogger->debug("Connection Class", "Connection end.");
+
+        xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+        mIsConnected = false;
+        uah::clearBuffer(mLastTransmittedMessage, MESSAGE_SIZE);
+        mLastTransmittedMessageAttempts = 0;
+        xSemaphoreGive(mConnectionDataMutex);
+
+        mpAddressing->setProtocolIPAddress(NULL_IP); // do anything only for Central Unit
+        #ifdef RF_CHANNELS
+            mpRfModule->firstChangeRFChannel(mpAddressing->getDefaultRFChannel());
+        #else
+            #error "Not implemented"
+        #endif
+    }
+
+    void Connection::transmitRepeatMessage() const {
+        xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+        if (mIsConnected || mpAddressing->getIsAddressingWorking()) {
+            uint8_t buffer[MESSAGE_SIZE];
+            uah::prepareBuffer(buffer, (uint8_t*)CONNECTION_REPEAT_MESSAGE, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
+            mpCommunication->sendPriorityMessage(buffer);
         }
         xSemaphoreGive(mConnectionDataMutex);
     }
@@ -89,40 +128,45 @@ namespace Comms {
         const std::shared_ptr<HC12> &rfModule,
         const std::shared_ptr<ul::Logger> &logger
     ) : mpCommunication(communication), mpAddressing(addressing), mpRfModule(rfModule), mpLogger(logger) {
-        mConnectionDataMutex = xSemaphoreCreateMutex();
         mspConnection = this;
-        // TODO consider creating timer only when is needed
-        createConnectionTimers();
+        mConnectionDataMutex = xSemaphoreCreateMutex();
+
+        xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+        uah::clearBuffer(mLastTransmittedMessage, MESSAGE_SIZE);
+        mLastTransmittedMessageAttempts = 0;
+        xSemaphoreGive(mConnectionDataMutex);
+
         mpLogger->info("Connection Class", "Connection initialized.");
     }
 
     Connection::~Connection() {
-        deleteConnectionTimers();
+        deleteConnectionTimer();
         vSemaphoreDelete(mConnectionDataMutex);
     }
 
     // ============================ Timers ============================
-    void Connection::connectionTimersCallbacks(TimerHandle_t xTimer) {
+    void Connection::connectionTimerCallback(TimerHandle_t xTimer) {
         auto &con = *mspConnection;
+        // TODO remove if?
         if (xTimer == con.mConnectionTimeoutTimer) {
             con.mpLogger->error("Connection Class", "Connection timeout.");
             con.endConnection();
         }
     }
 
-    void Connection::createConnectionTimers() {
+    void Connection::createConnectionTimer() {
         if (mConnectionTimeoutTimer == nullptr) {
             mConnectionTimeoutTimer = xTimerCreate(
                 "Connection Timeout",
                 pdMS_TO_TICKS(CONNECTION_TIMEOUT),
-                pdTRUE,
+                pdFALSE,
                 nullptr,
-                connectionTimersCallbacks
+                connectionTimerCallback
             );
         }
     }
 
-    void Connection::deleteConnectionTimers() {
+    void Connection::deleteConnectionTimer() {
         if (mConnectionTimeoutTimer != nullptr) {
             xTimerDelete(mConnectionTimeoutTimer, portMAX_DELAY);
             mConnectionTimeoutTimer = nullptr;
@@ -130,19 +174,23 @@ namespace Comms {
     }
 
     // ============================ Other =============================
-    void Connection::endConnection() {
-        xTimerStop(mConnectionTimeoutTimer, portMAX_DELAY);
-        mpLogger->debug("Connection Class", "Connection end.");
-
+    void Connection::setLastTransmittedMessage(const uint8_t message[MESSAGE_SIZE]) {
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
-        mIsConnected = false;
+        uah::prepareBuffer(mLastTransmittedMessage, message, MESSAGE_SIZE, MESSAGE_SIZE);
+        xSemaphoreGive(mConnectionDataMutex);
+    }
+
+    void Connection::repeatLastTransmittedMessage() {
+        xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+        if (mLastTransmittedMessage[0] != 0) {
+            mpCommunication->sendPriorityMessage(mLastTransmittedMessage);
+        }
+        mLastTransmittedMessageAttempts++;
         xSemaphoreGive(mConnectionDataMutex);
 
-        mpAddressing->setProtocolIPAddress(NULL_IP); // do anything only for Central Unit
-        #ifdef RF_CHANNELS
-            mpRfModule->firstChangeRFChannel(mpAddressing->getDefaultRFChannel());
-        #else
-            #error "Not implemented"
-        #endif
+        // TODO consider better handling that:
+        if (mLastTransmittedMessageAttempts > REPEAT_LAST_MESSAGE_MAX_ATTEMPTS) {
+            endConnection();
+        }
     }
 }

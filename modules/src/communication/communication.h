@@ -79,10 +79,18 @@ namespace Comms {
         void addByteToDecode(uint8_t data) const;
 
         /**
-        * @brief Add a message that needs to be transmitted to the encoding queue.
-        * @param message Message to transmit.
-        */
+         * @brief Add a message that needs to be transmitted to the encoding queue.
+         * @param message Message to transmit.
+         */
         void sendMessage(const uint8_t message[MESSAGE_SIZE]) const;
+        /**
+         * @brief Add a message that needs to be transmitted to the <b>front of</b> the encoding queue.
+         * @details This method works same as <code>sendMessage()</code>,
+         *          but adds message to the front of the encoding queue,
+         *          making sure that passed message will be sent first.
+         * @param message Message to transmit.
+         */
+        void sendPriorityMessage(const uint8_t message[MESSAGE_SIZE]) const;
 
         /**
          * @brief Add a message to received queue (omitting decoding process).
@@ -130,11 +138,6 @@ namespace Comms {
          * @param isReadingRawMessage Pointer to flag for raw message state.
          */
         void normalOperationHandling(bool *isReadingRawMessage);
-        /**
-         * @brief Handles when main task get notification about ping timeout.
-         * @param pingAttempts Pointer to counter with number of ping attempts.
-         */
-        void pingTimeoutNotifHandling(uint8_t *pingAttempts) const;
         /**
          * @brief Main FreeRTOS task for Communication class.
          * It is responsible for suspending/deleting resuming/creating other communication related tasks.
@@ -238,31 +241,6 @@ namespace Comms {
         void deleteCommunicationTimers();
 
         /**
-         * @brief Clears (sets all bytes to 0) the stored last transmitted RF message.
-         * Clears the buffer and sets repeat attempts to zero.
-         * @note Thread-safe.
-         */
-        void setLastTransmittedMessage();
-        /**
-         * @brief Set the last transmitted RF message value.
-         * @param message Message to set.
-         * @warning Do not set "repeat" message to last transmitted message, that may cause spamming "repeat" messages if RF transmission is disturbed.
-         * @note Thread-safe.
-         */
-        void setLastTransmittedMessage(const uint8_t message[MESSAGE_SIZE]);
-        /**
-         * @brief Transmit a "repeat" message to request re-transmission.
-         * Used when checksum or last byte of message is incorrect.
-         */
-        void transmitRepeatMessage() const;
-        /**
-         * @brief Resend the last message, if the repeat count is not exceeded.
-         * Used when get "repeat" message.
-         * @note Thread-safe.
-         */
-        void repeatLastTransmittedMessage();
-
-        /**
          * @brief Transmit a "ping" message.
          */
         void transmitPing() const;
@@ -298,18 +276,14 @@ namespace Comms {
             // SUSPEND_CONNECTION_TASK_NOTIF,
             // ping notifications
             START_PINGING_NOTIF,
+            STOP_PINGING_NOTIF,
             PING_TIMEOUT_NOTIF,
             // addressing notifications
             READ_RAW_MESSAGE_NOTIF,
             STOP_ADDRESSING_ALGORITHM_NOTIF,
         } mCommunicationMainNotifications; ///< Enum with main communication task notifications.
 
-        uint8_t mLastTransmittedMessage[MESSAGE_SIZE]{}; ///< Recently transmitted message (for "repeat" logic).
-        uint8_t mLastTransmittedMessageAttempts = 0; ///< Counter of repeats of last sent message.
-
         portMUX_TYPE mCriticalSectionMutex = portMUX_INITIALIZER_UNLOCKED; ///< FreeRTOS critical section mutex (used only for resetting encode task).
-
-        SemaphoreHandle_t mLastTransmittedMessageMutex = nullptr; ///< Handle to FreeRTOS mutex protecting the last transmitted message and last transmitted counter.
 
         QueueHandle_t mMainNotificationsQueue = nullptr; ///< Handle to FreeRTOS queue for notifications for the Main task, queue length: 5 bytes (uint8_t).
         QueueHandle_t mReceiveMessageQueue = nullptr; ///< Handle to FreeRTOS queue for received (decoded and internal) messages, queue length: 10x64 bytes (uint8_t).
