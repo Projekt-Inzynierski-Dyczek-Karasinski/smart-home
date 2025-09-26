@@ -64,7 +64,7 @@ namespace Comms {
         void messageDecider(const uint8_t receivedMessage[MESSAGE_SIZE]);
 
         /**
-         * @brief Handle connection, when received new RF message.
+         * @brief Handle connection when receiving new RF message.
          * @details Establishes connection, creates and starts/restarts timeout timer, and sets protocol IP address.
          * @param ip IP address of the connecting device
          * @note If addressing is in process, does nothing.\n
@@ -73,7 +73,7 @@ namespace Comms {
         void receivingHandle(uint8_t ip);
 
         /**
-         * @brief Handle connection, when sending new RF message.
+         * @brief Handle connection when sending new RF message.
          * @details Establishes connection, stores last transmitted message for potential retransmission,
          * and configures RF channel if needed.
          * @param message Array of <code>MESSAGE_SIZE</code> bytes to be transmitted.
@@ -125,7 +125,7 @@ namespace Comms {
 
         /**
          * @brief Static callback function for FreeRTOS timer.
-         * @details Calls <code>endConnection()</code> method when connection timeout.
+         * @details Calls <code>endConnection()</code> method when connection timeout occurs.
          * @param xTimer Handle to the timer that triggered the callback.
          */
         static void connectionTimerCallback(TimerHandle_t xTimer);
