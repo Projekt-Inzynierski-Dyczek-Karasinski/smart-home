@@ -117,7 +117,8 @@ namespace SmartHome {
 
     void Core::run() {
         if (!mIsInitialized.load()) {
-            throw std::runtime_error("[CORE] Core is not initialized");
+            mpLogger->error("[CORE] Core not initialized");
+            return;
         }
         if (mIsRunning.load()) {
             mpLogger->error("[CORE] Core is already running");
