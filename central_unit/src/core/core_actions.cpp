@@ -9,7 +9,7 @@ using namespace std::chrono_literals;
 namespace SmartHome {
     void CoreActions::handleRequest(const API::InternalApi::Request &request, const RequestCallback &callback) {
         if (!Core::Instance().isRunning()) return;
-        const auto logger = Core::Instance().mLogger;
+        const auto logger = Core::Instance().mpLogger;
         const auto requestId = getNextId();
 
         // TODO add ActiveRequest limit
@@ -350,7 +350,7 @@ namespace SmartHome {
         updateRequestStatus(commandMetadata->requestId);
 
 
-        Core::Instance().mLogger->errorf("[CORE_ACTIONS] Command timeout - request ID: %d command ID: %s",
+        Core::Instance().mpLogger->errorf("[CORE_ACTIONS] Command timeout - request ID: %d command ID: %s",
                                          commandMetadata->requestId,
                                          commandMetadata->command.commandId.hasValue()
                                              ? std::to_string(commandMetadata->command.commandId.value()).c_str()
@@ -382,7 +382,7 @@ namespace SmartHome {
     }
 
     void CoreActions::handleRequestTimeout(const apiId_t requestId) {
-        Core::Instance().mLogger->errorf("[CORE_ACTIONS] Request timeout - request ID: %d", requestId);
+        Core::Instance().mpLogger->errorf("[CORE_ACTIONS] Request timeout - request ID: %d", requestId);
 
         std::vector<CommandMetadataPtr> commandsMD;
 
@@ -433,7 +433,7 @@ namespace SmartHome {
     }
 
     void CoreActions::handleResponse(const apiId_t responseId) {
-        const auto logger = Core::Instance().mLogger;
+        const auto logger = Core::Instance().mpLogger;
         RequestCallback requestCallback;
         std::string responseString;
         connectionId_t id;
@@ -546,7 +546,7 @@ namespace SmartHome {
     ba::awaitable<API::ApiResponse> CoreActions::placeholderHandler(
         const std::shared_ptr<CommandMetadata> &commandMetadata) {
         // Optional debug log
-        Core::Instance().mLogger->debug("[CORE_ACTIONS] [PLACEHOLDER] called");
+        Core::Instance().mpLogger->debug("[CORE_ACTIONS] [PLACEHOLDER] called");
         // Universal command variables' definition.
         const auto &command = commandMetadata->command;
         API::ApiResponse commandResult;
@@ -605,7 +605,7 @@ namespace SmartHome {
 
     ba::awaitable<API::ApiResponse> CoreActions::coreEchoHandler(
         const std::shared_ptr<CommandMetadata> &commandMetadata) {
-        Core::Instance().mLogger->debug("[CORE_ACTIONS] [CORE_ECHO] called");
+        Core::Instance().mpLogger->debug("[CORE_ACTIONS] [CORE_ECHO] called");
         const auto &command = commandMetadata->command;
         API::ApiResponse commandResult;
         commandResult.id = command.commandId;

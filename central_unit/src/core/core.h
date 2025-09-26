@@ -141,7 +141,7 @@ namespace SmartHome {
          */
         ba::io_context &getCoreIoContext();
 
-        std::shared_ptr<Utils::AsyncLogger> mLogger; ///< Logger instance
+        std::shared_ptr<Utils::AsyncLogger> mpLogger; ///< Logger instance
 
     private:
         /**
