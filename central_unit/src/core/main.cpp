@@ -35,8 +35,8 @@ namespace SmartHome {
 
         // Core config
         root = "core";
-        configManager.getValue(root +".main_threads", coreConfig.coreMainThreads);
-        configManager.getValue(root +".worker_threads", coreConfig.coreWorkerThreads);
+        configManager.getValue(root + ".main_threads", coreConfig.coreMainThreads);
+        configManager.getValue(root + ".worker_threads", coreConfig.coreWorkerThreads);
 
         root = "core.ipc";
         configManager.getValue(root + ".threads", coreConfig.ipcServerThreads);
@@ -53,7 +53,7 @@ namespace SmartHome {
 
 
     void overwriteConfigsWithProgramOptions(const bpo::variables_map &vm,
-                                            loggerTemporaryOptions &logTmpOpt,
+                                            const loggerTemporaryOptions &logTmpOpt,
                                             Core::Config &coreConfig,
                                             Utils::Logger::Config &loggerConfig) {
         // Logger config
@@ -103,7 +103,10 @@ namespace SmartHome {
         // Load YAML config
         auto configManager = Utils::ConfigManager(logger);
         Utils::Logger::Config loggerConfig;
-        const std::string configPath = vm.contains("config") ? vm["config"].as<std::string>() : s_DEFAULT_CONFIG_PATH;
+        loggerConfig.logFile.path = s_DEFAULT_LOGFILE_PATH;
+        const std::string configPath = vm.contains("config")
+                                           ? vm["config"].as<std::string>()
+                                           : s_DEFAULT_CONFIG_PATH.data();
         if (configManager.loadConfig(configPath)) {
             logger->debug("[MAIN] Loading YAML logger config");
             loadLoggerYamlConfig(configManager, loggerConfig);
