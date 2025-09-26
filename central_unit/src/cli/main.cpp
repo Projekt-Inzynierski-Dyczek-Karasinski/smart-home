@@ -117,7 +117,7 @@ int main(const int argc, char *argv[]) {
     });
 
     auto logger = std::make_shared<SmartHome::Utils::Logger>();
-    logger->setLevel(su::LogLevels::Level::DEBUG);
+    logger->setLevel(su::LogLevels::Level::DEBUG); //TODO remove setting to debug level
     logger->info("[SMARTHOMECTL] Logger enabled");
 
     if (ipcType == si::SocketConnection::Type::UDS) {
