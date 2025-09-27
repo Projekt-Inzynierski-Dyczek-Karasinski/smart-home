@@ -154,16 +154,16 @@ namespace Comms {
                 mpConnection->messageDecider(buffer);
             }
             // if it is "ping", reply to ping
-            else if (uah::areArraysEqual(buffer, (uint8_t*)PING_MESSAGE, SPECIAL_MESSAGE_LEN)) {
+            else if (uah::areArraysEqual(buffer, PING_MESSAGE)) {
                 replyToPing();
             }
             // if it is "reping", reply to ping
-            else if (uah::areArraysEqual(buffer, (uint8_t*)RE_PING_MESSAGE, SPECIAL_MESSAGE_LEN)) {
+            else if (uah::areArraysEqual(buffer, RE_PING_MESSAGE)) {
                 xTimerStop(mPingTimeoutTimer, portMAX_DELAY);
                 mpLogger->info("Communication Main", "Ping Success");
                 mpConnection->endConnection();
             }
-            // TODO consider changing isReadingRawMessage flag to mpAddressing->getIsAddressingWorking()
+            // TODO consider changing isReadingRawMessage flag to mpAddressing->getIsAddressingInProgress()
             // if it is addressing message
             else if ((buffer[0] == (uint8_t)'A' && buffer[1] == (uint8_t)'D') || *isReadingRawMessage) {
                 *isReadingRawMessage = false;
@@ -426,7 +426,7 @@ namespace Comms {
                     // TODO before merge with main remove #ifndef directive
                     #ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
                     // if MAC is incorrect wait for possible rest of message and ignore it
-                    else if (!com.mpAddressing->isMACProper(protocolBuffer[protoBuffMessageIndex])) {
+                    else if (!com.mpAddressing->isMACValid(protocolBuffer[protoBuffMessageIndex])) {
                         xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
                         com.mpLogger->debug("Communication Decode", "Bad MAC");
                         vTaskDelay(pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT));
@@ -434,7 +434,7 @@ namespace Comms {
                         xQueueReset(com.mReceiveByteQueue);
                     }
                     // if IP is incorrect wait for possible rest of message and ignore it
-                    else if (!com.mpAddressing->isIpProper(protocolBuffer[protoBuffMessageIndex][PROTOCOL_IP_INDEX])) {
+                    else if (!com.mpAddressing->isIpValid(protocolBuffer[protoBuffMessageIndex][PROTOCOL_IP_INDEX])) {
                         xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
                         com.mpLogger->debugv("Communication Decode", "Bad IP: ", protocolBuffer[protoBuffMessageIndex][PROTOCOL_IP_INDEX]);
                         vTaskDelay(pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT));
@@ -465,7 +465,7 @@ namespace Comms {
                             isRawMessage = false;
                             com.mpLogger->infoa("Communication Decode", "Received raw message: ", protocolBuffer[0], PROTOCOL_SIZE, false);
                             xQueueSend(com.mReceiveMessageQueue, protocolBuffer[0], portMAX_DELAY);
-                        } else if (uah::calcLenOfDataInArray(messageBuffer, 2) != 1) {
+                        } else {
                             com.mpLogger->infoa("Communication Decode", "Received message: ", messageBuffer, MESSAGE_SIZE);
                             xQueueSend(com.mReceiveMessageQueue, messageBuffer, portMAX_DELAY);
                         }
@@ -629,23 +629,23 @@ namespace Comms {
                     com.mpLogger->infoa("Communication Input", "Input: ", buffer, MESSAGE_SIZE);
 
                     // special debug commands
-                    if (uah::areArraysEqual(buffer, (uint8_t*)"startping", 9)) {
+                    if (uah::areArraysEqual(buffer, "startping")) {
                         constexpr uint8_t notificationValue = START_PINGING_NOTIF;
                         xQueueSend(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
-                    } else if (uah::areArraysEqual(buffer, (uint8_t*)"stopping", 9)) {
+                    } else if (uah::areArraysEqual(buffer, "stopping")) {
                         constexpr uint8_t notificationValue = STOP_PINGING_NOTIF;
                         xQueueSend(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
-                    } else if (uah::areArraysEqual(buffer, (uint8_t*)"readraw", 7)) {
+                    } else if (uah::areArraysEqual(buffer, "readraw")) {
                         constexpr uint8_t notificationValue = READ_RAW_MESSAGE_NOTIF;
                         xQueueSendToFront(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
                     }
                     #ifdef ESP32_BOARD
-                        else if (uah::areArraysEqual(buffer, (uint8_t*)"reboot", 6)) {
+                        else if (uah::areArraysEqual(buffer, "reboot")) {
                             com.mpLogger->warning("Communication Input", "Rebooting...");
                             ESP.restart();
                         }
                     #endif
-                    else if (uah::areArraysEqual(buffer, (uint8_t*)"ip=", 3)) {
+                    else if (uah::areArraysEqual(buffer, "ip=")) {
                         if (buffer[6] != '\0') {
                             com.mpLogger->error("Communication Input", "Bad IP");
                         } else {
@@ -781,13 +781,13 @@ namespace Comms {
     // TODO fix: getting no reply to ping cause connection timeout and strange behaviour
     void Communication::transmitPing() const {
         uint8_t buffer[MESSAGE_SIZE];
-        uah::prepareBuffer(buffer, (uint8_t*)PING_MESSAGE, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
+        uah::prepareBuffer(buffer, PING_MESSAGE, MESSAGE_SIZE);
         sendMessage(buffer);
     }
 
     void Communication::replyToPing() const {
         uint8_t buffer[MESSAGE_SIZE];
-        uah::prepareBuffer(buffer, (uint8_t*)RE_PING_MESSAGE, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
+        uah::prepareBuffer(buffer, RE_PING_MESSAGE, MESSAGE_SIZE);
         sendMessage(buffer);
     }
 }

@@ -91,7 +91,7 @@ namespace Comms {
         }
     }
 
-    bool CentralUnitAddressing::isMACProper(const uint8_t *mac) {
+    bool CentralUnitAddressing::isMACValid(const uint8_t *mac) {
         bool result = false;
         if (getIsStartOfAddressing()) {
             result = true;
@@ -103,9 +103,14 @@ namespace Comms {
         return result;
     }
 
-    bool CentralUnitAddressing::isIpProper(const uint8_t ip) {
+    bool CentralUnitAddressing::isIpValid(const uint8_t ip) {
         bool result = true;
-        if ((getIsStartOfAddressing() && ip != NULL_IP) || (!getIsStartOfAddressing() && (ip == CENTRAL_UNIT_IP || ip == NULL_IP))) {
+
+        /* IP is not valid if:
+        - It is the start of the addressing process (i.e., waiting for the first message from the module) and received IP is other than NULL_IP; OR
+        - It is not the start of the addressing process and either CENTRAL_UNIT_IP was received (which is forbidden for modules) or NULL_IP was received (which is always forbidden except at the start of the addressing process). */
+        if ((getIsStartOfAddressing() && ip != NULL_IP) ||
+            (!getIsStartOfAddressing() && (ip == CENTRAL_UNIT_IP || ip == NULL_IP))) {
             result = false;
         }
         return result;
@@ -172,7 +177,7 @@ namespace Comms {
                             const uint8_t moduleNewRfChannel = ad.getModuleRfChannel(moduleNewIP);
 
                             // send module information about module's new IP address and rf channel
-                            uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_NEW_IP_NEW_RF_CHANNEL, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
+                            uah::prepareBuffer(sendBuffer, ADDRESSING_NEW_IP_NEW_RF_CHANNEL, MESSAGE_SIZE);
                             sendBuffer[3] = moduleNewIP;
                             sendBuffer[5] = moduleNewRfChannel;
                             ad.mpCommunication->sendMessage(sendBuffer);
@@ -195,7 +200,7 @@ namespace Comms {
                     case PINGING:
                         // send ping
                         ad.setIsStartOfAddressing(false);
-                        uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_PING, SPECIAL_MESSAGE_LEN, SPECIAL_MESSAGE_LEN);
+                        uah::prepareBuffer(sendBuffer, ADDRESSING_PING, MESSAGE_SIZE);
                         ad.mpCommunication->sendMessage(sendBuffer);
                         ad.mpLogger->debug("CentralUnitAddressing Main", "Sending ping.");
                         break;
@@ -230,14 +235,14 @@ namespace Comms {
                             break;
 
                         case PINGING:
-                            if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_REPING, SPECIAL_MESSAGE_LEN)) {
+                            if (uah::areArraysEqual(receiveBuffer, ADDRESSING_REPING)) {
                                 isReceivedPropperMessage = true;
                                 addressingState = PROCESS_SUMMARY;
                             }
                             break;
 
                         case PROCESS_SUMMARY:
-                            if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_SUMMARY_OK, SPECIAL_MESSAGE_LEN)) {
+                            if (uah::areArraysEqual(receiveBuffer, ADDRESSING_SUMMARY_OK)) {
                                 isReceivedPropperMessage = true;
                                 ad.mpLogger->info("CentralUnitAddressing Main", "Addressing complete." );
                                 // TODO before merge with main remove #ifndef directive and #else section
@@ -251,7 +256,7 @@ namespace Comms {
                                     ad.abortAddressing();
                                 #endif
                                 for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
-                            } else if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_SUMMARY_BAD, SPECIAL_MESSAGE_LEN)) {
+                            } else if (uah::areArraysEqual(receiveBuffer, ADDRESSING_SUMMARY_BAD)) {
                                 isReceivedPropperMessage = true;
                                 ad.mpLogger->warning("CentralUnitAddressing Main", "Module rejects summary.");
                                 isRestarting = true;

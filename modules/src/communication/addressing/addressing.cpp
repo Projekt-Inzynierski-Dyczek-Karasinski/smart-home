@@ -55,7 +55,7 @@ namespace Comms {
 
     void Addressing::startAddressing() {
         xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
-        mIsAddressingWorking = true;
+        mIsAddressingInProgress = true;
         xSemaphoreGive(mAddressingDataMutex);
 
         createAddressingTimer();
@@ -69,13 +69,13 @@ namespace Comms {
         deleteAddressingTimer();
 
         xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
-        mIsAddressingWorking = false;
+        mIsAddressingInProgress = false;
         xSemaphoreGive(mAddressingDataMutex);
     }
 
-    bool Addressing::getIsAddressingWorking() const {
+    bool Addressing::getIsAddressingInProgress() const {
         xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
-        const bool result = mIsAddressingWorking;
+        const bool result = mIsAddressingInProgress;
         xSemaphoreGive(mAddressingDataMutex);
         return result;
     }
@@ -133,13 +133,13 @@ namespace Comms {
 
     bool Addressing::isAddressingFailed(const uint8_t *receiveBuffer) {
         // if received message to abort addressing
-        if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_ABORT, SPECIAL_MESSAGE_LEN)) {
+        if (uah::areArraysEqual(receiveBuffer, ADDRESSING_ABORT)) {
             abortAddressing();
             for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
             return true;
         }
         // if received message to restart addressing
-        if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_RESTART, SPECIAL_MESSAGE_LEN)) {
+        if (uah::areArraysEqual(receiveBuffer, ADDRESSING_RESTART)) {
             return true;
         }
 

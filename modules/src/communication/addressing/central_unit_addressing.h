@@ -66,24 +66,24 @@ namespace Comms {
         void setProtocolIPAddress(uint8_t ip) override;
 
         /**
-         * @brief Checks if given MAC address is proper.
+         * @brief Checks if given MAC address is valid.
          * @details If the central unit is waiting for a new connection message, it will accept any MAC address,
          * otherwise checks if the given MAC address is the same as <code>mProtocolMACAddress</code>.
          * @param mac MAC address to check.
-         * @return True if MAC address is proper, false otherwise.
+         * @return True if MAC address is valid, false otherwise.
          * @note Thread-safe.
          */
-        bool isMACProper(const uint8_t *mac) override;
+        bool isMACValid(const uint8_t *mac) override;
 
         /**
-         * @brief Checks if the given IP address is proper.
+         * @brief Checks if the given IP address is valid.
          * @details If the central unit is waiting for a new connection message, it will accept only IP address = <code>NULL_IP</code>,
          * otherwise it accepts any IP address that isn't <code>NULL_IP</code> or <code>CENTRAL_UNIT_IP</code>.
          * @param ip IP address to check.
-         * @return True if IP address is proper, false otherwise.
+         * @return True if IP address is valid, false otherwise.
          * @note Thread-safe.
          */
-        bool isIpProper(uint8_t ip) override;
+        bool isIpValid(uint8_t ip) override;
 
     private:
         /**

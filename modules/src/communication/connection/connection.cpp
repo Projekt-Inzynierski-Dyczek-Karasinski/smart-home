@@ -26,22 +26,22 @@ namespace Comms {
         // TODO before merge with main remove test messages
         // TODO consider ignoring 2 first letters in if statements (these letters are already checked)
         // TODO consider changing if else statements to switch case
-        if (uah::areArraysEqual(receivedMessage, (uint8_t*)CONNECTION_END, SPECIAL_MESSAGE_LEN)) {
+        if (uah::areArraysEqual(receivedMessage, CONNECTION_END)) {
             endConnection();
-        } else if (uah::areArraysEqual(receivedMessage, (uint8_t*)CONNECTION_AFFIRM, SPECIAL_MESSAGE_LEN)) {
-            uah::prepareBuffer(sendBuffer, (uint8_t*)CONNECTION_END, 5, MESSAGE_SIZE);
+        } else if (uah::areArraysEqual(receivedMessage, CONNECTION_AFFIRM)) {
+            uah::prepareBuffer(sendBuffer,CONNECTION_END, MESSAGE_SIZE);
             mpCommunication->sendMessage(sendBuffer);
             endConnection();
-        } else if (uah::areArraysEqual(receivedMessage, (uint8_t*)CONNECTION_REPEAT_MESSAGE, SPECIAL_MESSAGE_LEN)) {
+        } else if (uah::areArraysEqual(receivedMessage, CONNECTION_REPEAT_MESSAGE)) {
             repeatLastTransmittedMessage();
-        } else if (uah::areArraysEqual(receivedMessage, (uint8_t*)CONNECTION_TEST_EXECUTE, 5)) {
-            uah::prepareBuffer(sendBuffer, (uint8_t*)CONNECTION_AFFIRM, 4, MESSAGE_SIZE);
+        } else if (uah::areArraysEqual(receivedMessage, CONNECTION_TEST_EXECUTE)) {
+            uah::prepareBuffer(sendBuffer, CONNECTION_AFFIRM, MESSAGE_SIZE);
             mpCommunication->sendMessage(sendBuffer);
-        } else if (uah::areArraysEqual(receivedMessage, (uint8_t*)CONNECTION_TEST_GET, 6)) {
-            uah::prepareBuffer(sendBuffer, (uint8_t*)CONNECTION_RE_TEST_GET, 26, MESSAGE_SIZE);
+        } else if (uah::areArraysEqual(receivedMessage, CONNECTION_TEST_GET)) {
+            uah::prepareBuffer(sendBuffer, CONNECTION_RE_TEST_GET, MESSAGE_SIZE);
             mpCommunication->sendMessage(sendBuffer);
-        } else if (uah::areArraysEqual(receivedMessage, (uint8_t*)CONNECTION_RE_TEST_GET, 26)) {
-            uah::prepareBuffer(sendBuffer, (uint8_t*)CONNECTION_END, 5, MESSAGE_SIZE);
+        } else if (uah::areArraysEqual(receivedMessage, CONNECTION_RE_TEST_GET)) {
+            uah::prepareBuffer(sendBuffer, CONNECTION_END, MESSAGE_SIZE);
             mpCommunication->sendMessage(sendBuffer);
             endConnection();
         } else {
@@ -55,7 +55,7 @@ namespace Comms {
     }
 
     void Connection::receivingHandle(const uint8_t ip) {
-        if (mpAddressing->getIsAddressingWorking()) return;
+        if (mpAddressing->getIsAddressingInProgress()) return;
 
         createConnectionTimer();
         xTimerStart(mConnectionTimeoutTimer, portMAX_DELAY);
@@ -70,11 +70,11 @@ namespace Comms {
 
     void Connection::sendingHandle(const uint8_t message[MESSAGE_SIZE]) {
         // TODO add handling for failed connection
-        if (!uah::areArraysEqual(message, (uint8_t*)CONNECTION_REPEAT_MESSAGE, SPECIAL_MESSAGE_LEN)) {
+        if (!uah::areArraysEqual(message, CONNECTION_REPEAT_MESSAGE)) {
             mpLogger->debug("Connection Method", "setLastTransmittedMessage(message)");
             setLastTransmittedMessage(message);
         }
-        if (mpAddressing->getIsAddressingWorking()) return;
+        if (mpAddressing->getIsAddressingInProgress()) return;
 
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
         if (!mIsConnected) {
@@ -109,9 +109,9 @@ namespace Comms {
 
     void Connection::transmitRepeatMessage() const {
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
-        if (mIsConnected || mpAddressing->getIsAddressingWorking()) {
+        if (mIsConnected || mpAddressing->getIsAddressingInProgress()) {
             uint8_t buffer[MESSAGE_SIZE];
-            uah::prepareBuffer(buffer, (uint8_t*)CONNECTION_REPEAT_MESSAGE, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
+            uah::prepareBuffer(buffer, CONNECTION_REPEAT_MESSAGE, MESSAGE_SIZE);
             mpCommunication->sendPriorityMessage(buffer);
         }
         xSemaphoreGive(mConnectionDataMutex);

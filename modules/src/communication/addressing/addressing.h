@@ -34,7 +34,7 @@ namespace Comms {
 
         /**
          * @brief Copies the current protocol MAC address into the provided buffer.
-         * @param macAddress Output buffer of length 6 for the MAC address.
+         * @param macAddress Output buffer of length defined by MAC_ADDRESS_LENGTH for the MAC address.
          * @note Thread-safe.
          */
         void getProtocolMACAddress(uint8_t macAddress[MAC_ADDRESS_LENGTH]) const;
@@ -69,20 +69,20 @@ namespace Comms {
         virtual void setProtocolIPAddress(uint8_t ip);
 
         /**
-         * @brief Pure virtual function checking if given mac address is proper.
+         * @brief Pure virtual function checking if given mac address is valid.
          * @param mac MAC address to check.
-         * @return True if MAC address is proper, false otherwise.
+         * @return True if MAC address is valid, false otherwise.
          * @warning Must be implemented by derived class.
          */
-        virtual bool isMACProper(const uint8_t* mac) = 0;
+        virtual bool isMACValid(const uint8_t* mac) = 0;
 
         /**
-         * @brief Pure virtual function checking if given IP address is proper.
+         * @brief Pure virtual function checking if given IP address is valid.
          * @param ip IP address to check.
-         * @return True if IP address is proper, false otherwise.
+         * @return True if IP address is valid, false otherwise.
          * @warning Must be implemented by derived class.
          */
-        virtual bool isIpProper(uint8_t ip) = 0;
+        virtual bool isIpValid(uint8_t ip) = 0;
 
         /**
          * @brief Initializes addressing procedures and related FreeRTOS resources.
@@ -99,7 +99,7 @@ namespace Comms {
          * @return True if addressing algorithm is in progress, false otherwise.
          * @note Thread-safe.
          */
-        bool getIsAddressingWorking() const;
+        bool getIsAddressingInProgress() const;
 
         /**
          * @brief Adds a message to the addressing queue. Ensures that adding messages to queue is only available if queue exist.
@@ -182,7 +182,7 @@ namespace Comms {
 
         Communication *mpCommunication; ///< Pointer to the Communication class instance (owner class).
 
-        bool mIsAddressingWorking = false; ///< Indicates if addressing algorithm is in progress.
+        bool mIsAddressingInProgress = false; ///< Indicates if addressing algorithm is in progress.
         uint8_t mMACAddress[MAC_ADDRESS_LENGTH]{}; ///< Module's own MAC address.
         uint8_t mProtocolMACAddress[MAC_ADDRESS_LENGTH]{}; ///< Central unit's MAC address (or module's own MAC if unknown).
         uint8_t mIPAddress = NULL_IP; ///< Current assigned IP address (0 = NULL, 1 = central unit's IP).

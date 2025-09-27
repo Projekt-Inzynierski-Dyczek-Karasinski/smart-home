@@ -52,7 +52,7 @@ namespace Comms {
         return ipAddress;
     }
 
-    bool ModuleAddressing::isMACProper(const uint8_t *mac) {
+    bool ModuleAddressing::isMACValid(const uint8_t *mac) {
         bool result = false;
         xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
         if (mIPAddress == NULL_IP || uah::areArraysEqual(mac, mProtocolMACAddress, MAC_ADDRESS_LENGTH)) {
@@ -62,7 +62,7 @@ namespace Comms {
         return result;
     }
 
-    bool ModuleAddressing::isIpProper(const uint8_t ip) {
+    bool ModuleAddressing::isIpValid(const uint8_t ip) {
         bool result = false;
         xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
         if ((mIPAddress == NULL_IP && ip == CENTRAL_UNIT_IP) || ip == mIPAddress) {
@@ -105,9 +105,9 @@ namespace Comms {
                     case ADDRESSING_STATES::START_ADDRESSING:
                         #ifdef ESP32_BOARD
                             #ifdef RF_CHANNELS
-                                uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_NC_REAL_MAC_RF_CHANNELS, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
+                                uah::prepareBuffer(sendBuffer, ADDRESSING_NC_REAL_MAC_RF_CHANNELS, MESSAGE_SIZE);
                             #else
-                                uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_NC_REAL_MAC_NO_RF_CHANNELS, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
+                                uah::prepareBuffer(sendBuffer, ADDRESSING_NC_REAL_MAC_NO_RF_CHANNELS, MESSAGE_SIZE);
                             #endif
                         #else
                             #error "Not implemented"
@@ -118,7 +118,7 @@ namespace Comms {
 
                     case ADDRESSING_STATES::REPLY_PING:
                         // send reping
-                        uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_REPING, SPECIAL_MESSAGE_LEN, SPECIAL_MESSAGE_LEN);
+                        uah::prepareBuffer(sendBuffer, ADDRESSING_REPING, MESSAGE_SIZE);
                         ad.mpCommunication->sendMessage(sendBuffer);
                         addressingState = ADDRESSING_STATES::PROCESS_SUMMARY;
                         break;
@@ -131,7 +131,7 @@ namespace Comms {
                                 isMacRealToCheck == ad.m_IS_MAC_ADDRESS_REAL &&
                                 uah::areArraysEqual(ad.mMACAddress, macToCheck, MAC_ADDRESS_LENGTH)
                             ) {
-                                uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_SUMMARY_OK, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
+                                uah::prepareBuffer(sendBuffer, ADDRESSING_SUMMARY_OK, MESSAGE_SIZE);
                                 ad.mpCommunication->sendMessage(sendBuffer);
 
                                 ad.mpLogger->info("ModuleAddressing Main", "Addressing complete." );
@@ -145,7 +145,7 @@ namespace Comms {
                                 for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
                             } else {
                                 ad.mpLogger->warning("ModuleAddressing Main", "Central unit send bad data in summary." );
-                                uah::prepareBuffer(sendBuffer, (uint8_t*)ADDRESSING_SUMMARY_BAD, SPECIAL_MESSAGE_LEN, MESSAGE_SIZE);
+                                uah::prepareBuffer(sendBuffer, ADDRESSING_SUMMARY_BAD, MESSAGE_SIZE);
                                 ad.mpCommunication->sendMessage(sendBuffer);
                                 isRestarting = true;
                             }
@@ -193,7 +193,7 @@ namespace Comms {
                             break;
 
                         case ADDRESSING_STATES::WAIT_FOR_PING:
-                            if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_PING, SPECIAL_MESSAGE_LEN)) {
+                            if (uah::areArraysEqual(receiveBuffer, ADDRESSING_PING)) {
                                 isReceivedPropperMessage = true;
                                 ad.mpLogger->debug("ModuleAddressing Main", "Got ping.");
                                 addressingState = ADDRESSING_STATES::REPLY_PING;
@@ -202,10 +202,10 @@ namespace Comms {
 
                         case ADDRESSING_STATES::PROCESS_SUMMARY:
                             // if central unit is still sending ping
-                            if (uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_PING, SPECIAL_MESSAGE_LEN)) {
+                            if (uah::areArraysEqual(receiveBuffer, ADDRESSING_PING)) {
                                 addressingState = ADDRESSING_STATES::REPLY_PING;
                             } else if (
-                                uah::areArraysEqual(receiveBuffer, (uint8_t*)ADDRESSING_SUMMARY, SPECIAL_MESSAGE_LEN) &&
+                                uah::areArraysEqual(receiveBuffer, ADDRESSING_SUMMARY) &&
                                 receiveBuffer[6]  == (uint8_t)'i' &&
                                 receiveBuffer[8]  == (uint8_t)'c' &&
                                 receiveBuffer[10] == (uint8_t)'r' &&

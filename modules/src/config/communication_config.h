@@ -38,12 +38,12 @@
 
 // special messages
 #define SPECIAL_MESSAGE_LEN 6
-#define PING_MESSAGE "ping\0\0"
+#define PING_MESSAGE "ping"
 #define RE_PING_MESSAGE "reping"
 
 // connection messages
-#define CONNECTION_END "COend\0"
-#define CONNECTION_AFFIRM "COok\0\0"
+#define CONNECTION_END "COend"
+#define CONNECTION_AFFIRM "COok"
 #define CONNECTION_REPEAT_MESSAGE "COrepe"
 #define CONNECTION_TEST_EXECUTE "COexe"
 #define CONNECTION_TEST_GET "COtest"
