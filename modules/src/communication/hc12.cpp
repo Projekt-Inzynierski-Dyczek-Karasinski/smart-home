@@ -244,7 +244,7 @@ namespace Comms {
             xTaskCreate(
                 HC12MainTask,
                 "HC12 Main Task",
-                2048,
+                HC12_MAIN_TASK_SIZE,
                 nullptr,
                 BACKGROUND_TASK_PRIORITY,
                 &mHC12MainTaskHandle
@@ -314,7 +314,7 @@ namespace Comms {
             xTaskCreate(
                 transmitTask,
                 "HC12 Transmit Task",
-                2048,
+                TRANSMIT_TASK_SIZE,
                 nullptr,
                 HIGH_TASK_PRIORITY,
                 &mTransmitTaskHandle
@@ -394,7 +394,7 @@ namespace Comms {
             xTaskCreate(
                 setupHC12Task,
                 "HC12 Setup Task",
-                2048,
+                SETUP_HC12_TASK_SIZE,
                 nullptr,
                 HIGH_TASK_PRIORITY,
                 &mSetupHC12TaskHandle

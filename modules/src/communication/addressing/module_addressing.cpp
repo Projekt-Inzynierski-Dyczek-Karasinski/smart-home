@@ -242,7 +242,7 @@ namespace Comms {
             xTaskCreate(
                 addressingTask,
                 "Addressing Task",
-                4096,
+                MODULE_ADDRESSING_TASK_SIZE,
                 nullptr,
                 MEDIUM_TASK_PRIORITY,
                 &mAddressingTaskHandle

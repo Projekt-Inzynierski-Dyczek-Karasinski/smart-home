@@ -278,7 +278,7 @@ namespace Comms {
             xTaskCreate(
                 communicationMainTask,
                 "Communication Main",
-                2048,
+                COMMUNICATION_MAIN_TASK_SIZE,
                 nullptr,
                 BACKGROUND_TASK_PRIORITY,
                 &mCommunicationMainTaskHandle
@@ -486,7 +486,7 @@ namespace Comms {
             xTaskCreate(
                 decodeMessageTask,
                 "Decode message",
-                2048,
+                DECODE_TASK_SIZE,
                 nullptr,
                 LOW_TASK_PRIORITY,
                 &mDecodeMessageTaskHandle
@@ -585,7 +585,7 @@ namespace Comms {
             xTaskCreate(
                 encodeMessageTask,
                 "Encode Message",
-                2048,
+                ENCODE_TASK_SIZE,
                 nullptr,
                 MEDIUM_TASK_PRIORITY,
                 &mEncodeMessageTaskHandle
@@ -690,7 +690,7 @@ namespace Comms {
             xTaskCreate(
                 terminalInputTask,
                 "Terminal Input Task",
-                2048,
+                TERMINAL_INPUT_TASK_SIZE,
                 nullptr,
                 BACKGROUND_TASK_PRIORITY,
                 &mTerminalInputTaskHandle
