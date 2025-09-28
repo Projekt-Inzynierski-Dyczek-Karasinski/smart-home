@@ -33,13 +33,6 @@ namespace Comms {
         virtual ~Addressing();
 
         /**
-         * @brief Copies the current protocol MAC address into the provided buffer.
-         * @param macAddress Output buffer of length defined by MAC_ADDRESS_LENGTH for the MAC address.
-         * @note Thread-safe.
-         */
-        void getProtocolMACAddress(uint8_t macAddress[MAC_ADDRESS_LENGTH]) const;
-
-        /**
          * @brief Pure virtual getter for rf channel when device starts new connection.
          * @return RF Channel.
          * @warning Must be implemented by derived class.
@@ -61,14 +54,6 @@ namespace Comms {
         virtual uint8_t getIPAddress() = 0;
 
         /**
-         * @brief Virtual setter for IP address.
-         * @return IP address.
-         * @warning Must be implemented by CentralUnitAddressing class.
-         * @note By default, this method does nothing.
-         */
-        virtual void setProtocolIPAddress(uint8_t ip);
-
-        /**
          * @brief Pure virtual function checking if given mac address is valid.
          * @param mac MAC address to check.
          * @return True if MAC address is valid, false otherwise.
@@ -83,6 +68,21 @@ namespace Comms {
          * @warning Must be implemented by derived class.
          */
         virtual bool isIpValid(uint8_t ip) = 0;
+
+        /**
+         * @brief Virtual setter for IP address.
+         * @return IP address.
+         * @warning Must be implemented by CentralUnitAddressing class.
+         * @note By default, this method does nothing.
+         */
+        virtual void setProtocolIPAddress(uint8_t ip);
+
+        /**
+         * @brief Copies the current protocol MAC address into the provided buffer.
+         * @param macAddress Output buffer of length defined by MAC_ADDRESS_LENGTH for the MAC address.
+         * @note Thread-safe.
+         */
+        void getProtocolMACAddress(uint8_t macAddress[MAC_ADDRESS_LENGTH]) const;
 
         /**
          * @brief Initializes addressing procedures and related FreeRTOS resources.
@@ -109,6 +109,30 @@ namespace Comms {
 
     protected:
         /**
+         * @brief Pure virtual function for creating the addressing task.
+         * @warning Must be implemented by derived class.
+         */
+        virtual void createAddressingTask() = 0;
+
+        /**
+         * @brief Pure virtual function for creating the addressing timer.
+         * @warning Must be implemented by derived class.
+         */
+        virtual void createAddressingTimer() = 0;
+
+        /**
+         * @brief Pure virtual function to clear all data of a new connection.
+         * @warning Must be implemented by derived class.
+         */
+        virtual void clearNewConnectionData() = 0;
+
+        /**
+         * @brief Pure virtual function to completely abort the addressing process.
+         * @warning Must be implemented by derived class.
+         */
+        virtual void abortAddressing() = 0;
+
+        /**
          * @brief Creates the FreeRTOS queue used for addressing messages.
          */
         void createAddressingQueue();
@@ -119,21 +143,9 @@ namespace Comms {
         void deleteAddressingQueue();
 
         /**
-         * @brief Pure virtual function for creating the addressing task.
-         * @warning Must be implemented by derived class.
-         */
-        virtual void createAddressingTask() = 0;
-
-        /**
          * @brief Deletes the addressing task and frees related resources.
          */
         void deleteAddressingTask();
-
-        /**
-         * @brief Pure virtual function for creating the addressing timer.
-         * @warning Must be implemented by derived class.
-         */
-        virtual void createAddressingTimer() = 0;
 
         /**
          * @brief Deletes the addressing timer and frees resources.
@@ -141,21 +153,9 @@ namespace Comms {
         void deleteAddressingTimer();
 
         /**
-         * @brief Pure virtual function to clear all data of a new connection.
-         * @warning Must be implemented by derived class.
-         */
-        virtual void clearNewConnectionData() = 0;
-
-        /**
          * @brief Sends a message to restart the addressing algorithm and calls clearNewConnectionData() method.
          */
         void sendRestartMessage();
-
-        /**
-         * @brief Pure virtual function to completely abort the addressing process.
-         * @warning Must be implemented by derived class.
-         */
-        virtual void abortAddressing() = 0;
 
         /**
          * @brief Sends a message to completely abort the addressing process and calls abortAddressing() method.

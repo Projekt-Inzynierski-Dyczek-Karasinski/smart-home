@@ -43,14 +43,14 @@ namespace Comms {
         vSemaphoreDelete(mAddressingDataMutex);
     }
 
+    void Addressing::setProtocolIPAddress(uint8_t ip) {
+        mpLogger->debug("Addressing Method", "Called setProtocolIPAddress()");
+    }
+
     void Addressing::getProtocolMACAddress(uint8_t macAddress[MAC_ADDRESS_LENGTH]) const {
         xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
         uah::prepareBuffer(macAddress, mProtocolMACAddress, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
         xSemaphoreGive(mAddressingDataMutex);
-    }
-
-    void Addressing::setProtocolIPAddress(uint8_t ip) {
-        mpLogger->debug("Addressing Method", "Called setProtocolIPAddress()");
     }
 
     void Addressing::startAddressing() {
