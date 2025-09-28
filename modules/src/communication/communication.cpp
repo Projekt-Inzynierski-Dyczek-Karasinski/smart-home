@@ -510,6 +510,15 @@ namespace Comms {
             checkSum += (uint16_t)protocolBuffer[i];
         }
 
+        // TODO create namespace Tests
+        #ifdef TEST_CHECKSUM
+            // force bad checksum
+            pinMode(12, INPUT_PULLUP);
+            if (digitalRead(12) == LOW) {
+                checkSum++;
+            }
+        #endif
+
         checkSum = (CHECKSUM_MODULO - (checkSum % CHECKSUM_MODULO)) % CHECKSUM_MODULO;
 
         protocolBuffer[PROTOCOL_CHECKSUM_INDEX] = checkSum;

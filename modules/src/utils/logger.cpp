@@ -13,10 +13,12 @@ namespace Utils {
         bool Logger::smIsSerialEnabled = false;
 
         Logger::Logger(const Level level) {
-            mLogLevelMutex = xSemaphoreCreateMutex();
-            xSemaphoreTake(mLogLevelMutex, portMAX_DELAY);
-            mLogLevel = level;
-            xSemaphoreGive(mLogLevelMutex);
+            // TODO before merge with main remove commented code/rollback atomic
+            // mLogLevelMutex = xSemaphoreCreateMutex();
+            // xSemaphoreTake(mLogLevelMutex, portMAX_DELAY);
+            // mLogLevel = level;
+            // xSemaphoreGive(mLogLevelMutex);
+            mLogLevel.store(level);
 
             if (getLogLevel() == Level::NONE) return;
             beginSerial();
@@ -25,15 +27,18 @@ namespace Utils {
             }
         }
 
-        Logger::~Logger() {
-            vSemaphoreDelete(mLogLevelMutex);
-        }
+        // TODO before merge with main remove commented code/rollback atomic
+        // Logger::~Logger() {
+        //     vSemaphoreDelete(mLogLevelMutex);
+        // }
 
         Level Logger::getLogLevel() const {
-            xSemaphoreTake(mLogLevelMutex, portMAX_DELAY);
-            const Level level = mLogLevel;
-            xSemaphoreGive(mLogLevelMutex);
-            return level;
+            // TODO before merge with main remove commented code/rollback atomic
+            // xSemaphoreTake(mLogLevelMutex, portMAX_DELAY);
+            // const Level level = mLogLevel;
+            // xSemaphoreGive(mLogLevelMutex);
+            // return level;
+            return mLogLevel.load();
         }
 
         bool Logger::getIsSerialEnabled() {

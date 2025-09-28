@@ -29,7 +29,7 @@ void setup() {
 }
 
 void loop() {
-    ul::Logger logger = ul::Logger();
+    ul::Logger logger;
     logger.error("Main", "Failed to delete loop().");
     vTaskDelay(pdMS_TO_TICKS(1000));
 }

@@ -20,6 +20,7 @@ namespace Comms {
     CentralUnitAddressing::CentralUnitAddressing(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
         : Addressing(communication, logger) {
         mspAddressing = this;
+        // TODO before merge with main remove commented code/rollback atomic
         mIPAddress = CENTRAL_UNIT_IP;
 
         mModulesAddressingDataMutex = xSemaphoreCreateMutex();

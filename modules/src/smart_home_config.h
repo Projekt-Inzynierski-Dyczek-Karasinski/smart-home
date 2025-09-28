@@ -2,6 +2,9 @@
 
 // TODO before merge with main comment/remove DEBUG_MODE
 #define DEBUG_MODE
+#ifdef DEBUG_MODE
+    // #define TEST_CHECKSUM
+#endif
 
 // RF module
 #define HC12_MODULE

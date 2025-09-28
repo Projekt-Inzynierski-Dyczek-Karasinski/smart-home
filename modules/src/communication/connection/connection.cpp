@@ -186,11 +186,11 @@ namespace Comms {
             mpCommunication->sendPriorityMessage(mLastTransmittedMessage);
         }
         mLastTransmittedMessageAttempts++;
-        xSemaphoreGive(mConnectionDataMutex);
 
         // TODO consider better handling that:
         if (mLastTransmittedMessageAttempts > REPEAT_LAST_MESSAGE_MAX_ATTEMPTS) {
             endConnection();
         }
+        xSemaphoreGive(mConnectionDataMutex);
     }
 }

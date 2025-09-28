@@ -120,7 +120,9 @@ namespace Comms {
         static ModuleAddressing *mspAddressing; ///< Static pointer to a ModuleAddressing instance.
 
         #ifdef RF_CHANNELS
-            uint8_t mRfChannel = DEFAULT_CHANNEL; ///< Module's current RF channel.
+            // TODO before merge with main remove commented code/rollback atomic
+            // uint8_t mRfChannel = DEFAULT_CHANNEL; ///< Module's current RF channel.
+            std::atomic<uint8_t> mRfChannel{DEFAULT_CHANNEL}; ///< Module's current RF channel.
         #endif
     };
 }
