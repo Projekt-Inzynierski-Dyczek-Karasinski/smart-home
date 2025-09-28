@@ -17,7 +17,7 @@
 #define CHECKSUM_MODULO 256
 // TODO assign final value
 #define RECEIVE_BYTE_QUEUE_LEN 128
-#define BLANK_CHARACTER ' '
+#define BLANK_CHARACTER 0
 // TODO assign final value
 #define SUSPEND_TASK_TIME_SHORT 200 // 0.2s
 // TODO assign final value
@@ -32,3 +32,20 @@
 #define PING_MAX_ATTEMPTS 3
 // TODO assign final value
 #define DELAY_BETWEEN_MESSAGES 40
+
+#define CONNECTION_TIMEOUT 10000 // 10s
+#define CONNECTION_SEMAPHORE_TIMEOUT 100 // 0.1s
+
+// special messages
+#define SPECIAL_MESSAGE_LEN 6
+#define PING_MESSAGE "ping"
+#define RE_PING_MESSAGE "reping"
+
+// connection messages
+#define CONNECTION_END "COend"
+#define CONNECTION_AFFIRM "COok"
+#define CONNECTION_REPEAT_MESSAGE "COrepe"
+#define CONNECTION_TEST_EXECUTE "COexe"
+#define CONNECTION_TEST_GET "COtest"
+#define CONNECTION_RE_TEST_GET "COsending_some_data_123..."
+

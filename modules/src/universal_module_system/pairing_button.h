@@ -7,6 +7,7 @@
 #include "utils/logger.h"
 
 // TODO change to thread-save singleton and change some methods and vars to nonstatic
+// TODO consider adding namespace for universal module system
 namespace ul = Utils::Logging;
 
 /**
@@ -22,13 +23,13 @@ namespace ul = Utils::Logging;
 class PairingButton {
 public:
     /**
-     * @brief Method that initializes PairingButton and returns a pointer to the instance of PairingButton
+     * @brief Method that initializes PairingButton and returns a pointer to the instance of PairingButton.
      * @param debugLED Pointer to DebugLED object.
      * @param communication Pointer to Communication object.
      * @param logger Shared pointer to the Logger instance.
      * @return PairingButton* pointer to the instance of PairingButton.
      */
-    static PairingButton* getInstance(DebugLED *debugLED, Communication *communication, const std::shared_ptr<ul::Logger> &logger);
+    static PairingButton* getInstance(DebugLED *debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger);
     
     // Delete copy constructor and assignment operator
     PairingButton(const PairingButton&) = delete;
@@ -42,7 +43,7 @@ private:
      * @param logger Shared pointer to the Logger instance.
      * @note Constructor of this class is private, because this class is a singleton.
      */
-    PairingButton(DebugLED *debugLED, Communication *communication, const std::shared_ptr<ul::Logger> &logger);
+    PairingButton(DebugLED *debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger);
     
     /**
      * @brief Destructor of PairingButton class. Detaches interrupt from BUTTON_PIN and deletes Button Press Timer if exists.
@@ -93,7 +94,7 @@ private:
     static PairingButton* mspInstance;
 
     static DebugLED *mspDebugLED;
-    static Communication *mspCommunication;
+    static Comms::Communication *mspCommunication;
 
     static uint8_t msButtonMode;
     static uint8_t msButtonPressCounter;

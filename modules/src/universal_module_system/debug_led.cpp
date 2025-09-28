@@ -76,7 +76,7 @@ void DebugLED::createPairingBlinkTask() {
         xTaskCreate(
             createPairingBlinkTaskHandle,
             "Pairing Blink",
-            1024,
+            PAIRING_BLINK_TASK_SIZE,
             nullptr,
             BACKGROUND_TASK_PRIORITY,
             &msPairingBlinkHandle
@@ -114,7 +114,7 @@ void DebugLED::createResetBlinkTask() {
         xTaskCreate(
             createResetBlinkTaskHandle,
             "Reset Blink",
-            1024,
+            RESET_BLINK_TASK_SIZE,
             nullptr,
             1,
             &msResetBlinkHandle

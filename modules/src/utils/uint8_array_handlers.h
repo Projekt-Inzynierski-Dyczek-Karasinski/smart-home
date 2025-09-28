@@ -1,30 +1,21 @@
 #pragma once
 #include <Arduino.h>
 
-// TODO add @example tags
-
 namespace Utils {
-    /**
-     * @brief Namespace containing utility functions for arrays.
-     * @note Available functions:\n
-     * void printArrayAsChar()\n
-     * void printArrayAsInt()\n
-     * void prepareBuffer()\n
-     * uint8_t calcLenOfDataInArray()\n
-     * bool areArraysEqual()\n
-     */
     namespace ArrayHandlers {
         /**
          * @brief Prints given uint8_t array as a char array.
          * @param array Array to be printed.
          * @param len Length of the array.
+         * @warning This function is <b>not</b> thread-safe, use it only for debugging.
          */
         void printArrayAsChar(const uint8_t *array, uint8_t len);
 
         /**
-         * @brief Prints given uint8_t array as a int array.
+         * @brief Prints given uint8_t array as an int array.
          * @param array Array to be printed.
          * @param len Length of the array.
+         * @warning This function is <b>not</b> thread-safe, use it only for debugging.
          */
         void printArrayAsInt(const uint8_t *array, uint8_t len);
 
@@ -43,6 +34,15 @@ namespace Utils {
          * @param maxLen Length of the buffer.
          */
         void prepareBuffer(uint8_t *buffer, const uint8_t *value, uint8_t len, uint8_t maxLen);
+
+        /**
+         * @brief Sets given uint8_t array (buffer) to given value and fills the rest with 0.
+         * @param buffer Array to be filled with given value.
+         * @param value Array to be copied into buffer.
+         * @param maxLen Length of the buffer.
+         * @param len Length of the value array, default 0 for automatic calculation.
+         */
+        void prepareBuffer(uint8_t *buffer, const char *value, uint8_t maxLen, size_t len = 0);
 
         /**
          * @brief Calculates length of data in given uint8_t array (assuming that first occur of 0 is end of data).
@@ -67,5 +67,18 @@ namespace Utils {
          * @return True if arrays are equal, false otherwise.
          */
         bool areArraysEqual(const uint8_t *array1, const uint8_t *array2, uint8_t len);
+
+        /**
+         * @brief Compares uint8_t array to char array.
+         *
+         * @param uint8Array uint8_t array to be compared.
+         * @param charArray char array to be compared.
+         * @param len Length of the arrays, default 0 for automatic calculation.
+         * @return True if arrays are equal, false otherwise.
+         *
+         * @warning Automatic calculation of array size is based on length of <code>charArray</code>,
+         * the length of the <code>charArray</code> must be less than or equal to the length of <code>uint8Array</code>.
+         */
+        bool areArraysEqual(const uint8_t *uint8Array, const char *charArray, size_t len = 0);
     }
 }

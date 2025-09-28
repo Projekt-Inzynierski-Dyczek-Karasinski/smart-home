@@ -1,11 +1,9 @@
 #pragma once
 
 #include <Arduino.h>
+#include <atomic>
 
 namespace Utils {
-    /**
-     * @brief Namespace containing enum Level and class Logger.
-     */
     namespace Logging {
         /**
          * @brief Enumeration of available log levels.
@@ -36,6 +34,12 @@ namespace Utils {
              * @note Thread-safe.
              */
             explicit Logger(Level level = static_cast<Level>(LOGGING_LEVEL));
+
+            // TODO before merge with main remove commented code/rollback atomic
+            // /**
+            //  * @brief Cleans up FreeRTOS resources used by the class.
+            //  */
+            // ~Logger();
             ~Logger() = default;
 
             /**
@@ -203,8 +207,10 @@ namespace Utils {
             static xSemaphoreHandle smSerialMutex; ///< Static handle to FreeRTOS mutex protecting changing settings of Serial and printing.
             static bool smIsSerialEnabled; ///< Static flag ensuring that <code>Serial.begin()</code> is called only once.
 
-            Level mLogLevel; ///< Currently set logging level.
-            xSemaphoreHandle mLogLevelMutex; ///< Handle to FreeRTOS mutex protecting <code>mLogLevel</code>.
+            // TODO before merge with main remove commented code/rollback atomic
+            std::atomic<Level> mLogLevel; ///< Currently set logging level.
+            // Level mLogLevel; ///< Currently set logging level.
+            // xSemaphoreHandle mLogLevelMutex; ///< Handle to FreeRTOS mutex protecting <code>mLogLevel</code>.
         };
     }
 }
