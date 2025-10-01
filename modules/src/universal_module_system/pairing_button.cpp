@@ -4,19 +4,18 @@
 #include "config/univarsal_module_system_config.h"
 
 namespace UniversalModuleSystem {
-    PairingButton* PairingButton::mspPairingButton = nullptr;
-
-    PairingButton& PairingButton::getInstance(DebugLED *debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
+    PairingButton& PairingButton::getInstance(const std::shared_ptr<DebugLED> &debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
         static PairingButton instance(debugLED, communication, logger);
         return instance;
     }
 
-    PairingButton::PairingButton(DebugLED *debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger)
+    PairingButton::PairingButton(const std::shared_ptr<DebugLED> &debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger)
         : mpDebugLED(debugLED), mpCommunication(communication), mpLogger(logger) {
-        mspPairingButton = this;
         pinMode(BUTTON_PIN, INPUT_PULLUP);
-        attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
+        // TODO !BEFORE PULL REQUEST! remove
+        mpLogger = std::make_shared<ul::Logger>(ul::Level::DEBUG);
 
+        attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
         mpLogger->info("PairingButton Class", "PairingButton initialized.");
     }
 
@@ -26,10 +25,10 @@ namespace UniversalModuleSystem {
     }
 
     void IRAM_ATTR PairingButton::buttonISR() {
-        auto &pb = *mspPairingButton;
+        const auto pb = &getInstance(nullptr, nullptr, nullptr);
         detachInterrupt(digitalPinToInterrupt(BUTTON_PIN));
-        pb.mpLogger->debug("PairingButton ISR", "Button pressed.");
-        pb.startButtonPressTimer();
+        pb->mpLogger->debug("PairingButton ISR", "Button pressed.");
+        pb->startButtonPressTimer();
 
         // Force context switch if higher priority task was woken
         portYIELD_FROM_ISR(pdFALSE);
@@ -37,7 +36,7 @@ namespace UniversalModuleSystem {
 
     // ====================== Button Press Timer ======================
     void PairingButton::buttonPressTimerCallback(TimerHandle_t xTimer) {
-        auto &pb = *mspPairingButton;
+        auto &pb = *static_cast<PairingButton*>(pvTimerGetTimerID(xTimer));
         if (digitalRead(BUTTON_PIN) == LOW) {
             pb.mButtonPressCounter.fetch_add(1);
             pb.mButtonNotPressedCounter.store(3);
@@ -82,7 +81,7 @@ namespace UniversalModuleSystem {
                 "Button Press Timer",
                 pdMS_TO_TICKS(DEBOUNCING_TIME),
                 pdTRUE,
-                nullptr,
+                this,
                 buttonPressTimerCallback
             );
         }

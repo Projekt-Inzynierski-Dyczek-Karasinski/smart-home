@@ -17,7 +17,8 @@ void setup() {
     vTaskDelay(pdTICKS_TO_MS(1000));
     const auto logger = std::make_shared<ul::Logger>();
 
-    ums::DebugLED* debugLed = ums::DebugLED::getInstance(logger);
+    const auto debugLed = std::make_shared<ums::DebugLED>(logger);
+    // ums::DebugLED debugLed(logger);
 
     Comms::Communication& communication = Comms::Communication::getInstance(debugLed, logger);
     ums::PairingButton& pairingButton = ums::PairingButton::getInstance(debugLed, &communication, logger);

@@ -15,8 +15,6 @@ namespace UniversalModuleSystem {
      * @details Pressing button for:
      * - 3 seconds initializes a pairing process.
      * - 10 seconds initializes a reset process.
-     * @note This class should be initialized at the beginning of setup() (but after DebugLED and Communication classes). Serial.begin() have to be initialized separately before this class to see debug messages.
-     * This class is a singleton.
      */
     class PairingButton {
     public:
@@ -27,7 +25,7 @@ namespace UniversalModuleSystem {
          * @param logger Shared pointer to the Logger instance.
          * @return PairingButton* pointer to the instance of PairingButton.
          */
-        static PairingButton& getInstance(DebugLED *debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger);
+        static PairingButton& getInstance(const std::shared_ptr<DebugLED> &debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger);
 
         // Delete copy constructor and assignment operator
         PairingButton(const PairingButton&) = delete;
@@ -41,7 +39,7 @@ namespace UniversalModuleSystem {
          * @param logger Shared pointer to the Logger instance.
          * @note Constructor of this class is private, because this class is a singleton.
          */
-        PairingButton(DebugLED *debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger);
+        PairingButton(const std::shared_ptr<DebugLED> &debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger);
 
         /**
          * @brief Destructor of PairingButton class. Detaches interrupt from BUTTON_PIN and deletes Button Press Timer if exists.
@@ -58,7 +56,7 @@ namespace UniversalModuleSystem {
 
         /**
          * @brief Method that is called when the Button Press Timer expires. It debounces a button and controls its logic.
-         * @param xTimer FreeRTOS software timer (not used).
+         * @param xTimer FreeRTOS software timer.
          */
         static void buttonPressTimerCallback(TimerHandle_t xTimer);
 
@@ -80,10 +78,9 @@ namespace UniversalModuleSystem {
             RESET
         };
 
-        static PairingButton* mspPairingButton;
-        DebugLED *mpDebugLED;
-        Comms::Communication *mpCommunication;
+        std::shared_ptr<DebugLED> mpDebugLED;
         std::shared_ptr<ul::Logger> mpLogger;
+        Comms::Communication *mpCommunication;
 
         std::atomic<ButtonModes> mButtonMode{ButtonModes::IDLE}; ///< State of button.
         std::atomic<uint8_t> mButtonPressCounter{0}; ///< Counter how long is button pressed in <code>DEBOUNCING_TIME</code> (0.1) s.
