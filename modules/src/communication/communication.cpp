@@ -14,13 +14,12 @@ namespace Comms {
     Communication* Communication::mspCommunication = nullptr;
 
     // ============================ Public ============================
-    Communication &Communication::getInstance(DebugLED *debugLED, const std::shared_ptr<ul::Logger> &logger) {
+    Communication &Communication::getInstance(const std::shared_ptr<ums::DebugLED> &debugLED, const std::shared_ptr<ul::Logger> &logger) {
         static Communication instance(debugLED, logger);
         return instance;
     }
 
     void Communication::startAddressingAlgorithm() const {
-        mpDebugLED->createPairingBlinkTask();
         mpAddressing->startAddressing();
     }
 
@@ -70,7 +69,9 @@ namespace Comms {
     }
 
     // ================== Constructor and Destructor ==================
-    Communication::Communication(DebugLED *debugLED, const std::shared_ptr<ul::Logger> &logger) :
+    Communication::Communication(const std::shared_ptr<ums::DebugLED> &debugLED, const std::shared_ptr<ul::Logger> &logger) :
+        mpDebugLED(debugLED),
+        mpLogger(logger),
         #ifdef HC12_MODULE
             mpRfModule(new HC12(this, logger)),
         #else
@@ -83,8 +84,6 @@ namespace Comms {
         #endif
     {
         mspCommunication = this;
-        mpDebugLED = debugLED;
-        mpLogger = logger;
         mpConnection = &Connection::getInstance(this, mpAddressing, mpRfModule, logger);
 
         createCommunicationQueues();
@@ -262,7 +261,7 @@ namespace Comms {
 
                 case STOP_ADDRESSING_ALGORITHM_NOTIF:
                     isReadingRawMessage = false;
-                    com.mpDebugLED->deletePairingBlinkTask();
+                    com.mpDebugLED->deleteBlinkTask();
                     com.mpAddressing->stopAddressing();
                     break;
 
@@ -510,7 +509,6 @@ namespace Comms {
             checkSum += (uint16_t)protocolBuffer[i];
         }
 
-        // TODO create namespace Tests
         #ifdef TEST_CHECKSUM
             // force bad checksum
             pinMode(12, INPUT_PULLUP);

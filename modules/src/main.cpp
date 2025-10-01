@@ -10,16 +10,18 @@
 #include "utils/logger.h"
 
 namespace ul = Utils::Logging;
+namespace ums = UniversalModuleSystem;
 
 void setup() {
     // TODO before merge with main remove delay
     vTaskDelay(pdTICKS_TO_MS(1000));
     const auto logger = std::make_shared<ul::Logger>();
 
-    DebugLED* debugLed = DebugLED::getInstance(logger);
+    const auto debugLed = std::make_shared<ums::DebugLED>(logger);
+    // ums::DebugLED debugLed(logger);
 
     Comms::Communication& communication = Comms::Communication::getInstance(debugLed, logger);
-    PairingButton* pairingButton = PairingButton::getInstance(debugLed, &communication, logger);
+    ums::PairingButton& pairingButton = ums::PairingButton::getInstance(debugLed, &communication, logger);
 
     logger->info("Main", "Deleting functions setup() and loop().");
     vTaskDelete(nullptr);

@@ -1,109 +1,100 @@
-#include <memory>
-
 #include "pairing_button.h"
+
 #include "utils/logger.h"
+#include "config/univarsal_module_system_config.h"
 
-#define DEBOUNCING_TIME 100
-#define DEBOUNCING_COUNTER_TO_SECONDS(value) (value * DEBOUNCING_TIME / 1000)
-
-PairingButton* PairingButton::mspInstance = nullptr;
-Comms::Communication* PairingButton::mspCommunication = nullptr;
-DebugLED* PairingButton::mspDebugLED = nullptr;
-
-uint8_t PairingButton::msButtonMode = 0;
-uint8_t PairingButton::msButtonPressCounter = 0;
-int8_t PairingButton::msButtonNotPressedCounter = 3;
-TimerHandle_t PairingButton::msButtonPressTimer = nullptr;
-
-
-PairingButton* PairingButton::getInstance(DebugLED *debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
-    if (mspInstance == nullptr) {
-        mspInstance = new PairingButton(debugLED, communication, logger);
+namespace UniversalModuleSystem {
+    PairingButton& PairingButton::getInstance(const std::shared_ptr<DebugLED> &debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
+        static PairingButton instance(debugLED, communication, logger);
+        return instance;
     }
-    return mspInstance;
-}
 
-PairingButton::PairingButton(DebugLED *debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
-    mspDebugLED = debugLED;
-    mspCommunication = communication;
-    pinMode(BUTTON_PIN, INPUT_PULLUP);
-    attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
+    PairingButton::PairingButton(const std::shared_ptr<DebugLED> &debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger)
+        : mpDebugLED(debugLED), mpCommunication(communication), mpLogger(logger) {
+        pinMode(BUTTON_PIN, INPUT_PULLUP);
 
-    mpLogger = logger;
-    mpLogger->info("PairingButton Class", "PairingButton initialized.");
-}
+        attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
+        mpLogger->info("PairingButton Class", "PairingButton initialized.");
+    }
 
-PairingButton::~PairingButton() {
-    detachInterrupt(digitalPinToInterrupt(BUTTON_PIN));
-    deleteButtonPressTimer();
-}
+    PairingButton::~PairingButton() {
+        detachInterrupt(digitalPinToInterrupt(BUTTON_PIN));
+        deleteButtonPressTimer();
+    }
 
-void IRAM_ATTR PairingButton::buttonISR() {
-    detachInterrupt(digitalPinToInterrupt(BUTTON_PIN));
-    mspInstance->mpLogger->debug("PairingButton ISR", "Button pressed.");
-    startButtonPressTimer();
+    void IRAM_ATTR PairingButton::buttonISR() {
+        const auto pb = &getInstance(nullptr, nullptr, nullptr);
+        detachInterrupt(digitalPinToInterrupt(BUTTON_PIN));
+        pb->mpLogger->debug("PairingButton ISR", "Button pressed.");
+        pb->startButtonPressTimer();
 
-    // Force context switch if higher priority task was woken
-    constexpr BaseType_t xHigherPriorityTaskWoken = pdFALSE;
-    portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
-}
+        // Force context switch if higher priority task was woken
+        portYIELD_FROM_ISR(pdFALSE);
+    }
 
+    // ====================== Button Press Timer ======================
+    void PairingButton::buttonPressTimerCallback(TimerHandle_t xTimer) {
+        auto &pb = *static_cast<PairingButton*>(pvTimerGetTimerID(xTimer));
+        if (digitalRead(BUTTON_PIN) == LOW) {
+            pb.mButtonPressCounter.fetch_add(1);
+            pb.mButtonNotPressedCounter.store(3);
 
-// ====================== Button Press Timer ======================
-
-void PairingButton::buttonPressTimerCallback() {
-    if (digitalRead(BUTTON_PIN) == LOW) {
-        msButtonPressCounter++;
-        msButtonNotPressedCounter = 3;
-        
-        // after pressing button for 10 seconds call createResetBlinkTask()
-        if (DEBOUNCING_COUNTER_TO_SECONDS(msButtonPressCounter) >= 10 && msButtonMode != 2) {
-            msButtonMode = 2;
-            mspDebugLED->createResetBlinkTask();
-            
-        } 
-        // after pressing button for 3 seconds call createPairingBlinkTask()
-        else if (DEBOUNCING_COUNTER_TO_SECONDS(msButtonPressCounter) >= 3 && msButtonMode == 0) {
-            if (msButtonMode != 1) {
-                mspCommunication->startAddressingAlgorithm();
+            // after pressing button for 10 seconds call createResetBlinkTask()
+            if (DEBOUNCING_COUNTER_TO_SECONDS(pb.mButtonPressCounter.load()) >= 10 && pb.mButtonMode.load() != ButtonModes::RESET) {
+                pb.mButtonMode.store(ButtonModes::RESET);
+                pb.mpDebugLED->createResetBlinkTask();
+                // give time for blink DebugLED, clear data and reboot
+                pb.mpLogger->warning("PairingButton Timer", "Clearing data...");
+                // TODO add handler for clear data in flash memory
+                pb.mpLogger->error("PairingButton Timer", "Clearing data not implemented!");
+                vTaskDelay(pdMS_TO_TICKS(BUTTON_REBOOT_DELAY));
+                pb.mpLogger->warning("PairingButton Timer", "Rebooting...");
+                ESP.restart();
             }
-            msButtonMode = 1;
-        }
-    } else {
-        msButtonNotPressedCounter--;
+            // after pressing button for 3 seconds call createPairingBlinkTask()
+            else if (DEBOUNCING_COUNTER_TO_SECONDS(pb.mButtonPressCounter.load()) >= 3 && pb.mButtonMode.load() == ButtonModes::IDLE) {
+                if (pb.mButtonMode.load() != ButtonModes::PAIR) {
+                    pb.mpDebugLED->createPairingBlinkTask();
+                    pb.mpLogger->debug("PairingButton Timer", "ButtonModes::PAIR");
+                }
+                pb.mButtonMode.store(ButtonModes::PAIR);
+            }
+        } else {
+            pb.mButtonNotPressedCounter.fetch_sub(1);
 
-        // if button will not be press for 3*DEBOUNCING_TIME (0.3 seconds) timer will stop
-        if (msButtonNotPressedCounter <= 0) {
-            deleteButtonPressTimer();     
-            msButtonMode = 0;
-            attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);       
+            // if button will not be press for 3*DEBOUNCING_TIME (0.3 seconds) timer will stop
+            if (pb.mButtonNotPressedCounter.load() <= 0) {
+                if (pb.mButtonMode.load() == ButtonModes::PAIR) {
+                    pb.mpCommunication->startAddressingAlgorithm();
+                    pb.mpLogger->debug("PairingButton Timer", "startAddressingAlgorithm()");
+                }
+                pb.deleteButtonPressTimer();
+            }
         }
     }
-}
-void PairingButton::buttonPressTimerCallbackHandle(TimerHandle_t xTimer) {
-    const PairingButton* instance = static_cast<PairingButton*>(pvTimerGetTimerID(xTimer)); 
-    instance->buttonPressTimerCallback();
-}
-void PairingButton::startButtonPressTimer() {
-    if (msButtonPressTimer == nullptr) {
-        msButtonPressTimer = xTimerCreate(
-            "Button Press Timer",
-            pdMS_TO_TICKS(DEBOUNCING_TIME),
-            pdTRUE,
-            nullptr,
-            buttonPressTimerCallbackHandle
-        );
+
+    void PairingButton::startButtonPressTimer() {
+        if (mButtonPressTimer == nullptr) {
+            mButtonPressTimer = xTimerCreate(
+                "Button Press Timer",
+                pdMS_TO_TICKS(DEBOUNCING_TIME),
+                pdTRUE,
+                this,
+                buttonPressTimerCallback
+            );
+        }
+        if (mButtonPressTimer != nullptr) {
+            xTimerStart(mButtonPressTimer, portMAX_DELAY);
+        }
     }
-    if (msButtonPressTimer != nullptr) {
-        xTimerStart(msButtonPressTimer, portMAX_DELAY);
+    void PairingButton::deleteButtonPressTimer() {
+        if (mButtonPressTimer != nullptr) {
+            xTimerDelete(mButtonPressTimer, portMAX_DELAY);
+            mButtonPressTimer = nullptr;
+        }
+        mButtonMode.store(ButtonModes::IDLE);
+        mButtonPressCounter.store(0);
+        mButtonNotPressedCounter.store(3);
+        attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
     }
 }
-void PairingButton::deleteButtonPressTimer() {
-    if (msButtonPressTimer != nullptr) {
-        xTimerDelete(msButtonPressTimer, portMAX_DELAY);
-        msButtonPressTimer = nullptr;
-    } 
-    msButtonPressCounter = 0;
-    msButtonNotPressedCounter = 3;
-}
-// ================================================================
