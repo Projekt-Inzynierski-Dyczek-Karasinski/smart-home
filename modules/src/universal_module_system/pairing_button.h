@@ -19,11 +19,11 @@ namespace UniversalModuleSystem {
     class PairingButton {
     public:
         /**
-         * @brief Method that initializes PairingButton and returns a pointer to the instance of PairingButton.
-         * @param debugLED Pointer to DebugLED object.
+         * @brief Method that gets the singleton instance of PairingButton and returns a reference to it.
+         * @param debugLED Shared pointer to DebugLED object.
          * @param communication Pointer to Communication object.
          * @param logger Shared pointer to the Logger instance.
-         * @return PairingButton* pointer to the instance of PairingButton.
+         * @return PairingButton& reference to the singleton instance of PairingButton.
          */
         static PairingButton& getInstance(const std::shared_ptr<DebugLED> &debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger);
 
@@ -49,14 +49,20 @@ namespace UniversalModuleSystem {
         ~PairingButton();
 
         /**
-         * @brief Method that is called when the button is pressed (and interrupt is attached) and calls startButtonPressTimer().
-         * @note This method detaches interrupt for debouncing reasons. Interrupt is reattached at the end of buttonPressTimerCallback().
+         * @brief ISR method that is called when the button is pressed (and interrupt is attached) and starts the button press timer.
+         * @details This method detaches interrupt for debouncing reasons. Interrupt is reattached when the timer is deleted.
          */
         static void IRAM_ATTR buttonISR();
 
         /**
-         * @brief Method that is called when the Button Press Timer expires. It debounces a button and controls its logic.
-         * @param xTimer FreeRTOS software timer.
+         * @brief Callback method that is called periodically by the Button Press Timer to handle button debouncing and logic.
+         * @details This method:
+         * - Increments press counter when button is held down.
+         * - Triggers pairing mode after 3 seconds of continuous press.
+         * - Triggers reset mode after 10 seconds of continuous press (clears data and reboots).
+         * @param xTimer FreeRTOS software timer handle.
+         * @note Pairing process starts only after releasing button, but LED starts blinking immediately after 3 seconds
+         * to indicate user that can release button.
          */
         static void buttonPressTimerCallback(TimerHandle_t xTimer);
 
@@ -66,9 +72,7 @@ namespace UniversalModuleSystem {
         void startButtonPressTimer();
 
         /**
-         * @brief Method that deletes the Button Press Timer and resets button's variables to default values.
-         * If Button Press Timer doesn't exist, it only reset variables.
-         * @note Button's variables are: msButtonPressCounter, msButtonNotPressedCounter.
+         * @brief Method that deletes the Button Press Timer, resets button's variables to default values and reattaches the button interrupt.
          */
         void deleteButtonPressTimer();
 
@@ -83,9 +87,9 @@ namespace UniversalModuleSystem {
         Comms::Communication *mpCommunication;
 
         std::atomic<ButtonModes> mButtonMode{ButtonModes::IDLE}; ///< State of button.
-        std::atomic<uint8_t> mButtonPressCounter{0}; ///< Counter how long is button pressed in <code>DEBOUNCING_TIME</code> (0.1) s.
-        std::atomic<int8_t> mButtonNotPressedCounter{3}; ///< Counter how long is not button pressed (for debouncing).
+        std::atomic<uint8_t> mButtonPressCounter{0}; ///< Counter for how long is button pressed in <code>DEBOUNCING_TIME</code> (0.1) s.
+        std::atomic<int8_t> mButtonNotPressedCounter{3}; ///< Counter for how long is not button pressed (for debouncing).
 
-        TimerHandle_t mButtonPressTimer = nullptr; ///< FreeRTOS software timer for measure how long is button pressed.
+        TimerHandle_t mButtonPressTimer = nullptr; ///< FreeRTOS software timer to measure how long is button pressed.
     };
 }

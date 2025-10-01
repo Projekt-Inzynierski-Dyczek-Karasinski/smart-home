@@ -9,7 +9,7 @@ namespace ul = Utils::Logging;
 namespace UniversalModuleSystem {
     /**
      * @brief Class that controls the LED.
-     * @details Blinking types:
+     * @details Blinking patterns:
      * - slowly (0.5s ON, 0.5s OFF) indicates pairing process
      * - quickly (0.1s ON, 0.1s OFF) indicates reset process
      */
@@ -54,44 +54,38 @@ namespace UniversalModuleSystem {
          * @brief Make LED blink for a given times.
          * @param ledOnDuration Time in milliseconds for which the LED will be on.
          * @param ledOffDuration Time in milliseconds for which the LED will be off.
-         * @note This method is private.
          */
         void blink(uint32_t ledOnDuration, uint32_t ledOffDuration);
 
         /**
          * @brief FreeRTOS task that blinks LED signalizing pairing process.
          * @param parameters FreeRTOS task parameters.
-         * @note This method is private.
          */
         static void pairingBlink(void *parameters);
 
         /**
          * @brief FreeRTOS task that blinks LED signalizing reset process.
          * @param parameters FreeRTOS task parameters.
-         * @note This method is private.
          */
         static void resetBlink(void *parameters);
 
         /**
          * @brief Method that is called when the Blink Timeout Timer expires. Deletes Timer and Pairing Blink and Reset Blink tasks if exists.
-         * @note This method is private.
          */
         static void blinkTimeoutCallback(TimerHandle_t xTimer);
 
         /**
          * @brief Creates and starts Blink Timeout Timer. If timer is already started, it will be restarted.
-         * @note This method is private.
          * @param maxBlinkTime Time in milliseconds after which the timer will expire.
          */
         void startBlinkTimeout(uint32_t maxBlinkTime);
 
         /**
          * @brief Deletes Blink Timeout Timer if exists.
-         * @note This method is private.
          */
         void deleteBlinkTimeout();
 
-        TaskHandle_t mBlinkHandle = nullptr; ///< FreeRTOS handle to responsible for blinking LED.
+        TaskHandle_t mBlinkHandle = nullptr; ///< FreeRTOS task handle to responsible for blinking LED.
         TimerHandle_t mBlinkTimeout = nullptr; ///< FreeRTOS software timer for automatic deleting <code>mBlinkHandle</code> task when timeout occurs.
 
         std::shared_ptr<ul::Logger> mpLogger;

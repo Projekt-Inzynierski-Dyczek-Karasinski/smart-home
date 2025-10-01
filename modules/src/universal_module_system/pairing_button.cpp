@@ -12,8 +12,6 @@ namespace UniversalModuleSystem {
     PairingButton::PairingButton(const std::shared_ptr<DebugLED> &debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger)
         : mpDebugLED(debugLED), mpCommunication(communication), mpLogger(logger) {
         pinMode(BUTTON_PIN, INPUT_PULLUP);
-        // TODO !BEFORE PULL REQUEST! remove
-        mpLogger = std::make_shared<ul::Logger>(ul::Level::DEBUG);
 
         attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
         mpLogger->info("PairingButton Class", "PairingButton initialized.");

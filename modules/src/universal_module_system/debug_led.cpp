@@ -11,9 +11,6 @@ namespace UniversalModuleSystem {
         pinMode(LED_PIN, OUTPUT);
         digitalWrite(LED_PIN, LOW);
 
-        // TODO !BEFORE PULL REQUEST! remove
-        mpLogger = std::make_shared<ul::Logger>(ul::Level::DEBUG);
-
         mpLogger->info("DebugLED Class", "DebugLED initialized.");
     }
 
