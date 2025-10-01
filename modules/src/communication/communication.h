@@ -22,6 +22,7 @@
 
 
 namespace ul = Utils::Logging;
+namespace ums = UniversalModuleSystem;
 
 namespace Comms {
     /**
@@ -39,7 +40,7 @@ namespace Comms {
          * @param logger Shared pointer to the Logger instance.
          * @return Reference to the singleton Communication instance.
          */
-        static Communication& getInstance(DebugLED *debugLED, const std::shared_ptr<ul::Logger> &logger);
+        static Communication& getInstance(ums::DebugLED *debugLED, const std::shared_ptr<ul::Logger> &logger);
 
         // Delete copy constructor and assignment operator
         Communication(const Communication&) = delete;
@@ -112,7 +113,7 @@ namespace Comms {
          * @param debugLED Pointer to DebugLED instance.
          * @param logger Shared pointer to the Logger instance.
          */
-        explicit Communication(DebugLED *debugLED, const std::shared_ptr<ul::Logger> &logger);
+        explicit Communication(ums::DebugLED *debugLED, const std::shared_ptr<ul::Logger> &logger);
         /**
          * @brief Destructor. Cleans up FreeRTOS resources used by the class.
          * @warning Destructor of this class exists only for programming principles. This class should never be deleted.
@@ -250,7 +251,7 @@ namespace Comms {
         void replyToPing() const;
 
         static Communication *mspCommunication;
-        DebugLED *mpDebugLED; ///< Pointer to debugLED class instance.
+        ums::DebugLED *mpDebugLED; ///< Pointer to debugLED class instance.
         Connection *mpConnection; ///< Pointer to Connection class instance.
 
         #ifdef HC12_MODULE

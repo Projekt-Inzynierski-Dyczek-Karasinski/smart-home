@@ -10,7 +10,5 @@
     #define HARDWARE_SERIAL_UART_NR 2
 #endif
 
-#define LED_PIN 39
-#define BUTTON_PIN 1
-#define CENTRAL_UNIT 
-
+#define LED_PIN 1
+#define BUTTON_PIN 39

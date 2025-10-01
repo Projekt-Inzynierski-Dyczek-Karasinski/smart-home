@@ -13,6 +13,16 @@
  */
 namespace Comms {}
 
+// TODO update comment
+/**
+ * @namespace UniversalModuleSystem
+ * @brief brief...
+ * @details Contains:
+ * - class DebugLED - class handling led
+ * - class PairingButton - class handling button
+ */
+namespace UniversalModuleSystem {}
+
 /**
  * @namespace Utils
  * @brief Utility tools and common components.

@@ -9,10 +9,6 @@
     #define HARDWARE_SERIAL_UART_NR 2
 #endif
 
-#ifndef RGB_BUILTIN
-    #define RGB_BUILTIN 97
-#endif
-
 #define LED_PIN 39
 #define BUTTON_PIN 1
 #define CENTRAL_UNIT

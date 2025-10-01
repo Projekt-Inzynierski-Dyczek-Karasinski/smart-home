@@ -44,7 +44,7 @@
     #if defined(ESP32_WROOM_BOARD_TYPE) || defined(ESP32_S3_WROOM_BOARD_TYPE)
         #error "Only one of ESP32_WROOM_BOARD_TYPE, ESP32_S3_WROOM_BOARD_TYPE and ESP32_YD_BOARD_TYPE can be defined."
     #endif
-    #include "config/basic_esp32_s3_wroom_config.h"
+    #include "config/basic_esp32_yd_config.h"
 #endif
 
 // TODO before merge with main remove COMMUNICATION_WITHOUT_SAVING_ADDRESSING
