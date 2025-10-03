@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common/smart_home_config.h"
+
 #define NOTIFICATIONS_QUEUE_SIZE 5
 #define MESSAGE_QUEUE_LEN 10
 #define MESSAGE_SIZE 64

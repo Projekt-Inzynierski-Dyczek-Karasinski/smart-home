@@ -1,7 +1,6 @@
 #include "pairing_button.h"
 
-#include "utils/logger.h"
-#include "config/univarsal_module_system_config.h"
+#include "../config/universal_module_system_config.h"
 
 namespace UniversalModuleSystem {
     PairingButton& PairingButton::getInstance(const std::shared_ptr<DebugLED> &debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger) {

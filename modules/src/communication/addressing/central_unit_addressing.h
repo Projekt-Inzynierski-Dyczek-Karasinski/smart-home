@@ -3,8 +3,6 @@
 #include <Arduino.h>
 #include <memory>
 
-#include "smart_home_config.h"
-
 #include "communication/addressing/addressing.h"
 
 // assuming that central unit is using hc12 to rf communication

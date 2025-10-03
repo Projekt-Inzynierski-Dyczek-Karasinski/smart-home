@@ -1,12 +1,6 @@
 #include "communication.h"
 
-#include <Arduino.h>
-#include <HardwareSerial.h>
-#include <memory>
-
-#include "../utils/uint8_array_handlers.h"
-
-#include "config/addressing_config.h"
+#include "utils/uint8_array_handlers.h"
 
 namespace uah = Utils::ArrayHandlers;
 
@@ -651,6 +645,20 @@ namespace Comms {
                             com.mpLogger->warning("Communication Input", "Rebooting...");
                             ESP.restart();
                         }
+                    // TODO !BEFORE PULL REQUEST! remove
+                    // else if (uah::areArraysEqual(buffer, "testr")) {
+                    //     File file = SPIFFS.open("/test.txt", "r");
+                    //     if (file) {
+                    //         while (file.available()) {
+                    //             Serial.write(file.read());
+                    //         }
+                    //         file.close();
+                    //     }
+                    // } else if (uah::areArraysEqual(buffer, "testw")) {
+                    //     File file = SPIFFS.open("/test.txt", "a");
+                    //     file.print("data");
+                    //     file.close();
+                    // }
                     #endif
                     else if (uah::areArraysEqual(buffer, "ip=")) {
                         if (buffer[6] != '\0') {
@@ -697,7 +705,8 @@ namespace Comms {
             xTaskCreate(
                 terminalInputTask,
                 "Terminal Input Task",
-                TERMINAL_INPUT_TASK_SIZE,
+                4096,
+                // TERMINAL_INPUT_TASK_SIZE,
                 nullptr,
                 BACKGROUND_TASK_PRIORITY,
                 &mTerminalInputTaskHandle

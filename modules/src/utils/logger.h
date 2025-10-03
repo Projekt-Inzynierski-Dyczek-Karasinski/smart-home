@@ -30,7 +30,8 @@ namespace Utils {
              * @details If the log level is NONE, logging is disabled.
              * The constructor will ensure Serial is initialized once across all instances.
              * @param level Logging level to set for this Logger instance,\n default: logging level set in the config.
-             * @warning Assumes that <code>Serial.begin()</code> is <b>not</b> called outside of this class.
+             * @warning Assumes that <code>Serial.begin()</code> is <b>not</b> called outside of this class. \n
+             * Do <b>not</b> call <code>Serial.end()</code> due to issues with Serial on ESP32.
              * @note Thread-safe.
              */
             explicit Logger(Level level = static_cast<Level>(LOGGING_LEVEL));
@@ -48,6 +49,9 @@ namespace Utils {
              * @note Thread-safe.
              */
             Level getLogLevel() const;
+
+            // TODO !BEFORE PULL REQUEST! add comment
+            void setLogLevel(Level newLevel);
 
             /**
              * @brief Static getter returning if Serial is enabled (was called <code>Serial.begin()</code>).
@@ -211,6 +215,8 @@ namespace Utils {
             std::atomic<Level> mLogLevel; ///< Currently set logging level.
             // Level mLogLevel; ///< Currently set logging level.
             // xSemaphoreHandle mLogLevelMutex; ///< Handle to FreeRTOS mutex protecting <code>mLogLevel</code>.
+
+            const size_t m_LOG_TYPE_LENGTH = 10;
         };
     }
 }

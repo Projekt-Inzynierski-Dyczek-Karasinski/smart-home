@@ -1,24 +1,37 @@
 #include <Arduino.h>
-#include <HardwareSerial.h>
 #include <memory>
+
+// TODO !BEFORE PULL REQUEST! remove
+// #include <nlohmann/json.hpp>
+// #include <SPIFFS.h>
 
 #include "universal_module_system/debug_led.h"
 #include "universal_module_system/pairing_button.h"
-
 #include "communication/communication.h"
-
 #include "utils/logger.h"
 
 namespace ul = Utils::Logging;
 namespace ums = UniversalModuleSystem;
+// TODO !BEFORE PULL REQUEST! remove
+// namespace nl = nlohmann;
 
 void setup() {
+    // TODO !BEFORE PULL REQUEST! remove
+    // nl::json test;
+    // test["var1"] = 13;
+    // test["var2"] = "val2";
+    // test["var3"] = false;
+
     // TODO before merge with main remove delay
     vTaskDelay(pdTICKS_TO_MS(1000));
+
     const auto logger = std::make_shared<ul::Logger>();
 
+    // TODO !BEFORE PULL REQUEST! remove
+    // String jsonString = test.dump().c_str();
+    // Serial.println(jsonString);
+
     const auto debugLed = std::make_shared<ums::DebugLED>(logger);
-    // ums::DebugLED debugLed(logger);
 
     Comms::Communication& communication = Comms::Communication::getInstance(debugLed, logger);
     ums::PairingButton& pairingButton = ums::PairingButton::getInstance(debugLed, &communication, logger);

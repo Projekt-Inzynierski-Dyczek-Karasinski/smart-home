@@ -2,9 +2,7 @@
 
 #include <memory>
 
-#include "smart_home_config.h"
-#include "config/univarsal_module_system_config.h"
-#include "utils/logger.h"
+#include "../config/universal_module_system_config.h"
 
 namespace UniversalModuleSystem {
     DebugLED::DebugLED(const std::shared_ptr<ul::Logger> &logger) : mpLogger(logger) {

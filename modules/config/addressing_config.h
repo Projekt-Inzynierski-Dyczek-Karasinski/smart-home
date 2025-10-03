@@ -1,6 +1,6 @@
 #pragma once
 
-#include "smart_home_config.h"
+#include "common/smart_home_config.h"
 
 // TODO assign final value
 #define ADDRESSING_ABSOLUTE_TIMEOUT 60000 // 60s
@@ -25,14 +25,9 @@
 #define ipToIndex(value) (uint8_t)(value - 2)
 #define rfChannelToIndex(value) (uint8_t)(value - 1)
 #define indexToRfChannel(value) (uint8_t)(value + 1)
-#ifdef HC12_MODULE
-    #include "config/hc12_common_config.h"
-#endif
-
-// TODO change API Calls to numeric values
 
 // ===================== Addressing API Calls =====================
-
+// TODO change API Calls to numeric values
 #define ADDRESSING_ABORT "ADabor"
 #define ADDRESSING_RESTART "ADrest"
 #define ADDRESSING_NC_REAL_MAC_RF_CHANNELS "ADncry"
@@ -46,4 +41,3 @@
 #define ADDRESSING_SUMMARY_BAD "ADsuba"
 #define ADDRESSING_PING "ADping"
 #define ADDRESSING_REPING "ADrepi"
-// ================================================================

@@ -1,12 +1,5 @@
 #include "hc12.h"
 
-#include <Arduino.h>
-#include <HardwareSerial.h>
-#include <memory>
-
-#include "config/communication_config.h"
-
-#include "../utils/uint8_array_handlers.h"
 #include "communication/communication.h"
 
 namespace uah = Utils::ArrayHandlers;

@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 
-#include "smart_home_config.h"
+#include "../config/logger_config.h"
 #include "utils/uint8_array_handlers.h"
 
 namespace uah = Utils::ArrayHandlers;
@@ -20,7 +20,6 @@ namespace Utils {
             // xSemaphoreGive(mLogLevelMutex);
             mLogLevel.store(level);
 
-            if (getLogLevel() == Level::NONE) return;
             beginSerial();
             if (getLogLevel() == Level::DEBUG) {
                 warning("Logger Level DEBUG", "Logger is set with Level::DEBUG.\n If this is main Logger instance (that is used for all components),\n Logger will print a huge amount of messages,\n consider making new instance to debug only part of program,\n otherwise that may cause unintended behaviour (including panic core).\n");
@@ -39,6 +38,20 @@ namespace Utils {
             // xSemaphoreGive(mLogLevelMutex);
             // return level;
             return mLogLevel.load();
+        }
+
+        void Logger::setLogLevel(const Level newLevel) {
+            xSemaphoreTake(smSerialMutex, portMAX_DELAY);
+            char logLevel[m_LOG_TYPE_LENGTH];
+            if (logLevelToString(logLevel, newLevel)) {
+                constexpr char message[] = "[INFO] [Logger] Changing log level to: ";
+                const size_t messageSize = snprintf(nullptr, 0, "%s, %s", message, logLevel);
+                char messageBuffer[messageSize];
+                sprintf(messageBuffer, " Changing log level to: %s", logLevel);
+                Serial.println(messageBuffer);
+            }
+            mLogLevel.store(newLevel);
+            xSemaphoreGive(smSerialMutex);
         }
 
         bool Logger::getIsSerialEnabled() {
@@ -99,8 +112,9 @@ namespace Utils {
                 char message[35];
                 sprintf(message, "Serial began with baudrate %i.", TERMINAL_BAUD_RATE);
                 info("Logger Class", message);
+            } else {
+                xSemaphoreGive(smSerialMutex);
             }
-            xSemaphoreGive(smSerialMutex);
         }
 
         bool Logger::logLevelToString(char *buffer, const Level level) {
@@ -109,6 +123,7 @@ namespace Utils {
                 case Level::WARNING: strcpy(buffer, "<WARNING>"); return true;
                 case Level::INFO: strcpy(buffer, "[INFO]"); return true;
                 case Level::DEBUG: strcpy(buffer, "[DEBUG]"); return true;
+                case Level::NONE: strcpy(buffer, "NONE"); return true;
                 default:
                     char errorMessage[38];
                     sprintf(errorMessage, "Incorrect log level: %i, log ignored.", level);
@@ -118,10 +133,9 @@ namespace Utils {
         }
 
         void Logger::log(const Level level, const char *name, const char *message) {
-            constexpr uint8_t logTypeLength = 10;
             // protections
             if (getLogLevel() < level) return;
-            char logType[logTypeLength];
+            char logType[m_LOG_TYPE_LENGTH];
             if (!logLevelToString(logType, level)) return;
 
             // write log
@@ -130,10 +144,9 @@ namespace Utils {
             xSemaphoreGive(smSerialMutex);
         }
         void Logger::log(const Level level, const char *name, const char *message, const int value) {
-            constexpr uint8_t logTypeLength = 10;
             // protections
             if (getLogLevel() < level) return;
-            char logType[logTypeLength];
+            char logType[m_LOG_TYPE_LENGTH];
             if (!logLevelToString(logType, level)) return;
 
             // write log
@@ -143,10 +156,9 @@ namespace Utils {
             xSemaphoreGive(smSerialMutex);
         }
         void Logger::log(const Level level, const char *name, const char *message, const uint8_t *values, const uint8_t len, const bool isAscii) {
-            constexpr uint8_t logTypeLength = 10;
             // protections
             if (getLogLevel() < level) return;
-            char logType[logTypeLength];
+            char logType[m_LOG_TYPE_LENGTH];
             if (!logLevelToString(logType, level)) return;
 
             if (isAscii) {

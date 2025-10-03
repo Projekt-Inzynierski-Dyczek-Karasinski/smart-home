@@ -3,8 +3,6 @@
 #include <Arduino.h>
 #include <memory>
 
-#include "config/addressing_config.h"
-
 #include "communication/addressing/addressing.h"
 
 namespace ul = Utils::Logging;
