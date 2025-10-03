@@ -212,7 +212,7 @@ namespace Utils {
             static bool smIsSerialEnabled; ///< Static flag ensuring that <code>Serial.begin()</code> is called only once.
 
             // TODO before merge with main remove commented code/rollback atomic
-            std::atomic<Level> mLogLevel; ///< Currently set logging level.
+            std::atomic<Level> mLogLevel{Level::NONE}; ///< Currently set logging level.
             // Level mLogLevel; ///< Currently set logging level.
             // xSemaphoreHandle mLogLevelMutex; ///< Handle to FreeRTOS mutex protecting <code>mLogLevel</code>.
 

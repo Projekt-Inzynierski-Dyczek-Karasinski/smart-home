@@ -7,29 +7,17 @@
 
 #include "universal_module_system/debug_led.h"
 #include "universal_module_system/pairing_button.h"
+#include "universal_module_system/data_manager.h"
 #include "communication/communication.h"
 #include "utils/logger.h"
 
 namespace ul = Utils::Logging;
 namespace ums = UniversalModuleSystem;
 // TODO !BEFORE PULL REQUEST! remove
-// namespace nl = nlohmann;
+namespace nl = nlohmann;
 
 void setup() {
-    // TODO !BEFORE PULL REQUEST! remove
-    // nl::json test;
-    // test["var1"] = 13;
-    // test["var2"] = "val2";
-    // test["var3"] = false;
-
-    // TODO before merge with main remove delay
-    vTaskDelay(pdTICKS_TO_MS(1000));
-
     const auto logger = std::make_shared<ul::Logger>();
-
-    // TODO !BEFORE PULL REQUEST! remove
-    // String jsonString = test.dump().c_str();
-    // Serial.println(jsonString);
 
     const auto debugLed = std::make_shared<ums::DebugLED>(logger);
 

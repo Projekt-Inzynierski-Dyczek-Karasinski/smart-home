@@ -2,6 +2,8 @@
 
 #include "../config/universal_module_system_config.h"
 
+#include "data_manager.h"
+
 namespace UniversalModuleSystem {
     PairingButton& PairingButton::getInstance(const std::shared_ptr<DebugLED> &debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
         static PairingButton instance(debugLED, communication, logger);
@@ -44,8 +46,9 @@ namespace UniversalModuleSystem {
                 pb.mpDebugLED->createResetBlinkTask();
                 // give time for blink DebugLED, clear data and reboot
                 pb.mpLogger->warning("PairingButton Timer", "Clearing data...");
-                // TODO add handler for clear data in flash memory
-                pb.mpLogger->error("PairingButton Timer", "Clearing data not implemented!");
+                // TODO consider removing files instead of formating memory
+                const auto dm = &DataManager::getInstance();
+                dm->eraseAllData();
                 vTaskDelay(pdMS_TO_TICKS(BUTTON_REBOOT_DELAY));
                 pb.mpLogger->warning("PairingButton Timer", "Rebooting...");
                 ESP.restart();

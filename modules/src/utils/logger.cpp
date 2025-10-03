@@ -1,18 +1,21 @@
 #include "logger.h"
 
 #include <Arduino.h>
+#include <nlohmann/json.hpp>
 
 #include "../config/logger_config.h"
 #include "utils/uint8_array_handlers.h"
+#include "universal_module_system/data_manager.h"
 
 namespace uah = Utils::ArrayHandlers;
+namespace ums = UniversalModuleSystem;
 
 namespace Utils {
     namespace Logging {
         xSemaphoreHandle Logger::smSerialMutex = xSemaphoreCreateMutex();
         bool Logger::smIsSerialEnabled = false;
 
-        Logger::Logger(const Level level) {
+        Logger::Logger(Level level) {
             // TODO before merge with main remove commented code/rollback atomic
             // mLogLevelMutex = xSemaphoreCreateMutex();
             // xSemaphoreTake(mLogLevelMutex, portMAX_DELAY);
@@ -21,6 +24,22 @@ namespace Utils {
             mLogLevel.store(level);
 
             beginSerial();
+
+            #ifndef DEBUG_MODE
+                ums::DataManager& dataManager = ums::DataManager::getInstance();
+                // TODO change path
+                if (dataManager.isFileExists("/main")) {
+                    nl::json loggerData = dataManager.load("/main");
+                    if (loggerData["disableLogs"] == true) {
+                        mLogLevel.store(Level::NONE);
+                    }
+                } else {
+                    nl::json loggerData;
+                    loggerData["disableLogs"] = true;
+                    dataManager.save("/main", loggerData);
+                }
+            #endif
+
             if (getLogLevel() == Level::DEBUG) {
                 warning("Logger Level DEBUG", "Logger is set with Level::DEBUG.\n If this is main Logger instance (that is used for all components),\n Logger will print a huge amount of messages,\n consider making new instance to debug only part of program,\n otherwise that may cause unintended behaviour (including panic core).\n");
             }
