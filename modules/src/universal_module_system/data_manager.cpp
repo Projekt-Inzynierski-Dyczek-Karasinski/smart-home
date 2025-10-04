@@ -2,6 +2,8 @@
 
 #include <SPIFFS.h>
 
+namespace nl = nlohmann;
+
 namespace UniversalModuleSystem {
     DataManager &DataManager::getInstance() {
         static DataManager instance;

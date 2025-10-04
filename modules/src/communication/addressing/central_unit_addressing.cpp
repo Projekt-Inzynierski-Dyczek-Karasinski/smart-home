@@ -6,6 +6,7 @@
 
 namespace uah = Utils::ArrayHandlers;
 namespace ums = UniversalModuleSystem;
+namespace nl = nlohmann;
 
 namespace Comms {
     CentralUnitAddressing* CentralUnitAddressing::mspAddressing = nullptr;
