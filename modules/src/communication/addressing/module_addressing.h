@@ -115,6 +115,11 @@ namespace Comms {
          */
         void abortAddressing() override;
 
+        /**
+         * @brief Saves addressing data to flash memory.
+         */
+        void saveAddressingData();
+
         static ModuleAddressing *mspAddressing; ///< Static pointer to a ModuleAddressing instance.
 
         #ifdef RF_CHANNELS

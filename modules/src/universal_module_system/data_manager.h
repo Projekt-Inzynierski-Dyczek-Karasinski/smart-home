@@ -67,7 +67,7 @@ namespace UniversalModuleSystem {
         /**
          * @brief Private constructor for singleton pattern.
          * Initializes mutex protecting access to files and mounts the SPIFFS file system.
-         * 
+         *
          * @note Automatically format SPIFFS file system if mounts fail.
          */
         DataManager();

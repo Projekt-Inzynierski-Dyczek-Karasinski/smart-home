@@ -154,20 +154,7 @@ namespace Comms {
                                 ad.mpLogger->info("ModuleAddressing Main", "Addressing complete." );
                                 // TODO before merge with main remove #ifndef directive and #else section
                                 #ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
-                                    nl::json addressingData;
-                                    addressingData["IP"] = ad.getIPAddress();
-                                    addressingData["RFC"] = ad.getDefaultRFChannel();
-                                    addressingData["MAC"] = nl::json::array();
-                                    uint8_t macToSave[MAC_ADDRESS_LENGTH];
-                                    ad.getProtocolMACAddress(macToSave);
-                                    // TODO consider making function in uah
-                                    for (uint8_t i = 0; i< MAC_ADDRESS_LENGTH; i++) {
-                                        addressingData["MAC"].push_back(macToSave[i]);
-                                    }
-
-                                    const auto &dataManager = ums::DataManager::getInstance();
-                                    dataManager.save(ADDRESSING_DATA_PATH, addressingData);
-
+                                    ad.saveAddressingData();
                                     ad.mpCommunication->stopAddressingAlgorithm();
                                 #else
                                     ad.abortAddressing();
@@ -344,5 +331,21 @@ namespace Comms {
         mpLogger->warning("ModuleAddressing Main", "Aborting addressing.");
         clearNewConnectionData();
         mpCommunication->stopAddressingAlgorithm();
+    }
+
+    void ModuleAddressing::saveAddressingData() {
+        nl::json addressingData;
+        addressingData["IP"] = getIPAddress();
+        addressingData["RFC"] = getDefaultRFChannel();
+        addressingData["MAC"] = nl::json::array();
+        uint8_t macToSave[MAC_ADDRESS_LENGTH];
+        getProtocolMACAddress(macToSave);
+        // TODO consider making function in uah
+        for (uint8_t i = 0; i < MAC_ADDRESS_LENGTH; i++) {
+            addressingData["MAC"].push_back(macToSave[i]);
+        }
+
+        const auto &dataManager = ums::DataManager::getInstance();
+        dataManager.save(ADDRESSING_DATA_PATH, addressingData);
     }
 }

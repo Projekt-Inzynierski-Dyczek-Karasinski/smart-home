@@ -12,7 +12,6 @@
 #endif
 
 namespace ul = Utils::Logging;
-// namespace nl = nlohmann;
 
 namespace Comms {
     class Communication;
