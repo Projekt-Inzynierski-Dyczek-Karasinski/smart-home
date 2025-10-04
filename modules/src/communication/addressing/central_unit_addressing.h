@@ -2,7 +2,6 @@
 
 #include <Arduino.h>
 #include <memory>
-// #include <nlohmann/json.hpp>
 
 #include "communication/addressing/addressing.h"
 
