@@ -27,16 +27,15 @@ namespace Utils {
 
             #ifndef DEBUG_MODE
                 ums::DataManager& dataManager = ums::DataManager::getInstance();
-                // TODO change path
-                if (dataManager.isFileExists("/main")) {
-                    nl::json loggerData = dataManager.load("/main");
+                if (dataManager.isFileExists(LOGGER_DATA_PATH)) {
+                    nl::json loggerData = dataManager.load(LOGGER_DATA_PATH);
                     if (loggerData["disableLogs"] == true) {
                         mLogLevel.store(Level::NONE);
                     }
                 } else {
                     nl::json loggerData;
                     loggerData["disableLogs"] = true;
-                    dataManager.save("/main", loggerData);
+                    dataManager.save(LOGGER_DATA_PATH, loggerData);
                 }
             #endif
 

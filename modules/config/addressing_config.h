@@ -19,12 +19,14 @@
 
 #define NULL_IP 0
 #define CENTRAL_UNIT_IP 1
-#define MAX_NUM_OF_MODULES 254
+#define MAX_NUM_OF_MODULES 3 // this is changed due to saving flash memory
 #define MAC_ADDRESS_LENGTH 6
 #define indexToIP(value) (uint8_t)(value + 2)
 #define ipToIndex(value) (uint8_t)(value - 2)
 #define rfChannelToIndex(value) (uint8_t)(value - 1)
 #define indexToRfChannel(value) (uint8_t)(value + 1)
+
+#define ADDRESSING_DATA_PATH "/addressing"
 
 // ===================== Addressing API Calls =====================
 // TODO change API Calls to numeric values

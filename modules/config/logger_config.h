@@ -14,3 +14,6 @@
         #define LOGGING_LEVEL 0 // NONE
     #endif
 #endif
+
+// TODO change path
+#define LOGGER_DATA_PATH "/main"
