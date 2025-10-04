@@ -50,7 +50,11 @@ namespace Utils {
              */
             Level getLogLevel() const;
 
-            // TODO !BEFORE PULL REQUEST! add comment
+            /**
+             * @brief Setter for log level.
+             * @param newLevel Level to set.
+             * @note Thread-safe.
+             */
             void setLogLevel(Level newLevel);
 
             /**

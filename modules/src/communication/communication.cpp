@@ -645,20 +645,6 @@ namespace Comms {
                             com.mpLogger->warning("Communication Input", "Rebooting...");
                             ESP.restart();
                         }
-                    // TODO !BEFORE PULL REQUEST! remove
-                    // else if (uah::areArraysEqual(buffer, "testr")) {
-                    //     File file = SPIFFS.open("/test.txt", "r");
-                    //     if (file) {
-                    //         while (file.available()) {
-                    //             Serial.write(file.read());
-                    //         }
-                    //         file.close();
-                    //     }
-                    // } else if (uah::areArraysEqual(buffer, "testw")) {
-                    //     File file = SPIFFS.open("/test.txt", "a");
-                    //     file.print("data");
-                    //     file.close();
-                    // }
                     #endif
                     else if (uah::areArraysEqual(buffer, "ip=")) {
                         if (buffer[6] != '\0') {
@@ -705,8 +691,7 @@ namespace Comms {
             xTaskCreate(
                 terminalInputTask,
                 "Terminal Input Task",
-                4096,
-                // TERMINAL_INPUT_TASK_SIZE,
+                TERMINAL_INPUT_TASK_SIZE,
                 nullptr,
                 BACKGROUND_TASK_PRIORITY,
                 &mTerminalInputTaskHandle
