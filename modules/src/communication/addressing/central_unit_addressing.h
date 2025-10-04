@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <memory>
+// #include <nlohmann/json.hpp>
 
 #include "communication/addressing/addressing.h"
 
@@ -11,6 +12,7 @@
 #endif
 
 namespace ul = Utils::Logging;
+// namespace nl = nlohmann;
 
 namespace Comms {
     class Communication;
@@ -177,6 +179,19 @@ namespace Comms {
          * @note Thread-safe.
          */
         void setTmpModuleIp(uint8_t ip);
+
+        /**
+         * @brief Loads modules addressing data from flash memory.
+         * @details If no data exists, the method returns without modifying the current state.
+         * @note Thread-safe.
+         */
+        void loadModulesAddressingData();
+
+        /**
+         * @brief Saves current modules addressing data to flash memory.
+         * @note Thread-safe.
+         */
+        void saveModulesAddressingData();
 
         /**
          * @brief Clears all data related to a new connection attempt.

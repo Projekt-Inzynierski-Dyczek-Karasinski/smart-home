@@ -1,7 +1,6 @@
 #pragma once
 
 #include <Arduino.h>
-#include <memory>
 #include <nlohmann/json.hpp>
 
 #include "utils/logger.h"
@@ -18,10 +17,10 @@ namespace UniversalModuleSystem {
         DataManager(const DataManager&) = delete;
         DataManager& operator = (const DataManager&) = delete;
 
-        void save(const char *path, nl::json data) const;
+        void save(const char *path, const nl::json &data) const;
         nl::json load(const char *path) const;
 
-        bool isFileExists(const char *path);
+        bool isFileExists(const char *path) const;
 
         void eraseAllData() const;
 

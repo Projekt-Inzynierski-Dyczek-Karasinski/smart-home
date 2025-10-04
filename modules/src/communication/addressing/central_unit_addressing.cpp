@@ -2,8 +2,10 @@
 
 #include "utils/uint8_array_handlers.h"
 #include "communication/communication.h"
+#include "universal_module_system/data_manager.h"
 
 namespace uah = Utils::ArrayHandlers;
+namespace ums = UniversalModuleSystem;
 
 namespace Comms {
     CentralUnitAddressing* CentralUnitAddressing::mspAddressing = nullptr;
@@ -12,7 +14,6 @@ namespace Comms {
     CentralUnitAddressing::CentralUnitAddressing(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
         : Addressing(communication, logger) {
         mspAddressing = this;
-        // TODO before merge with main remove commented code/rollback atomic
         mIPAddress = CENTRAL_UNIT_IP;
 
         mModulesAddressingDataMutex = xSemaphoreCreateMutex();
@@ -23,13 +24,14 @@ namespace Comms {
         mNumOFModulesOnRfChannel[0] = 1;
         xSemaphoreGive(mModulesAddressingDataMutex);
 
-
         // TODO before merge with main remove
         #ifdef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
             uint8_t tmpMAC[] = {1,1,1,1,1,1};
             addModule(tmpMAC, true, 2);
             mpLogger->warning("CentralUnitAddressing TMP", "Hardcoded module");
         #endif
+
+        loadModulesAddressingData();
 
         mpLogger->info("CentralUnitAddressing Class", "CentralUnitAddressing initialized.");
     }
@@ -240,7 +242,7 @@ namespace Comms {
                                 ad.mpLogger->info("CentralUnitAddressing Main", "Addressing complete." );
                                 // TODO before merge with main remove #ifndef directive and #else section
                                 #ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
-                                    // TODO add saving data in flash memory
+                                    ad.saveModulesAddressingData();
                                     ad.setTmpModuleIp(NULL_IP);
                                     ad.mpCommunication->stopAddressingAlgorithm();
                                     ad.mpCommunication->changeRFChannel(DEFAULT_CHANNEL);
@@ -378,11 +380,9 @@ namespace Comms {
 
     uint8_t CentralUnitAddressing::getModuleRfChannel(const uint8_t ipAddress) const {
         xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
-
         const uint8_t index = ipToIndex(ipAddress);
         const uint8_t rfChannel = mModulesAddressingData[index].rfChannel;
         xSemaphoreGive(mModulesAddressingDataMutex);
-
 
         return rfChannel;
     }
@@ -412,7 +412,7 @@ namespace Comms {
                 }
                 mNumOFModulesOnRfChannel[rfChannelToIndex(rfChannel)]++;
 
-                // save data about module
+                // (temporary) save data about module
                 chosenIP = indexToIP(i);
                 mModulesAddressingData[i].ipAddress = chosenIP;
                 uah::prepareBuffer(mModulesAddressingData[i].macAddress, macAddress, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
@@ -445,6 +445,7 @@ namespace Comms {
         mIsStartOfAddressing = false;
 
         xSemaphoreGive(mModulesAddressingDataMutex);
+        saveModulesAddressingData();
     }
 
     uint8_t CentralUnitAddressing::getTmpModuleIp() const {
@@ -459,6 +460,59 @@ namespace Comms {
         xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
         mTmpModuleIp = ip;
         xSemaphoreGive(mModulesAddressingDataMutex);
+    }
+
+    void CentralUnitAddressing::loadModulesAddressingData() {
+        const auto &dataManager = ums::DataManager::getInstance();
+        const nl::json addressingData = dataManager.load(ADDRESSING_DATA_PATH);
+
+        if (addressingData.empty()) return;
+
+        xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
+        for (uint8_t i = 0; i < MAX_CHANNEL; i++) {
+            mNumOFModulesOnRfChannel[i] = addressingData["num"][i].get<uint8_t>();
+        }
+
+        uint8_t moduleIndex = 0;
+        for (auto moduleDataJson : addressingData["mod"]) {
+            mModulesAddressingData[moduleIndex].ipAddress = moduleDataJson["IP"];
+            mModulesAddressingData[moduleIndex].isMACAddressReal = moduleDataJson["isMacReal"];
+            mModulesAddressingData[moduleIndex].rfChannel = moduleDataJson["RFC"];
+            // TODO consider making function in uah
+            for (uint8_t macIndex = 0; macIndex < MAC_ADDRESS_LENGTH; macIndex++) {
+                mModulesAddressingData[moduleIndex].macAddress[macIndex] = moduleDataJson["MAC"][macIndex].get<uint8_t>();
+            }
+            moduleIndex++;
+        }
+        xSemaphoreGive(mModulesAddressingDataMutex);
+    }
+
+    void CentralUnitAddressing::saveModulesAddressingData() {
+        nl::json addressingDataJson;
+        addressingDataJson["num"] = nl::json::array();
+
+        xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
+        // TODO consider making function in uah
+        for (unsigned char & i : mNumOFModulesOnRfChannel) {
+            addressingDataJson["num"].push_back(i);
+        }
+        addressingDataJson["mod"] = nl::json::array();
+        for (auto & moduleData : mModulesAddressingData) {
+            nl::json moduleDataJson;
+            moduleDataJson["IP"] = moduleData.ipAddress;
+            moduleDataJson["RFC"] = moduleData.rfChannel;
+            moduleDataJson["isMacReal"] = moduleData.isMACAddressReal;
+
+            moduleDataJson["MAC"] = nl::json::array();
+            for (uint8_t i = 0; i < MAC_ADDRESS_LENGTH; i++) {
+                moduleDataJson["MAC"].push_back(moduleData.macAddress[i]);
+            }
+            addressingDataJson["mod"].push_back(moduleDataJson);
+        }
+        xSemaphoreGive(mModulesAddressingDataMutex);
+
+        const auto &dataManager = ums::DataManager::getInstance();
+        dataManager.save(ADDRESSING_DATA_PATH, addressingDataJson);
     }
 
     // ============================ Other =============================

@@ -18,7 +18,7 @@ namespace UniversalModuleSystem {
         SPIFFS.end();
     }
 
-    void DataManager::save(const char *path, nl::json data) const {
+    void DataManager::save(const char *path, const nl::json &data) const {
         xSemaphoreTake(mFileAccessMutex, portMAX_DELAY);
         File file = SPIFFS.open(path, "w");
         file.println(data.dump().c_str());
@@ -38,7 +38,7 @@ namespace UniversalModuleSystem {
         return result;
     }
 
-    bool DataManager::isFileExists(const char *path) {
+    bool DataManager::isFileExists(const char *path) const {
         return SPIFFS.exists(path);
     }
 
