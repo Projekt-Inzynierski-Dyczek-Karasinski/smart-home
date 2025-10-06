@@ -2,9 +2,9 @@
 
 #include <Arduino.h>
 #include <memory>
+#include <nlohmann/json.hpp>
 
 #include "communication/addressing/addressing.h"
-#include "nlohmann/json.hpp"
 
 // assuming that central unit is using hc12 to rf communication
 #ifndef HC12_MODULE
