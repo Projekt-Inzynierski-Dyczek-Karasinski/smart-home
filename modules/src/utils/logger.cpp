@@ -27,7 +27,7 @@ namespace Utils {
 
             #ifndef DEBUG_MODE
                 ums::DataManager& dataManager = ums::DataManager::getInstance();
-                if (dataManager.isFileExists(LOGGER_DATA_PATH)) {
+                if (dataManager.fileExists(LOGGER_DATA_PATH)) {
                     nl::json loggerData = dataManager.load(LOGGER_DATA_PATH);
                     if (loggerData["disableLogs"] == true) {
                         mLogLevel.store(Level::NONE);

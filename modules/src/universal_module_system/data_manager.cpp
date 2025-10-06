@@ -40,7 +40,7 @@ namespace UniversalModuleSystem {
         return result;
     }
 
-    bool DataManager::isFileExists(const char *path) const {
+    bool DataManager::fileExists(const char *path) const {
         return SPIFFS.exists(path);
     }
 

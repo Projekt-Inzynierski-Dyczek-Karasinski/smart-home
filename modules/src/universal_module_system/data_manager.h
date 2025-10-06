@@ -54,7 +54,7 @@ namespace UniversalModuleSystem {
          * (have to start with <b>/</b>).
          * @return True if the file exists, false otherwise.
          */
-        bool isFileExists(const char *path) const;
+        bool fileExists(const char *path) const;
 
         /**
          * @brief Erases all data by formatting the SPIFFS file system.

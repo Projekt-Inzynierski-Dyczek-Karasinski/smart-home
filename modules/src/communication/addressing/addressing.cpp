@@ -5,7 +5,6 @@
 
 namespace uah = Utils::ArrayHandlers;
 
-
 namespace Comms {
     // ============================ Public ============================
     Addressing::Addressing(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
