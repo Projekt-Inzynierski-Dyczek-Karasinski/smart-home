@@ -463,12 +463,12 @@ namespace Comms {
         xSemaphoreGive(mModulesAddressingDataMutex);
     }
 
-    constexpr char CentralUnitAddressing::sm_JK_MODULES[];
-    constexpr char CentralUnitAddressing::sm_JK_NUM_OF_MODULES_ON_RF_CHANNEL[];
-    constexpr char CentralUnitAddressing::ModuleAddressingData::sm_JK_IP[];
-    constexpr char CentralUnitAddressing::ModuleAddressingData::sm_JK_RF_CHANNEL[];
-    constexpr char CentralUnitAddressing::ModuleAddressingData::sm_JK_MAC_ADDRESS[];
-    constexpr char CentralUnitAddressing::ModuleAddressingData::sm_JK_IS_MAC_REAL[];
+    constexpr char CentralUnitAddressing::ms_JK_MODULES[];
+    constexpr char CentralUnitAddressing::ms_JK_NUM_OF_MODULES_ON_RF_CHANNEL[];
+    constexpr char CentralUnitAddressing::ModuleAddressingData::ms_JK_IP[];
+    constexpr char CentralUnitAddressing::ModuleAddressingData::ms_JK_RF_CHANNEL[];
+    constexpr char CentralUnitAddressing::ModuleAddressingData::ms_JK_MAC_ADDRESS[];
+    constexpr char CentralUnitAddressing::ModuleAddressingData::ms_JK_IS_MAC_REAL[];
 
     void CentralUnitAddressing::loadModulesAddressingData() {
         const auto &dataManager = ums::DataManager::getInstance();
@@ -477,10 +477,10 @@ namespace Comms {
 
         xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
         for (uint8_t i = 0; i < MAX_CHANNEL; i++) {
-            mNumOfModulesOnRfChannel[i] = addressingData[sm_JK_NUM_OF_MODULES_ON_RF_CHANNEL][i].get<uint8_t>();
+            mNumOfModulesOnRfChannel[i] = addressingData[ms_JK_NUM_OF_MODULES_ON_RF_CHANNEL][i].get<uint8_t>();
         }
         uint8_t moduleIndex = 0;
-        for (const auto& moduleDataJson : addressingData[sm_JK_MODULES]) {
+        for (const auto& moduleDataJson : addressingData[ms_JK_MODULES]) {
             const ModuleAddressingData module(moduleDataJson);
             mModulesAddressingData[moduleIndex] = module;
             moduleIndex++;
@@ -490,17 +490,17 @@ namespace Comms {
 
     void CentralUnitAddressing::saveModulesAddressingData() {
         nl::json addressingDataJson;
-        addressingDataJson[sm_JK_NUM_OF_MODULES_ON_RF_CHANNEL] = nl::json::array();
+        addressingDataJson[ms_JK_NUM_OF_MODULES_ON_RF_CHANNEL] = nl::json::array();
 
         xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
         // TODO consider making function in uah
         for (auto & i : mNumOfModulesOnRfChannel) {
-            addressingDataJson[sm_JK_NUM_OF_MODULES_ON_RF_CHANNEL].push_back(i);
+            addressingDataJson[ms_JK_NUM_OF_MODULES_ON_RF_CHANNEL].push_back(i);
         }
-        addressingDataJson[sm_JK_MODULES] = nl::json::array();
+        addressingDataJson[ms_JK_MODULES] = nl::json::array();
         for (auto & moduleData : mModulesAddressingData) {
             nl::json moduleDataJson = moduleData.toJson();
-            addressingDataJson[sm_JK_MODULES].push_back(moduleDataJson);
+            addressingDataJson[ms_JK_MODULES].push_back(moduleDataJson);
         }
         xSemaphoreGive(mModulesAddressingDataMutex);
 
@@ -509,22 +509,22 @@ namespace Comms {
     }
 
     CentralUnitAddressing::ModuleAddressingData::ModuleAddressingData(const nl::json &json) {
-        ipAddress = json[sm_JK_IP];
-        rfChannel = json[sm_JK_RF_CHANNEL];
-        isMACAddressReal = json[sm_JK_IS_MAC_REAL];
+        ipAddress = json[ms_JK_IP];
+        rfChannel = json[ms_JK_RF_CHANNEL];
+        isMACAddressReal = json[ms_JK_IS_MAC_REAL];
         for (uint8_t i = 0; i < MAC_ADDRESS_LENGTH; i++) {
-            macAddress[i] = json[sm_JK_MAC_ADDRESS][i].get<uint8_t>();
+            macAddress[i] = json[ms_JK_MAC_ADDRESS][i].get<uint8_t>();
         }
     }
 
     nlohmann::json CentralUnitAddressing::ModuleAddressingData::toJson() {
         nl::json json;
-        json[sm_JK_IP] = ipAddress;
-        json[sm_JK_RF_CHANNEL] = rfChannel;
-        json[sm_JK_IS_MAC_REAL] = isMACAddressReal;
-        json[sm_JK_MAC_ADDRESS] = nl::json::array();
+        json[ms_JK_IP] = ipAddress;
+        json[ms_JK_RF_CHANNEL] = rfChannel;
+        json[ms_JK_IS_MAC_REAL] = isMACAddressReal;
+        json[ms_JK_MAC_ADDRESS] = nl::json::array();
         for (uint8_t i = 0; i < MAC_ADDRESS_LENGTH; i++) {
-            json[sm_JK_MAC_ADDRESS].push_back(macAddress[i]);
+            json[ms_JK_MAC_ADDRESS].push_back(macAddress[i]);
         }
         return json;
     }

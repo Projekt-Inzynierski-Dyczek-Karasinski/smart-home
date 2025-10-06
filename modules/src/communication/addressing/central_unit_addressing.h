@@ -110,10 +110,10 @@ namespace Comms {
 
         private:
             //json keys
-            static constexpr char sm_JK_IP[] = "ip";
-            static constexpr char sm_JK_RF_CHANNEL[] = "rfChannel";
-            static constexpr char sm_JK_MAC_ADDRESS[] = "mac";
-            static constexpr char sm_JK_IS_MAC_REAL[] = "imr";
+            static constexpr char ms_JK_IP[] = "ip";
+            static constexpr char ms_JK_RF_CHANNEL[] = "rfChannel";
+            static constexpr char ms_JK_MAC_ADDRESS[] = "mac";
+            static constexpr char ms_JK_IS_MAC_REAL[] = "imr";
         };
 
         /**
@@ -248,7 +248,7 @@ namespace Comms {
         SemaphoreHandle_t mModulesAddressingDataMutex = nullptr; ///< Handle to mutex protecting access to modules addressing data.
 
         //json keys
-        static constexpr char sm_JK_MODULES[] = "mod";
-        static constexpr char sm_JK_NUM_OF_MODULES_ON_RF_CHANNEL[] = "num";
+        static constexpr char ms_JK_MODULES[] = "mod";
+        static constexpr char ms_JK_NUM_OF_MODULES_ON_RF_CHANNEL[] = "num";
     };
 }

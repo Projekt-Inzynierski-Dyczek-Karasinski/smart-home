@@ -160,9 +160,9 @@ namespace Comms {
 
         private:
             //json keys
-            static constexpr char sm_JK_IP[] = "ip";
-            static constexpr char sm_JK_RF_CHANNEL[] = "rfChannel";
-            static constexpr char sm_JK_MAC_ADDRESS[] = "mac";
+            static constexpr char ms_JK_IP[] = "ip";
+            static constexpr char ms_JK_RF_CHANNEL[] = "rfChannel";
+            static constexpr char ms_JK_MAC_ADDRESS[] = "mac";
         };
 
         #ifdef RF_CHANNELS

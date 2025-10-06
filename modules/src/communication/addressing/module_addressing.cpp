@@ -343,15 +343,15 @@ namespace Comms {
         xSemaphoreGive(mAddressingDataMutex);
     }
 
-    constexpr char ModuleAddressing::AddressingData::sm_JK_IP[];
-    constexpr char ModuleAddressing::AddressingData::sm_JK_RF_CHANNEL[];
-    constexpr char ModuleAddressing::AddressingData::sm_JK_MAC_ADDRESS[];
+    constexpr char ModuleAddressing::AddressingData::ms_JK_IP[];
+    constexpr char ModuleAddressing::AddressingData::ms_JK_RF_CHANNEL[];
+    constexpr char ModuleAddressing::AddressingData::ms_JK_MAC_ADDRESS[];
 
     ModuleAddressing::AddressingData::AddressingData(const nlohmann::json& json) {
-        ipAddress = json[sm_JK_IP];
-        rfChannel = json[sm_JK_RF_CHANNEL];
+        ipAddress = json[ms_JK_IP];
+        rfChannel = json[ms_JK_RF_CHANNEL];
         for (uint8_t i = 0; i < MAC_ADDRESS_LENGTH; i++) {
-            macAddress[i] = json[sm_JK_MAC_ADDRESS][i].get<uint8_t>();
+            macAddress[i] = json[ms_JK_MAC_ADDRESS][i].get<uint8_t>();
         }
     }
 
@@ -362,11 +362,11 @@ namespace Comms {
 
     nl::json ModuleAddressing::AddressingData::toJson() {
         nl::json json;
-        json[sm_JK_IP] = ipAddress;
-        json[sm_JK_RF_CHANNEL] = rfChannel;
-        json[sm_JK_MAC_ADDRESS] = nl::json::array();
+        json[ms_JK_IP] = ipAddress;
+        json[ms_JK_RF_CHANNEL] = rfChannel;
+        json[ms_JK_MAC_ADDRESS] = nl::json::array();
         for (uint8_t i = 0; i < MAC_ADDRESS_LENGTH; i++) {
-            json[sm_JK_MAC_ADDRESS].push_back(macAddress[i]);
+            json[ms_JK_MAC_ADDRESS].push_back(macAddress[i]);
         }
         return json;
     }
