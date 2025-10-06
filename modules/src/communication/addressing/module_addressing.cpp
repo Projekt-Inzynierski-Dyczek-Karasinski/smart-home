@@ -1,14 +1,12 @@
 #include "module_addressing.h"
 
-#include "smart_home_config.h"
-#include "config/communication_config.h"
-
-#include "../../utils/uint8_array_handlers.h"
-#include "../../utils/logger.h"
-
+#include "utils/uint8_array_handlers.h"
 #include "communication/communication.h"
+#include "universal_module_system/data_manager.h"
 
+namespace nl = nlohmann;
 namespace uah = Utils::ArrayHandlers;
+namespace ums = UniversalModuleSystem;
 
 namespace Comms {
     ModuleAddressing* ModuleAddressing::mspAddressing = nullptr;
@@ -18,6 +16,8 @@ namespace Comms {
         : Addressing(communication, logger) {
         mspAddressing = this;
         mIPAddress = NULL_IP;
+
+        loadAddressingData();
 
         // TODO before merge with main remove
         #ifdef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
@@ -142,7 +142,7 @@ namespace Comms {
                                 ad.mpLogger->info("ModuleAddressing Main", "Addressing complete." );
                                 // TODO before merge with main remove #ifndef directive and #else section
                                 #ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
-                                    // TODO add saving data in flash memory
+                                    ad.saveAddressingData();
                                     ad.mpCommunication->stopAddressingAlgorithm();
                                 #else
                                     ad.abortAddressing();
@@ -319,5 +319,55 @@ namespace Comms {
         mpLogger->warning("ModuleAddressing Main", "Aborting addressing.");
         clearNewConnectionData();
         mpCommunication->stopAddressingAlgorithm();
+    }
+
+    void ModuleAddressing::saveAddressingData() {
+        uint8_t macToSave[MAC_ADDRESS_LENGTH];
+        getProtocolMACAddress(macToSave);
+        const nl::json dataToSave = AddressingData(getIPAddress(), macToSave, getDefaultRFChannel()).toJson();
+
+        const auto &dataManager = ums::DataManager::getInstance();
+        dataManager.save(ADDRESSING_DATA_PATH, dataToSave);
+    }
+
+    void ModuleAddressing::loadAddressingData() {
+        const auto &dataManager = ums::DataManager::getInstance();
+        const nl::json jsonData = dataManager.load(ADDRESSING_DATA_PATH);
+        if (jsonData.empty()) return;
+
+        const AddressingData addressingData(jsonData);
+        xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
+        mIPAddress = addressingData.ipAddress;
+        mRfChannel.store(addressingData.rfChannel);
+        uah::prepareBuffer(mProtocolMACAddress, addressingData.macAddress, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
+        xSemaphoreGive(mAddressingDataMutex);
+    }
+
+    constexpr char ModuleAddressing::AddressingData::ms_JK_IP[];
+    constexpr char ModuleAddressing::AddressingData::ms_JK_RF_CHANNEL[];
+    constexpr char ModuleAddressing::AddressingData::ms_JK_MAC_ADDRESS[];
+
+    ModuleAddressing::AddressingData::AddressingData(const nlohmann::json& json) {
+        ipAddress = json[ms_JK_IP];
+        rfChannel = json[ms_JK_RF_CHANNEL];
+        for (uint8_t i = 0; i < MAC_ADDRESS_LENGTH; i++) {
+            macAddress[i] = json[ms_JK_MAC_ADDRESS][i].get<uint8_t>();
+        }
+    }
+
+    ModuleAddressing::AddressingData::AddressingData(const uint8_t ip, const uint8_t *mac, const uint8_t rfc)
+        : ipAddress(ip), rfChannel(rfc) {
+        uah::prepareBuffer(macAddress, mac, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
+    }
+
+    nl::json ModuleAddressing::AddressingData::toJson() {
+        nl::json json;
+        json[ms_JK_IP] = ipAddress;
+        json[ms_JK_RF_CHANNEL] = rfChannel;
+        json[ms_JK_MAC_ADDRESS] = nl::json::array();
+        for (uint8_t i = 0; i < MAC_ADDRESS_LENGTH; i++) {
+            json[ms_JK_MAC_ADDRESS].push_back(macAddress[i]);
+        }
+        return json;
     }
 }

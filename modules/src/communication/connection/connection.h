@@ -2,10 +2,8 @@
 
 #include <memory>
 
-#include "smart_home_config.h"
-#include "config/communication_config.h"
+#include "../config/communication_config.h"
 
-#include "utils/logger.h"
 #include "utils/uint8_array_handlers.h"
 
 #ifdef CENTRAL_UNIT

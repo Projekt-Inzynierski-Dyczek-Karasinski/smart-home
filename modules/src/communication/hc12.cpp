@@ -1,12 +1,5 @@
 #include "hc12.h"
 
-#include <Arduino.h>
-#include <HardwareSerial.h>
-#include <memory>
-
-#include "config/communication_config.h"
-
-#include "../utils/uint8_array_handlers.h"
 #include "communication/communication.h"
 
 namespace uah = Utils::ArrayHandlers;
@@ -36,6 +29,8 @@ namespace Comms {
 
         createTransmitTask();
         createHC12MainTask();
+
+        // TODO add check if is proper rf channel set
 
         mpLogger->info("HC12 Class", "HC12 initialized.");
     }

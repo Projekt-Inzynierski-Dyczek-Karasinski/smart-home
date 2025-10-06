@@ -1,7 +1,7 @@
 #pragma once
 
 #ifdef HC12_MODULE
-    #include "config/hc12_common_config.h"
+    #include "hc12_common_config.h"
 
     #define BAUD_RATE 9600
     #define RX_PIN 6 

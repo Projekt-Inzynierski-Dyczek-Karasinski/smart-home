@@ -2,8 +2,7 @@
 
 #include <Arduino.h>
 #include <memory>
-
-#include "smart_home_config.h"
+#include <nlohmann/json.hpp>
 
 #include "communication/addressing/addressing.h"
 
@@ -87,13 +86,34 @@ namespace Comms {
 
     private:
         /**
-         * @brief Structure holding addressing data for a module.
+         * @brief Structure holding and serializing addressing data for a module.
          */
-        struct AddressingData {
+        struct ModuleAddressingData {
+            ModuleAddressingData() = default;
+
+            /**
+             * @brief Constructor that deserializes module addressing data from JSON.
+             * @param json JSON object containing module addressing data.
+             */
+            explicit ModuleAddressingData(const nlohmann::json & json);
+
+            /**
+             * @brief Serializes the module addressing data to JSON format.
+             * @return JSON object containing all module addressing data fields.
+             */
+            nlohmann::json toJson();
+
             bool isMACAddressReal = true; ///< True if MAC address is a real hardware address, false otherwise.
             uint8_t ipAddress = NULL_IP; ///< Module's IP address.
             uint8_t rfChannel = DEFAULT_CHANNEL; ///< Module's RF channel.
-            uint8_t macAddress[6] = {0, 0, 0, 0, 0, 0}; ///< Module's MAC address.
+            uint8_t macAddress[MAC_ADDRESS_LENGTH] = {0, 0, 0, 0, 0, 0}; ///< Module's MAC address.
+
+        private:
+            //json keys
+            static constexpr char ms_JK_IP[] = "ip";
+            static constexpr char ms_JK_RF_CHANNEL[] = "rfChannel";
+            static constexpr char ms_JK_MAC_ADDRESS[] = "mac";
+            static constexpr char ms_JK_IS_MAC_REAL[] = "imr";
         };
 
         /**
@@ -101,7 +121,7 @@ namespace Comms {
          * @param sendBuffer Buffer to be prepared.
          * @param moduleData Data of the module which is addressing.
          */
-        void prepareSummary(uint8_t *sendBuffer, const AddressingData *moduleData);
+        void prepareSummary(uint8_t *sendBuffer, const ModuleAddressingData *moduleData);
         /**
          * @brief Static FreeRTOS task function. Handles message exchanges and addressing logic of the central unit's addressing procedure.
          * @param parameters Task parameters (unused).
@@ -139,7 +159,7 @@ namespace Comms {
          * @param ipAddress IP address of the module to get data for.
          * @note Thread-safe.
          */
-        void getModuleData(AddressingData *addressingData, uint8_t ipAddress) const;
+        void getModuleData(ModuleAddressingData *addressingData, uint8_t ipAddress) const;
         /**
          * @brief Gets the RF channel assigned to a module with the given IP address.
          * @param ipAddress IP address of the module.
@@ -181,6 +201,19 @@ namespace Comms {
         void setTmpModuleIp(uint8_t ip);
 
         /**
+         * @brief Loads modules addressing data from flash memory.
+         * @details If no data exists, the method returns without modifying the current state.
+         * @note Thread-safe.
+         */
+        void loadModulesAddressingData();
+
+        /**
+         * @brief Saves current modules addressing data to flash memory.
+         * @note Thread-safe.
+         */
+        void saveModulesAddressingData();
+
+        /**
          * @brief Clears all data related to a new connection attempt.
          * Sends a command to the HC12 module (if used) to reset it to default settings.
          */
@@ -207,11 +240,15 @@ namespace Comms {
 
         static CentralUnitAddressing *mspAddressing; ///< Static pointer to a CentralUnitAddressing instance.
 
-        AddressingData mModulesAddressingData[MAX_NUM_OF_MODULES]; ///< Array containing addressing data for all registered modules.
-        uint8_t mNumOFModulesOnRfChannel[MAX_CHANNEL]{}; ///< Array containing the number of modules assigned to each RF channel.
+        ModuleAddressingData mModulesAddressingData[MAX_NUM_OF_MODULES]; ///< Array containing addressing data for all registered modules.
+        uint8_t mNumOfModulesOnRfChannel[MAX_CHANNEL]{}; ///< Array containing the number of modules assigned to each RF channel.
         uint8_t mTmpModuleIp = NULL_IP; ///< IP address of the module currently being addressed.
         bool mIsStartOfAddressing = false; ///< Flag indicating that it is waiting for a new connection message, so will accept any MAC address.
 
         SemaphoreHandle_t mModulesAddressingDataMutex = nullptr; ///< Handle to mutex protecting access to modules addressing data.
+
+        //json keys
+        static constexpr char ms_JK_MODULES[] = "mod";
+        static constexpr char ms_JK_NUM_OF_MODULES_ON_RF_CHANNEL[] = "num";
     };
 }

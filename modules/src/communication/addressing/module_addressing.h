@@ -2,8 +2,7 @@
 
 #include <Arduino.h>
 #include <memory>
-
-#include "config/addressing_config.h"
+#include <nlohmann/json.hpp>
 
 #include "communication/addressing/addressing.h"
 
@@ -117,7 +116,54 @@ namespace Comms {
          */
         void abortAddressing() override;
 
+        /**
+         * @brief Saves addressing data to flash memory.
+         */
+        void saveAddressingData();
+
+        /**
+         * @brief Loads modules addressing data from flash memory.
+         * @details If no data exists, the method returns without modifying the current state.
+         * @note Thread-safe.
+         */
+        void loadAddressingData();
+
         static ModuleAddressing *mspAddressing; ///< Static pointer to a ModuleAddressing instance.
+
+        /**
+         * @brief Data structure for serializing module addressing information.
+         */
+        struct AddressingData {
+            /**
+             * @brief Constructor that deserializes addressing data from JSON.
+             * @param json JSON object containing addressing data.
+             */
+            explicit AddressingData(const nlohmann::json& json);
+
+            /**
+             * @brief Constructor that initializes addressing data with provided values.
+             * @param ip IP address.
+             * @param mac Pointer to MAC address array.
+             * @param rfc RF channel to store, default is 0 for null.
+             */
+            AddressingData(uint8_t ip, const uint8_t* mac, uint8_t rfc = 0);
+
+            /**
+             * @brief Serializes the addressing data to JSON format.
+             * @return JSON object containing all addressing data fields.
+             */
+            nlohmann::json toJson();
+
+            uint8_t ipAddress = NULL_IP;
+            uint8_t rfChannel = 0; // 0 for null
+            uint8_t macAddress[MAC_ADDRESS_LENGTH] = {0,0,0,0,0,0};
+
+        private:
+            //json keys
+            static constexpr char ms_JK_IP[] = "ip";
+            static constexpr char ms_JK_RF_CHANNEL[] = "rfChannel";
+            static constexpr char ms_JK_MAC_ADDRESS[] = "mac";
+        };
 
         #ifdef RF_CHANNELS
             // TODO before merge with main remove commented code/rollback atomic

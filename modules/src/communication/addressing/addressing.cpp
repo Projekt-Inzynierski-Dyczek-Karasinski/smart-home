@@ -1,16 +1,9 @@
 #include "addressing.h"
 
-#include <Arduino.h>
-#include <memory>
-
-#include "smart_home_config.h"
-#include "config/communication_config.h"
-#include "config/addressing_config.h"
-#include "../../utils/uint8_array_handlers.h"
+#include "utils/uint8_array_handlers.h"
 #include "communication/communication.h"
 
 namespace uah = Utils::ArrayHandlers;
-
 
 namespace Comms {
     // ============================ Public ============================

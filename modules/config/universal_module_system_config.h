@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common/smart_home_config.h"
+
 // DebugLED
 #define CONNECTION_BLINK_DELAY 500
 #define RESET_BLINK_DELAY 100

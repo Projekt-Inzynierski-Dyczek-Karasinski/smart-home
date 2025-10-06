@@ -13,13 +13,14 @@
  */
 namespace Comms {}
 
-// TODO update comment
+// TODO update comment after adding power management
 /**
  * @namespace UniversalModuleSystem
  * @brief brief...
  * @details Contains:
  * - class DebugLED - class handling led
  * - class PairingButton - class handling button
+ * - class DataManager - class handling loading and saving data from/to flash memory.
  */
 namespace UniversalModuleSystem {}
 

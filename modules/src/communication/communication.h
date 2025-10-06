@@ -1,16 +1,10 @@
 #pragma once
 
-#include <Arduino.h>
-#include <HardwareSerial.h>
-#include <memory>
-
-#include "../smart_home_config.h"
-#include "config/communication_config.h"
+#include "../config/communication_config.h"
 
 #include "universal_module_system/debug_led.h"
-#include "utils/logger.h"
-#include "connection/connection.h"
 
+#include "connection/connection.h"
 #ifdef HC12_MODULE
     #include "communication/hc12.h"
 #endif

@@ -2,7 +2,8 @@
 
 #define RF_CHANNELS
 #define DEFAULT_CHANNEL 1
-#define MAX_CHANNEL 127
+#define MAX_CHANNEL 4 // TODO change back to 127 (saving flash memory)
+// #define MAX_CHANNEL 127
 
 #define SETUP_COMMAND_SIZE 10
 #define SETUP_MAX_NUM_OF_COMMANDS 5

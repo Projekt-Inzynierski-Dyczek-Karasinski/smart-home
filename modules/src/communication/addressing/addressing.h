@@ -4,10 +4,10 @@
 #include <atomic>
 #include <memory>
 
-#include "config/communication_config.h"
-#include "config/addressing_config.h"
-#include "utils/logger.h"
+#include "../config/communication_config.h"
+#include "../config/addressing_config.h"
 
+#include "utils/logger.h"
 
 namespace ul = Utils::Logging;
 
