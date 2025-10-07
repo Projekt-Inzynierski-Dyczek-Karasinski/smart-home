@@ -65,6 +65,11 @@ namespace Utils {
             static bool getIsSerialEnabled();
 
             /**
+             * @brief Waits for ongoing Serial transmission to complete and disables it.
+             */
+            static void waitAndDisable();
+
+            /**
              * @brief Logs an <i>error</i> message.
              * @param name Name of the location/purpose of the log.
              * @param message The log message.

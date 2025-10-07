@@ -1,6 +1,7 @@
 #include "communication.h"
 
 #include "utils/uint8_array_handlers.h"
+#include "universal_module_system/power_management.h"
 
 namespace uah = Utils::ArrayHandlers;
 
@@ -61,6 +62,11 @@ namespace Comms {
     void Communication::changeRFChannel(uint8_t channel) const {
         mpRfModule->firstChangeRFChannel(channel);
     }
+
+    void Communication::waitAndDisableRfModule() const {
+        mpRfModule->waitAndDisable();
+    }
+
 
     // ================== Constructor and Destructor ==================
     Communication::Communication(const std::shared_ptr<ums::DebugLED> &debugLED, const std::shared_ptr<ul::Logger> &logger) :
@@ -642,8 +648,7 @@ namespace Comms {
                     }
                     #ifdef ESP32_BOARD
                         else if (uah::areArraysEqual(buffer, "reboot")) {
-                            com.mpLogger->warning("Communication Input", "Rebooting...");
-                            ESP.restart();
+                            ums::PowerManagement::safeRestart("Communication Input");
                         }
                     #endif
                     else if (uah::areArraysEqual(buffer, "ip=")) {

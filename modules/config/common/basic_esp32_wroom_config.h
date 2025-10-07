@@ -12,5 +12,6 @@
 
 #define LED_PIN 26
 #define BUTTON_PIN 27
+#define BUTTON_PIN_AS_GPIO GPIO_NUM_27
 
 // #define CENTRAL_UNIT

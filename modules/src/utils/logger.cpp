@@ -79,6 +79,15 @@ namespace Utils {
             return isSerialEnabled;
         }
 
+        void Logger::waitAndDisable() {
+            xSemaphoreTake(smSerialMutex, pdMS_TO_TICKS(POWER_MANAGEMENT_SEMAPHORE_TIMEOUT));
+            if (smIsSerialEnabled) {
+                Serial.flush();
+            }
+            // TODO consider adding Serial.end()
+        }
+
+
         void Logger::error(const char *name, const char *message) {
             log(Level::ERROR, name, message);
         }

@@ -3,6 +3,7 @@
 #include "../config/universal_module_system_config.h"
 
 #include "data_manager.h"
+#include "power_management.h"
 
 namespace UniversalModuleSystem {
     PairingButton& PairingButton::getInstance(const std::shared_ptr<DebugLED> &debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
@@ -50,8 +51,7 @@ namespace UniversalModuleSystem {
                 const auto dm = &DataManager::getInstance();
                 dm->eraseAllData();
                 vTaskDelay(pdMS_TO_TICKS(BUTTON_REBOOT_DELAY));
-                pb.mpLogger->warning("PairingButton Timer", "Rebooting...");
-                ESP.restart();
+                PowerManagement::safeRestart("PairingButton");
             }
             // after pressing button for 3 seconds call createPairingBlinkTask()
             else if (DEBOUNCING_COUNTER_TO_SECONDS(pb.mButtonPressCounter.load()) >= 3 && pb.mButtonMode.load() == ButtonModes::IDLE) {

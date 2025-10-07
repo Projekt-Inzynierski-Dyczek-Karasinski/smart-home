@@ -100,6 +100,11 @@ namespace Comms {
          */
         void changeRFChannel(uint8_t channel) const;
 
+        /**
+         * @brief Method used for safe disabling rf module.
+         */
+        void waitAndDisableRfModule() const;
+
     private:
         /**
          * @brief Private constructor for singleton pattern.
