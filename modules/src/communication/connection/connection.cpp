@@ -3,8 +3,6 @@
 #include "communication/communication.h"
 
 namespace Comms {
-    Connection *Connection::mspConnection = nullptr;
-
     // ============================ Public ============================
     Connection &Connection::getInstance(
         Communication *communication,
@@ -128,7 +126,6 @@ namespace Comms {
         const std::shared_ptr<HC12> &rfModule,
         const std::shared_ptr<ul::Logger> &logger
     ) : mpCommunication(communication), mpAddressing(addressing), mpRfModule(rfModule), mpLogger(logger) {
-        mspConnection = this;
         mConnectionDataMutex = xSemaphoreCreateMutex();
 
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
@@ -145,22 +142,23 @@ namespace Comms {
     }
 
     // ============================ Timers ============================
+    constexpr uint16_t Connection::ms_TIMEOUTS[];
+
     void Connection::connectionTimerCallback(TimerHandle_t xTimer) {
-        auto &con = *mspConnection;
-        // TODO remove if?
-        if (xTimer == con.mConnectionTimeoutTimer) {
-            con.mpLogger->error("Connection Class", "Connection timeout.");
-            con.endConnection();
-        }
+        auto &con = *static_cast<Connection *>(pvTimerGetTimerID(xTimer));
+        con.mpLogger->warning("Connection Class", "Connection timeout.");
+        con.repeatLastTransmittedMessage();
     }
 
     void Connection::createConnectionTimer() {
         if (mConnectionTimeoutTimer == nullptr) {
+            // TODO assign final values
+
             mConnectionTimeoutTimer = xTimerCreate(
                 "Connection Timeout",
-                pdMS_TO_TICKS(CONNECTION_TIMEOUT),
+                pdMS_TO_TICKS(ms_TIMEOUTS[0]),
                 pdFALSE,
-                nullptr,
+                this,
                 connectionTimerCallback
             );
         }
@@ -174,6 +172,13 @@ namespace Comms {
     }
 
     // ============================ Other =============================
+    uint8_t Connection::getLastTransmittedMessageAttempts() const {
+        xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+        const uint8_t result = mLastTransmittedMessageAttempts;
+        xSemaphoreGive(mConnectionDataMutex);
+        return result;
+    }
+
     void Connection::setLastTransmittedMessage(const uint8_t message[MESSAGE_SIZE]) {
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
         uah::prepareBuffer(mLastTransmittedMessage, message, MESSAGE_SIZE, MESSAGE_SIZE);
@@ -187,10 +192,14 @@ namespace Comms {
         }
         mLastTransmittedMessageAttempts++;
 
-        // TODO consider better handling that:
         if (mLastTransmittedMessageAttempts > REPEAT_LAST_MESSAGE_MAX_ATTEMPTS) {
+            xSemaphoreGive(mConnectionDataMutex);
             endConnection();
+        } else {
+            xTimerChangePeriod(mConnectionTimeoutTimer, ms_TIMEOUTS[mLastTransmittedMessageAttempts - 1], portMAX_DELAY);
+            xTimerStart(mConnectionTimeoutTimer, portMAX_DELAY);
+            xSemaphoreGive(mConnectionDataMutex);
         }
-        xSemaphoreGive(mConnectionDataMutex);
+
     }
 }

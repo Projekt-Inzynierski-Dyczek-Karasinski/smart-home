@@ -7,8 +7,7 @@
 #include "utils/logger.h"
 
 // TODO !BEFORE PULL REQUEST! remove
-#include "universal_module_system/power_management.h"
-namespace pm = UniversalModuleSystem::PowerManagement;
+#include "universal_module_system/power_manager.h"
 
 namespace ul = Utils::Logging;
 namespace ums = UniversalModuleSystem;
@@ -17,14 +16,17 @@ void setup() {
     const auto logger = std::make_shared<ul::Logger>();
 
     // TODO !BEFORE PULL REQUEST! remove
-    pm::printWakeUpReason();
+    auto & powerManager = ums::PowerManager::getInstance(logger);
 
     const auto debugLed = std::make_shared<ums::DebugLED>(logger);
-    Comms::Communication& communication = Comms::Communication::getInstance(debugLed, logger);
-    ums::PairingButton& pairingButton = ums::PairingButton::getInstance(debugLed, &communication, logger);
+    auto & communication = Comms::Communication::getInstance(debugLed, logger);
+    auto & pairingButton = ums::PairingButton::getInstance(debugLed, &communication, logger);
+
+    // TODO !BEFORE PULL REQUEST! remove
+    // vTaskDelay(pdMS_TO_TICKS(10000));
+    // powerManager.enterSleep(30, true);
 
     logger->info("Main", "Deleting functions setup() and loop().");
-
     vTaskDelete(nullptr);
 
     // everything below this comment should never be executed

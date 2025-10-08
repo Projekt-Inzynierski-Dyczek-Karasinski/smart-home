@@ -1,7 +1,7 @@
 #include "communication.h"
 
 #include "utils/uint8_array_handlers.h"
-#include "universal_module_system/power_management.h"
+#include "universal_module_system/power_manager.h"
 
 namespace uah = Utils::ArrayHandlers;
 
@@ -648,7 +648,8 @@ namespace Comms {
                     }
                     #ifdef ESP32_BOARD
                         else if (uah::areArraysEqual(buffer, "reboot")) {
-                            ums::PowerManagement::safeRestart("Communication Input");
+                            auto & powerManager = ums::PowerManager::getInstance(com.mpLogger);
+                            powerManager.safeRestart("Communication Input");
                         }
                     #endif
                     else if (uah::areArraysEqual(buffer, "ip=")) {

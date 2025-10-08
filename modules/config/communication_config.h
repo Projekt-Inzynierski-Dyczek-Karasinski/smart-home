@@ -29,13 +29,12 @@
 // TODO assign final value
 #define RECEIVE_MESSAGE_TIMEOUT 1000 // 1s
 // TODO assign final value
-#define REPEAT_LAST_MESSAGE_MAX_ATTEMPTS 3
+#define REPEAT_LAST_MESSAGE_MAX_ATTEMPTS 5
 // TODO assign final value
 #define PING_MAX_ATTEMPTS 3
 // TODO assign final value
 #define DELAY_BETWEEN_MESSAGES 40
 
-#define CONNECTION_TIMEOUT 10000 // 10s
 #define CONNECTION_SEMAPHORE_TIMEOUT 100 // 0.1s
 
 // special messages

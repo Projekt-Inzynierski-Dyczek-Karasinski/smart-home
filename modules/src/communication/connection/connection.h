@@ -140,6 +140,13 @@ namespace Comms {
         void deleteConnectionTimer();
 
         /**
+         * @brief Getter for <code>mLastTransmittedMessageAttempts</code>.
+         * @return Number of last transmitted message attempts.
+         * @note Thread-safe.
+         */
+        uint8_t getLastTransmittedMessageAttempts() const;
+
+        /**
          * @brief Set the last transmitted RF message value.
          * @param message Message to set.
          * @warning Do not set "repeat" message to last transmitted message, that may cause spamming "repeat" messages if RF transmission is disturbed.
@@ -148,13 +155,12 @@ namespace Comms {
         void setLastTransmittedMessage(const uint8_t message[MESSAGE_SIZE]);
         /**
          * @brief Resend the last message, if the repeat count is not exceeded.
-         * Used when get "repeat" message.
+         * Used when get "repeat" message or on connection timeout.
          * @note Thread-safe.
          */
         void repeatLastTransmittedMessage();
 
         // Pointers
-        static Connection *mspConnection; ///< Static pointer to this class instance.
         Communication *mpCommunication; ///< Pointer to the Communication class instance.
         #ifdef CENTRAL_UNIT
             std::shared_ptr<CentralUnitAddressing> mpAddressing; ///< Pointer to CentralUnitAddressing class instance.
@@ -176,5 +182,7 @@ namespace Comms {
         // FreeRTOS
         SemaphoreHandle_t mConnectionDataMutex = nullptr; ///< FreeRTOS mutex protecting Connection class variables.
         TimerHandle_t mConnectionTimeoutTimer = nullptr; ///< FreeRTOS software timer for connection timeout management.
+
+        static constexpr uint16_t ms_TIMEOUTS[] = {1000, 3000, 10000, 30000, 60000}; // 1s, 3s, 10s, 30s, 60s
     };
 }
