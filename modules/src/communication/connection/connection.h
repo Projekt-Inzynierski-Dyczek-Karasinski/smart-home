@@ -160,6 +160,9 @@ namespace Comms {
          */
         void repeatLastTransmittedMessage();
 
+        // TODO !BEFORE PULL REQUEST! add comment
+        void afterConnectionEndHandler();
+
         // Pointers
         Communication *mpCommunication; ///< Pointer to the Communication class instance.
         #ifdef CENTRAL_UNIT
@@ -182,6 +185,9 @@ namespace Comms {
         // FreeRTOS
         SemaphoreHandle_t mConnectionDataMutex = nullptr; ///< FreeRTOS mutex protecting Connection class variables.
         TimerHandle_t mConnectionTimeoutTimer = nullptr; ///< FreeRTOS software timer for connection timeout management.
+
+        // TODO consider better handling that
+        uint32_t mSleepTime = 0;
 
         static constexpr uint16_t ms_TIMEOUTS[] = {1000, 3000, 10000, 30000, 60000}; // 1s, 3s, 10s, 30s, 60s
     };

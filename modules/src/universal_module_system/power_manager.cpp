@@ -38,6 +38,9 @@ namespace UniversalModuleSystem {
             #else
                 esp_sleep_enable_ext1_wakeup(RF_MODULE_WAKE_UP_PIN_BITMASK, ESP_EXT1_WAKEUP_ANY_LOW);
             #endif
+        } else {
+            const auto &communication = Comms::Communication::getInstance(nullptr, nullptr);
+            communication.putRfModuleToSleep();
         }
 
         // timer wake up

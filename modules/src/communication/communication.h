@@ -105,6 +105,9 @@ namespace Comms {
          */
         void waitAndDisableRfModule() const;
 
+        // TODO !BEFORE PULL REQUEST! add comment
+        void putRfModuleToSleep() const;
+
     private:
         /**
          * @brief Private constructor for singleton pattern.

@@ -116,6 +116,10 @@ namespace Comms {
         xSemaphoreTake(mSendingDataMutex, pdMS_TO_TICKS(POWER_MANAGEMENT_SEMAPHORE_TIMEOUT));
     }
 
+    void HC12::sleep() {
+        setupHC12((uint8_t*)"HC+SLEEP");
+    }
+
     // ============================ Queues ============================
     void HC12::createQueues() {
         if (mMainNotificationsQueue == nullptr) {

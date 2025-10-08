@@ -1,6 +1,7 @@
 #include "connection.h"
 
 #include "communication/communication.h"
+#include "universal_module_system/power_manager.h"
 
 namespace Comms {
     // ============================ Public ============================
@@ -39,6 +40,25 @@ namespace Comms {
             uah::prepareBuffer(sendBuffer, CONNECTION_RE_TEST_GET, MESSAGE_SIZE);
             mpCommunication->sendMessage(sendBuffer);
         } else if (uah::areArraysEqual(receivedMessage, CONNECTION_RE_TEST_GET)) {
+            uah::prepareBuffer(sendBuffer, CONNECTION_END, MESSAGE_SIZE);
+            mpCommunication->sendMessage(sendBuffer);
+            endConnection();
+        } else if (uah::areArraysEqual(receivedMessage, CONNECTION_GO_TO_SLEEP_ONCE)) {
+            // TODO !BEFORE PULL REQUEST! remove magic number
+            xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+            mSleepTime = std::stoi((char*)&receivedMessage[7]);
+            xSemaphoreGive(mConnectionDataMutex);
+            uah::prepareBuffer(sendBuffer, CONNECTION_RE_GO_TO_SLEEP_ONCE, MESSAGE_SIZE);
+            mpCommunication->sendMessage(sendBuffer);
+        } else if (uah::areArraysEqual(receivedMessage, CONNECTION_RE_GO_TO_SLEEP_ONCE)) {
+            uah::prepareBuffer(sendBuffer, CONNECTION_END, MESSAGE_SIZE);
+            mpCommunication->sendMessage(sendBuffer);
+            endConnection();
+        } else if (uah::areArraysEqual(receivedMessage, CONNECTION_GO_TO_SLEEP_PERIODICALLY)) {
+            uah::prepareBuffer(sendBuffer, CONNECTION_RE_GO_TO_SLEEP_PERIODICALLY, MESSAGE_SIZE);
+            mpCommunication->sendMessage(sendBuffer);
+            // TODO !BEFORE PULL REQUEST! add
+        } else if (uah::areArraysEqual(receivedMessage, CONNECTION_RE_GO_TO_SLEEP_PERIODICALLY)) {
             uah::prepareBuffer(sendBuffer, CONNECTION_END, MESSAGE_SIZE);
             mpCommunication->sendMessage(sendBuffer);
             endConnection();
@@ -103,6 +123,7 @@ namespace Comms {
         #else
             #error "Not implemented"
         #endif
+        afterConnectionEndHandler();
     }
 
     void Connection::transmitRepeatMessage() const {
@@ -200,6 +221,16 @@ namespace Comms {
             xTimerStart(mConnectionTimeoutTimer, portMAX_DELAY);
             xSemaphoreGive(mConnectionDataMutex);
         }
-
     }
+
+    void Connection::afterConnectionEndHandler() {
+        // TODO !BEFORE PULL REQUEST! add logic for sleep with and without rf module in sleep
+        xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+        if (mSleepTime != 0) {
+            auto & powerManager = ums::PowerManager::getInstance(mpLogger);
+            powerManager.enterSleep(mSleepTime, true);
+        }
+        xSemaphoreGive(mConnectionDataMutex);
+    }
+
 }

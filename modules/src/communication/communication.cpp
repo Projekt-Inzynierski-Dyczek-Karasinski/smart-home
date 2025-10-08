@@ -67,6 +67,9 @@ namespace Comms {
         mpRfModule->waitAndDisable();
     }
 
+    void Communication::putRfModuleToSleep() const {
+        mpRfModule->sleep();
+    }
 
     // ================== Constructor and Destructor ==================
     Communication::Communication(const std::shared_ptr<ums::DebugLED> &debugLED, const std::shared_ptr<ul::Logger> &logger) :

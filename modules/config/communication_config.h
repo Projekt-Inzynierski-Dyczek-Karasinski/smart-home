@@ -50,3 +50,10 @@
 #define CONNECTION_TEST_GET "COtest"
 #define CONNECTION_RE_TEST_GET "COsending_some_data_123..."
 
+// TODO !BEFORE PULL REQUEST! add messages for sleep with and without rf module in sleep
+#define CONNECTION_GO_TO_SLEEP_ONCE "COsleep"
+#define CONNECTION_RE_GO_TO_SLEEP_ONCE "COoksleep"
+#define CONNECTION_GO_TO_SLEEP_PERIODICALLY "COpslee"
+#define CONNECTION_RE_GO_TO_SLEEP_PERIODICALLY "COokpslee"
+
+

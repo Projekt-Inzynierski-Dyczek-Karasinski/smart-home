@@ -71,6 +71,9 @@ namespace Comms {
          */
         void waitAndDisable() const;
 
+        // TODO !BEFORE PULL REQUEST! add comment
+        void sleep();
+
     private:
         /**
          * @brief Create a FreeRTOS Queues used in HC12 class.
