@@ -79,6 +79,9 @@ namespace Comms {
         xTimerStart(mConnectionTimeoutTimer, portMAX_DELAY);
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
         if (!mIsConnected) {
+            auto & powerManager = ums::PowerManager::getInstance(mpLogger);
+            powerManager.disableAutoSleep();
+
             mpLogger->debug("Connection Class", "Connection start.");
             mIsConnected = true;
             mpAddressing->setProtocolIPAddress(ip); // do anything only for Central Unit

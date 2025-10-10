@@ -35,3 +35,7 @@
     #endif
     #include "basic_esp32_yd_config.h"
 #endif
+
+// module config
+// TODO consider saving that in SPIFFS:
+#define AUTO_SLEEP

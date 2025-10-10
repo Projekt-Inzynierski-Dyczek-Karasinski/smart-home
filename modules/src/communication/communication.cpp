@@ -628,7 +628,12 @@ namespace Comms {
         for(;;) {
             if (Serial.available() > 0) {
                 buffer[index] = Serial.read();
-                if (buffer[index] != 13) {
+                com.mpLogger->printInputChar(buffer[index]);
+                if (buffer[index] == 8) {
+                    if (index > 0) {
+                        index--;
+                    }
+                } else if (buffer[index] != 13) {
                     index++;
                 }
 

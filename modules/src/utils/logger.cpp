@@ -3,7 +3,6 @@
 #include <Arduino.h>
 #include <nlohmann/json.hpp>
 
-#include "../config/logger_config.h"
 #include "utils/uint8_array_handlers.h"
 #include "universal_module_system/data_manager.h"
 
@@ -84,7 +83,28 @@ namespace Utils {
             if (smIsSerialEnabled) {
                 Serial.flush();
             }
-            // TODO consider adding Serial.end()
+        }
+
+        void Logger::printInputChar(uint8_t letter) {
+            xSemaphoreTake(smSerialMutex, portMAX_DELAY);
+            if (mInputBufferIndex == 0) {
+                Serial.print("> ");
+            }
+            if (letter == 8) {
+                Serial.print("\b \b");
+                mInputBuffer[mInputBufferIndex] = *"\0";
+                if (mInputBufferIndex > 0) {
+                    mInputBufferIndex--;
+                }
+            } else if (letter == 10) {
+                memset(mInputBuffer, 0, sizeof(mInputBuffer));
+                mInputBufferIndex = 0;
+            } else if (letter != 13) {
+                mInputBuffer[mInputBufferIndex] = (char)letter;
+                Serial.print(mInputBuffer[mInputBufferIndex]);
+                mInputBufferIndex++;
+            }
+            xSemaphoreGive(smSerialMutex);
         }
 
 
@@ -218,12 +238,17 @@ namespace Utils {
         void Logger::writeLog(const char *logType, const char *name, const char *message, const bool newLine) const {
             const uint16_t size = snprintf(nullptr, 0, "%s [%s] %s", logType, name, message) + 1;
             char log[size];
-            sprintf(log, "%s [%s] %s", logType, name, message);
+            sprintf(log, "\r%s [%s] %s", logType, name, message);
 
             if (newLine) {
                 Serial.println(log);
             } else {
                 Serial.print(log);
+            }
+
+            if (mInputBufferIndex > 0) {
+                Serial.print("> ");
+                Serial.print(mInputBuffer);
             }
         }
     }

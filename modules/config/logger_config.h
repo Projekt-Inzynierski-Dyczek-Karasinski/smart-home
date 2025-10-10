@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/smart_home_config.h"
+#include "communication_config.h"
 
 // Logger
 #ifndef TERMINAL_BAUD_RATE

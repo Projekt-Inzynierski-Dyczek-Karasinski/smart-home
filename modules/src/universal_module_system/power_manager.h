@@ -25,11 +25,13 @@ namespace UniversalModuleSystem {
         PowerManager(const PowerManager&) = delete;
         PowerManager& operator = (const PowerManager&) = delete;
 
-        void enterSleep(uint32_t seconds, bool enableWakeUpWithRfModule = false);
+        void enterSleep(uint32_t milliSeconds, bool enableWakeUpWithRfModule = false);
 
         void safeRestart(const char *source) const;
 
         uint16_t getBatteryRead() const;
+
+        void disableAutoSleep();
 
     private:
         explicit PowerManager(const std::shared_ptr<ul::Logger> &logger);
@@ -37,15 +39,28 @@ namespace UniversalModuleSystem {
 
         void waitAndDisableCriticalFeatures() const;
 
-        void printWakeUpReason() const;
+        void handleDefaultWakeUpAction();
+
+        void handleWakeUpReason();
 
         void readBattery();
 
         static void batteryReadTask(void* parameters);
 
+        void enableAutoSleep();
+        static void goToAutoSleep(TimerHandle_t xTimer);
+
+        uint32_t getCurrentTime() const;
+
         std::shared_ptr<ul::Logger> mpLogger;
         std::atomic<uint16_t> mBatteryRead{0};
 
         SemaphoreHandle_t mReadCompleteSemaphore = nullptr;
+
+        TimerHandle_t mAutoSleepTimer = nullptr;
+
+        // auto sleep
+        static uint32_t msSleepStart;
+        static int64_t msIntendedSleepTime;
     };
 }

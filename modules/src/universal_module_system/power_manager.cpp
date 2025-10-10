@@ -3,11 +3,16 @@
 #include <driver/rtc_io.h>
 
 #include "data_manager.h"
-#include "../config/common/smart_home_config.h"
+#include "../config/universal_module_system_config.h"
 
 #include "communication/communication.h"
 
 namespace UniversalModuleSystem {
+    #ifdef AUTO_SLEEP
+        RTC_DATA_ATTR uint32_t PowerManager::msSleepStart = 0;
+        RTC_DATA_ATTR int64_t PowerManager::msIntendedSleepTime = 0;
+    #endif
+
     PowerManager& PowerManager::getInstance(const std::shared_ptr<ul::Logger> &logger) {
         static PowerManager instance(logger);
         return instance;
@@ -19,8 +24,8 @@ namespace UniversalModuleSystem {
         ESP.restart();
     }
 
-    void PowerManager::enterSleep(const uint32_t seconds, const bool enableWakeUpWithRfModule) {
-        constexpr uint32_t US_TO_SECONDS_FACTOR = 1000000;
+    void PowerManager::enterSleep(const uint32_t milliSeconds, const bool enableWakeUpWithRfModule) {
+        constexpr uint16_t US_TO_MILLISECONDS_FACTOR = 1000;
 
         // button wake up
         rtc_gpio_pulldown_dis(BUTTON_PIN_AS_GPIO);
@@ -44,11 +49,17 @@ namespace UniversalModuleSystem {
         }
 
         // timer wake up
-        esp_sleep_enable_timer_wakeup(seconds * US_TO_SECONDS_FACTOR);
+        esp_sleep_enable_timer_wakeup(milliSeconds * US_TO_MILLISECONDS_FACTOR);
 
-        mpLogger->infov("PowerManager", "Going to sleep for (s): ", seconds);
+        mpLogger->infov("PowerManager", "Going to sleep for (ms): ", milliSeconds);
 
         waitAndDisableCriticalFeatures();
+
+        #ifdef AUTO_SLEEP
+            msIntendedSleepTime = milliSeconds;
+            msSleepStart = getCurrentTime();
+        #endif
+
         esp_deep_sleep_start();
     }
 
@@ -58,13 +69,25 @@ namespace UniversalModuleSystem {
         return mBatteryRead.load();
     }
 
+    void PowerManager::disableAutoSleep() {
+        #ifdef AUTO_SLEEP
+            if (mAutoSleepTimer != nullptr) {
+                xTimerDelete(mAutoSleepTimer, portMAX_DELAY);
+                mAutoSleepTimer = nullptr;
+            }
+            msIntendedSleepTime = 0;
+            msSleepStart = 0;
+        #endif
+    }
+
     PowerManager::PowerManager(const std::shared_ptr<ul::Logger> &logger) : mpLogger(logger) {
-        printWakeUpReason();
+        handleWakeUpReason();
         mReadCompleteSemaphore = xSemaphoreCreateBinary();
         readBattery();
     }
 
     PowerManager::~PowerManager() {
+        xTimerDelete(mAutoSleepTimer, portMAX_DELAY);
         vSemaphoreDelete(mReadCompleteSemaphore);
     }
 
@@ -77,18 +100,30 @@ namespace UniversalModuleSystem {
         mpLogger->waitAndDisable();
     }
 
-    void PowerManager::printWakeUpReason() const {
+    void PowerManager::handleDefaultWakeUpAction() {
+        mpLogger->info("PowerManager Method", "handleDefaultWakeUpAction...");
+    }
+
+    void PowerManager::handleWakeUpReason() {
         const esp_sleep_wakeup_cause_t wakeupReason = esp_sleep_get_wakeup_cause();
 
         switch (wakeupReason) {
             case ESP_SLEEP_WAKEUP_EXT0:
-                mpLogger->info("PowerManager Class", "Module was wake up by Pairing Button."); break;
+                mpLogger->info("PowerManager Class", "Module was wake up by Pairing Button.");
+                disableAutoSleep();
+                break;
             case ESP_SLEEP_WAKEUP_EXT1:
-                mpLogger->info("PowerManager Class", "Module was wake up by rf module."); break;
+                mpLogger->info("PowerManager Class", "Module was wake up by rf module.");
+                enableAutoSleep();
+                break;
             case ESP_SLEEP_WAKEUP_TIMER:
-                mpLogger->info("PowerManager Class", "Module was wake up by timer."); break;
+                mpLogger->info("PowerManager Class", "Module was wake up by timer.");
+                disableAutoSleep();
+                break;
             default:
-                mpLogger->info("PowerManager Class", "Module had power loss."); break;
+                mpLogger->info("PowerManager Class", "Module had power loss.");
+                disableAutoSleep();
+                break;
         }
     }
 
@@ -124,4 +159,38 @@ namespace UniversalModuleSystem {
             nullptr
         );
     }
+
+    void PowerManager::enableAutoSleep() {
+        #ifdef AUTO_SLEEP
+            // constexpr uint16_t US_TO_MILLISECONDS_FACTOR = 1000;
+            const uint32_t sleepTime = getCurrentTime() - msSleepStart;
+            msIntendedSleepTime -= (sleepTime + (AUTO_SLEEP_WAIT_TIME));
+            if (msIntendedSleepTime > 0) {
+                mAutoSleepTimer = xTimerCreate(
+                    "Auto Sleep Timer",
+                    pdMS_TO_TICKS(AUTO_SLEEP_WAIT_TIME),
+                    pdFALSE,
+                    this,
+                    goToAutoSleep
+                );
+                xTimerStart(mAutoSleepTimer, portMAX_DELAY);
+            }
+        #endif
+    }
+
+    void PowerManager::goToAutoSleep(TimerHandle_t xTimer) {
+        #ifdef AUTO_SLEEP
+            auto &pm = *static_cast<PowerManager *>(pvTimerGetTimerID(xTimer));
+            pm.enterSleep(msIntendedSleepTime , true);
+        #endif
+    }
+
+    uint32_t PowerManager::getCurrentTime() const {
+        struct timeval timeStruct{};
+        gettimeofday(&timeStruct, nullptr);
+        // TODO consider making this more accurate
+        return timeStruct.tv_sec * 1000;
+    }
+
+
 }
