@@ -26,8 +26,12 @@ namespace Comms {
         #error "Not implemented"
     #endif
 
-    // TODO !BEFORE PULL REQUEST! add comment
+    /**
+     * @brief Contains connection-related message definitions and utilities for them.
+     * @details Provides message code constants and convertion form strings to enum for switch statement.
+     */
     struct ConnectionMessages {
+        // Enum for all connection messages.
         enum class MessagesEnum : uint8_t {
             END,
             AFFIRM,
@@ -41,6 +45,9 @@ namespace Comms {
             UNKNOWN
         };
 
+        /**
+         * @brief Functor for comparing C-string message identifiers in std::map.
+         */
         struct Comparator {
             bool operator()(const char* a, const char* b) const {
                 return strncmp(a, b, strlen(a)) < 0;
@@ -58,6 +65,7 @@ namespace Comms {
         static constexpr char s_CONNECTION_GO_TO_DEEP_SLEEP[] = "COdsleep";
         static constexpr char s_CONNECTION_RE_GO_TO_SLEEP[] = "COoksleep";
 
+        // Lookup table mapping message strings to internal enumerator values.
         inline static const std::map<const char*, MessagesEnum, Comparator> messagesMap {
         {s_CONNECTION_END, MessagesEnum::END},
         {s_CONNECTION_AFFIRM, MessagesEnum::AFFIRM},
@@ -206,7 +214,11 @@ namespace Comms {
          */
         void repeatLastTransmittedMessage();
 
-        // TODO !BEFORE PULL REQUEST! add comment
+        /**
+         * @brief Handler executed after the connection termination cleanup is complete.
+         * @details If <code>mSleepTime != 0</code> put module in sleep.
+         * @note Thread-safe.
+         */
         void afterConnectionEndHandler() const;
 
         // Pointers

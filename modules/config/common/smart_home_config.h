@@ -38,4 +38,4 @@
 
 // module config
 // TODO consider saving that in SPIFFS:
-#define AUTO_SLEEP
+// #define AUTO_SLEEP

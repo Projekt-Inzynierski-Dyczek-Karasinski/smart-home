@@ -100,14 +100,8 @@ namespace UniversalModuleSystem {
         mpLogger->waitAndDisable();
     }
 
-    void PowerManager::handleDefaultWakeUpAction() {
-        mpLogger->info("PowerManager Method", "handleDefaultWakeUpAction...");
-    }
-
     void PowerManager::handleWakeUpReason() {
-        const esp_sleep_wakeup_cause_t wakeupReason = esp_sleep_get_wakeup_cause();
-
-        switch (wakeupReason) {
+        switch (esp_sleep_get_wakeup_cause()) {
             case ESP_SLEEP_WAKEUP_EXT0:
                 mpLogger->info("PowerManager Class", "Module was wake up by Pairing Button.");
                 disableAutoSleep();
@@ -191,6 +185,4 @@ namespace UniversalModuleSystem {
         // TODO consider making this more accurate
         return timeStruct.tv_sec * 1000;
     }
-
-
 }
