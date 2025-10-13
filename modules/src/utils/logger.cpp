@@ -85,7 +85,7 @@ namespace Utils {
             }
         }
 
-        void Logger::printInputChar(uint8_t letter) {
+        void Logger::printInputChar(const uint8_t letter) {
             xSemaphoreTake(smSerialMutex, portMAX_DELAY);
             if (mInputBufferIndex == 0) {
                 Serial.print("> ");
@@ -246,10 +246,12 @@ namespace Utils {
                 Serial.print(log);
             }
 
-            if (mInputBufferIndex > 0) {
-                Serial.print("> ");
-                Serial.print(mInputBuffer);
-            }
+            #ifdef DEBUG_MODE
+                if (mInputBufferIndex > 0) {
+                    Serial.print("> ");
+                    Serial.print(mInputBuffer);
+                }
+            #endif
         }
     }
 }

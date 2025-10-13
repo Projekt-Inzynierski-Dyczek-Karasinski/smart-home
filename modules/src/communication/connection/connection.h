@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <map>
 
 #include "../config/communication_config.h"
 
@@ -24,6 +25,51 @@ namespace Comms {
     #else
         #error "Not implemented"
     #endif
+
+    // TODO !BEFORE PULL REQUEST! add comment
+    struct ConnectionMessages {
+        enum class MessagesEnum : uint8_t {
+            END,
+            AFFIRM,
+            REPEAT_MESSAGE,
+            TEST_EXECUTE,
+            TEST_GET,
+            RE_TEST_GET,
+            GO_TO_NORMAL_SLEEP,
+            GO_TO_DEEP_SLEEP,
+            RE_GO_TO_SLEEP,
+            UNKNOWN
+        };
+
+        struct Comparator {
+            bool operator()(const char* a, const char* b) const {
+                return strncmp(a, b, strlen(a)) < 0;
+            }
+        };
+
+        // connection messages
+        static constexpr char s_CONNECTION_END[] = "COend";
+        static constexpr char s_CONNECTION_AFFIRM[] = "COok";
+        static constexpr char s_CONNECTION_REPEAT_MESSAGE[] = "COrepe";
+        static constexpr char s_CONNECTION_TEST_EXECUTE[] = "COexe";
+        static constexpr char s_CONNECTION_TEST_GET[] = "COtest";
+        static constexpr char s_CONNECTION_RE_TEST_GET[] = "COsending_some_data_123...";
+        static constexpr char s_CONNECTION_GO_TO_NORMAL_SLEEP[] = "COnsleep";
+        static constexpr char s_CONNECTION_GO_TO_DEEP_SLEEP[] = "COdsleep";
+        static constexpr char s_CONNECTION_RE_GO_TO_SLEEP[] = "COoksleep";
+
+        inline static const std::map<const char*, MessagesEnum, Comparator> messagesMap {
+        {s_CONNECTION_END, MessagesEnum::END},
+        {s_CONNECTION_AFFIRM, MessagesEnum::AFFIRM},
+        {s_CONNECTION_REPEAT_MESSAGE, MessagesEnum::REPEAT_MESSAGE},
+        {s_CONNECTION_TEST_EXECUTE, MessagesEnum::TEST_EXECUTE},
+        {s_CONNECTION_TEST_GET, MessagesEnum::TEST_GET},
+        {s_CONNECTION_RE_TEST_GET, MessagesEnum::RE_TEST_GET},
+        {s_CONNECTION_GO_TO_NORMAL_SLEEP, MessagesEnum::GO_TO_NORMAL_SLEEP},
+        {s_CONNECTION_GO_TO_DEEP_SLEEP, MessagesEnum::GO_TO_DEEP_SLEEP},
+        {s_CONNECTION_RE_GO_TO_SLEEP, MessagesEnum::RE_GO_TO_SLEEP}
+        };
+    };
 
     /**
      * @brief Thread-safe Meyers Singleton for managing RF communication connections.
@@ -161,7 +207,7 @@ namespace Comms {
         void repeatLastTransmittedMessage();
 
         // TODO !BEFORE PULL REQUEST! add comment
-        void afterConnectionEndHandler();
+        void afterConnectionEndHandler() const;
 
         // Pointers
         Communication *mpCommunication; ///< Pointer to the Communication class instance.
@@ -188,7 +234,8 @@ namespace Comms {
 
         // TODO consider better handling that
         uint32_t mSleepTime = 0;
+        bool mIsDeepSleep = false;
 
-        static constexpr uint16_t ms_TIMEOUTS[] = {1000, 3000, 10000, 30000, 60000}; // 1s, 3s, 10s, 30s, 60s
+        static constexpr uint16_t ms_TIMEOUTS[] = {3000, 5000, 10000, 30000, 60000}; // 3s, 5s, 10s, 30s, 60s
     };
 }

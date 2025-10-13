@@ -674,6 +674,11 @@ namespace Comms {
                                 com.mpAddressing->setProtocolIPAddress((uint8_t)ip);
                             }
                         }
+                    } else if (uah::areArraysEqual(buffer, ConnectionMessages::s_CONNECTION_END)) {
+                        uint8_t sendBuffer[MESSAGE_SIZE];
+                        uah::prepareBuffer(sendBuffer, ConnectionMessages::s_CONNECTION_END, MESSAGE_SIZE);
+                        com.sendMessage(sendBuffer);
+                        com.mpConnection->endConnection();
                     }
                     // rest
                     else {
