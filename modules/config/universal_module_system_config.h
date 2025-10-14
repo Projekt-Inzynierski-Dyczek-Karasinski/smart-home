@@ -5,7 +5,6 @@
 // DebugLED
 #define CONNECTION_BLINK_DELAY 500
 #define RESET_BLINK_DELAY 100
-// TODO assign final value
 #define MAX_RESET_BLINK_TIME 3000
 
 // PairingButton

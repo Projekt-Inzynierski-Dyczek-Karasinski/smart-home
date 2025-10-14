@@ -24,7 +24,7 @@ namespace Comms {
 
         using CM = ConnectionMessages;
         using CME = ConnectionMessages::MessagesEnum;
-        // TODO before merge with main remove test messages
+        // TODO !mm remove test messages
         // TODO consider ignoring 2 first letters in if statements (these letters are already checked)
         switch (
             const auto it = CM::messagesMap.find((char*)receivedMessage);
@@ -107,7 +107,7 @@ namespace Comms {
     }
 
     void Connection::sendingHandle(const uint8_t message[MESSAGE_SIZE]) {
-        // TODO add handling for failed connection
+        // TODO add handling for completely failed connection
         if (!uah::areArraysEqual(message, ConnectionMessages::s_CONNECTION_REPEAT_MESSAGE)) {
             mpLogger->debug("Connection Method", "setLastTransmittedMessage(message)");
             setLastTransmittedMessage(message);
@@ -133,8 +133,8 @@ namespace Comms {
 
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
         mIsConnected = false;
-        uah::clearBuffer(mLastTransmittedMessage, MESSAGE_SIZE);
-        mLastTransmittedMessageAttempts = 0;
+        uah::clearBuffer(mConnectionFailedData.lastMessage, MESSAGE_SIZE);
+        mConnectionFailedData.attempts = 0;
         xSemaphoreGive(mConnectionDataMutex);
 
         mpAddressing->setProtocolIPAddress(NULL_IP); // do anything only for Central Unit
@@ -170,8 +170,8 @@ namespace Comms {
         mConnectionDataMutex = xSemaphoreCreateMutex();
 
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
-        uah::clearBuffer(mLastTransmittedMessage, MESSAGE_SIZE);
-        mLastTransmittedMessageAttempts = 0;
+        uah::clearBuffer(mConnectionFailedData.lastMessage, MESSAGE_SIZE);
+        mConnectionFailedData.attempts = 0;
         xSemaphoreGive(mConnectionDataMutex);
 
         mpLogger->info("Connection Class", "Connection initialized.");
@@ -193,7 +193,7 @@ namespace Comms {
         if (mConnectionTimeoutTimer == nullptr) {
             mConnectionTimeoutTimer = xTimerCreate(
                 "Connection Timeout",
-                pdMS_TO_TICKS(ms_TIMEOUTS[0]),
+                pdMS_TO_TICKS(mConnectionFailedData.s_TIMEOUTS[0]),
                 pdFALSE,
                 this,
                 connectionTimerCallback
@@ -211,29 +211,29 @@ namespace Comms {
     // ============================ Other =============================
     uint8_t Connection::getLastTransmittedMessageAttempts() const {
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
-        const uint8_t result = mLastTransmittedMessageAttempts;
+        const uint8_t result = mConnectionFailedData.attempts;
         xSemaphoreGive(mConnectionDataMutex);
         return result;
     }
 
     void Connection::setLastTransmittedMessage(const uint8_t message[MESSAGE_SIZE]) {
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
-        uah::prepareBuffer(mLastTransmittedMessage, message, MESSAGE_SIZE, MESSAGE_SIZE);
+        uah::prepareBuffer(mConnectionFailedData.lastMessage, message, MESSAGE_SIZE, MESSAGE_SIZE);
         xSemaphoreGive(mConnectionDataMutex);
     }
 
     void Connection::repeatLastTransmittedMessage() {
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
-        if (mLastTransmittedMessage[0] != 0) {
-            mpCommunication->sendPriorityMessage(mLastTransmittedMessage);
+        if (mConnectionFailedData.lastMessage[0] != 0) {
+            mpCommunication->sendPriorityMessage(mConnectionFailedData.lastMessage);
         }
-        mLastTransmittedMessageAttempts++;
+        mConnectionFailedData.attempts++;
 
-        if (mLastTransmittedMessageAttempts > REPEAT_LAST_MESSAGE_MAX_ATTEMPTS) {
+        if (mConnectionFailedData.attempts > REPEAT_LAST_MESSAGE_MAX_ATTEMPTS) {
             xSemaphoreGive(mConnectionDataMutex);
             endConnection();
         } else {
-            xTimerChangePeriod(mConnectionTimeoutTimer, ms_TIMEOUTS[mLastTransmittedMessageAttempts - 1], portMAX_DELAY);
+            xTimerChangePeriod(mConnectionTimeoutTimer, mConnectionFailedData.s_TIMEOUTS[mConnectionFailedData.attempts - 1], portMAX_DELAY);
             xTimerStart(mConnectionTimeoutTimer, portMAX_DELAY);
             xSemaphoreGive(mConnectionDataMutex);
         }

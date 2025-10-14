@@ -24,9 +24,7 @@
 #define SUSPEND_TASK_TIME_SHORT 200 // 0.2s
 // TODO assign final value
 #define SUSPEND_TASK_TIME_LONG 2000 // 2s
-// TODO assign final value
 #define RECEIVE_BYTE_TIMEOUT 100 // 0.1s
-// TODO assign final value
 #define RECEIVE_MESSAGE_TIMEOUT 1000 // 1s
 // TODO assign final value
 #define REPEAT_LAST_MESSAGE_MAX_ATTEMPTS 5

@@ -13,14 +13,17 @@
  */
 namespace Comms {}
 
-// TODO update comment after adding power management
 /**
  * @namespace UniversalModuleSystem
- * @brief brief...
+ * @brief Features common for all modules in SMART Home system.
+ *
  * @details Contains:
  * - class DebugLED - class handling led
  * - class PairingButton - class handling button
- * - class DataManager - class handling loading and saving data from/to flash memory.
+ * - class DataManager - class handling loading and saving data from/to flash memory
+ * - class PowerManager - class responsible for rebooting, putting to sleep and reading battery
+ *
+ * @warning Class PowerManager works only with ESP32.
  */
 namespace UniversalModuleSystem {}
 
@@ -32,25 +35,25 @@ namespace UniversalModuleSystem {}
  * - Logging - namespace containing Logger class and enum Level
  * - ArrayHandlers - namespace containing utility functions for arrays
  */
-namespace Utils {
-    /**
-     * @namespace Utils::Logging
-     * @brief Namespace containing methods used for logging.
-     * @details Contains:
-     * - enum Level
-     * - class Logger
-     */
-    namespace Logging {}
+namespace Utils {}
 
-    /**
-     * @namespace Utils::ArrayHandlers
-     * @brief Namespace containing utility functions for arrays.
-     * @details Available functions:
-     * - void printArrayAsChar()
-     * - void printArrayAsInt()
-     * - void prepareBuffer()
-     * - uint8_t calcLenOfDataInArray()
-     * - bool areArraysEqual()
-     */
-    namespace ArrayHandlers {}
-}
+/**
+ * @namespace Utils::Logging
+ * @brief Namespace containing methods used for logging.
+ * @details Contains:
+ * - enum Level
+ * - class Logger
+ */
+namespace Utils::Logging {}
+
+/**
+ * @namespace Utils::ArrayHandlers
+ * @brief Namespace containing utility functions for arrays.
+ * @details Available functions:
+ * - void printArrayAsChar()
+ * - void printArrayAsInt()
+ * - void prepareBuffer()
+ * - uint8_t calcLenOfDataInArray()
+ * - bool areArraysEqual()
+ */
+namespace Utils::ArrayHandlers {}

@@ -221,6 +221,15 @@ namespace Comms {
          */
         void afterConnectionEndHandler() const;
 
+        /**
+         * @brief Struct containing data related to failed connection.
+         */
+        struct ConnectionFailedData {
+            uint8_t lastMessage[MESSAGE_SIZE]{}; ///< Recently transmitted message (for "repeat" logic).
+            uint8_t attempts = 0; ///< Counter of repeats of last sent message.
+            static constexpr uint16_t s_TIMEOUTS[] = {3000, 5000, 10000, 30000, 60000}; // 3s, 5s, 10s, 30s, 60s
+        };
+
         // Pointers
         Communication *mpCommunication; ///< Pointer to the Communication class instance.
         #ifdef CENTRAL_UNIT
@@ -237,8 +246,7 @@ namespace Comms {
 
         // Class variables
         bool mIsConnected = false; //< Flag indicating current connection status.
-        uint8_t mLastTransmittedMessage[MESSAGE_SIZE]{}; ///< Recently transmitted message (for "repeat" logic).
-        uint8_t mLastTransmittedMessageAttempts = 0; ///< Counter of repeats of last sent message.
+        ConnectionFailedData mConnectionFailedData;
 
         // FreeRTOS
         SemaphoreHandle_t mConnectionDataMutex = nullptr; ///< FreeRTOS mutex protecting Connection class variables.
@@ -247,7 +255,5 @@ namespace Comms {
         // TODO consider better handling that
         uint32_t mSleepTime = 0;
         bool mIsDeepSleep = false;
-
-        static constexpr uint16_t ms_TIMEOUTS[] = {3000, 5000, 10000, 30000, 60000}; // 3s, 5s, 10s, 30s, 60s
     };
 }

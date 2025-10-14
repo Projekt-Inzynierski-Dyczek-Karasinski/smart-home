@@ -166,7 +166,7 @@ namespace Comms {
         };
 
         #ifdef RF_CHANNELS
-            // TODO before merge with main remove commented code/rollback atomic
+            // TODO !mm remove commented code/rollback atomic
             // uint8_t mRfChannel = DEFAULT_CHANNEL; ///< Module's current RF channel.
             std::atomic<uint8_t> mRfChannel{DEFAULT_CHANNEL}; ///< Module's current RF channel.
         #endif

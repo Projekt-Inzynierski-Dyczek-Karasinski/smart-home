@@ -1,6 +1,7 @@
 #pragma once
 
 // functions in PowerManager are exclusively for ESP32
+// TODO !o add PowerManager for other boards
 #ifndef ESP32_BOARD
 #error "Power management not implemented"
 #endif

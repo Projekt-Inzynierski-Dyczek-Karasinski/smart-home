@@ -15,7 +15,7 @@ namespace Utils {
         bool Logger::smIsSerialEnabled = false;
 
         Logger::Logger(Level level) {
-            // TODO before merge with main remove commented code/rollback atomic
+            // TODO !mm remove commented code/rollback atomic
             // mLogLevelMutex = xSemaphoreCreateMutex();
             // xSemaphoreTake(mLogLevelMutex, portMAX_DELAY);
             // mLogLevel = level;
@@ -43,13 +43,13 @@ namespace Utils {
             }
         }
 
-        // TODO before merge with main remove commented code/rollback atomic
+        // TODO !mm remove commented code/rollback atomic
         // Logger::~Logger() {
         //     vSemaphoreDelete(mLogLevelMutex);
         // }
 
         Level Logger::getLogLevel() const {
-            // TODO before merge with main remove commented code/rollback atomic
+            // TODO !mm remove commented code/rollback atomic
             // xSemaphoreTake(mLogLevelMutex, portMAX_DELAY);
             // const Level level = mLogLevel;
             // xSemaphoreGive(mLogLevelMutex);
@@ -87,19 +87,20 @@ namespace Utils {
 
         void Logger::printInputChar(const uint8_t letter) {
             xSemaphoreTake(smSerialMutex, portMAX_DELAY);
+
             if (mInputBufferIndex == 0) {
                 Serial.print("> ");
             }
-            if (letter == 8) {
+            if (letter == '\b') {
                 Serial.print("\b \b");
-                mInputBuffer[mInputBufferIndex] = *"\0";
+                mInputBuffer[mInputBufferIndex] = '\0';
                 if (mInputBufferIndex > 0) {
                     mInputBufferIndex--;
                 }
-            } else if (letter == 10) {
+            } else if (letter == '\n') {
                 memset(mInputBuffer, 0, sizeof(mInputBuffer));
                 mInputBufferIndex = 0;
-            } else if (letter != 13) {
+            } else if (letter != '\r') {
                 mInputBuffer[mInputBufferIndex] = (char)letter;
                 Serial.print(mInputBuffer[mInputBufferIndex]);
                 mInputBufferIndex++;

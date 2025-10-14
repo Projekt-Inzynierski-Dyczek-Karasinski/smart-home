@@ -1,10 +1,10 @@
 #pragma once
 
 // debug
-// TODO before merge with main comment/remove DEBUG_MODE
+// TODO !mm comment/remove DEBUG_MODE
 #define DEBUG_MODE
 #ifdef DEBUG_MODE
-    // TODO before merge with main remove COMMUNICATION_WITHOUT_SAVING_ADDRESSING
+    // TODO !mm remove COMMUNICATION_WITHOUT_SAVING_ADDRESSING
     // #define COMMUNICATION_WITHOUT_SAVING_ADDRESSING
     // #define TEST_CHECKSUM
 #endif

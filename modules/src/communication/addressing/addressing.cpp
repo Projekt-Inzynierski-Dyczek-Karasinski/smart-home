@@ -13,12 +13,12 @@ namespace Comms {
             esp_read_mac(mMACAddress, ESP_MAC_WIFI_STA);
             esp_read_mac(mProtocolMACAddress, ESP_MAC_WIFI_STA);
         #else
-        // TODO add function to get MAC address on different boards
+            // TODO !o add function to get MAC address on different boards
             #error "MAC address not implemented!"
         #endif
         mpLogger = logger;
 
-        // TODO merge with main remove
+        // TODO !mm remove
         #ifdef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
             const uint8_t tmpMAC[] = {1,1,1,1,1,1};
             uah::prepareBuffer(mProtocolMACAddress, tmpMAC, 6,6);
@@ -47,7 +47,7 @@ namespace Comms {
     }
 
     void Addressing::startAddressing() {
-        // TODO before merge with main remove commented code/rollback atomic
+        // TODO !mm remove commented code/rollback atomic
         // xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
         // mIsAddressingInProgress = true;
         // xSemaphoreGive(mAddressingDataMutex);
@@ -63,7 +63,7 @@ namespace Comms {
         deleteAddressingQueue();
         deleteAddressingTimer();
 
-        // TODO before merge with main remove commented code/rollback atomic
+        // TODO !mm remove commented code/rollback atomic
         // xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
         // mIsAddressingInProgress = false;
         // xSemaphoreGive(mAddressingDataMutex);
@@ -71,7 +71,7 @@ namespace Comms {
     }
 
     bool Addressing::getIsAddressingInProgress() const {
-        // TODO before merge with main remove commented code/rollback atomic
+        // TODO !mm remove commented code/rollback atomic
         // xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
         // const bool result = mIsAddressingInProgress;
         // xSemaphoreGive(mAddressingDataMutex);

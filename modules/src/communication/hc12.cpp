@@ -348,7 +348,7 @@ namespace Comms {
             if (xQueueReceive(hc12.mSetupHC12CommandsQueue, commandBuffer, 0) == pdTRUE) {
                 hc12.mpLogger->infoa("HC12 Setup", "Received command: ", commandBuffer, SETUP_COMMAND_SIZE);
 
-                // TODO add better protection against bad commands
+                // TODO !o add better protection against bad commands
                 if (!(commandBuffer[0] == (uint8_t)'H' && commandBuffer[1] == (uint8_t)'C')) {
                     hc12.mpLogger->error("HC12 Setup", "Received array is not hc12 command.");
                 } else {

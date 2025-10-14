@@ -71,7 +71,9 @@ namespace Comms {
          */
         void waitAndDisable() const;
 
-        // TODO !BEFORE PULL REQUEST! add comment
+        /**
+         * @brief Sends a command to the HC12 to put the RF module to sleep.
+         */
         void sleep();
 
     private:

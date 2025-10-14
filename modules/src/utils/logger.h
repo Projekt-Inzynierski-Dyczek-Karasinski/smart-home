@@ -38,7 +38,7 @@ namespace Utils {
              */
             explicit Logger(Level level = static_cast<Level>(LOGGING_LEVEL));
 
-            // TODO before merge with main remove commented code/rollback atomic
+            // TODO !mm remove commented code/rollback atomic
             // /**
             //  * @brief Cleans up FreeRTOS resources used by the class.
             //  */
@@ -71,8 +71,10 @@ namespace Utils {
              */
             static void waitAndDisable();
 
-            // TODO !BEFORE PULL REQUEST! add comment
-
+            /**
+             * @brief Handles printing current input buffer (for terminal input task in Communication class).
+             * @param letter Letter which will be printed.
+             */
             void printInputChar(uint8_t letter);
 
             /**
@@ -226,7 +228,7 @@ namespace Utils {
             static xSemaphoreHandle smSerialMutex; ///< Static handle to FreeRTOS mutex protecting changing settings of Serial and printing.
             static bool smIsSerialEnabled; ///< Static flag ensuring that <code>Serial.begin()</code> is called only once.
 
-            // TODO before merge with main remove commented code/rollback atomic
+            // TODO !mm remove commented code/rollback atomic
             std::atomic<Level> mLogLevel{Level::NONE}; ///< Currently set logging level.
             // Level mLogLevel; ///< Currently set logging level.
             // xSemaphoreHandle mLogLevelMutex; ///< Handle to FreeRTOS mutex protecting <code>mLogLevel</code>.

@@ -165,7 +165,7 @@ namespace Comms {
                 mpLogger->info("Communication Main", "Ping Success");
                 mpConnection->endConnection();
             }
-            // TODO consider changing isReadingRawMessage flag to mpAddressing->getIsAddressingInProgress()
+            // TODO !mm consider change isReadingRawMessage flag to mpAddressing->getIsAddressingInProgress()
             // if it is addressing message
             else if ((buffer[0] == (uint8_t)'A' && buffer[1] == (uint8_t)'D') || *isReadingRawMessage) {
                 *isReadingRawMessage = false;
@@ -425,7 +425,7 @@ namespace Comms {
                         handleIncorrectMessage(isRawMessage);
                         com.mpLogger->warning("Communication Decode", "Bad checksum");
                     }
-                    // TODO before merge with main remove #ifndef directive
+                    // TODO !mm remove #ifndef directive
                     #ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
                     // if MAC is incorrect wait for possible rest of message and ignore it
                     else if (!com.mpAddressing->isMACValid(protocolBuffer[protoBuffMessageIndex])) {
@@ -532,7 +532,6 @@ namespace Comms {
         // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
         uint8_t protocolBuffer[PROTOCOL_SIZE];
 
-        // TODO implement setting IP address for central unit
         // prepare MAC address in protocol buffer and clear rest of buffer
         uint8_t macAddress[6];
         com.mpAddressing->getProtocolMACAddress(macAddress);
@@ -798,7 +797,7 @@ namespace Comms {
     }
 
     // ============================ Other =============================
-    // TODO fix: getting no reply to ping cause connection timeout and strange behaviour
+    // FIXME getting no reply to ping cause connection timeout and strange behaviour
     void Communication::transmitPing() const {
         uint8_t buffer[MESSAGE_SIZE];
         uah::prepareBuffer(buffer, PING_MESSAGE, MESSAGE_SIZE);

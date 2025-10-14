@@ -16,5 +16,4 @@
     #endif
 #endif
 
-// TODO change path
-#define LOGGER_DATA_PATH "/main"
+#define LOGGER_DATA_PATH "/logger"

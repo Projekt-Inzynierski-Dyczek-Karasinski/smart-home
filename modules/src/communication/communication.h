@@ -55,7 +55,6 @@ namespace Comms {
          */
         void needRawMessage() const;
 
-        // TODO consider change so that don't be necessary
         /**
          * @brief Signals the main task to delete and recreate encode task (used after getting new IP address).
          */
@@ -105,7 +104,10 @@ namespace Comms {
          */
         void waitAndDisableRfModule() const;
 
-        // TODO !BEFORE PULL REQUEST! add comment
+        /**
+         * @brief Puts the rf module to sleep.
+         * @details Calls rf module's <code>sleep()</code> method.
+         */
         void putRfModuleToSleep() const;
 
     private:
