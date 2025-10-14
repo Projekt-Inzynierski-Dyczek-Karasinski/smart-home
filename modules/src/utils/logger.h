@@ -3,6 +3,8 @@
 #include <Arduino.h>
 #include <atomic>
 
+#include "../config/logger_config.h"
+
 namespace Utils {
     namespace Logging {
         /**
@@ -36,7 +38,7 @@ namespace Utils {
              */
             explicit Logger(Level level = static_cast<Level>(LOGGING_LEVEL));
 
-            // TODO before merge with main remove commented code/rollback atomic
+            // TODO !mm remove commented code/rollback atomic
             // /**
             //  * @brief Cleans up FreeRTOS resources used by the class.
             //  */
@@ -63,6 +65,17 @@ namespace Utils {
              * @note Thread-safe.
              */
             static bool getIsSerialEnabled();
+
+            /**
+             * @brief Waits for ongoing Serial transmission to complete and disables it.
+             */
+            static void waitAndDisable();
+
+            /**
+             * @brief Handles printing current input buffer (for terminal input task in Communication class).
+             * @param letter Letter which will be printed.
+             */
+            void printInputChar(uint8_t letter);
 
             /**
              * @brief Logs an <i>error</i> message.
@@ -203,7 +216,7 @@ namespace Utils {
             void log(Level level, const char *name, const char *message, const uint8_t *values, uint8_t len, bool isAscii);
 
             /**
-             * @brief Writes a log.
+             * @brief Writes a log and reprints input buffer if needed.
              * @param logType String representation of log level.
              * @param name Name of the location/purpose of the log.
              * @param message The log message.
@@ -215,12 +228,14 @@ namespace Utils {
             static xSemaphoreHandle smSerialMutex; ///< Static handle to FreeRTOS mutex protecting changing settings of Serial and printing.
             static bool smIsSerialEnabled; ///< Static flag ensuring that <code>Serial.begin()</code> is called only once.
 
-            // TODO before merge with main remove commented code/rollback atomic
+            // TODO !mm remove commented code/rollback atomic
             std::atomic<Level> mLogLevel{Level::NONE}; ///< Currently set logging level.
             // Level mLogLevel; ///< Currently set logging level.
             // xSemaphoreHandle mLogLevelMutex; ///< Handle to FreeRTOS mutex protecting <code>mLogLevel</code>.
 
             const size_t m_LOG_TYPE_LENGTH = 10;
+            char mInputBuffer[MESSAGE_SIZE]{};
+            uint8_t mInputBufferIndex = 0;
         };
     }
 }

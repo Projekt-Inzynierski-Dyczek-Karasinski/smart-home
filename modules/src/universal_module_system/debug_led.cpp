@@ -38,7 +38,7 @@ namespace UniversalModuleSystem {
 
     // ====================== Pairing Blink Task ======================
     void DebugLED::pairingBlink(void *parameters) {
-        // TODO remove from other classes pointer to instance of class (mps[classname]) and replace it (if needed) with this:
+        // TODO !mm remove from other classes pointer to instance of class (mps[classname]) and replace it (if needed) with this:
         auto& dl = *static_cast<DebugLED*>(parameters);
 
         for(;;) {
@@ -92,7 +92,7 @@ namespace UniversalModuleSystem {
 
     // ===================== Blink Timeout Timer ======================
     void DebugLED::blinkTimeoutCallback(TimerHandle_t xTimer) {
-        // TODO remove from other classes pointer to instance of class (mps[classname]) and replace it (if needed) with this (timers):
+        // TODO !mm remove from other classes pointer to instance of class (mps[classname]) and replace it (if needed) with this (timers):
         auto &dl = *static_cast<DebugLED*>(pvTimerGetTimerID(xTimer));
 
         if (dl.mBlinkHandle != nullptr) {

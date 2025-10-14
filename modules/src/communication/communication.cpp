@@ -1,6 +1,7 @@
 #include "communication.h"
 
 #include "utils/uint8_array_handlers.h"
+#include "universal_module_system/power_manager.h"
 
 namespace uah = Utils::ArrayHandlers;
 
@@ -60,6 +61,14 @@ namespace Comms {
 
     void Communication::changeRFChannel(uint8_t channel) const {
         mpRfModule->firstChangeRFChannel(channel);
+    }
+
+    void Communication::waitAndDisableRfModule() const {
+        mpRfModule->waitAndDisable();
+    }
+
+    void Communication::putRfModuleToSleep() const {
+        mpRfModule->sleep();
     }
 
     // ================== Constructor and Destructor ==================
@@ -156,7 +165,7 @@ namespace Comms {
                 mpLogger->info("Communication Main", "Ping Success");
                 mpConnection->endConnection();
             }
-            // TODO consider changing isReadingRawMessage flag to mpAddressing->getIsAddressingInProgress()
+            // TODO !mm consider change isReadingRawMessage flag to mpAddressing->getIsAddressingInProgress()
             // if it is addressing message
             else if ((buffer[0] == (uint8_t)'A' && buffer[1] == (uint8_t)'D') || *isReadingRawMessage) {
                 *isReadingRawMessage = false;
@@ -416,7 +425,7 @@ namespace Comms {
                         handleIncorrectMessage(isRawMessage);
                         com.mpLogger->warning("Communication Decode", "Bad checksum");
                     }
-                    // TODO before merge with main remove #ifndef directive
+                    // TODO !mm remove #ifndef directive
                     #ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
                     // if MAC is incorrect wait for possible rest of message and ignore it
                     else if (!com.mpAddressing->isMACValid(protocolBuffer[protoBuffMessageIndex])) {
@@ -523,7 +532,6 @@ namespace Comms {
         // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
         uint8_t protocolBuffer[PROTOCOL_SIZE];
 
-        // TODO implement setting IP address for central unit
         // prepare MAC address in protocol buffer and clear rest of buffer
         uint8_t macAddress[6];
         com.mpAddressing->getProtocolMACAddress(macAddress);
@@ -619,7 +627,12 @@ namespace Comms {
         for(;;) {
             if (Serial.available() > 0) {
                 buffer[index] = Serial.read();
-                if (buffer[index] != 13) {
+                com.mpLogger->printInputChar(buffer[index]);
+                if (buffer[index] == 8) {
+                    if (index > 0) {
+                        index--;
+                    }
+                } else if (buffer[index] != 13) {
                     index++;
                 }
 
@@ -642,8 +655,8 @@ namespace Comms {
                     }
                     #ifdef ESP32_BOARD
                         else if (uah::areArraysEqual(buffer, "reboot")) {
-                            com.mpLogger->warning("Communication Input", "Rebooting...");
-                            ESP.restart();
+                            auto & powerManager = ums::PowerManager::getInstance(com.mpLogger);
+                            powerManager.safeRestart("Communication Input");
                         }
                     #endif
                     else if (uah::areArraysEqual(buffer, "ip=")) {
@@ -660,6 +673,11 @@ namespace Comms {
                                 com.mpAddressing->setProtocolIPAddress((uint8_t)ip);
                             }
                         }
+                    } else if (uah::areArraysEqual(buffer, ConnectionMessages::s_CONNECTION_END)) {
+                        uint8_t sendBuffer[MESSAGE_SIZE];
+                        uah::prepareBuffer(sendBuffer, ConnectionMessages::s_CONNECTION_END, MESSAGE_SIZE);
+                        com.sendMessage(sendBuffer);
+                        com.mpConnection->endConnection();
                     }
                     // rest
                     else {
@@ -779,7 +797,7 @@ namespace Comms {
     }
 
     // ============================ Other =============================
-    // TODO fix: getting no reply to ping cause connection timeout and strange behaviour
+    // FIXME getting no reply to ping cause connection timeout and strange behaviour
     void Communication::transmitPing() const {
         uint8_t buffer[MESSAGE_SIZE];
         uah::prepareBuffer(buffer, PING_MESSAGE, MESSAGE_SIZE);

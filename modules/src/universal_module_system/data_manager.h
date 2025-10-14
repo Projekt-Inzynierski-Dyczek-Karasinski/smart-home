@@ -63,6 +63,11 @@ namespace UniversalModuleSystem {
          */
         void eraseAllData() const;
 
+        /**
+         * @brief Waits for ongoing flash data modification to complete and disables it.
+         */
+        void waitAndDisable() const;
+
     private:
         /**
          * @brief Private constructor for singleton pattern.

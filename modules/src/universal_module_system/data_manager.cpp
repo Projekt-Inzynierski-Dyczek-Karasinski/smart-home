@@ -2,6 +2,8 @@
 
 #include <SPIFFS.h>
 
+#include "../../config/common/freertos_common_config.h"
+
 namespace nl = nlohmann;
 
 namespace UniversalModuleSystem {
@@ -48,5 +50,9 @@ namespace UniversalModuleSystem {
         xSemaphoreTake(mFileAccessMutex, portMAX_DELAY);
         SPIFFS.format();
         xSemaphoreGive(mFileAccessMutex);
+    }
+
+    void DataManager::waitAndDisable() const {
+        xSemaphoreTake(mFileAccessMutex, pdMS_TO_TICKS(POWER_MANAGEMENT_SEMAPHORE_TIMEOUT));
     }
 }

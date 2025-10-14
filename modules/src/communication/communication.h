@@ -55,7 +55,6 @@ namespace Comms {
          */
         void needRawMessage() const;
 
-        // TODO consider change so that don't be necessary
         /**
          * @brief Signals the main task to delete and recreate encode task (used after getting new IP address).
          */
@@ -99,6 +98,17 @@ namespace Comms {
          * @param channel Channel to change.
          */
         void changeRFChannel(uint8_t channel) const;
+
+        /**
+         * @brief Method used for safe disabling rf module.
+         */
+        void waitAndDisableRfModule() const;
+
+        /**
+         * @brief Puts the rf module to sleep.
+         * @details Calls rf module's <code>sleep()</code> method.
+         */
+        void putRfModuleToSleep() const;
 
     private:
         /**

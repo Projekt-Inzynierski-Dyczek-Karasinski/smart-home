@@ -1,10 +1,9 @@
 #include "connection.h"
 
 #include "communication/communication.h"
+#include "universal_module_system/power_manager.h"
 
 namespace Comms {
-    Connection *Connection::mspConnection = nullptr;
-
     // ============================ Public ============================
     Connection &Connection::getInstance(
         Communication *communication,
@@ -23,34 +22,70 @@ namespace Comms {
     void Connection::messageDecider(const uint8_t receivedMessage[MESSAGE_SIZE]) {
         uint8_t sendBuffer[MESSAGE_SIZE];
 
-        // TODO before merge with main remove test messages
+        using CM = ConnectionMessages;
+        using CME = ConnectionMessages::MessagesEnum;
+        // TODO !mm remove test messages
         // TODO consider ignoring 2 first letters in if statements (these letters are already checked)
-        // TODO consider changing if else statements to switch case
-        if (uah::areArraysEqual(receivedMessage, CONNECTION_END)) {
-            endConnection();
-        } else if (uah::areArraysEqual(receivedMessage, CONNECTION_AFFIRM)) {
-            uah::prepareBuffer(sendBuffer,CONNECTION_END, MESSAGE_SIZE);
-            mpCommunication->sendMessage(sendBuffer);
-            endConnection();
-        } else if (uah::areArraysEqual(receivedMessage, CONNECTION_REPEAT_MESSAGE)) {
-            repeatLastTransmittedMessage();
-        } else if (uah::areArraysEqual(receivedMessage, CONNECTION_TEST_EXECUTE)) {
-            uah::prepareBuffer(sendBuffer, CONNECTION_AFFIRM, MESSAGE_SIZE);
-            mpCommunication->sendMessage(sendBuffer);
-        } else if (uah::areArraysEqual(receivedMessage, CONNECTION_TEST_GET)) {
-            uah::prepareBuffer(sendBuffer, CONNECTION_RE_TEST_GET, MESSAGE_SIZE);
-            mpCommunication->sendMessage(sendBuffer);
-        } else if (uah::areArraysEqual(receivedMessage, CONNECTION_RE_TEST_GET)) {
-            uah::prepareBuffer(sendBuffer, CONNECTION_END, MESSAGE_SIZE);
-            mpCommunication->sendMessage(sendBuffer);
-            endConnection();
-        } else {
-            mpLogger->warninga(
-                "Connection Message Decider",
-                "Received custom receivedMessage.\nIgnored receivedMessage: ",
-                receivedMessage,
-                MESSAGE_SIZE
-            );
+        switch (
+            const auto it = CM::messagesMap.find((char*)receivedMessage);
+            it != CM::messagesMap.end() ? it->second : CME::UNKNOWN
+        ) {
+            case CME::END:
+                endConnection();
+                break;
+
+            case CME::AFFIRM:
+                uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_END, MESSAGE_SIZE);
+                mpCommunication->sendMessage(sendBuffer);
+                endConnection();
+                break;
+
+            case CME::REPEAT_MESSAGE:
+                repeatLastTransmittedMessage();
+                break;
+
+            case CME::TEST_EXECUTE:
+                uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_AFFIRM, MESSAGE_SIZE);
+                mpCommunication->sendMessage(sendBuffer);
+                break;
+
+            case CME::TEST_GET:
+                uah::prepareBuffer(sendBuffer,  CM::s_CONNECTION_RE_TEST_GET, MESSAGE_SIZE);
+                mpCommunication->sendMessage(sendBuffer);
+                break;
+
+            case CME::RE_TEST_GET:
+                uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_END, MESSAGE_SIZE);
+                mpCommunication->sendMessage(sendBuffer);
+                endConnection();
+                break;
+
+            case CME::GO_TO_DEEP_SLEEP:
+                xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+                mIsDeepSleep = true;
+                xSemaphoreGive(mConnectionDataMutex);
+            case CME::GO_TO_NORMAL_SLEEP:
+                xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+                mSleepTime = std::stoi((char*)&receivedMessage[strlen(CM::s_CONNECTION_GO_TO_NORMAL_SLEEP)]);
+                xSemaphoreGive(mConnectionDataMutex);
+                uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_RE_GO_TO_SLEEP, MESSAGE_SIZE);
+                mpCommunication->sendMessage(sendBuffer);
+                break;
+
+            case CME::RE_GO_TO_SLEEP:
+                uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_END, MESSAGE_SIZE);
+                mpCommunication->sendMessage(sendBuffer);
+                endConnection();
+                break;
+
+            default:
+                mpLogger->warninga(
+                   "Connection Message Decider",
+                   "Received custom receivedMessage.\nIgnored receivedMessage: ",
+                   receivedMessage,
+                   MESSAGE_SIZE
+                );
+                break;
         }
     }
 
@@ -61,6 +96,9 @@ namespace Comms {
         xTimerStart(mConnectionTimeoutTimer, portMAX_DELAY);
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
         if (!mIsConnected) {
+            auto & powerManager = ums::PowerManager::getInstance(mpLogger);
+            powerManager.disableAutoSleep();
+
             mpLogger->debug("Connection Class", "Connection start.");
             mIsConnected = true;
             mpAddressing->setProtocolIPAddress(ip); // do anything only for Central Unit
@@ -69,8 +107,8 @@ namespace Comms {
     }
 
     void Connection::sendingHandle(const uint8_t message[MESSAGE_SIZE]) {
-        // TODO add handling for failed connection
-        if (!uah::areArraysEqual(message, CONNECTION_REPEAT_MESSAGE)) {
+        // TODO add handling for completely failed connection
+        if (!uah::areArraysEqual(message, ConnectionMessages::s_CONNECTION_REPEAT_MESSAGE)) {
             mpLogger->debug("Connection Method", "setLastTransmittedMessage(message)");
             setLastTransmittedMessage(message);
         }
@@ -89,14 +127,14 @@ namespace Comms {
     }
 
     void Connection::endConnection() {
+        mpLogger->debug("Connection Class", "Connection end.");
         xTimerStop(mConnectionTimeoutTimer, portMAX_DELAY);
         deleteConnectionTimer();
-        mpLogger->debug("Connection Class", "Connection end.");
 
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
         mIsConnected = false;
-        uah::clearBuffer(mLastTransmittedMessage, MESSAGE_SIZE);
-        mLastTransmittedMessageAttempts = 0;
+        uah::clearBuffer(mConnectionFailedData.lastMessage, MESSAGE_SIZE);
+        mConnectionFailedData.attempts = 0;
         xSemaphoreGive(mConnectionDataMutex);
 
         mpAddressing->setProtocolIPAddress(NULL_IP); // do anything only for Central Unit
@@ -105,13 +143,14 @@ namespace Comms {
         #else
             #error "Not implemented"
         #endif
+        afterConnectionEndHandler();
     }
 
     void Connection::transmitRepeatMessage() const {
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
         if (mIsConnected || mpAddressing->getIsAddressingInProgress()) {
             uint8_t buffer[MESSAGE_SIZE];
-            uah::prepareBuffer(buffer, CONNECTION_REPEAT_MESSAGE, MESSAGE_SIZE);
+            uah::prepareBuffer(buffer, ConnectionMessages::s_CONNECTION_REPEAT_MESSAGE, MESSAGE_SIZE);
             mpCommunication->sendPriorityMessage(buffer);
         }
         xSemaphoreGive(mConnectionDataMutex);
@@ -128,12 +167,11 @@ namespace Comms {
         const std::shared_ptr<HC12> &rfModule,
         const std::shared_ptr<ul::Logger> &logger
     ) : mpCommunication(communication), mpAddressing(addressing), mpRfModule(rfModule), mpLogger(logger) {
-        mspConnection = this;
         mConnectionDataMutex = xSemaphoreCreateMutex();
 
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
-        uah::clearBuffer(mLastTransmittedMessage, MESSAGE_SIZE);
-        mLastTransmittedMessageAttempts = 0;
+        uah::clearBuffer(mConnectionFailedData.lastMessage, MESSAGE_SIZE);
+        mConnectionFailedData.attempts = 0;
         xSemaphoreGive(mConnectionDataMutex);
 
         mpLogger->info("Connection Class", "Connection initialized.");
@@ -146,21 +184,18 @@ namespace Comms {
 
     // ============================ Timers ============================
     void Connection::connectionTimerCallback(TimerHandle_t xTimer) {
-        auto &con = *mspConnection;
-        // TODO remove if?
-        if (xTimer == con.mConnectionTimeoutTimer) {
-            con.mpLogger->error("Connection Class", "Connection timeout.");
-            con.endConnection();
-        }
+        auto &con = *static_cast<Connection *>(pvTimerGetTimerID(xTimer));
+        con.mpLogger->warning("Connection Class", "Connection timeout.");
+        con.repeatLastTransmittedMessage();
     }
 
     void Connection::createConnectionTimer() {
         if (mConnectionTimeoutTimer == nullptr) {
             mConnectionTimeoutTimer = xTimerCreate(
                 "Connection Timeout",
-                pdMS_TO_TICKS(CONNECTION_TIMEOUT),
+                pdMS_TO_TICKS(mConnectionFailedData.s_TIMEOUTS[0]),
                 pdFALSE,
-                nullptr,
+                this,
                 connectionTimerCallback
             );
         }
@@ -174,22 +209,41 @@ namespace Comms {
     }
 
     // ============================ Other =============================
+    uint8_t Connection::getLastTransmittedMessageAttempts() const {
+        xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+        const uint8_t result = mConnectionFailedData.attempts;
+        xSemaphoreGive(mConnectionDataMutex);
+        return result;
+    }
+
     void Connection::setLastTransmittedMessage(const uint8_t message[MESSAGE_SIZE]) {
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
-        uah::prepareBuffer(mLastTransmittedMessage, message, MESSAGE_SIZE, MESSAGE_SIZE);
+        uah::prepareBuffer(mConnectionFailedData.lastMessage, message, MESSAGE_SIZE, MESSAGE_SIZE);
         xSemaphoreGive(mConnectionDataMutex);
     }
 
     void Connection::repeatLastTransmittedMessage() {
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
-        if (mLastTransmittedMessage[0] != 0) {
-            mpCommunication->sendPriorityMessage(mLastTransmittedMessage);
+        if (mConnectionFailedData.lastMessage[0] != 0) {
+            mpCommunication->sendPriorityMessage(mConnectionFailedData.lastMessage);
         }
-        mLastTransmittedMessageAttempts++;
+        mConnectionFailedData.attempts++;
 
-        // TODO consider better handling that:
-        if (mLastTransmittedMessageAttempts > REPEAT_LAST_MESSAGE_MAX_ATTEMPTS) {
+        if (mConnectionFailedData.attempts > REPEAT_LAST_MESSAGE_MAX_ATTEMPTS) {
+            xSemaphoreGive(mConnectionDataMutex);
             endConnection();
+        } else {
+            xTimerChangePeriod(mConnectionTimeoutTimer, mConnectionFailedData.s_TIMEOUTS[mConnectionFailedData.attempts - 1], portMAX_DELAY);
+            xTimerStart(mConnectionTimeoutTimer, portMAX_DELAY);
+            xSemaphoreGive(mConnectionDataMutex);
+        }
+    }
+
+    void Connection::afterConnectionEndHandler() const {
+        xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+        if (mSleepTime != 0) {
+            auto & powerManager = ums::PowerManager::getInstance(mpLogger);
+            powerManager.enterSleep(mSleepTime, !mIsDeepSleep);
         }
         xSemaphoreGive(mConnectionDataMutex);
     }

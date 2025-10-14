@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common/smart_home_config.h"
+#include "communication_config.h"
 
 // Logger
 #ifndef TERMINAL_BAUD_RATE
@@ -15,5 +16,4 @@
     #endif
 #endif
 
-// TODO change path
-#define LOGGER_DATA_PATH "/main"
+#define LOGGER_DATA_PATH "/logger"

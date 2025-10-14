@@ -45,7 +45,7 @@ namespace Comms {
          * It is also possible to pass multiple commands at once by separating them with '|' character (up to 5).
          * Commands:
          * - "HC"    - check if HC12 is responding
-         * - "HC+RB" - check te baudrate
+         * - "HC+RB" - check set baudrate
          * - "HC+RC" - check set rf channel
          * - "HC+RF" - check set HC12 mode
          * - "HC+RP" - check set transmission power
@@ -65,6 +65,16 @@ namespace Comms {
          * @note Ensures that after calling this method, the RF channel will be changed first, and only then will messages be transmitted.
          */
         void firstChangeRFChannel(uint8_t channel);
+
+        /**
+         * @brief Waits for ongoing HC12 transmission to complete and disables transmission to HC12 module.
+         */
+        void waitAndDisable() const;
+
+        /**
+         * @brief Sends a command to the HC12 to put the RF module to sleep.
+         */
+        void sleep();
 
     private:
         /**

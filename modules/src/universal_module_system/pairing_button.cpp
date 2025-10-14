@@ -3,14 +3,18 @@
 #include "../config/universal_module_system_config.h"
 
 #include "data_manager.h"
+#include "power_manager.h"
 
 namespace UniversalModuleSystem {
-    PairingButton& PairingButton::getInstance(const std::shared_ptr<DebugLED> &debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
+    PairingButton &PairingButton::getInstance(const std::shared_ptr<DebugLED> &debugLED,
+                                              Comms::Communication *communication,
+                                              const std::shared_ptr<ul::Logger> &logger) {
         static PairingButton instance(debugLED, communication, logger);
         return instance;
     }
 
-    PairingButton::PairingButton(const std::shared_ptr<DebugLED> &debugLED, Comms::Communication *communication, const std::shared_ptr<ul::Logger> &logger)
+    PairingButton::PairingButton(const std::shared_ptr<DebugLED> &debugLED, Comms::Communication *communication,
+                                 const std::shared_ptr<ul::Logger> &logger)
         : mpDebugLED(debugLED), mpCommunication(communication), mpLogger(logger) {
         pinMode(BUTTON_PIN, INPUT_PULLUP);
 
@@ -35,13 +39,14 @@ namespace UniversalModuleSystem {
 
     // ====================== Button Press Timer ======================
     void PairingButton::buttonPressTimerCallback(TimerHandle_t xTimer) {
-        auto &pb = *static_cast<PairingButton*>(pvTimerGetTimerID(xTimer));
+        auto &pb = *static_cast<PairingButton *>(pvTimerGetTimerID(xTimer));
         if (digitalRead(BUTTON_PIN) == LOW) {
             pb.mButtonPressCounter.fetch_add(1);
             pb.mButtonNotPressedCounter.store(3);
 
             // after pressing button for 10 seconds call createResetBlinkTask()
-            if (DEBOUNCING_COUNTER_TO_SECONDS(pb.mButtonPressCounter.load()) >= 10 && pb.mButtonMode.load() != ButtonModes::RESET) {
+            if (DEBOUNCING_COUNTER_TO_SECONDS(pb.mButtonPressCounter.load()) >= 10 && pb.mButtonMode.load() !=
+                ButtonModes::RESET) {
                 pb.mButtonMode.store(ButtonModes::RESET);
                 pb.mpDebugLED->createResetBlinkTask();
                 // give time for blink DebugLED, clear data and reboot
@@ -50,11 +55,12 @@ namespace UniversalModuleSystem {
                 const auto dm = &DataManager::getInstance();
                 dm->eraseAllData();
                 vTaskDelay(pdMS_TO_TICKS(BUTTON_REBOOT_DELAY));
-                pb.mpLogger->warning("PairingButton Timer", "Rebooting...");
-                ESP.restart();
+                auto &powerManager = ums::PowerManager::getInstance(pb.mpLogger);
+                powerManager.safeRestart("PairingButton");
             }
             // after pressing button for 3 seconds call createPairingBlinkTask()
-            else if (DEBOUNCING_COUNTER_TO_SECONDS(pb.mButtonPressCounter.load()) >= 3 && pb.mButtonMode.load() == ButtonModes::IDLE) {
+            else if (DEBOUNCING_COUNTER_TO_SECONDS(pb.mButtonPressCounter.load()) >= 3 && pb.mButtonMode.load() ==
+                     ButtonModes::IDLE) {
                 if (pb.mButtonMode.load() != ButtonModes::PAIR) {
                     pb.mpDebugLED->createPairingBlinkTask();
                     pb.mpLogger->debug("PairingButton Timer", "ButtonModes::PAIR");
@@ -89,6 +95,7 @@ namespace UniversalModuleSystem {
             xTimerStart(mButtonPressTimer, portMAX_DELAY);
         }
     }
+
     void PairingButton::deleteButtonPressTimer() {
         if (mButtonPressTimer != nullptr) {
             xTimerDelete(mButtonPressTimer, portMAX_DELAY);

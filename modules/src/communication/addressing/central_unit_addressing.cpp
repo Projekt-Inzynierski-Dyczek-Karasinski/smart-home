@@ -26,7 +26,7 @@ namespace Comms {
         mNumOfModulesOnRfChannel[0] = 1;
         xSemaphoreGive(mModulesAddressingDataMutex);
 
-        // TODO before merge with main remove
+        // TODO !mm remove
         #ifdef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
             uint8_t tmpMAC[] = {1,1,1,1,1,1};
             addModule(tmpMAC, true, 2);
@@ -241,14 +241,14 @@ namespace Comms {
                             if (uah::areArraysEqual(receiveBuffer, ADDRESSING_SUMMARY_OK)) {
                                 isReceivedPropperMessage = true;
                                 ad.mpLogger->info("CentralUnitAddressing Main", "Addressing complete." );
-                                // TODO before merge with main remove #ifndef directive and #else section
+                                // TODO !mm remove #ifndef directive and #else section
                                 #ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
                                     ad.saveModulesAddressingData();
                                     ad.setTmpModuleIp(NULL_IP);
                                     ad.mpCommunication->stopAddressingAlgorithm();
                                     ad.mpCommunication->changeRFChannel(DEFAULT_CHANNEL);
                                 #else
-                                    // TODO remove clearing data
+                                    // TODO !mm remove clearing data
                                     ad.abortAddressing();
                                 #endif
                                 for (;;) vTaskDelay(pdMS_TO_TICKS(1000));

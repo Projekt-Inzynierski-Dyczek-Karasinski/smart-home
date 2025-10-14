@@ -1,6 +1,7 @@
 #pragma once
 
 #include <memory>
+#include <map>
 
 #include "../config/communication_config.h"
 
@@ -24,6 +25,59 @@ namespace Comms {
     #else
         #error "Not implemented"
     #endif
+
+    /**
+     * @brief Contains connection-related message definitions and utilities for them.
+     * @details Provides message code constants and convertion form strings to enum for switch statement.
+     */
+    struct ConnectionMessages {
+        // Enum for all connection messages.
+        enum class MessagesEnum : uint8_t {
+            END,
+            AFFIRM,
+            REPEAT_MESSAGE,
+            TEST_EXECUTE,
+            TEST_GET,
+            RE_TEST_GET,
+            GO_TO_NORMAL_SLEEP,
+            GO_TO_DEEP_SLEEP,
+            RE_GO_TO_SLEEP,
+            UNKNOWN
+        };
+
+        /**
+         * @brief Functor for comparing C-string message identifiers in std::map.
+         */
+        struct Comparator {
+            bool operator()(const char* a, const char* b) const {
+                return strncmp(a, b, strlen(a)) < 0;
+            }
+        };
+
+        // connection messages
+        static constexpr char s_CONNECTION_END[] = "COend";
+        static constexpr char s_CONNECTION_AFFIRM[] = "COok";
+        static constexpr char s_CONNECTION_REPEAT_MESSAGE[] = "COrepe";
+        static constexpr char s_CONNECTION_TEST_EXECUTE[] = "COexe";
+        static constexpr char s_CONNECTION_TEST_GET[] = "COtest";
+        static constexpr char s_CONNECTION_RE_TEST_GET[] = "COsending_some_data_123...";
+        static constexpr char s_CONNECTION_GO_TO_NORMAL_SLEEP[] = "COnsleep";
+        static constexpr char s_CONNECTION_GO_TO_DEEP_SLEEP[] = "COdsleep";
+        static constexpr char s_CONNECTION_RE_GO_TO_SLEEP[] = "COoksleep";
+
+        // Lookup table mapping message strings to internal enumerator values.
+        inline static const std::map<const char*, MessagesEnum, Comparator> messagesMap {
+        {s_CONNECTION_END, MessagesEnum::END},
+        {s_CONNECTION_AFFIRM, MessagesEnum::AFFIRM},
+        {s_CONNECTION_REPEAT_MESSAGE, MessagesEnum::REPEAT_MESSAGE},
+        {s_CONNECTION_TEST_EXECUTE, MessagesEnum::TEST_EXECUTE},
+        {s_CONNECTION_TEST_GET, MessagesEnum::TEST_GET},
+        {s_CONNECTION_RE_TEST_GET, MessagesEnum::RE_TEST_GET},
+        {s_CONNECTION_GO_TO_NORMAL_SLEEP, MessagesEnum::GO_TO_NORMAL_SLEEP},
+        {s_CONNECTION_GO_TO_DEEP_SLEEP, MessagesEnum::GO_TO_DEEP_SLEEP},
+        {s_CONNECTION_RE_GO_TO_SLEEP, MessagesEnum::RE_GO_TO_SLEEP}
+        };
+    };
 
     /**
      * @brief Thread-safe Meyers Singleton for managing RF communication connections.
@@ -140,6 +194,13 @@ namespace Comms {
         void deleteConnectionTimer();
 
         /**
+         * @brief Getter for <code>mLastTransmittedMessageAttempts</code>.
+         * @return Number of last transmitted message attempts.
+         * @note Thread-safe.
+         */
+        uint8_t getLastTransmittedMessageAttempts() const;
+
+        /**
          * @brief Set the last transmitted RF message value.
          * @param message Message to set.
          * @warning Do not set "repeat" message to last transmitted message, that may cause spamming "repeat" messages if RF transmission is disturbed.
@@ -148,13 +209,28 @@ namespace Comms {
         void setLastTransmittedMessage(const uint8_t message[MESSAGE_SIZE]);
         /**
          * @brief Resend the last message, if the repeat count is not exceeded.
-         * Used when get "repeat" message.
+         * Used when get "repeat" message or on connection timeout.
          * @note Thread-safe.
          */
         void repeatLastTransmittedMessage();
 
+        /**
+         * @brief Handler executed after the connection termination cleanup is complete.
+         * @details If <code>mSleepTime != 0</code> put module in sleep.
+         * @note Thread-safe.
+         */
+        void afterConnectionEndHandler() const;
+
+        /**
+         * @brief Struct containing data related to failed connection.
+         */
+        struct ConnectionFailedData {
+            uint8_t lastMessage[MESSAGE_SIZE]{}; ///< Recently transmitted message (for "repeat" logic).
+            uint8_t attempts = 0; ///< Counter of repeats of last sent message.
+            static constexpr uint16_t s_TIMEOUTS[] = {3000, 5000, 10000, 30000, 60000}; // 3s, 5s, 10s, 30s, 60s
+        };
+
         // Pointers
-        static Connection *mspConnection; ///< Static pointer to this class instance.
         Communication *mpCommunication; ///< Pointer to the Communication class instance.
         #ifdef CENTRAL_UNIT
             std::shared_ptr<CentralUnitAddressing> mpAddressing; ///< Pointer to CentralUnitAddressing class instance.
@@ -170,11 +246,14 @@ namespace Comms {
 
         // Class variables
         bool mIsConnected = false; //< Flag indicating current connection status.
-        uint8_t mLastTransmittedMessage[MESSAGE_SIZE]{}; ///< Recently transmitted message (for "repeat" logic).
-        uint8_t mLastTransmittedMessageAttempts = 0; ///< Counter of repeats of last sent message.
+        ConnectionFailedData mConnectionFailedData;
 
         // FreeRTOS
         SemaphoreHandle_t mConnectionDataMutex = nullptr; ///< FreeRTOS mutex protecting Connection class variables.
         TimerHandle_t mConnectionTimeoutTimer = nullptr; ///< FreeRTOS software timer for connection timeout management.
+
+        // TODO consider better handling that
+        uint32_t mSleepTime = 0;
+        bool mIsDeepSleep = false;
     };
 }

@@ -112,6 +112,14 @@ namespace Comms {
         setupHC12(commandBuffer);
     }
 
+    void HC12::waitAndDisable() const {
+        xSemaphoreTake(mSendingDataMutex, pdMS_TO_TICKS(POWER_MANAGEMENT_SEMAPHORE_TIMEOUT));
+    }
+
+    void HC12::sleep() {
+        setupHC12((uint8_t*)"HC+SLEEP");
+    }
+
     // ============================ Queues ============================
     void HC12::createQueues() {
         if (mMainNotificationsQueue == nullptr) {
@@ -340,7 +348,7 @@ namespace Comms {
             if (xQueueReceive(hc12.mSetupHC12CommandsQueue, commandBuffer, 0) == pdTRUE) {
                 hc12.mpLogger->infoa("HC12 Setup", "Received command: ", commandBuffer, SETUP_COMMAND_SIZE);
 
-                // TODO add better protection against bad commands
+                // TODO !o add better protection against bad commands
                 if (!(commandBuffer[0] == (uint8_t)'H' && commandBuffer[1] == (uint8_t)'C')) {
                     hc12.mpLogger->error("HC12 Setup", "Received array is not hc12 command.");
                 } else {

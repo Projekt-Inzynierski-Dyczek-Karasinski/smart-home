@@ -3,6 +3,7 @@
 
 #include "universal_module_system/debug_led.h"
 #include "universal_module_system/pairing_button.h"
+#include "universal_module_system/power_manager.h"
 #include "communication/communication.h"
 #include "utils/logger.h"
 
@@ -11,9 +12,12 @@ namespace ums = UniversalModuleSystem;
 
 void setup() {
     const auto logger = std::make_shared<ul::Logger>();
+
+    auto & powerManager = ums::PowerManager::getInstance(logger);
+
     const auto debugLed = std::make_shared<ums::DebugLED>(logger);
-    Comms::Communication& communication = Comms::Communication::getInstance(debugLed, logger);
-    ums::PairingButton& pairingButton = ums::PairingButton::getInstance(debugLed, &communication, logger);
+    auto & communication = Comms::Communication::getInstance(debugLed, logger);
+    auto & pairingButton = ums::PairingButton::getInstance(debugLed, &communication, logger);
 
     logger->info("Main", "Deleting functions setup() and loop().");
     vTaskDelete(nullptr);
