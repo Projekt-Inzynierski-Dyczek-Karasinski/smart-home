@@ -1,7 +1,7 @@
 #include "communication.h"
 
 #include "utils/uint8_array_handlers.h"
-#include "universal_module_system/power_manager.h"
+#include "universal_module_system/power_manager/power_manager.h"
 
 namespace uah = Utils::ArrayHandlers;
 
@@ -628,11 +628,11 @@ namespace Comms {
             if (Serial.available() > 0) {
                 buffer[index] = Serial.read();
                 com.mpLogger->printInputChar(buffer[index]);
-                if (buffer[index] == 8) {
+                if (buffer[index] == '\b') {
                     if (index > 0) {
                         index--;
                     }
-                } else if (buffer[index] != 13) {
+                } else if (buffer[index] != '\r') {
                     index++;
                 }
 
@@ -727,8 +727,8 @@ namespace Comms {
     }
 
     #else
-        void Communication::createSendCustomMessageTask() {}
-        void Communication::deleteSendCustomMessageTask() {}
+        void Communication::createTerminalInputTask() {}
+        void Communication::deleteTerminalInputTask() {}
     #endif
 
     // ============================ Timers ============================

@@ -1,7 +1,7 @@
 #include "connection.h"
 
 #include "communication/communication.h"
-#include "universal_module_system/power_manager.h"
+#include "universal_module_system/power_manager/power_manager.h"
 
 namespace Comms {
     // ============================ Public ============================

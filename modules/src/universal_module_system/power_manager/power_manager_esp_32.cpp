@@ -1,30 +1,28 @@
-#include "power_manager.h"
+#include "power_manager_esp_32.h"
 
 #include <driver/rtc_io.h>
 
-#include "data_manager.h"
-#include "../config/universal_module_system_config.h"
-
+#include "universal_module_system/data_manager.h"
 #include "communication/communication.h"
 
 namespace UniversalModuleSystem {
     #ifdef AUTO_SLEEP
-        RTC_DATA_ATTR uint32_t PowerManager::msSleepStart = 0;
-        RTC_DATA_ATTR int64_t PowerManager::msIntendedSleepTime = 0;
+        RTC_DATA_ATTR uint32_t PowerManagerESP32::msSleepStart = 0;
+        RTC_DATA_ATTR int64_t PowerManagerESP32::msIntendedSleepTime = 0;
     #endif
 
-    PowerManager& PowerManager::getInstance(const std::shared_ptr<ul::Logger> &logger) {
-        static PowerManager instance(logger);
+    PowerManagerESP32& PowerManagerESP32::getInstance(const std::shared_ptr<ul::Logger> &logger) {
+        static PowerManagerESP32 instance(logger);
         return instance;
     }
 
-    void PowerManager::safeRestart(const char *source) const {
+    void PowerManagerESP32::safeRestart(const char *source) const {
         mpLogger->warning(source, "Safe Rebooting...");
         waitAndDisableCriticalFeatures();
         ESP.restart();
     }
 
-    void PowerManager::enterSleep(const uint32_t milliSeconds, const bool enableWakeUpWithRfModule) {
+    void PowerManagerESP32::enterSleep(const uint32_t milliSeconds, const bool enableWakeUpWithRfModule) {
         constexpr uint16_t US_TO_MILLISECONDS_FACTOR = 1000;
 
         // button wake up
@@ -51,7 +49,7 @@ namespace UniversalModuleSystem {
         // timer wake up
         esp_sleep_enable_timer_wakeup(milliSeconds * US_TO_MILLISECONDS_FACTOR);
 
-        mpLogger->infov("PowerManager", "Going to sleep for (ms): ", milliSeconds);
+        mpLogger->infov("PowerManagerESP32", "Going to sleep for (ms): ", milliSeconds);
 
         waitAndDisableCriticalFeatures();
 
@@ -63,13 +61,13 @@ namespace UniversalModuleSystem {
         esp_deep_sleep_start();
     }
 
-    uint16_t PowerManager::getBatteryRead() const {
+    uint16_t PowerManagerESP32::getBatteryRead() const {
         xSemaphoreTake(mReadCompleteSemaphore, portMAX_DELAY);
         xSemaphoreGive(mReadCompleteSemaphore);
         return mBatteryRead.load();
     }
 
-    void PowerManager::disableAutoSleep() {
+    void PowerManagerESP32::disableAutoSleep() {
         #ifdef AUTO_SLEEP
             if (mAutoSleepTimer != nullptr) {
                 xTimerDelete(mAutoSleepTimer, portMAX_DELAY);
@@ -80,18 +78,18 @@ namespace UniversalModuleSystem {
         #endif
     }
 
-    PowerManager::PowerManager(const std::shared_ptr<ul::Logger> &logger) : mpLogger(logger) {
+    PowerManagerESP32::PowerManagerESP32(const std::shared_ptr<ul::Logger> &logger) : mpLogger(logger) {
         handleWakeUpReason();
         mReadCompleteSemaphore = xSemaphoreCreateBinary();
         readBattery();
     }
 
-    PowerManager::~PowerManager() {
+    PowerManagerESP32::~PowerManagerESP32() {
         xTimerDelete(mAutoSleepTimer, portMAX_DELAY);
         vSemaphoreDelete(mReadCompleteSemaphore);
     }
 
-    void PowerManager::waitAndDisableCriticalFeatures() const {
+    void PowerManagerESP32::waitAndDisableCriticalFeatures() const {
         const auto &communication = Comms::Communication::getInstance(nullptr, nullptr);
         const auto &dataManager = DataManager::getInstance();
 
@@ -100,29 +98,29 @@ namespace UniversalModuleSystem {
         mpLogger->waitAndDisable();
     }
 
-    void PowerManager::handleWakeUpReason() {
+    void PowerManagerESP32::handleWakeUpReason() {
         switch (esp_sleep_get_wakeup_cause()) {
             case ESP_SLEEP_WAKEUP_EXT0:
-                mpLogger->info("PowerManager Class", "Module was wake up by Pairing Button.");
+                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
                 disableAutoSleep();
                 break;
             case ESP_SLEEP_WAKEUP_EXT1:
-                mpLogger->info("PowerManager Class", "Module was wake up by rf module.");
+                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by rf module.");
                 enableAutoSleep();
                 break;
             case ESP_SLEEP_WAKEUP_TIMER:
-                mpLogger->info("PowerManager Class", "Module was wake up by timer.");
+                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by timer.");
                 disableAutoSleep();
                 break;
             default:
-                mpLogger->info("PowerManager Class", "Module had power loss.");
+                mpLogger->info("PowerManagerESP32 Class", "Module had power loss.");
                 disableAutoSleep();
                 break;
         }
     }
 
-    void PowerManager::batteryReadTask(void* parameters) {
-        auto& pm = *static_cast<PowerManager*>(parameters);
+    void PowerManagerESP32::batteryReadTask(void* parameters) {
+        auto& pm = *static_cast<PowerManagerESP32*>(parameters);
         constexpr uint16_t timeBetweenReads = 50;
         constexpr uint8_t numberOfReads = 5;
         uint16_t batteryReadSum = 0;
@@ -134,13 +132,13 @@ namespace UniversalModuleSystem {
 
         pm.mBatteryRead.store(batteryReadSum / numberOfReads);
         // TODO add convertion from raw analog read to volts or %
-        pm.mpLogger->infov("PowerManager Task", "Battery charge level is: ", pm.mBatteryRead.load());
+        pm.mpLogger->infov("PowerManagerESP32 Task", "Battery charge level is: ", pm.mBatteryRead.load());
 
         xSemaphoreGive(pm.mReadCompleteSemaphore);
         vTaskDelete(nullptr);
     }
 
-    void PowerManager::readBattery() {
+    void PowerManagerESP32::readBattery() {
         // make sure that semaphore indicates that battery read is not completed
         xSemaphoreTake(mReadCompleteSemaphore, 0);
 
@@ -154,7 +152,7 @@ namespace UniversalModuleSystem {
         );
     }
 
-    void PowerManager::enableAutoSleep() {
+    void PowerManagerESP32::enableAutoSleep() {
         #ifdef AUTO_SLEEP
             // constexpr uint16_t US_TO_MILLISECONDS_FACTOR = 1000;
             const uint32_t sleepTime = getCurrentTime() - msSleepStart;
@@ -172,14 +170,14 @@ namespace UniversalModuleSystem {
         #endif
     }
 
-    void PowerManager::goToAutoSleep(TimerHandle_t xTimer) {
+    void PowerManagerESP32::goToAutoSleep(TimerHandle_t xTimer) {
         #ifdef AUTO_SLEEP
-            auto &pm = *static_cast<PowerManager *>(pvTimerGetTimerID(xTimer));
+            auto &pm = *static_cast<PowerManagerESP32 *>(pvTimerGetTimerID(xTimer));
             pm.enterSleep(msIntendedSleepTime , true);
         #endif
     }
 
-    uint32_t PowerManager::getCurrentTime() const {
+    uint32_t PowerManagerESP32::getCurrentTime() const {
         struct timeval timeStruct{};
         gettimeofday(&timeStruct, nullptr);
         // TODO consider making this more accurate

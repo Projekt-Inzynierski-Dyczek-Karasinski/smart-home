@@ -463,6 +463,7 @@ namespace Comms {
         xSemaphoreGive(mModulesAddressingDataMutex);
     }
 
+    // TODO !pr remove
     constexpr char CentralUnitAddressing::ms_JK_MODULES[];
     constexpr char CentralUnitAddressing::ms_JK_NUM_OF_MODULES_ON_RF_CHANNEL[];
     constexpr char CentralUnitAddressing::ModuleAddressingData::ms_JK_IP[];
