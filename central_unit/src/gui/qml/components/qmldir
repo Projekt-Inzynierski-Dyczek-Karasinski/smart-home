@@ -1,0 +1,4 @@
+module components
+CustomTabButton 1.0 CustomTabButton.qml
+SettingsButton 1.0 SettingsButton.qml
+DialogButton 1.0 DialogButton.qml

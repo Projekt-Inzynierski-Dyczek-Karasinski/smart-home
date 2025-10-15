@@ -311,5 +311,17 @@ namespace SmartHome {
          */
         static ba::awaitable<API::ApiResponse> coreEchoHandler(
             const std::shared_ptr<CommandMetadata> &commandMetadata);
+
+        // TODO change docstring after adding proper implementation
+        /**
+         * @brief Temporary implementation for API testing purposes.
+         *
+         * @param commandMetadata Command execution metadata.
+         * @return API response with echoed parameters.
+         *
+         * @note Proper implementation will be added later.
+         */
+        static ba::awaitable<API::ApiResponse> coreGetHandler(
+            const std::shared_ptr<CommandMetadata> &commandMetadata);
     };
 }

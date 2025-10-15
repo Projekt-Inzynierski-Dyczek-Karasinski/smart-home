@@ -184,6 +184,8 @@ int main(int argc, char *argv[]) {
     logger->debug("[MAIN] Initialized Core");
 
 
+    // TODO launch gui if in gui mode
+
     // Launch mediator if enabled
     if (mediatorConfig.isEnabled) {
         logger->debug("[MAIN] Initializing Mediator...");

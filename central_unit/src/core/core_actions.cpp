@@ -2,6 +2,7 @@
 #include "core.h"
 
 #include <memory>
+#include <boost/algorithm/string/case_conv.hpp>
 
 using sai = SmartHome::API::InternalApi;
 using namespace std::chrono_literals;
@@ -351,10 +352,10 @@ namespace SmartHome {
 
 
         Core::Instance().mpLogger->errorf("[CORE_ACTIONS] Command timeout - request ID: %d command ID: %s",
-                                         commandMetadata->requestId,
-                                         commandMetadata->command.commandId.hasValue()
-                                             ? std::to_string(commandMetadata->command.commandId.value()).c_str()
-                                             : "null");
+                                          commandMetadata->requestId,
+                                          commandMetadata->command.commandId.hasValue()
+                                              ? std::to_string(commandMetadata->command.commandId.value()).c_str()
+                                              : "null");
     }
 
     void CoreActions::addCommandResultToResponse(const std::shared_ptr<CommandMetadata> &commandMetadata,
@@ -504,7 +505,7 @@ namespace SmartHome {
     {
         // TODO implement actions needed for basic functionality
         //Core
-        {{sai::TargetTypes::CORE, sai::MethodTypes::GET}, placeholderHandler},
+        {{sai::TargetTypes::CORE, sai::MethodTypes::GET}, coreGetHandler},
         {{sai::TargetTypes::CORE, sai::MethodTypes::SET}, placeholderHandler},
         {{sai::TargetTypes::CORE, sai::MethodTypes::EXECUTE}, placeholderHandler},
         {{sai::TargetTypes::CORE, sai::MethodTypes::ECHO_REQUEST}, coreEchoHandler},
@@ -618,6 +619,90 @@ namespace SmartHome {
         }
 
         commandResult.result = "Core Echo response: " + message;
+
+        co_return commandResult;
+    }
+
+    ba::awaitable<API::ApiResponse> CoreActions::coreGetHandler(
+        const std::shared_ptr<CommandMetadata> &commandMetadata) {
+        Core::Instance().mpLogger->debug("[CORE_ACTIONS] [CORE_GET] called");
+        const auto &command = commandMetadata->command;
+        API::ApiResponse commandResult;
+        commandResult.id = command.commandId;
+
+
+        // TODO implement core cached data object with getter methods
+        // TODO remove - temporary code for API testing
+        static const std::function tmpDataGetter = [](const std::string_view value) {
+            const std::map<std::string_view, std::string> tmpMap = {
+                {
+                    "modules_status",
+                    R"([{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"2","name":"Thermometer","description":"Thermometer + Hygrometer","values":[{"name":"Temperature","value":"22C"},{"name":"Humidity","value":"44%"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"},{"name":"Update Values","method":"updateValues"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]}])"
+                },
+                {
+                    "module_status",
+                    R"({"Id":22,"Status":"Online","Battery":"56%","Logs":["Received status request","Woke from sleep - incoming traffic","Going to sleep for 30000000ms","Sent requested value","Received read value request"]})"
+                }
+            };
+
+            const auto iter = tmpMap.find(boost::algorithm::to_lower_copy(std::string(value)));
+            std::string result = (iter != tmpMap.end()) ? iter->second.data() : "";
+
+            return result;
+        };
+
+
+        std::string queryResponse;
+
+        bool invalidParamsFlag = false;
+        if (command.params.has_value()) {
+            const auto &params = command.params.value();
+            size_t paramsSize = 0;
+
+            // params must be an array
+            if (params.is_array()) {
+                paramsSize = params.size();
+            } else {
+                invalidParamsFlag = true;
+            }
+
+            // params must have at least a query target
+            if (!invalidParamsFlag && paramsSize > 0 && params[0].is_string()) {
+                // TODO pass query target into target resolver
+                queryResponse = tmpDataGetter(params[0].get<std::string>());
+                // TODO remove - temporary code for API testing
+                commandResult.result = queryResponse;
+            } else {
+                invalidParamsFlag = true;
+            }
+
+            // params might have query conditions object
+            if (!invalidParamsFlag && paramsSize > 1 && params[1].is_object()) {
+                nlohmann::json conditionParam = params[1];
+                // TODO implement condition handler
+
+                // TODO remove - temporary code for API testing
+                auto indx = conditionParam.find("id");
+                if (indx != conditionParam.end()) {
+                    if (conditionParam["id"] == 22) {
+                        nlohmann::json response;
+                        response["id"] = 22;
+                        response["object"] = queryResponse;
+                        commandResult.result = nlohmann::to_string(response);
+                    }
+                }
+            }
+
+            //TODO pass query and condition to coreCachedDataGetter
+        }
+
+        if (invalidParamsFlag || !commandResult.result.has_value()) {
+            commandResult.error = API::ApiError(
+                API::ErrorCodes::INVALID_PARAMS,
+                API::errorCodeToString(API::ErrorCodes::INVALID_PARAMS).data(),
+                "Query failed"
+            );
+        }
 
         co_return commandResult;
     }
