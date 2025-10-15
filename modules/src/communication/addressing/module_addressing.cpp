@@ -343,11 +343,6 @@ namespace Comms {
         xSemaphoreGive(mAddressingDataMutex);
     }
 
-    // TODO !pr remove
-    constexpr char ModuleAddressing::AddressingData::ms_JK_IP[];
-    constexpr char ModuleAddressing::AddressingData::ms_JK_RF_CHANNEL[];
-    constexpr char ModuleAddressing::AddressingData::ms_JK_MAC_ADDRESS[];
-
     ModuleAddressing::AddressingData::AddressingData(const nlohmann::json& json) {
         ipAddress = json[ms_JK_IP];
         rfChannel = json[ms_JK_RF_CHANNEL];

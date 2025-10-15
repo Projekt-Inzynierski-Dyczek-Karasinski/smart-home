@@ -92,9 +92,9 @@ namespace Comms {
     void Connection::receivingHandle(const uint8_t ip) {
         if (mpAddressing->getIsAddressingInProgress()) return;
 
+        xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
         createConnectionTimer();
         xTimerStart(mConnectionTimeoutTimer, portMAX_DELAY);
-        xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
         if (!mIsConnected) {
             auto & powerManager = ums::PowerManager::getInstance(mpLogger);
             powerManager.disableAutoSleep();
@@ -193,7 +193,7 @@ namespace Comms {
         if (mConnectionTimeoutTimer == nullptr) {
             mConnectionTimeoutTimer = xTimerCreate(
                 "Connection Timeout",
-                pdMS_TO_TICKS(mConnectionFailedData.s_TIMEOUTS[0]),
+                pdMS_TO_TICKS(mConnectionFailedData.getTimeout()),
                 pdFALSE,
                 this,
                 connectionTimerCallback
@@ -227,16 +227,17 @@ namespace Comms {
         if (mConnectionFailedData.lastMessage[0] != 0) {
             mpCommunication->sendPriorityMessage(mConnectionFailedData.lastMessage);
         }
-        mConnectionFailedData.attempts++;
 
         if (mConnectionFailedData.attempts > REPEAT_LAST_MESSAGE_MAX_ATTEMPTS) {
             xSemaphoreGive(mConnectionDataMutex);
             endConnection();
         } else {
-            xTimerChangePeriod(mConnectionTimeoutTimer, mConnectionFailedData.s_TIMEOUTS[mConnectionFailedData.attempts - 1], portMAX_DELAY);
+            xTimerChangePeriod(mConnectionTimeoutTimer, mConnectionFailedData.getTimeout(), portMAX_DELAY);
             xTimerStart(mConnectionTimeoutTimer, portMAX_DELAY);
             xSemaphoreGive(mConnectionDataMutex);
         }
+
+        mConnectionFailedData.attempts++;
     }
 
     void Connection::afterConnectionEndHandler() const {
@@ -247,4 +248,12 @@ namespace Comms {
         }
         xSemaphoreGive(mConnectionDataMutex);
     }
+
+    uint16_t Connection::ConnectionFailedData::getTimeout() {
+        const int32_t range = s_TIMEOUTS[attempts] * OFFSET_PERCENTAGE / 100;
+        const int32_t offset = std::uniform_int_distribution<>(range * -1, range)(mGenerator);
+        const uint16_t result = s_TIMEOUTS[attempts] + offset;
+        return result;
+    }
+
 }
