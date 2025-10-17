@@ -21,7 +21,7 @@ namespace SmartHomeGUI {
     }
 
     QString ApiClient::sendRequest(const QString &request) {
-        mSocket.write(request.toUtf8() + messageDelimiter.data());
+        mSocket.write(request.toUtf8() + ms_MESSAGE_DELIMITER.data());
         mSocket.flush();
 
         if (!mSocket.waitForReadyRead(ms_REQUEST_TIMEOUT.count())) {
@@ -34,7 +34,7 @@ namespace SmartHomeGUI {
     }
 
     void ApiClient::sendNotification(const QString &notification) {
-        mSocket.write(notification.toUtf8() + messageDelimiter.data());
+        mSocket.write(notification.toUtf8() + ms_MESSAGE_DELIMITER.data());
         mSocket.flush();
     }
 }

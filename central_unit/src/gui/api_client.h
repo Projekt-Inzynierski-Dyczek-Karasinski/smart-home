@@ -31,19 +31,19 @@ namespace SmartHomeGUI {
          *
          * @return QString containing JSON-RPC 2.0 response, empty Qstring on failed fetch.
          */
-        Q_INVOKABLE QString sendRequest(const QString &request) ;
+        Q_INVOKABLE QString sendRequest(const QString &request);
 
         /**
          * @brief Send JSON-RPC 2.0 notification to SmartHome daemon.
          *
          * @param notification JSON-RPC 2.0 notification message to send to SmartHome daemon.
          */
-        Q_INVOKABLE void sendNotification(const QString &notification) ;
+        Q_INVOKABLE void sendNotification(const QString &notification);
 
     private:
         QLocalSocket mSocket;
 
-        static constexpr std::string_view messageDelimiter = "\r\n";
+        static constexpr std::string_view ms_MESSAGE_DELIMITER = "\r\n";
         static constexpr auto ms_CONNECTION_TIMEOUT = 1000ms;
         static constexpr auto ms_REQUEST_TIMEOUT = 5000ms;
     };

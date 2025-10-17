@@ -50,15 +50,6 @@ ApplicationWindow {
             Layout.fillHeight: true
             currentIndex: tabBar.currentIndex
 
-            // onCurrentIndexChanged: {
-            //     if (currentIndex === 0) {
-            //         homeStack.currentItem.fetchModules()
-            //     }
-            //     if( homeStack.size > 1){
-            //         homeStack.pop()
-            //     }
-            // }
-
             // HomePage
             Item {
                 StackView {
