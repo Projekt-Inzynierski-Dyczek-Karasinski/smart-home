@@ -74,7 +74,7 @@ namespace SmartHome {
      * @param loggerConfig Logger configuration to update.
      */
     void overwriteConfigsWithProgramOptions(const bpo::variables_map &vm,
-                                            loggerTemporaryOptions &logTmpOpt,
+                                            const loggerTemporaryOptions &logTmpOpt,
                                             Core::Config &coreConfig,
                                             Utils::Logger::Config &loggerConfig);
 
@@ -103,5 +103,6 @@ namespace SmartHome {
 
 
     /// Default path for smarthome YAML config
-    static constexpr const char *s_DEFAULT_CONFIG_PATH = "/etc/smarthome/smart_home.yaml";
+    static constexpr std::string_view s_DEFAULT_CONFIG_PATH = "/etc/smarthome/smart_home.yaml";
+    static constexpr std::string_view s_DEFAULT_LOGFILE_PATH = "/var/log/smarthome/core.log";
 }

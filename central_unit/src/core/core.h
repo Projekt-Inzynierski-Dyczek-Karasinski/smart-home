@@ -17,6 +17,8 @@ namespace ba = boost::asio;
 namespace bs = boost::system;
 
 namespace SmartHome {
+    using namespace std::chrono_literals;
+
     /**
      * @brief Core system component managing smart home central unit.
      *
@@ -140,7 +142,7 @@ namespace SmartHome {
          */
         ba::io_context &getCoreIoContext();
 
-        std::shared_ptr<Utils::AsyncLogger> mLogger; ///< Logger instance
+        std::shared_ptr<Utils::AsyncLogger> mpLogger; ///< Logger instance
 
     private:
         /**
@@ -202,7 +204,7 @@ namespace SmartHome {
         /// Signals defined to handle in signalHandler
         static constexpr std::array ms_SIGNALS_TO_HANDLE = {SIGINT, SIGTERM, SIGHUP};
         /// Shutdown timeout timer value in ms
-        static constexpr uint ms_SHUTDOWN_TIMEOUT = 5000;
+        static constexpr auto ms_SHUTDOWN_TIMEOUT = 5000ms;
 
         //Core workers
         ba::io_context mCoreWorkerIoContext;

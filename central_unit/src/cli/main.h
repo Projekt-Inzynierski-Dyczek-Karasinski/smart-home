@@ -56,7 +56,7 @@ namespace SmartHomeCLI {
     inline std::optional<std::thread> loggerThread;
 
     /// Default IP address for TCP connection (address:port)
-    static constexpr const char *s_DEFAULT_TCP_ENDPOINT_ADDRESS = "127.0.0.1:43321";
+    static constexpr std::string_view s_DEFAULT_TCP_ENDPOINT_ADDRESS = "127.0.0.1:43321";
     /// Default path for Unix Domain Socket file
-    static constexpr const char *s_DEFAULT_UDS_ENDPOINT_PATH = "/var/run/smarthomed.sock";
+    static constexpr std::string_view s_DEFAULT_UDS_ENDPOINT_PATH = "/var/run/smarthomed.sock";
 }

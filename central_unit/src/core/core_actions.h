@@ -6,6 +6,8 @@
 namespace ba = boost::asio;
 
 namespace SmartHome {
+    using namespace std::chrono_literals;
+
     /**
      * @brief Core actions handler for processing internal API commands.
      *
@@ -282,9 +284,9 @@ namespace SmartHome {
         /// Mutex for responses map access
         static std::mutex msResponsesLock;
 
-        static constexpr uint ms_REQUEST_TIMEOUT = 30000; ///< Request timeout timer duration in ms
-        static constexpr uint ms_COMMAND_TIMEOUT = 15000; ///< Command timeout timer duration in ms
-        static constexpr uint ms_CLEANUP_TIMEOUT = 5000; ///< Timeout used in onCoreShutdown in ms
+        static constexpr auto ms_REQUEST_TIMEOUT = 30000ms; ///< Request timeout timer duration in ms
+        static constexpr auto ms_COMMAND_TIMEOUT = 15000ms; ///< Command timeout timer duration in ms
+        static constexpr auto ms_CLEANUP_TIMEOUT = 5000ms; ///< Timeout duration used in onCoreShutdown in ms
 
         // ======================================== CommandHandler functions ========================================
 
@@ -309,6 +311,18 @@ namespace SmartHome {
          * @return API response with echoed parameters.
          */
         static ba::awaitable<API::ApiResponse> coreEchoHandler(
+            const std::shared_ptr<CommandMetadata> &commandMetadata);
+
+        // TODO change docstring after adding proper implementation
+        /**
+         * @brief Temporary implementation for API testing purposes.
+         *
+         * @param commandMetadata Command execution metadata.
+         * @return API response with echoed parameters.
+         *
+         * @note Proper implementation will be added later.
+         */
+        static ba::awaitable<API::ApiResponse> coreGetHandler(
             const std::shared_ptr<CommandMetadata> &commandMetadata);
     };
 }

@@ -89,7 +89,7 @@ namespace SmartHome::Utils {
                 bool enabled = true; ///< Enable/disable file logging
                 bool createNew = true; ///< Clear existing / creates new file writes log file header
                 bool archiveOld = true; ///< Archives existing file to .old //TODO Add more advanced archiving options
-                std::string path = "/var/log/smarthome/core.log"; ///< Log file path
+                std::string path = "/var/log/smarthome/smarthome.log"; ///< Log file path
             } logFile;
         };
 

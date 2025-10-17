@@ -8,7 +8,7 @@ namespace SmartHome::Service {
 
     bool StandaloneService::onInitialize() {
         try {
-            lockFile.emplace(ms_LOCK_FILE_PATH);
+            lockFile.emplace(ms_LOCK_FILE_PATH.data());
             return true;
         } catch (std::exception &e) {
             mpLogger->errorf("[STANDALONE_SERVICE] Service initialization error: %s", e.what());

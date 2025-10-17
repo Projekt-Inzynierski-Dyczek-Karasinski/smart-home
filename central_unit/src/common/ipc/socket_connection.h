@@ -121,7 +121,7 @@ namespace SmartHome::IPC {
 
     protected:
         /// Message delimiter
-        static constexpr const char *ms_MESSAGE_DELIMITER = "\r\n";
+        static constexpr std::string_view ms_MESSAGE_DELIMITER = "\r\n";
         /// Compiled regex for delimiter matching
         static const boost::regex ms_DELIMITER_REGEX;
 

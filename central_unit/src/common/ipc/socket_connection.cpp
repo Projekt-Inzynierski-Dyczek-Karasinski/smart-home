@@ -11,7 +11,7 @@ namespace SmartHome::IPC {
         SocketConnection::close();
     }
 
-    const boost::regex SocketConnection::ms_DELIMITER_REGEX(ms_MESSAGE_DELIMITER);
+    const boost::regex SocketConnection::ms_DELIMITER_REGEX(ms_MESSAGE_DELIMITER.data());
 
     std::string SocketConnection::read() {
         if (isOpen()) {
@@ -52,7 +52,7 @@ namespace SmartHome::IPC {
 
         try {
             std::visit([message](auto &socket) {
-                ba::write(socket, ba::buffer(message + ms_MESSAGE_DELIMITER));
+                ba::write(socket, ba::buffer(message + ms_MESSAGE_DELIMITER.data()));
             }, mSocket);
         } catch (bs::system_error &e) {
             handleError(e.code());
@@ -62,7 +62,7 @@ namespace SmartHome::IPC {
     void SocketConnection::writeAsync(const std::string &message, const std::function<void()> &onWriteCompletion) {
         if (!isOpen()) return;
 
-        auto callback = [this, onWriteCompletion](const bs::error_code &ec, const std::size_t bytesTransferred) {
+        auto callback = [this, onWriteCompletion](const bs::error_code &ec, const std::size_t) {
             if (!ec && isOpen()) {
                 if (onWriteCompletion != nullptr) onWriteCompletion();
             } else {
@@ -73,7 +73,7 @@ namespace SmartHome::IPC {
         auto strandWrapper = ba::bind_executor(mStrand, callback);
 
         std::visit([message, strandWrapper](auto &socket) {
-            ba::async_write(socket, ba::buffer(message + ms_MESSAGE_DELIMITER), strandWrapper);
+            ba::async_write(socket, ba::buffer(message + ms_MESSAGE_DELIMITER.data()), strandWrapper);
         }, mSocket);
     }
 
@@ -152,8 +152,8 @@ namespace SmartHome::IPC {
         is.read(&message[0], static_cast<long>(bytesTransferred));
 
         // Cut delimiter from message
-        if (message.size() > strlen(ms_MESSAGE_DELIMITER) && message.ends_with(ms_MESSAGE_DELIMITER)) {
-            message.resize(message.size() - strlen(ms_MESSAGE_DELIMITER));
+        if (message.size() > ms_MESSAGE_DELIMITER.length() && message.ends_with(ms_MESSAGE_DELIMITER)) {
+            message.resize(message.size() - ms_MESSAGE_DELIMITER.length());
         }
 
         return message;

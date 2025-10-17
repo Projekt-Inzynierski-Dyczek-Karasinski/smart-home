@@ -5,6 +5,7 @@
 #include <ranges>
 
 namespace bs = boost::system;
+using namespace std::chrono_literals;
 
 namespace SmartHome::IPC {
     SocketServer &SocketServer::Instance() {
@@ -133,7 +134,7 @@ namespace SmartHome::IPC {
             mpLogger->errorf("[SOCKET_SERVER] Socket server accept failed: %s", e.what());
             connection->close();
             // Retry after dealy
-            std::this_thread::sleep_for(std::chrono::seconds(1));
+            std::this_thread::sleep_for(1s);
             return;
         }
 

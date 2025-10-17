@@ -7,6 +7,7 @@
 #include <boost/algorithm/string/classification.hpp>
 
 namespace si = SmartHome::IPC;
+using namespace std::chrono_literals;
 
 namespace SmartHomeCLI {
     bool attemptUdsConnection(si::SocketConnection &connection, const std::string &udsEndpointPath) {
@@ -39,8 +40,8 @@ namespace SmartHomeCLI {
     }
 
     void runCli(si::SocketConnection &connection) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100)); // Wait for logs
-        std::string input = "";
+        std::this_thread::sleep_for(100ms); // Wait for logs
+        std::string input;
         while (connection.isOpen()) {
             std::cout << "Smarthomectl: " << std::flush;
 
@@ -77,11 +78,11 @@ int main(const int argc, char *argv[]) {
             ("help,h", "produce help message")
 
             ("uds,u",
-             bpo::value<std::string>()->default_value(SmartHomeCLI::s_DEFAULT_UDS_ENDPOINT_PATH)->implicit_value(
-                 SmartHomeCLI::s_DEFAULT_UDS_ENDPOINT_PATH),
+             bpo::value<std::string>()->default_value(SmartHomeCLI::s_DEFAULT_UDS_ENDPOINT_PATH.data())->implicit_value(
+                 SmartHomeCLI::s_DEFAULT_UDS_ENDPOINT_PATH.data()),
              "UDS endpoint socket file path")
 
-            ("tcp,t", bpo::value<std::string>()->implicit_value(SmartHomeCLI::s_DEFAULT_TCP_ENDPOINT_ADDRESS),
+            ("tcp,t", bpo::value<std::string>()->implicit_value(SmartHomeCLI::s_DEFAULT_TCP_ENDPOINT_ADDRESS.data()),
              "TCP ipv4 address and port in address:port format");
 
     //TODO consider implementing more advanced options
@@ -116,7 +117,7 @@ int main(const int argc, char *argv[]) {
     });
 
     auto logger = std::make_shared<SmartHome::Utils::Logger>();
-    logger->setLevel(su::LogLevels::Level::DEBUG);
+    logger->setLevel(su::LogLevels::Level::DEBUG); //TODO remove setting to debug level
     logger->info("[SMARTHOMECTL] Logger enabled");
 
     if (ipcType == si::SocketConnection::Type::UDS) {
@@ -143,7 +144,7 @@ int main(const int argc, char *argv[]) {
     } else {
         auto tcpConnection = si::SocketConnection(ioContext, si::SocketConnection::Type::TCP, logger);
 
-        std::string tcpEndpointAddress = "";
+        std::string tcpEndpointAddress;
         int tcpEndpointPort = 0;
 
         try {

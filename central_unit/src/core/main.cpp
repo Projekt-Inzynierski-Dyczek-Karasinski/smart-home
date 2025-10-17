@@ -6,6 +6,8 @@
 #include <iostream>
 #include <filesystem>
 
+using namespace std::chrono_literals;
+
 namespace SmartHome {
     void loadLoggerYamlConfig(Utils::ConfigManager &configManager, Utils::Logger::Config &config) {
         std::string root = "core.logging";
@@ -33,8 +35,8 @@ namespace SmartHome {
 
         // Core config
         root = "core";
-        configManager.getValue(root +".main_threads", coreConfig.coreMainThreads);
-        configManager.getValue(root +".worker_threads", coreConfig.coreWorkerThreads);
+        configManager.getValue(root + ".main_threads", coreConfig.coreMainThreads);
+        configManager.getValue(root + ".worker_threads", coreConfig.coreWorkerThreads);
 
         root = "core.ipc";
         configManager.getValue(root + ".threads", coreConfig.ipcServerThreads);
@@ -51,7 +53,7 @@ namespace SmartHome {
 
 
     void overwriteConfigsWithProgramOptions(const bpo::variables_map &vm,
-                                            loggerTemporaryOptions &logTmpOpt,
+                                            const loggerTemporaryOptions &logTmpOpt,
                                             Core::Config &coreConfig,
                                             Utils::Logger::Config &loggerConfig) {
         // Logger config
@@ -101,7 +103,10 @@ namespace SmartHome {
         // Load YAML config
         auto configManager = Utils::ConfigManager(logger);
         Utils::Logger::Config loggerConfig;
-        const std::string configPath = vm.contains("config") ? vm["config"].as<std::string>() : s_DEFAULT_CONFIG_PATH;
+        loggerConfig.logFile.path = s_DEFAULT_LOGFILE_PATH;
+        const std::string configPath = vm.contains("config")
+                                           ? vm["config"].as<std::string>()
+                                           : s_DEFAULT_CONFIG_PATH.data();
         if (configManager.loadConfig(configPath)) {
             logger->debug("[MAIN] Loading YAML logger config");
             loadLoggerYamlConfig(configManager, loggerConfig);
@@ -140,7 +145,7 @@ int main(int argc, char *argv[]) {
             ("no-archive", bpo::bool_switch()->default_value(false), "Disables archiving old log files")
             ("no-log-file", "Disable file logging")
 
-            ("port,p", bpo::value<unsigned short>(), "TCP IPC port")
+            ("port,p", bpo::value<int>(), "TCP IPC port")
             ("ipv4,4", bpo::value<std::string>(), "TCP IPC ipv4 address");
 
 
@@ -179,6 +184,8 @@ int main(int argc, char *argv[]) {
     logger->debug("[MAIN] Initialized Core");
 
 
+    // TODO launch gui if in gui mode
+
     // Launch mediator if enabled
     if (mediatorConfig.isEnabled) {
         logger->debug("[MAIN] Initializing Mediator...");
@@ -212,7 +219,7 @@ int main(int argc, char *argv[]) {
         logger->debug("[MAIN] Waiting for mediator shutdown");
         if (mediatorConfig.serviceType == Utils::ServiceType::STANDALONE) {
             mediator.terminate(); //SIGTERM
-            if (!mediator.wait_for(std::chrono::seconds(15))) {
+            if (!mediator.wait_for(15s)) {
                 kill(mediator.id(), SIGKILL);
                 mediator.wait();
             }

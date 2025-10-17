@@ -2,14 +2,15 @@
 #include "core.h"
 
 #include <memory>
+#include <boost/algorithm/string/case_conv.hpp>
 
 using sai = SmartHome::API::InternalApi;
-
+using namespace std::chrono_literals;
 
 namespace SmartHome {
     void CoreActions::handleRequest(const API::InternalApi::Request &request, const RequestCallback &callback) {
         if (!Core::Instance().isRunning()) return;
-        const auto logger = Core::Instance().mLogger;
+        const auto logger = Core::Instance().mpLogger;
         const auto requestId = getNextId();
 
         // TODO add ActiveRequest limit
@@ -21,7 +22,7 @@ namespace SmartHome {
                 requestId,
                 request,
                 std::make_shared<ba::steady_timer>(
-                    Core::Instance().getCoreUtilityIoContext(), std::chrono::milliseconds(ms_REQUEST_TIMEOUT)),
+                    Core::Instance().getCoreUtilityIoContext(), ms_REQUEST_TIMEOUT),
                 request.commands.size(),
                 callback
             );
@@ -86,13 +87,14 @@ namespace SmartHome {
         );
 
         for (const auto &command: request.commands) {
-            CommandHandler handler = resolveCommand(command);
+            const CommandHandler handler = resolveCommand(command);
             executeCommandAsync(handler, command, requestId);
         }
     }
+
     void CoreActions::onCoreShutdown() {
         auto cleanupTimeout = std::make_shared<ba::steady_timer>(Core::Instance().getCoreUtilityIoContext(),
-                                                                 std::chrono::milliseconds(ms_CLEANUP_TIMEOUT));
+                                                                 ms_CLEANUP_TIMEOUT);
         std::atomic_bool cleanupTimeoutCalled = false;
         auto cleanup = [&cleanupTimeout, &cleanupTimeoutCalled]() {
             auto expected = false;
@@ -138,10 +140,12 @@ namespace SmartHome {
             }
         }
     }
+
     CoreActions::CommandKey::CommandKey(const sai::TargetTypes newTarget, const sai::MethodTypes newAction) {
         target = newTarget;
         action = newAction;
     }
+
     CoreActions::CommandKey::CommandKey(const API::InternalApi::Command &command) {
         target = command.target.type;
         action = command.method.type;
@@ -296,7 +300,7 @@ namespace SmartHome {
 
     void CoreActions::startCommandTimeoutTimer(const std::shared_ptr<CommandMetadata> &commandMetadata) {
         if (auto timer = commandMetadata->commandTimeoutTimer.load()) {
-            timer->expires_after(std::chrono::milliseconds(ms_COMMAND_TIMEOUT));
+            timer->expires_after(ms_COMMAND_TIMEOUT);
             timer->async_wait([commandMetadata](const bs::error_code &ec) {
                 if (!ec) {
                     handleCommandTimeout(commandMetadata);
@@ -338,7 +342,7 @@ namespace SmartHome {
             API::ApiError error;
             error.code = API::ErrorCodes::INTERNAL_ERROR;
             error.message = API::errorCodeToString(error.code);
-            error.data = "Command timeout: exceeded " + std::to_string(ms_COMMAND_TIMEOUT) + "ms timeout";
+            error.data = "Command timeout: exceeded " + std::to_string(ms_COMMAND_TIMEOUT.count()) + "ms timeout";
 
             timeoutResponse.error = error;
 
@@ -347,11 +351,11 @@ namespace SmartHome {
         updateRequestStatus(commandMetadata->requestId);
 
 
-        Core::Instance().mLogger->errorf("[CORE_ACTIONS] Command timeout - request ID: %d command ID: %s",
-                                         commandMetadata->requestId,
-                                         commandMetadata->command.commandId.hasValue()
-                                             ? std::to_string(commandMetadata->command.commandId.value()).c_str()
-                                             : "null");
+        Core::Instance().mpLogger->errorf("[CORE_ACTIONS] Command timeout - request ID: %d command ID: %s",
+                                          commandMetadata->requestId,
+                                          commandMetadata->command.commandId.hasValue()
+                                              ? std::to_string(commandMetadata->command.commandId.value()).c_str()
+                                              : "null");
     }
 
     void CoreActions::addCommandResultToResponse(const std::shared_ptr<CommandMetadata> &commandMetadata,
@@ -379,7 +383,7 @@ namespace SmartHome {
     }
 
     void CoreActions::handleRequestTimeout(const apiId_t requestId) {
-        Core::Instance().mLogger->errorf("[CORE_ACTIONS] Request timeout - request ID: %d", requestId);
+        Core::Instance().mpLogger->errorf("[CORE_ACTIONS] Request timeout - request ID: %d", requestId);
 
         std::vector<CommandMetadataPtr> commandsMD;
 
@@ -402,7 +406,8 @@ namespace SmartHome {
                 API::ApiError error;
                 error.code = API::ErrorCodes::INTERNAL_ERROR;
                 error.message = API::errorCodeToString(error.code);
-                error.data = "Command cancelled: request exceeded " + std::to_string(ms_REQUEST_TIMEOUT) + "ms timeout";
+                error.data = "Command cancelled: request exceeded " + std::to_string(ms_REQUEST_TIMEOUT.count()) +
+                             "ms timeout";
 
                 timeoutResult.error = error;
 
@@ -429,7 +434,7 @@ namespace SmartHome {
     }
 
     void CoreActions::handleResponse(const apiId_t responseId) {
-        const auto logger = Core::Instance().mLogger;
+        const auto logger = Core::Instance().mpLogger;
         RequestCallback requestCallback;
         std::string responseString;
         connectionId_t id;
@@ -500,7 +505,7 @@ namespace SmartHome {
     {
         // TODO implement actions needed for basic functionality
         //Core
-        {{sai::TargetTypes::CORE, sai::MethodTypes::GET}, placeholderHandler},
+        {{sai::TargetTypes::CORE, sai::MethodTypes::GET}, coreGetHandler},
         {{sai::TargetTypes::CORE, sai::MethodTypes::SET}, placeholderHandler},
         {{sai::TargetTypes::CORE, sai::MethodTypes::EXECUTE}, placeholderHandler},
         {{sai::TargetTypes::CORE, sai::MethodTypes::ECHO_REQUEST}, coreEchoHandler},
@@ -542,7 +547,7 @@ namespace SmartHome {
     ba::awaitable<API::ApiResponse> CoreActions::placeholderHandler(
         const std::shared_ptr<CommandMetadata> &commandMetadata) {
         // Optional debug log
-        Core::Instance().mLogger->debug("[CORE_ACTIONS] [PLACEHOLDER] called");
+        Core::Instance().mpLogger->debug("[CORE_ACTIONS] [PLACEHOLDER] called");
         // Universal command variables' definition.
         const auto &command = commandMetadata->command;
         API::ApiResponse commandResult;
@@ -554,7 +559,7 @@ namespace SmartHome {
         // Check for params and handle them accordingly.
         if (command.params.has_value()) {
             const auto &params = command.params.value();
-            if (params.is_array() && params.size() > 0 && params[0].is_number()) {
+            if (params.is_array() && !params.empty() && params[0].is_number()) {
                 operationDuration = params[0].get<int>();
             }
         }
@@ -576,15 +581,14 @@ namespace SmartHome {
                     promise->set_exception(std::make_exception_ptr(std::runtime_error("Operation cancelled")));
                     return;
                 }
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                std::this_thread::sleep_for(100ms);
             }
             promise->set_value("Operation finished successfully");
         });
 
         // Wait asynchronously for long operation result.
-        while (future.wait_for(std::chrono::milliseconds(25)) != std::future_status::ready) {
-            co_await ba::steady_timer(co_await ba::this_coro::executor,
-                                      std::chrono::milliseconds(75)).async_wait(ba::use_awaitable);
+        while (future.wait_for(25ms) != std::future_status::ready) {
+            co_await ba::steady_timer(co_await ba::this_coro::executor, 75ms).async_wait(ba::use_awaitable);
         }
 
         // Handle and return result or error.
@@ -602,7 +606,7 @@ namespace SmartHome {
 
     ba::awaitable<API::ApiResponse> CoreActions::coreEchoHandler(
         const std::shared_ptr<CommandMetadata> &commandMetadata) {
-        Core::Instance().mLogger->debug("[CORE_ACTIONS] [CORE_ECHO] called");
+        Core::Instance().mpLogger->debug("[CORE_ACTIONS] [CORE_ECHO] called");
         const auto &command = commandMetadata->command;
         API::ApiResponse commandResult;
         commandResult.id = command.commandId;
@@ -615,6 +619,90 @@ namespace SmartHome {
         }
 
         commandResult.result = "Core Echo response: " + message;
+
+        co_return commandResult;
+    }
+
+    ba::awaitable<API::ApiResponse> CoreActions::coreGetHandler(
+        const std::shared_ptr<CommandMetadata> &commandMetadata) {
+        Core::Instance().mpLogger->debug("[CORE_ACTIONS] [CORE_GET] called");
+        const auto &command = commandMetadata->command;
+        API::ApiResponse commandResult;
+        commandResult.id = command.commandId;
+
+
+        // TODO implement core cached data object with getter methods
+        // TODO remove - temporary code for API testing
+        static const std::function tmpDataGetter = [](const std::string_view value) {
+            const std::map<std::string_view, std::string> tmpMap = {
+                {
+                    "modules_status",
+                    R"([{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"2","name":"Thermometer","description":"Thermometer + Hygrometer","values":[{"name":"Temperature","value":"22C"},{"name":"Humidity","value":"44%"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"},{"name":"Update Values","method":"updateValues"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]}])"
+                },
+                {
+                    "module_status",
+                    R"({"Id":22,"Status":"Online","Battery":"56%","Logs":["Received status request","Woke from sleep - incoming traffic","Going to sleep for 30000000ms","Sent requested value","Received read value request"]})"
+                }
+            };
+
+            const auto iter = tmpMap.find(boost::algorithm::to_lower_copy(std::string(value)));
+            std::string result = (iter != tmpMap.end()) ? iter->second.data() : "";
+
+            return result;
+        };
+
+
+        std::string queryResponse;
+
+        bool invalidParamsFlag = false;
+        if (command.params.has_value()) {
+            const auto &params = command.params.value();
+            size_t paramsSize = 0;
+
+            // params must be an array
+            if (params.is_array()) {
+                paramsSize = params.size();
+            } else {
+                invalidParamsFlag = true;
+            }
+
+            // params must have at least a query target
+            if (!invalidParamsFlag && paramsSize > 0 && params[0].is_string()) {
+                // TODO pass query target into target resolver
+                queryResponse = tmpDataGetter(params[0].get<std::string>());
+                // TODO remove - temporary code for API testing
+                commandResult.result = queryResponse;
+            } else {
+                invalidParamsFlag = true;
+            }
+
+            // params might have query conditions object
+            if (!invalidParamsFlag && paramsSize > 1 && params[1].is_object()) {
+                nlohmann::json conditionParam = params[1];
+                // TODO implement condition handler
+
+                // TODO remove - temporary code for API testing
+                auto indx = conditionParam.find("id");
+                if (indx != conditionParam.end()) {
+                    if (conditionParam["id"] == 22) {
+                        nlohmann::json response;
+                        response["id"] = 22;
+                        response["object"] = queryResponse;
+                        commandResult.result = nlohmann::to_string(response);
+                    }
+                }
+            }
+
+            //TODO pass query and condition to coreCachedDataGetter
+        }
+
+        if (invalidParamsFlag || !commandResult.result.has_value()) {
+            commandResult.error = API::ApiError(
+                API::ErrorCodes::INVALID_PARAMS,
+                API::errorCodeToString(API::ErrorCodes::INVALID_PARAMS).data(),
+                "Query failed"
+            );
+        }
 
         co_return commandResult;
     }

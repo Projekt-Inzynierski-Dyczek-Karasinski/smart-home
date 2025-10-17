@@ -154,7 +154,7 @@ namespace SmartHome::API {
             .connectionId = connectionId,
         };
 
-        const auto logger = Core::Instance().mLogger;
+        const auto logger = Core::Instance().mpLogger;
         logger->debug("[INTERNAL_API] handleRequest");
 
         ApiError e;
@@ -234,7 +234,7 @@ namespace SmartHome::API {
     }
 
     void InternalApi::handleResponse(const apiId_t connectionId, std::string &&response) {
-        Core::Instance().mLogger->debug("[INTERNAL_API] handle response called");
+        Core::Instance().mpLogger->debug("[INTERNAL_API] handle response called");
         ba::post(*IPC::SocketServer::Instance().getIoContext(), [connectionId, message = std::string(response)] {
             auto &socketServer = IPC::SocketServer::Instance();
             if (!socketServer.isRunning()) return;

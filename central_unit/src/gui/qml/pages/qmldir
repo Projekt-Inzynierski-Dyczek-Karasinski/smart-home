@@ -1,0 +1,5 @@
+module pages
+HomePage 1.0 HomePage.qml
+ModuleDetailPage 1.0 ModuleDetailPage.qml
+SettingsPage 1.0 SettingsPage.qml
+StatusPage 1.0 StatusPage.qml

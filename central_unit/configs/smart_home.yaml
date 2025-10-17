@@ -1,4 +1,7 @@
 preset_values:
+  core_modes:
+    headless: &headless 0
+    gui: &gui 1
   thread_count_values:
     quarter_cpu_cores: &quarter_cpu_cores -3
     third_cpu_cores: &third_cpu_cores -2
@@ -20,11 +23,11 @@ preset_values:
 #   value >= 1: exact thread count
 
 core:
-  mode: "headless"  #TODO add kiosk gui
+  mode: *headless
   main_threads: *two_threads # Recommended setting value >= 2
   worker_threads: *single_thread  # Recommended setting value >= 1
   logging:
-    log_level: *warning
+    log_level: *info
     enable_console_log_output: true
     log_file:
       enabled: true
@@ -47,3 +50,14 @@ services:
     service_type: "Standalone" # TODO implement systemd service along proper mediator implementation
     exec_path: ~ #Option for standalone mode - Default: /usr/local/bin/
     config_path: "/etc/smarthome/mediator.yaml"
+
+# TODO add more config options for gui
+gui:
+  logging:
+    log_level: *info
+    enable_console_log_output: true
+    log_file:
+      enabled: true
+      create_new: true
+      archive_old: true
+      path: "/var/log/smarthome/gui.log"
