@@ -15,9 +15,10 @@
 
 namespace ba = boost::asio;
 namespace bs = boost::system;
-using namespace std::chrono_literals;
 
 namespace SmartHome {
+    using namespace std::chrono_literals;
+
     /**
      * @brief Core system component managing smart home central unit.
      *

@@ -4,11 +4,12 @@
 #include <QStack>
 #include <QLocalSocket>
 
-using namespace std::chrono_literals;
-
 namespace SmartHomeGUI {
-    class ApiClient: public QObject {
+    using namespace std::chrono_literals;
+
+    class ApiClient : public QObject {
         Q_OBJECT
+
     public:
         explicit ApiClient(QObject *parent = nullptr);
 

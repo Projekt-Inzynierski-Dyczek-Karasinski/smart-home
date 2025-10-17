@@ -4,9 +4,10 @@
 #include <boost/asio.hpp>
 
 namespace ba = boost::asio;
-using namespace std::chrono_literals;
 
 namespace SmartHome {
+    using namespace std::chrono_literals;
+
     /**
      * @brief Core actions handler for processing internal API commands.
      *
