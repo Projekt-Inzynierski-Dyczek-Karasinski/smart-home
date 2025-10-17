@@ -3,6 +3,9 @@
 #include <string>
 
 namespace SmartHome::Exceptions {
+    /**
+     * @brief Enum with custom SmartHome exception types.
+     */
     enum class ExceptionCodes: int {
         INSTANCE_ALREADY_EXISTS,
         FILE_LOCK_FAILED,
@@ -11,6 +14,9 @@ namespace SmartHome::Exceptions {
         FILE_LOCK_WRITE_FAILED,
     };
 
+    /**
+     * @brief Custom SmartHome exception class.
+     */
     class Exception final : public std::exception {
         ExceptionCodes mCode;
         std::string mMessage;
@@ -20,11 +26,20 @@ namespace SmartHome::Exceptions {
             : mCode(code), mMessage(message) {
         }
 
-
+        /**
+         * @brief Exception code getter.
+         *
+         * @return Exception code.
+         */
         ExceptionCodes getCode() const {
             return mCode;
         }
 
+        /**
+         * @brief Exception message getter.
+         *
+         * @return Exception message.
+         */
         const char *what() const noexcept override {
             return mMessage.c_str();
         }

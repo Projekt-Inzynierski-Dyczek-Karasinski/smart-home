@@ -85,6 +85,16 @@ namespace SmartHome::Utils {
 }
 
 /**
+ * @namespace SmartHome::Exceptions
+ * @brief Custom exceptions for Smart Home.
+ *
+ * @details Implements custom exception types based on \c std::exception class. \n Used in:
+ * - SmartHome::Utils
+ */
+namespace SmartHome::Exceptions {
+}
+
+/**
  * @namespace SmartHomeCLI
  * @brief Command Line Interface for Smart Home system.
  *
@@ -96,4 +106,17 @@ namespace SmartHome::Utils {
  *
  */
 namespace SmartHomeCLI {
+}
+
+/**
+ * @namespace SmartHomeGUI
+ * @brief Graphic User Interface for Smart Home system.
+ *
+ * @details Separate namespace for GUI application that:
+ * - Is an independent program communicating with Core via UDS IPC using internal API
+ * - Uses SmartHome::Logger, SmartHome::Utils
+ *
+ * @note This is a separate program, not part of Core.
+ */
+namespace SmartHomeGUI {
 }
