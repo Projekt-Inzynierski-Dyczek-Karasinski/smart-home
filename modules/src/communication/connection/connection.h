@@ -37,6 +37,7 @@ namespace Comms {
         enum class MessagesEnum : uint8_t {
             END,
             AFFIRM,
+            NEGATIVE,
             REPEAT_MESSAGE,
             TEST_EXECUTE,
             TEST_GET,
@@ -60,6 +61,7 @@ namespace Comms {
         // connection messages
         static constexpr char s_CONNECTION_END[] = "COend";
         static constexpr char s_CONNECTION_AFFIRM[] = "COok";
+        static constexpr char s_CONNECTION_NEGATIVE[] = "COneg";
         static constexpr char s_CONNECTION_REPEAT_MESSAGE[] = "COrepe";
         static constexpr char s_CONNECTION_TEST_EXECUTE[] = "COexe";
         static constexpr char s_CONNECTION_TEST_GET[] = "COtest";
@@ -73,6 +75,7 @@ namespace Comms {
         inline static const std::map<const char*, MessagesEnum, Comparator> messagesMap {
         {s_CONNECTION_END, MessagesEnum::END},
         {s_CONNECTION_AFFIRM, MessagesEnum::AFFIRM},
+        {s_CONNECTION_AFFIRM, MessagesEnum::NEGATIVE},
         {s_CONNECTION_REPEAT_MESSAGE, MessagesEnum::REPEAT_MESSAGE},
         {s_CONNECTION_TEST_EXECUTE, MessagesEnum::TEST_EXECUTE},
         {s_CONNECTION_TEST_GET, MessagesEnum::TEST_GET},

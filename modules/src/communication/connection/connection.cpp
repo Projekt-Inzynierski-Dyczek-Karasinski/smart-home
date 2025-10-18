@@ -65,11 +65,20 @@ namespace Comms {
                 mIsDeepSleep = true;
                 xSemaphoreGive(mConnectionDataMutex);
             case CME::GO_TO_NORMAL_SLEEP:
-                xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
-                mSleepTime = std::stoi((char*)&receivedMessage[strlen(CM::s_CONNECTION_GO_TO_NORMAL_SLEEP)]);
-                xSemaphoreGive(mConnectionDataMutex);
-                uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_RE_GO_TO_SLEEP, MESSAGE_SIZE);
-                mpCommunication->sendMessage(sendBuffer);
+                try {
+                    xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+                    mSleepTime = std::stoi((char*)&receivedMessage[strlen(CM::s_CONNECTION_GO_TO_NORMAL_SLEEP)]);
+                    xSemaphoreGive(mConnectionDataMutex);
+                    uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_RE_GO_TO_SLEEP, MESSAGE_SIZE);
+                    mpCommunication->sendMessage(sendBuffer);
+                } catch (...) {
+                    xSemaphoreTake(mConnectionDataMutex, 0);
+                    mIsDeepSleep = false;
+                    mSleepTime = 0;
+                    xSemaphoreGive(mConnectionDataMutex);
+                    uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_NEGATIVE, MESSAGE_SIZE);
+                    mpCommunication->sendMessage(sendBuffer);
+                }
                 break;
 
             case CME::RE_GO_TO_SLEEP:
@@ -79,15 +88,21 @@ namespace Comms {
                 break;
 
             case CME::CHANGE_CHANNEL: {
-                uint8_t newChannel = std::stoi((char*)&receivedMessage[strlen(CM::s_CONNECTION_CHANGE_CHANNEL)]);
-                xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
-                mTmpChannel = newChannel;
-                xSemaphoreGive(mConnectionDataMutex);
+                try {
+                    uint8_t newChannel = std::stoi((char*)&receivedMessage[strlen(CM::s_CONNECTION_CHANGE_CHANNEL)]);
+                    xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+                    mTmpChannel = newChannel;
+                    xSemaphoreGive(mConnectionDataMutex);
 
-                uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_AFFIRM, MESSAGE_SIZE);
-                mpCommunication->sendMessage(sendBuffer);
+                    uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_AFFIRM, MESSAGE_SIZE);
+                    mpCommunication->sendMessage(sendBuffer);
 
-                mpRfModule->firstChangeRFChannel(newChannel);
+                    mpRfModule->firstChangeRFChannel(newChannel);
+                } catch (...) {
+                    uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_NEGATIVE, MESSAGE_SIZE);
+                    mpCommunication->sendMessage(sendBuffer);
+                }
+
                 break;
             }
 
