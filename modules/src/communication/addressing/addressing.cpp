@@ -40,6 +40,10 @@ namespace Comms {
         mpLogger->debug("Addressing Method", "Called setProtocolIPAddress()");
     }
 
+    void Addressing::changeRfChannel(const uint8_t rfChannel) {
+        mpLogger->debug("Addressing Method", "Called changeRfChannel()");
+    }
+
     void Addressing::getProtocolMACAddress(uint8_t macAddress[MAC_ADDRESS_LENGTH]) const {
         xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
         uah::prepareBuffer(macAddress, mProtocolMACAddress, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);

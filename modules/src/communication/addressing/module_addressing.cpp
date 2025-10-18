@@ -77,6 +77,11 @@ namespace Comms {
         return result;
     }
 
+    void ModuleAddressing::changeRfChannel(const uint8_t rfChannel) {
+        mRfChannel.store(rfChannel);
+        saveAddressingData();
+    }
+
     // ===================== Addressing Algorithm =====================
     void ModuleAddressing::addressingTask(void* parameters) {
         auto &ad = *mspAddressing;

@@ -79,6 +79,14 @@ namespace Comms {
         virtual void setProtocolIPAddress(uint8_t ip);
 
         /**
+         * @brief Virtual function for changing and saving rf channel.
+         * @param rfChannel Channel to save.
+         * @warning Must be implemented by ModuleAddressing class.
+         * @note By default, this method does nothing.
+         */
+        virtual void changeRfChannel(uint8_t rfChannel);
+
+        /**
          * @brief Copies the current protocol MAC address into the provided buffer.
          * @param macAddress Output buffer of length defined by MAC_ADDRESS_LENGTH for the MAC address.
          * @note Thread-safe.

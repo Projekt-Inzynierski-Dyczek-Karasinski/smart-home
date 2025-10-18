@@ -66,6 +66,13 @@ namespace Comms {
          */
         bool isIpValid(uint8_t ip) override;
 
+        /**
+         * @brief Changes and saves new rf channel in flash memory.
+         * @param rfChannel Channel to save.
+         * @note Thread-safe.
+         */
+        void changeRfChannel(uint8_t rfChannel) override;
+
     private:
         /**
          * @brief Static FreeRTOS task function. Handles message exchanges and addressing logic for the module.

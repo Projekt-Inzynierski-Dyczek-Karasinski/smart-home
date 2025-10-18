@@ -1,8 +1,7 @@
 #pragma once
 
-// functions in PowerManagerESP32 are exclusively for ESP32
 #ifndef ESP32_BOARD
-#error "Power management not implemented"
+#error "PowerManagerESP32 class is exclusively for ESP32"
 #endif
 
 #include "i_power_manager.h"

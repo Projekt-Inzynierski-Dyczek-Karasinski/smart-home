@@ -3,6 +3,7 @@
 #include <memory>
 #include <map>
 #include <random>
+#include <optional>
 
 #include "../config/communication_config.h"
 
@@ -43,6 +44,7 @@ namespace Comms {
             GO_TO_NORMAL_SLEEP,
             GO_TO_DEEP_SLEEP,
             RE_GO_TO_SLEEP,
+            CHANGE_CHANNEL,
             UNKNOWN
         };
 
@@ -65,8 +67,7 @@ namespace Comms {
         static constexpr char s_CONNECTION_GO_TO_NORMAL_SLEEP[] = "COnsleep";
         static constexpr char s_CONNECTION_GO_TO_DEEP_SLEEP[] = "COdsleep";
         static constexpr char s_CONNECTION_RE_GO_TO_SLEEP[] = "COoksleep";
-        static constexpr char s_CONNECTION_CHANGE_CHANNEL[] = "COoksleep";
-        static constexpr char s_CONNECTION_SAVE_CHANNEL[] = "COoksleep";
+        static constexpr char s_CONNECTION_CHANGE_CHANNEL[] = "COrfc";
 
         // Lookup table mapping message strings to internal enumerator values.
         inline static const std::map<const char*, MessagesEnum, Comparator> messagesMap {
@@ -78,7 +79,8 @@ namespace Comms {
         {s_CONNECTION_RE_TEST_GET, MessagesEnum::RE_TEST_GET},
         {s_CONNECTION_GO_TO_NORMAL_SLEEP, MessagesEnum::GO_TO_NORMAL_SLEEP},
         {s_CONNECTION_GO_TO_DEEP_SLEEP, MessagesEnum::GO_TO_DEEP_SLEEP},
-        {s_CONNECTION_RE_GO_TO_SLEEP, MessagesEnum::RE_GO_TO_SLEEP}
+        {s_CONNECTION_RE_GO_TO_SLEEP, MessagesEnum::RE_GO_TO_SLEEP},
+        {s_CONNECTION_CHANGE_CHANNEL, MessagesEnum::CHANGE_CHANNEL},
         };
     };
 
@@ -222,7 +224,7 @@ namespace Comms {
          * @details If <code>mSleepTime != 0</code> put module in sleep.
          * @note Thread-safe.
          */
-        void afterConnectionEndHandler() const;
+        void afterConnectionEndHandler();
 
         /**
          * @brief Struct containing data related to failed connection.
@@ -270,5 +272,6 @@ namespace Comms {
         // TODO consider better handling that
         uint32_t mSleepTime = 0;
         bool mIsDeepSleep = false;
+        std::optional<uint8_t> mTmpChannel{};
     };
 }
