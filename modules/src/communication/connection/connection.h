@@ -227,14 +227,14 @@ namespace Comms {
          * @details If <code>mSleepTime != 0</code> put module in sleep.
          * @note Thread-safe.
          */
-        void afterConnectionEndHandler();
+        void afterConnectionEndHandler() const;
 
         /**
          * @brief Struct containing data related to failed connection.
          */
         struct ConnectionFailedData {
             static constexpr uint8_t OFFSET_PERCENTAGE = 10; ///< 10%; if base timeout == 3000 -> generated timeout == 3000 ± 300
-            static constexpr uint16_t s_TIMEOUTS[] = {3000, 5000, 10000, 30000, 60000}; ///< 3s, 5s, 10s, 30s, 60s
+            static constexpr uint16_t s_TIMEOUTS[] = {30000, 5000, 10000, 30000, 60000}; ///< 3s, 5s, 10s, 30s, 60s // TODO !pr undo 1st timeout
             uint8_t lastMessage[MESSAGE_SIZE]{}; ///< Recently transmitted message (for "repeat" logic).
             uint8_t attempts = 0; ///< Counter of repeats of last sent message.
 

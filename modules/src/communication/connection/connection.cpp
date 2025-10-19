@@ -64,22 +64,32 @@ namespace Comms {
                 xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
                 mIsDeepSleep = true;
                 xSemaphoreGive(mConnectionDataMutex);
-            case CME::GO_TO_NORMAL_SLEEP:
+            case CME::GO_TO_NORMAL_SLEEP: {
+                std::optional<uint32_t> sleepTime;
                 try {
+                    sleepTime = std::stoi((char*)&receivedMessage[strlen(CM::s_CONNECTION_GO_TO_NORMAL_SLEEP)]);
+                } catch (...) {
+                    sleepTime.reset(); // make sure that sleepTime is null if error occurs
+                    mpLogger->error("Connection Message Decider", "Received sleep time is not a number.");
+                }
+
+                if (sleepTime.has_value()) {
                     xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
-                    mSleepTime = std::stoi((char*)&receivedMessage[strlen(CM::s_CONNECTION_GO_TO_NORMAL_SLEEP)]);
+                    mSleepTime = sleepTime.value();
                     xSemaphoreGive(mConnectionDataMutex);
+
                     uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_RE_GO_TO_SLEEP, MESSAGE_SIZE);
                     mpCommunication->sendMessage(sendBuffer);
-                } catch (...) {
-                    xSemaphoreTake(mConnectionDataMutex, 0);
-                    mIsDeepSleep = false;
-                    mSleepTime = 0;
+                } else {
+                    xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+                    mIsDeepSleep = false; // clear mIsDeepSleep from case CME::GO_TO_DEEP_SLEEP
                     xSemaphoreGive(mConnectionDataMutex);
+
                     uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_NEGATIVE, MESSAGE_SIZE);
                     mpCommunication->sendMessage(sendBuffer);
                 }
                 break;
+            }
 
             case CME::RE_GO_TO_SLEEP:
                 uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_END, MESSAGE_SIZE);
@@ -88,17 +98,23 @@ namespace Comms {
                 break;
 
             case CME::CHANGE_CHANNEL: {
+                std::optional<uint8_t> newChannel;
                 try {
-                    uint8_t newChannel = std::stoi((char*)&receivedMessage[strlen(CM::s_CONNECTION_CHANGE_CHANNEL)]);
+                    newChannel = std::stoi((char*)&receivedMessage[strlen(CM::s_CONNECTION_CHANGE_CHANNEL)]);
+                } catch (...) {
+                    newChannel.reset(); // make sure that newChannel is null if error occurs
+                    mpLogger->error("Connection Message Decider", "Received rf channel is not a number.");
+                }
+
+                if (newChannel.has_value()) {
                     xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
-                    mTmpChannel = newChannel;
+                    mTmpChannel = newChannel.value();
                     xSemaphoreGive(mConnectionDataMutex);
 
                     uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_AFFIRM, MESSAGE_SIZE);
                     mpCommunication->sendMessage(sendBuffer);
-
-                    mpRfModule->firstChangeRFChannel(newChannel);
-                } catch (...) {
+                    mpRfModule->firstChangeRFChannel(newChannel.value());
+                } else {
                     uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_NEGATIVE, MESSAGE_SIZE);
                     mpCommunication->sendMessage(sendBuffer);
                 }
@@ -130,6 +146,11 @@ namespace Comms {
             mpLogger->debug("Connection Class", "Connection start.");
             mIsConnected = true;
             mpAddressing->setProtocolIPAddress(ip); // do anything only for Central Unit
+        }
+        // if received any message while rf was changed, save rf channel
+        if (mTmpChannel.has_value()) {
+            mpAddressing->changeRfChannel(mTmpChannel.value());
+            mTmpChannel.reset();
         }
         xSemaphoreGive(mConnectionDataMutex);
     }
@@ -273,16 +294,11 @@ namespace Comms {
         mConnectionFailedData.attempts++;
     }
 
-    void Connection::afterConnectionEndHandler() {
+    void Connection::afterConnectionEndHandler() const {
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
         // changing rf channel
         #ifdef RF_CHANNELS
-        if (mTmpChannel.has_value()) {
-            mpAddressing->changeRfChannel(mTmpChannel.value());
-            mTmpChannel.reset();
-        } else {
             mpRfModule->firstChangeRFChannel(mpAddressing->getDefaultRFChannel());
-        }
         #else
             #error "Not implemented"
         #endif
