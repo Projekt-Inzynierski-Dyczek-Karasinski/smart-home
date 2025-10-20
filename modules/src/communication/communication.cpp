@@ -671,6 +671,9 @@ namespace Comms {
                     } else if (uah::areArraysEqual(buffer, "cat")) {
                         auto & dataManager = ums::DataManager::getInstance();
                         dataManager.cat((char*)&buffer[strlen("cat") + 1]);
+                    } else if (uah::areArraysEqual(buffer, "rm")) {
+                        auto & dataManager = ums::DataManager::getInstance();
+                        dataManager.rm((char*)&buffer[strlen("rm") + 1]);
                     } else if (uah::areArraysEqual(buffer, "ip=")) {
                         if (buffer[6] != '\0') {
                             com.mpLogger->error("Communication Input", "Bad IP");

@@ -66,17 +66,32 @@ namespace UniversalModuleSystem {
 
         /**
          * @brief Prints files in directory (like "ls" linux command).
-        * @param path Path where print files, default: "" for main directory.\n
+         *
+         * @param path Path where print files, default: "" for main directory.\n
          * (have to start with <b>/</b>, except default).
+         * @note Thread-safe.
          */
         void ls(const char* path = "") const;
 
         /**
          * @brief Prints content of file (like "cat" linux command).
+         *
          * @param path Path to file.\n
          * (have to start with <b>/</b>).
+         *
+         * @note Thread-safe.
          */
-        void cat(const char* path);
+        void cat(const char* path) const;
+
+        /**
+        * @brief Removes file from SPIFFS.
+        *
+        * @param path Path to file.\n
+        * (have to start with <b>/</b>).
+        *
+        * @note Thread-safe.
+        */
+        void rm(const char* path);
 
     private:
         /**
@@ -96,5 +111,6 @@ namespace UniversalModuleSystem {
         SemaphoreHandle_t mFileAccessMutex = nullptr; ///< FreeRTOS mutex protecting access to files.
 
         static constexpr char ms_ROOT_PATH[] = "/root"; ///< Prefix for all files stored in SPIFFS due to issues with opening root ("/") directory
+        static constexpr char ms_BASE_CONFIG_PATH[] = "/base_config.json"; ///< Path to config uploaded by platformio
     };
 }

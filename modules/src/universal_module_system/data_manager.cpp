@@ -17,6 +17,8 @@ namespace UniversalModuleSystem {
     DataManager::DataManager() {
         mFileAccessMutex = xSemaphoreCreateMutex();
         SPIFFS.begin(true);
+        // TODO !pr first start of DataManager should check if only base config files exists -> if yes, create copy of them and only copy edit
+        // TODO !pr consider making base_config.json next to (not inside) /root, with dedicated read method
     };
 
     DataManager::~DataManager() {
@@ -25,6 +27,11 @@ namespace UniversalModuleSystem {
     }
 
     void DataManager::save(const char *path, const nl::json &data) const {
+        if (strncmp(path, ms_BASE_CONFIG_PATH, strlen(ms_BASE_CONFIG_PATH)) == 0) {
+            ul::Logger logger;
+            logger.error("DataManager rm", "This file is read only.");
+            return;
+        }
         size_t pathLen = snprintf(nullptr, 0, "%s%s", ms_ROOT_PATH, path);
         char newPath[pathLen];
         sprintf(newPath, "%s%s", ms_ROOT_PATH, path);
@@ -79,7 +86,7 @@ namespace UniversalModuleSystem {
         xSemaphoreGive(mFileAccessMutex);
     }
 
-    void DataManager::cat(const char *path) {
+    void DataManager::cat(const char *path) const {
         size_t pathLen = snprintf(nullptr, 0, "%s%s", ms_ROOT_PATH, path);
         char newPath[pathLen];
         sprintf(newPath, "%s%s", ms_ROOT_PATH, path);
@@ -103,9 +110,25 @@ namespace UniversalModuleSystem {
         logger.info("DataManager cat", charData);
     }
 
+    void DataManager::rm(const char *path) {
+        if (strncmp(path, ms_BASE_CONFIG_PATH, strlen(ms_BASE_CONFIG_PATH)) == 0) {
+            ul::Logger logger;
+            logger.error("DataManager rm", "This file is read only.");
+            return;
+        }
+        size_t pathLen = snprintf(nullptr, 0, "%s%s", ms_ROOT_PATH, path);
+        char newPath[pathLen];
+        sprintf(newPath, "%s%s", ms_ROOT_PATH, path);
+
+        xSemaphoreTake(mFileAccessMutex, portMAX_DELAY);
+        SPIFFS.remove(newPath);
+        xSemaphoreGive(mFileAccessMutex);
+    }
+
+
     void DataManager::eraseAllData() const {
         xSemaphoreTake(mFileAccessMutex, portMAX_DELAY);
-        SPIFFS.format();
+        SPIFFS.format(); // TODO !pr change to remove files
         xSemaphoreGive(mFileAccessMutex);
     }
 

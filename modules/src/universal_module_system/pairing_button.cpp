@@ -51,7 +51,6 @@ namespace UniversalModuleSystem {
                 pb.mpDebugLED->createResetBlinkTask();
                 // give time for blink DebugLED, clear data and reboot
                 pb.mpLogger->warning("PairingButton Timer", "Clearing data...");
-                // TODO consider removing files instead of formating memory
                 const auto dm = &DataManager::getInstance();
                 dm->eraseAllData();
                 vTaskDelay(pdMS_TO_TICKS(BUTTON_REBOOT_DELAY));
