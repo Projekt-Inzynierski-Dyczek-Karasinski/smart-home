@@ -77,6 +77,11 @@ namespace Comms {
         return result;
     }
 
+    void ModuleAddressing::changeRfChannel(const uint8_t rfChannel) {
+        mRfChannel.store(rfChannel);
+        saveAddressingData();
+    }
+
     // ===================== Addressing Algorithm =====================
     void ModuleAddressing::addressingTask(void* parameters) {
         auto &ad = *mspAddressing;
@@ -342,10 +347,6 @@ namespace Comms {
         uah::prepareBuffer(mProtocolMACAddress, addressingData.macAddress, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
         xSemaphoreGive(mAddressingDataMutex);
     }
-
-    constexpr char ModuleAddressing::AddressingData::ms_JK_IP[];
-    constexpr char ModuleAddressing::AddressingData::ms_JK_RF_CHANNEL[];
-    constexpr char ModuleAddressing::AddressingData::ms_JK_MAC_ADDRESS[];
 
     ModuleAddressing::AddressingData::AddressingData(const nlohmann::json& json) {
         ipAddress = json[ms_JK_IP];

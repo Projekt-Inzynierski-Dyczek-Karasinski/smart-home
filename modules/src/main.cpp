@@ -3,7 +3,7 @@
 
 #include "universal_module_system/debug_led.h"
 #include "universal_module_system/pairing_button.h"
-#include "universal_module_system/power_manager.h"
+#include "universal_module_system/power_manager/power_manager.h"
 #include "communication/communication.h"
 #include "utils/logger.h"
 

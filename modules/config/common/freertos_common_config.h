@@ -6,6 +6,7 @@
 #define HIGH_TASK_PRIORITY 4
 #define CRITICAL_TASK_PRIORITY 5
 
+// TODO !mm check stack usage for all FreeRTOS tasks
 // WARNING: smaller task size than 1024B is NOT recommended (theoretically the smallest task size for ESP32 is 768B)
 #define SMALL_TASK_SIZE 1024 // 1kB
 #define MEDIUM_TASK_SIZE 2048 // 2kB
@@ -16,9 +17,9 @@
 #define RESET_BLINK_TASK_SIZE       SMALL_TASK_SIZE
 
 // Communication
-#define COMMUNICATION_MAIN_TASK_SIZE    MEDIUM_TASK_SIZE
+#define COMMUNICATION_MAIN_TASK_SIZE    BIG_TASK_SIZE
 #define ENCODE_TASK_SIZE                MEDIUM_TASK_SIZE
-#define DECODE_TASK_SIZE                MEDIUM_TASK_SIZE
+#define DECODE_TASK_SIZE                BIG_TASK_SIZE
 #define TERMINAL_INPUT_TASK_SIZE        MEDIUM_TASK_SIZE
 
 // HC12

@@ -1,7 +1,7 @@
 #include "connection.h"
 
 #include "communication/communication.h"
-#include "universal_module_system/power_manager.h"
+#include "universal_module_system/power_manager/power_manager.h"
 
 namespace Comms {
     // ============================ Public ============================
@@ -64,19 +64,63 @@ namespace Comms {
                 xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
                 mIsDeepSleep = true;
                 xSemaphoreGive(mConnectionDataMutex);
-            case CME::GO_TO_NORMAL_SLEEP:
-                xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
-                mSleepTime = std::stoi((char*)&receivedMessage[strlen(CM::s_CONNECTION_GO_TO_NORMAL_SLEEP)]);
-                xSemaphoreGive(mConnectionDataMutex);
-                uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_RE_GO_TO_SLEEP, MESSAGE_SIZE);
-                mpCommunication->sendMessage(sendBuffer);
+            case CME::GO_TO_NORMAL_SLEEP: {
+                std::optional<uint32_t> sleepTime;
+                try {
+                    sleepTime = std::stoi((char*)&receivedMessage[strlen(CM::s_CONNECTION_GO_TO_NORMAL_SLEEP)]);
+                } catch (...) {
+                    sleepTime.reset(); // make sure that sleepTime is null if error occurs
+                    mpLogger->error("Connection Message Decider", "Received sleep time is not a number.");
+                }
+
+                if (sleepTime.has_value()) {
+                    xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+                    mSleepTime = sleepTime.value();
+                    xSemaphoreGive(mConnectionDataMutex);
+
+                    uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_RE_GO_TO_SLEEP, MESSAGE_SIZE);
+                    mpCommunication->sendMessage(sendBuffer);
+                } else {
+                    xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+                    mIsDeepSleep = false; // clear mIsDeepSleep from case CME::GO_TO_DEEP_SLEEP
+                    xSemaphoreGive(mConnectionDataMutex);
+
+                    uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_NEGATIVE, MESSAGE_SIZE);
+                    mpCommunication->sendMessage(sendBuffer);
+                }
                 break;
+            }
 
             case CME::RE_GO_TO_SLEEP:
                 uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_END, MESSAGE_SIZE);
                 mpCommunication->sendMessage(sendBuffer);
                 endConnection();
                 break;
+
+            case CME::CHANGE_CHANNEL: {
+                std::optional<uint8_t> newChannel;
+                try {
+                    newChannel = std::stoi((char*)&receivedMessage[strlen(CM::s_CONNECTION_CHANGE_CHANNEL)]);
+                } catch (...) {
+                    newChannel.reset(); // make sure that newChannel is null if error occurs
+                    mpLogger->error("Connection Message Decider", "Received rf channel is not a number.");
+                }
+
+                if (newChannel.has_value()) {
+                    xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+                    mTmpChannel = newChannel.value();
+                    xSemaphoreGive(mConnectionDataMutex);
+
+                    uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_AFFIRM, MESSAGE_SIZE);
+                    mpCommunication->sendMessage(sendBuffer);
+                    mpRfModule->firstChangeRFChannel(newChannel.value());
+                } else {
+                    uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_NEGATIVE, MESSAGE_SIZE);
+                    mpCommunication->sendMessage(sendBuffer);
+                }
+
+                break;
+            }
 
             default:
                 mpLogger->warninga(
@@ -92,9 +136,9 @@ namespace Comms {
     void Connection::receivingHandle(const uint8_t ip) {
         if (mpAddressing->getIsAddressingInProgress()) return;
 
+        xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
         createConnectionTimer();
         xTimerStart(mConnectionTimeoutTimer, portMAX_DELAY);
-        xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
         if (!mIsConnected) {
             auto & powerManager = ums::PowerManager::getInstance(mpLogger);
             powerManager.disableAutoSleep();
@@ -102,6 +146,11 @@ namespace Comms {
             mpLogger->debug("Connection Class", "Connection start.");
             mIsConnected = true;
             mpAddressing->setProtocolIPAddress(ip); // do anything only for Central Unit
+        }
+        // if received any message while rf was changed, save rf channel
+        if (mTmpChannel.has_value()) {
+            mpAddressing->changeRfChannel(mTmpChannel.value());
+            mTmpChannel.reset();
         }
         xSemaphoreGive(mConnectionDataMutex);
     }
@@ -138,11 +187,6 @@ namespace Comms {
         xSemaphoreGive(mConnectionDataMutex);
 
         mpAddressing->setProtocolIPAddress(NULL_IP); // do anything only for Central Unit
-        #ifdef RF_CHANNELS
-            mpRfModule->firstChangeRFChannel(mpAddressing->getDefaultRFChannel());
-        #else
-            #error "Not implemented"
-        #endif
         afterConnectionEndHandler();
     }
 
@@ -186,14 +230,24 @@ namespace Comms {
     void Connection::connectionTimerCallback(TimerHandle_t xTimer) {
         auto &con = *static_cast<Connection *>(pvTimerGetTimerID(xTimer));
         con.mpLogger->warning("Connection Class", "Connection timeout.");
-        con.repeatLastTransmittedMessage();
+
+        // if timeout occurred while changing channel
+        xSemaphoreTake(con.mConnectionDataMutex, portMAX_DELAY);
+        if (con.mTmpChannel.has_value()) {
+            con.mTmpChannel.reset();
+            xSemaphoreGive(con.mConnectionDataMutex);
+            con.endConnection();
+        } else {
+            xSemaphoreGive(con.mConnectionDataMutex);
+            con.repeatLastTransmittedMessage();
+        }
     }
 
     void Connection::createConnectionTimer() {
         if (mConnectionTimeoutTimer == nullptr) {
             mConnectionTimeoutTimer = xTimerCreate(
                 "Connection Timeout",
-                pdMS_TO_TICKS(mConnectionFailedData.s_TIMEOUTS[0]),
+                pdMS_TO_TICKS(mConnectionFailedData.getTimeout()),
                 pdFALSE,
                 this,
                 connectionTimerCallback
@@ -227,24 +281,40 @@ namespace Comms {
         if (mConnectionFailedData.lastMessage[0] != 0) {
             mpCommunication->sendPriorityMessage(mConnectionFailedData.lastMessage);
         }
-        mConnectionFailedData.attempts++;
 
         if (mConnectionFailedData.attempts > REPEAT_LAST_MESSAGE_MAX_ATTEMPTS) {
             xSemaphoreGive(mConnectionDataMutex);
             endConnection();
         } else {
-            xTimerChangePeriod(mConnectionTimeoutTimer, mConnectionFailedData.s_TIMEOUTS[mConnectionFailedData.attempts - 1], portMAX_DELAY);
+            xTimerChangePeriod(mConnectionTimeoutTimer, mConnectionFailedData.getTimeout(), portMAX_DELAY);
             xTimerStart(mConnectionTimeoutTimer, portMAX_DELAY);
             xSemaphoreGive(mConnectionDataMutex);
         }
+
+        mConnectionFailedData.attempts++;
     }
 
     void Connection::afterConnectionEndHandler() const {
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+        // changing rf channel
+        #ifdef RF_CHANNELS
+            mpRfModule->firstChangeRFChannel(mpAddressing->getDefaultRFChannel());
+        #else
+            #error "Not implemented"
+        #endif
+        // going to sleep
         if (mSleepTime != 0) {
             auto & powerManager = ums::PowerManager::getInstance(mpLogger);
             powerManager.enterSleep(mSleepTime, !mIsDeepSleep);
         }
         xSemaphoreGive(mConnectionDataMutex);
     }
+
+    uint16_t Connection::ConnectionFailedData::getTimeout() {
+        const int32_t range = s_TIMEOUTS[attempts] * OFFSET_PERCENTAGE / 100;
+        const int32_t offset = std::uniform_int_distribution<>(range * -1, range)(mGenerator);
+        const uint16_t result = s_TIMEOUTS[attempts] + offset;
+        return result;
+    }
+
 }

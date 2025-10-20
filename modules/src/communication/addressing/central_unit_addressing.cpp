@@ -463,13 +463,6 @@ namespace Comms {
         xSemaphoreGive(mModulesAddressingDataMutex);
     }
 
-    constexpr char CentralUnitAddressing::ms_JK_MODULES[];
-    constexpr char CentralUnitAddressing::ms_JK_NUM_OF_MODULES_ON_RF_CHANNEL[];
-    constexpr char CentralUnitAddressing::ModuleAddressingData::ms_JK_IP[];
-    constexpr char CentralUnitAddressing::ModuleAddressingData::ms_JK_RF_CHANNEL[];
-    constexpr char CentralUnitAddressing::ModuleAddressingData::ms_JK_MAC_ADDRESS[];
-    constexpr char CentralUnitAddressing::ModuleAddressingData::ms_JK_IS_MAC_REAL[];
-
     void CentralUnitAddressing::loadModulesAddressingData() {
         const auto &dataManager = ums::DataManager::getInstance();
         const nl::json addressingData = dataManager.load(ADDRESSING_DATA_PATH);

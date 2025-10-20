@@ -2,6 +2,8 @@
 
 #include <memory>
 #include <map>
+#include <random>
+#include <optional>
 
 #include "../config/communication_config.h"
 
@@ -35,6 +37,7 @@ namespace Comms {
         enum class MessagesEnum : uint8_t {
             END,
             AFFIRM,
+            NEGATIVE,
             REPEAT_MESSAGE,
             TEST_EXECUTE,
             TEST_GET,
@@ -42,6 +45,7 @@ namespace Comms {
             GO_TO_NORMAL_SLEEP,
             GO_TO_DEEP_SLEEP,
             RE_GO_TO_SLEEP,
+            CHANGE_CHANNEL,
             UNKNOWN
         };
 
@@ -57,6 +61,7 @@ namespace Comms {
         // connection messages
         static constexpr char s_CONNECTION_END[] = "COend";
         static constexpr char s_CONNECTION_AFFIRM[] = "COok";
+        static constexpr char s_CONNECTION_NEGATIVE[] = "COneg";
         static constexpr char s_CONNECTION_REPEAT_MESSAGE[] = "COrepe";
         static constexpr char s_CONNECTION_TEST_EXECUTE[] = "COexe";
         static constexpr char s_CONNECTION_TEST_GET[] = "COtest";
@@ -64,18 +69,21 @@ namespace Comms {
         static constexpr char s_CONNECTION_GO_TO_NORMAL_SLEEP[] = "COnsleep";
         static constexpr char s_CONNECTION_GO_TO_DEEP_SLEEP[] = "COdsleep";
         static constexpr char s_CONNECTION_RE_GO_TO_SLEEP[] = "COoksleep";
+        static constexpr char s_CONNECTION_CHANGE_CHANNEL[] = "COrfc";
 
         // Lookup table mapping message strings to internal enumerator values.
         inline static const std::map<const char*, MessagesEnum, Comparator> messagesMap {
         {s_CONNECTION_END, MessagesEnum::END},
         {s_CONNECTION_AFFIRM, MessagesEnum::AFFIRM},
+        {s_CONNECTION_AFFIRM, MessagesEnum::NEGATIVE},
         {s_CONNECTION_REPEAT_MESSAGE, MessagesEnum::REPEAT_MESSAGE},
         {s_CONNECTION_TEST_EXECUTE, MessagesEnum::TEST_EXECUTE},
         {s_CONNECTION_TEST_GET, MessagesEnum::TEST_GET},
         {s_CONNECTION_RE_TEST_GET, MessagesEnum::RE_TEST_GET},
         {s_CONNECTION_GO_TO_NORMAL_SLEEP, MessagesEnum::GO_TO_NORMAL_SLEEP},
         {s_CONNECTION_GO_TO_DEEP_SLEEP, MessagesEnum::GO_TO_DEEP_SLEEP},
-        {s_CONNECTION_RE_GO_TO_SLEEP, MessagesEnum::RE_GO_TO_SLEEP}
+        {s_CONNECTION_RE_GO_TO_SLEEP, MessagesEnum::RE_GO_TO_SLEEP},
+        {s_CONNECTION_CHANGE_CHANNEL, MessagesEnum::CHANGE_CHANNEL},
         };
     };
 
@@ -225,9 +233,21 @@ namespace Comms {
          * @brief Struct containing data related to failed connection.
          */
         struct ConnectionFailedData {
+            static constexpr uint8_t OFFSET_PERCENTAGE = 10; ///< 10%; if base timeout == 3000 -> generated timeout == 3000 ± 300
+            static constexpr uint16_t s_TIMEOUTS[] = {30000, 5000, 10000, 30000, 60000}; ///< 3s, 5s, 10s, 30s, 60s // TODO !pr undo 1st timeout
             uint8_t lastMessage[MESSAGE_SIZE]{}; ///< Recently transmitted message (for "repeat" logic).
             uint8_t attempts = 0; ///< Counter of repeats of last sent message.
-            static constexpr uint16_t s_TIMEOUTS[] = {3000, 5000, 10000, 30000, 60000}; // 3s, 5s, 10s, 30s, 60s
+
+            /**
+             * @brief Gets timeout based on current <code>attempts</code> and adds to it \n
+             *        randomly generated offset (±<code>OFFSET_PERCENTAGE</code>%)
+             * @return Timeout with offset.
+             * @warning <b>Not thread-safe</b>. Must be protected externally with <code>mConnectionDataMutex</code> before calling.
+             */
+            uint16_t getTimeout();
+
+        private:
+            std::mt19937 mGenerator{std::random_device{}()};
         };
 
         // Pointers
@@ -255,5 +275,6 @@ namespace Comms {
         // TODO consider better handling that
         uint32_t mSleepTime = 0;
         bool mIsDeepSleep = false;
+        std::optional<uint8_t> mTmpChannel{};
     };
 }
