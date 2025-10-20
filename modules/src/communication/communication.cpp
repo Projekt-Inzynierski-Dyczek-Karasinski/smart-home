@@ -2,6 +2,7 @@
 
 #include "utils/uint8_array_handlers.h"
 #include "universal_module_system/power_manager/power_manager.h"
+#include "universal_module_system/data_manager.h"
 
 namespace uah = Utils::ArrayHandlers;
 
@@ -659,7 +660,18 @@ namespace Comms {
                             powerManager.safeRestart("Communication Input");
                         }
                     #endif
-                    else if (uah::areArraysEqual(buffer, "ip=")) {
+                    else if (uah::areArraysEqual(buffer, "ls")) {
+                        auto & dataManager = ums::DataManager::getInstance();
+                        const uint8_t pathStartIndex = strlen("cat") + 1;
+                        if (buffer[pathStartIndex] != 0) {
+                            dataManager.ls((char*)&buffer[pathStartIndex]);
+                        } else {
+                            dataManager.ls();
+                        }
+                    } else if (uah::areArraysEqual(buffer, "cat")) {
+                        auto & dataManager = ums::DataManager::getInstance();
+                        dataManager.cat((char*)&buffer[strlen("cat") + 1]);
+                    } else if (uah::areArraysEqual(buffer, "ip=")) {
                         if (buffer[6] != '\0') {
                             com.mpLogger->error("Communication Input", "Bad IP");
                         } else {

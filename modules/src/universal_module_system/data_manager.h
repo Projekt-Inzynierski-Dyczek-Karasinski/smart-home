@@ -3,10 +3,6 @@
 #include <Arduino.h>
 #include <nlohmann/json.hpp>
 
-#include "utils/logger.h"
-
-namespace ul = Utils::Logging;
-
 namespace UniversalModuleSystem {
     /**
      * @brief Singleton class responsible for managing data stored in flash memory.
@@ -68,6 +64,20 @@ namespace UniversalModuleSystem {
          */
         void waitAndDisable() const;
 
+        /**
+         * @brief Prints files in directory (like "ls" linux command).
+        * @param path Path where print files, default: "" for main directory.\n
+         * (have to start with <b>/</b>, except default).
+         */
+        void ls(const char* path = "") const;
+
+        /**
+         * @brief Prints content of file (like "cat" linux command).
+         * @param path Path to file.\n
+         * (have to start with <b>/</b>).
+         */
+        void cat(const char* path);
+
     private:
         /**
          * @brief Private constructor for singleton pattern.
@@ -84,5 +94,7 @@ namespace UniversalModuleSystem {
         ~DataManager();
 
         SemaphoreHandle_t mFileAccessMutex = nullptr; ///< FreeRTOS mutex protecting access to files.
+
+        static constexpr char ms_ROOT_PATH[] = "/root"; ///< Prefix for all files stored in SPIFFS due to issues with opening root ("/") directory
     };
 }
