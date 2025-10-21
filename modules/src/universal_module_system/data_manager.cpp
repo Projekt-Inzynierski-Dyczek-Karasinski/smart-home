@@ -3,22 +3,20 @@
 #include <SPIFFS.h>
 
 #include "../../config/common/freertos_common_config.h"
-#include "utils/logger.h"
+#include "../config/addressing_config.h"
 
 namespace nl = nlohmann;
-namespace ul = Utils::Logging;
 
 namespace UniversalModuleSystem {
-    DataManager &DataManager::getInstance() {
-        static DataManager instance;
+    DataManager &DataManager::getInstance(const std::shared_ptr<ul::Logger> &logger) {
+        static DataManager instance(logger);
         return instance;
     }
 
-    DataManager::DataManager() {
+    DataManager::DataManager(const std::shared_ptr<ul::Logger> &logger) : mpLogger(logger) {
         mFileAccessMutex = xSemaphoreCreateMutex();
         SPIFFS.begin(true);
-        // TODO !pr first start of DataManager should check if only base config files exists -> if yes, create copy of them and only copy edit
-        // TODO !pr consider making base_config.json next to (not inside) /root, with dedicated read method
+        loadBaseConfig(false);
     };
 
     DataManager::~DataManager() {
@@ -26,32 +24,25 @@ namespace UniversalModuleSystem {
         SPIFFS.end();
     }
 
-    void DataManager::save(const char *path, const nl::json &data) const {
-        if (strncmp(path, ms_BASE_CONFIG_PATH, strlen(ms_BASE_CONFIG_PATH)) == 0) {
-            ul::Logger logger;
-            logger.error("DataManager rm", "This file is read only.");
+    void DataManager::saveJson(const char *path, const nl::json &data) const {
+        if (strncmp(path, ms_ROOT_PATH, strlen(ms_ROOT_PATH)) != 0) {
+            mpLogger->error("DataManager", "Files not in /root are read only.");
             return;
         }
-        size_t pathLen = snprintf(nullptr, 0, "%s%s", ms_ROOT_PATH, path);
-        char newPath[pathLen];
-        sprintf(newPath, "%s%s", ms_ROOT_PATH, path);
 
         xSemaphoreTake(mFileAccessMutex, portMAX_DELAY);
-        File file = SPIFFS.open(newPath, "w");
+        File file = SPIFFS.open(path, "w");
         file.println(data.dump().c_str());
         file.close();
         xSemaphoreGive(mFileAccessMutex);
     }
 
-    nl::json DataManager::load(const char *path) const {
-        size_t pathLen = snprintf(nullptr, 0, "%s%s", ms_ROOT_PATH, path);
-        char newPath[pathLen];
-        sprintf(newPath, "%s%s", ms_ROOT_PATH, path);
-
+    nl::json DataManager::loadJson(const char *path) const {
         nl::json result;
-        if (SPIFFS.exists(newPath)) {
+
+        if (SPIFFS.exists(path)) {
             xSemaphoreTake(mFileAccessMutex, portMAX_DELAY);
-            File file = SPIFFS.open(newPath, "r");
+            File file = SPIFFS.open(path, "r");
             result = nl::json::parse(file.readString());
             file.close();
             xSemaphoreGive(mFileAccessMutex);
@@ -60,25 +51,16 @@ namespace UniversalModuleSystem {
     }
 
     bool DataManager::fileExists(const char *path) const {
-        size_t pathLen = snprintf(nullptr, 0, "%s%s", ms_ROOT_PATH, path);
-        char newPath[pathLen];
-        sprintf(newPath, "%s%s", ms_ROOT_PATH, path);
-
-        return SPIFFS.exists(newPath);
+        return SPIFFS.exists(path);
     }
 
-    void DataManager::ls(const char *path) const {
-        size_t pathLen = snprintf(nullptr, 0, "%s%s", ms_ROOT_PATH, path);
-        char newPath[pathLen];
-        sprintf(newPath, "%s%s", ms_ROOT_PATH, path);
-
-        ul::Logger logger;
+    void DataManager::ls() const {
         xSemaphoreTake(mFileAccessMutex, portMAX_DELAY);
 
-        File root = SPIFFS.open(newPath);
+        File root = SPIFFS.open(ms_ROOT_PATH);
         File file = root.openNextFile();
         while(file) {
-            logger.info("DataManager ls", file.name());
+            mpLogger->info("DataManager ls", file.path());
             file.close();
             file = root.openNextFile();
         }
@@ -87,19 +69,13 @@ namespace UniversalModuleSystem {
     }
 
     void DataManager::cat(const char *path) const {
-        size_t pathLen = snprintf(nullptr, 0, "%s%s", ms_ROOT_PATH, path);
-        char newPath[pathLen];
-        sprintf(newPath, "%s%s", ms_ROOT_PATH, path);
-
-        ul::Logger logger;
         xSemaphoreTake(mFileAccessMutex, portMAX_DELAY);
-        if (!SPIFFS.exists(newPath)) {
+        if (!SPIFFS.exists(path)) {
             xSemaphoreGive(mFileAccessMutex);
-            logger.warning("DataManager cat", "File does not exists.");
+            mpLogger->error("DataManager cat", "File does not exists.");
             return;
         }
-
-        File file = SPIFFS.open(newPath, "r");
+        File file = SPIFFS.open(path, "r");
         const String data = file.readString();
         file.close();
         xSemaphoreGive(mFileAccessMutex);
@@ -107,13 +83,12 @@ namespace UniversalModuleSystem {
         const size_t len = data.length() + 1;
         char charData[len];
         data.toCharArray(charData, len);
-        logger.info("DataManager cat", charData);
+        mpLogger->info("DataManager cat", charData);
     }
 
-    void DataManager::rm(const char *path) {
-        if (strncmp(path, ms_BASE_CONFIG_PATH, strlen(ms_BASE_CONFIG_PATH)) == 0) {
-            ul::Logger logger;
-            logger.error("DataManager rm", "This file is read only.");
+    void DataManager::rm(const char *path) const {
+        if (strncmp(path, ms_ROOT_PATH, strlen(ms_ROOT_PATH)) != 0) {
+            mpLogger->error("DataManager rm", "Files not in /root are read only.");
             return;
         }
         size_t pathLen = snprintf(nullptr, 0, "%s%s", ms_ROOT_PATH, path);
@@ -123,13 +98,30 @@ namespace UniversalModuleSystem {
         xSemaphoreTake(mFileAccessMutex, portMAX_DELAY);
         SPIFFS.remove(newPath);
         xSemaphoreGive(mFileAccessMutex);
+        mpLogger->info("DataManager rm", "Removed file.");
     }
 
+    void DataManager::loadBaseConfig(const bool overrideExistingFiles) {
+        File root = SPIFFS.open(ms_ROOT_PATH);
+        if (overrideExistingFiles) {
+            File file = root.openNextFile();
+            while(file) {
+                SPIFFS.remove(file.path());
+                file = root.openNextFile();
+            }
+        }
 
-    void DataManager::eraseAllData() const {
-        xSemaphoreTake(mFileAccessMutex, portMAX_DELAY);
-        SPIFFS.format(); // TODO !pr change to remove files
-        xSemaphoreGive(mFileAccessMutex);
+        // logger
+        nl::json baseConfig = loadJson(ms_BASE_CONFIG_PATH);
+        if (baseConfig.empty()) {
+            mpLogger->error("DataManager", "Base config not found!");
+            return;
+        }
+
+        // TODO add here other files to create
+        if (overrideExistingFiles || !SPIFFS.exists(ADDRESSING_DATA_PATH)) {
+            saveJson(ADDRESSING_DATA_PATH, baseConfig["addressing"]);
+        }
     }
 
     void DataManager::waitAndDisable() const {

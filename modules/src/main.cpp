@@ -17,6 +17,7 @@ namespace ums = UniversalModuleSystem;
 void setup() {
     const auto logger = std::make_shared<ul::Logger>();
 
+    auto & dataManager = ums::DataManager::getInstance(logger);
     auto & powerManager = ums::PowerManager::getInstance(logger);
 
     const auto debugLed = std::make_shared<ums::DebugLED>(logger);

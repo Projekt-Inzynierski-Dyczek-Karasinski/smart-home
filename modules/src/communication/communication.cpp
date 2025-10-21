@@ -551,7 +551,7 @@ namespace Comms {
 
         // task loop
         for (;;) {
-            // wait until the message appears in the queue and save message in local messageBuffer
+            // wait until the message appears in the queue and saveJson message in local messageBuffer
             if (xQueueReceive(com.mEncodeMessagesQueue, &messageBuffer, pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG)) == pdTRUE) {
                 com.mpConnection->sendingHandle(messageBuffer);
                 // only for central unit, because modules IP is constant
@@ -662,12 +662,7 @@ namespace Comms {
                     #endif
                     else if (uah::areArraysEqual(buffer, "ls")) {
                         auto & dataManager = ums::DataManager::getInstance();
-                        const uint8_t pathStartIndex = strlen("cat") + 1;
-                        if (buffer[pathStartIndex] != 0) {
-                            dataManager.ls((char*)&buffer[pathStartIndex]);
-                        } else {
-                            dataManager.ls();
-                        }
+                        dataManager.ls();
                     } else if (uah::areArraysEqual(buffer, "cat")) {
                         auto & dataManager = ums::DataManager::getInstance();
                         dataManager.cat((char*)&buffer[strlen("cat") + 1]);

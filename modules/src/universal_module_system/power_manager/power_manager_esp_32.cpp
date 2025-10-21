@@ -35,7 +35,7 @@ namespace UniversalModuleSystem {
             rtc_gpio_pulldown_dis(RF_MODULE_WAKE_UP_PIN);
             rtc_gpio_pullup_en(RF_MODULE_WAKE_UP_PIN);
             // NOTE: ESP_EXT1_WAKEUP_ALL_LOW is deprecated on ESP32-S3 boards, but ESP_EXT1_WAKEUP_ANY_LOW doesn't exist on ESP32-WROOM
-            // For wake up logic it doesn't matter  if is all or any, because RF_MODULE_WAKE_UP_PIN_BITMASK have only one pin assigned
+            // For wake up logic it doesn't matter if is all or any, because RF_MODULE_WAKE_UP_PIN_BITMASK have only one pin assigned
             #ifdef ESP32_WROOM_BOARD_TYPE
                 esp_sleep_enable_ext1_wakeup(RF_MODULE_WAKE_UP_PIN_BITMASK, ESP_EXT1_WAKEUP_ALL_LOW);
             #else
@@ -180,7 +180,7 @@ namespace UniversalModuleSystem {
     uint32_t PowerManagerESP32::getCurrentTime() const {
         struct timeval timeStruct{};
         gettimeofday(&timeStruct, nullptr);
-        // TODO consider making this more accurate
+        // TODO consider making this more accurate+
         return timeStruct.tv_sec * 1000;
     }
 }

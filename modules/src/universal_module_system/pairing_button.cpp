@@ -38,6 +38,25 @@ namespace UniversalModuleSystem {
     }
 
     // ====================== Button Press Timer ======================
+    void PairingButton::factoryResetTask(void *parameters) {
+        auto& pb = *static_cast<PairingButton*>(parameters);
+
+        pb.mButtonMode.store(ButtonModes::RESET);
+        pb.mpDebugLED->createResetBlinkTask();
+        pb.mpLogger->warning("PairingButton", "Clearing data...");
+
+        // give time for blink DebugLED, clear data and reboot
+        const auto dm = &DataManager::getInstance();
+        dm->loadBaseConfig(true);
+        vTaskDelay(pdMS_TO_TICKS(BUTTON_REBOOT_DELAY));
+
+        const auto &powerManager = PowerManagerESP32::getInstance(pb.mpLogger);
+        powerManager.safeRestart("PairingButton");
+
+        for (;;)
+            vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+
     void PairingButton::buttonPressTimerCallback(TimerHandle_t xTimer) {
         auto &pb = *static_cast<PairingButton *>(pvTimerGetTimerID(xTimer));
         if (digitalRead(BUTTON_PIN) == LOW) {
@@ -47,15 +66,14 @@ namespace UniversalModuleSystem {
             // after pressing button for 10 seconds call createResetBlinkTask()
             if (DEBOUNCING_COUNTER_TO_SECONDS(pb.mButtonPressCounter.load()) >= 10 && pb.mButtonMode.load() !=
                 ButtonModes::RESET) {
-                pb.mButtonMode.store(ButtonModes::RESET);
-                pb.mpDebugLED->createResetBlinkTask();
-                // give time for blink DebugLED, clear data and reboot
-                pb.mpLogger->warning("PairingButton Timer", "Clearing data...");
-                const auto dm = &DataManager::getInstance();
-                dm->eraseAllData();
-                vTaskDelay(pdMS_TO_TICKS(BUTTON_REBOOT_DELAY));
-                auto &powerManager = PowerManagerESP32::getInstance(pb.mpLogger);
-                powerManager.safeRestart("PairingButton");
+                xTaskCreate(
+                    factoryResetTask,
+                    "Factory Reset Task",
+                    FACTORY_RESET_TASK_SIZE,
+                    &pb,
+                    CRITICAL_TASK_PRIORITY,
+                    nullptr
+                );
             }
             // after pressing button for 3 seconds call createPairingBlinkTask()
             else if (DEBOUNCING_COUNTER_TO_SECONDS(pb.mButtonPressCounter.load()) >= 3 && pb.mButtonMode.load() ==

@@ -332,12 +332,12 @@ namespace Comms {
         const nl::json dataToSave = AddressingData(getIPAddress(), macToSave, getDefaultRFChannel()).toJson();
 
         const auto &dataManager = ums::DataManager::getInstance();
-        dataManager.save(ADDRESSING_DATA_PATH, dataToSave);
+        dataManager.saveJson(ADDRESSING_DATA_PATH, dataToSave);
     }
 
     void ModuleAddressing::loadAddressingData() {
         const auto &dataManager = ums::DataManager::getInstance();
-        const nl::json jsonData = dataManager.load(ADDRESSING_DATA_PATH);
+        const nl::json jsonData = dataManager.loadJson(ADDRESSING_DATA_PATH);
         if (jsonData.empty()) return;
 
         const AddressingData addressingData(jsonData);

@@ -236,6 +236,8 @@ namespace Utils {
             const size_t m_LOG_TYPE_LENGTH = 10;
             char mInputBuffer[MESSAGE_SIZE]{};
             uint8_t mInputBufferIndex = 0;
+
+            static bool msIsLoggingDisabled; ///< Saved in RTC memory, to disable logging.
         };
     }
 }

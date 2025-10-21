@@ -10,6 +10,8 @@ namespace uah = Utils::ArrayHandlers;
 namespace ums = UniversalModuleSystem;
 
 namespace Utils::Logging {
+    RTC_DATA_ATTR bool Logger::msIsLoggingDisabled = false;
+
     xSemaphoreHandle Logger::smSerialMutex = xSemaphoreCreateMutex();
     bool Logger::smIsSerialEnabled = false;
 
@@ -21,20 +23,16 @@ namespace Utils::Logging {
         // xSemaphoreGive(mLogLevelMutex);
         mLogLevel.store(level);
 
-        beginSerial();
 
         #ifndef DEBUG_MODE
-            ums::DataManager& dataManager = ums::DataManager::getInstance();
-            if (dataManager.fileExists(LOGGER_DATA_PATH)) {
-                nl::json loggerData = dataManager.load(LOGGER_DATA_PATH);
-                if (loggerData["disableLogs"] == true) {
-                    mLogLevel.store(Level::NONE);
-                }
+            if (msIsLoggingDisabled) {
+                mLogLevel.store(Level::NONE);
             } else {
-                nl::json loggerData;
-                loggerData["disableLogs"] = true;
-                dataManager.save(LOGGER_DATA_PATH, loggerData);
+                beginSerial();
+                msIsLoggingDisabled = true;
             }
+        #else
+            beginSerial();
         #endif
 
         if (getLogLevel() == Level::DEBUG) {

@@ -413,7 +413,7 @@ namespace Comms {
                 }
                 mNumOfModulesOnRfChannel[rfChannelToIndex(rfChannel)]++;
 
-                // (temporary) save data about module
+                // (temporary) saveJson data about module
                 chosenIP = indexToIP(i);
                 mModulesAddressingData[i].ipAddress = chosenIP;
                 uah::prepareBuffer(mModulesAddressingData[i].macAddress, macAddress, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
@@ -465,7 +465,7 @@ namespace Comms {
 
     void CentralUnitAddressing::loadModulesAddressingData() {
         const auto &dataManager = ums::DataManager::getInstance();
-        const nl::json addressingData = dataManager.load(ADDRESSING_DATA_PATH);
+        const nl::json addressingData = dataManager.loadJson(ADDRESSING_DATA_PATH);
         if (addressingData.empty()) return;
 
         xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
@@ -498,7 +498,7 @@ namespace Comms {
         xSemaphoreGive(mModulesAddressingDataMutex);
 
         const auto &dataManager = ums::DataManager::getInstance();
-        dataManager.save(ADDRESSING_DATA_PATH, addressingDataJson);
+        dataManager.saveJson(ADDRESSING_DATA_PATH, addressingDataJson);
     }
 
     CentralUnitAddressing::ModuleAddressingData::ModuleAddressingData(const nl::json &json) {

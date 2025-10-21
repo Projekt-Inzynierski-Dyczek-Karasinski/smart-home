@@ -26,7 +26,7 @@
 #define rfChannelToIndex(value) (uint8_t)(value - 1)
 #define indexToRfChannel(value) (uint8_t)(value + 1)
 
-#define ADDRESSING_DATA_PATH "/addressing"
+#define ADDRESSING_DATA_PATH "/root/addressing"
 
 // ===================== Addressing API Calls =====================
 // TODO change API Calls to numeric values

@@ -55,6 +55,14 @@ namespace UniversalModuleSystem {
         static void IRAM_ATTR buttonISR();
 
         /**
+         * @brief FreeRTOS Task handling resting module to factory settings.
+         * @details This task exists only because features needed to perform a factory reset
+         * cause "stack canary watchpoint trigger" in <code>buttonPressTimerCallback</code>.
+         * @param parameters FreeRTOS task parameters.
+         */
+        static void factoryResetTask(void *parameters);
+
+        /**
          * @brief Callback method that is called periodically by the Button Press Timer to handle button debouncing and logic.
          * @details This method:
          * - Increments press counter when button is held down.
