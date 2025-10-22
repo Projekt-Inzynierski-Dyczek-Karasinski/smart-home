@@ -98,7 +98,7 @@ namespace Comms {
         createEncodeMessageTask();
         createCommunicationMainTask();
 
-        mpLogger->info("Communication Class", "Communication initialized.");
+        mpLogger->verbose("Communication Class", "Communication initialized.");
     }
 
     Communication::~Communication() {

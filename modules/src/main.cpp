@@ -24,7 +24,7 @@ void setup() {
     auto & communication = Comms::Communication::getInstance(debugLed, logger);
     auto & pairingButton = ums::PairingButton::getInstance(debugLed, &communication, logger);
 
-    logger->info("Main", "Deleting functions setup() and loop().");
+    logger->info("Main", "All components initialized. Deleting functions setup() and loop()...");
     vTaskDelete(nullptr);
 
     // everything below this comment should never be executed

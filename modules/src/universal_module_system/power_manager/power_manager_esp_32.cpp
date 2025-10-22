@@ -99,6 +99,7 @@ namespace UniversalModuleSystem {
     }
 
     void PowerManagerESP32::handleWakeUpReason() {
+        // TODO change logs to verbose
         switch (esp_sleep_get_wakeup_cause()) {
             case ESP_SLEEP_WAKEUP_EXT0:
                 mpLogger->info("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
@@ -132,7 +133,7 @@ namespace UniversalModuleSystem {
 
         pm.mBatteryRead.store(batteryReadSum / numberOfReads);
         // TODO add convertion from raw analog read to volts or %
-        pm.mpLogger->infov("PowerManagerESP32 Task", "Battery charge level is: ", pm.mBatteryRead.load());
+        pm.mpLogger->debugv("PowerManagerESP32 Task", "Battery charge level is: ", pm.mBatteryRead.load());
 
         xSemaphoreGive(pm.mReadCompleteSemaphore);
         vTaskDelete(nullptr);

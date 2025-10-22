@@ -135,6 +135,16 @@ namespace Utils::Logging {
         log(Level::INFO, name, message, values, len, isAscii);
     }
 
+    void Logger::verbose(const char *name, const char *message) {
+        log(Level::VERBOSE, name, message);
+    }
+    void Logger::verbosev(const char *name, const char *message, const int value) {
+        log(Level::VERBOSE, name, message, value);
+    }
+    void Logger::verbosea(const char *name, const char *message, const uint8_t *values, const uint8_t len, const bool isAscii) {
+        log(Level::VERBOSE, name, message, values, len, isAscii);
+    }
+
     void Logger::debug(const char *name, const char *message) {
         log(Level::DEBUG, name, message);
     }
@@ -155,7 +165,7 @@ namespace Utils::Logging {
 
             char message[35];
             sprintf(message, "Serial began with baudrate %i.", TERMINAL_BAUD_RATE);
-            info("Logger Class", message);
+            verbose("Logger Class", message);
         } else {
             xSemaphoreGive(smSerialMutex);
         }
@@ -166,6 +176,7 @@ namespace Utils::Logging {
             case Level::ERROR: strcpy(buffer, "<ERROR>"); return true;
             case Level::WARNING: strcpy(buffer, "<WARNING>"); return true;
             case Level::INFO: strcpy(buffer, "[INFO]"); return true;
+            case Level::VERBOSE: strcpy(buffer, "[VERBOSE]"); return true;
             case Level::DEBUG: strcpy(buffer, "[DEBUG]"); return true;
             case Level::NONE: strcpy(buffer, "NONE"); return true;
             default:

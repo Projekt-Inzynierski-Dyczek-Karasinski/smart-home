@@ -15,7 +15,8 @@ namespace Utils {
             ERROR = 1, ///< Prints only errors
             WARNING = 2, ///< Prints warnings and errors
             INFO = 3, ///< Prints information, warnings and errors
-            DEBUG = 4, ///< Prints everything
+            VERBOSE = 4, /// Prints everything except debug messages
+            DEBUG = 5, ///< Prints everything
         };
 
         /**
@@ -145,6 +146,29 @@ namespace Utils {
              * @param isAscii True if values in array should be converted to chars before print, false otherwise,\n default: true
              */
             void infoa(const char *name, const char *message, const uint8_t *values, uint8_t len, bool isAscii = true);
+
+            /**
+             * @brief Logs a <i>verbose</i> message.
+             * @param name Name of the location/purpose of the log.
+             * @param message The log message.
+             */
+            void verbose(const char *name, const char *message);
+            /**
+             * @brief Logs a <i>verbose</i> message with given integer value.
+             * @param name Name of the location/purpose of the log.
+             * @param message The log message.
+             * @param value Value to add to end of log.
+             */
+            void verbosev(const char *name, const char *message, int value);
+            /**
+             * @brief Logs a <i>verbose</i> message with given uint8_t array.
+             * @param name Name of the location/purpose of the log.
+             * @param message The log message.
+             * @param values Array of values to add to end of log.
+             * @param len Length of array.
+             * @param isAscii True if values in array should be converted to chars before print, false otherwise,\n default: true
+             */
+            void verbosea(const char *name, const char *message, const uint8_t *values, uint8_t len, bool isAscii = true);
 
             /**
              * @brief Logs a <i>debug</i> message.

@@ -218,7 +218,7 @@ namespace Comms {
         mConnectionFailedData.attempts = 0;
         xSemaphoreGive(mConnectionDataMutex);
 
-        mpLogger->info("Connection Class", "Connection initialized.");
+        mpLogger->verbose("Connection Class", "Connection initialized.");
     }
 
     Connection::~Connection() {

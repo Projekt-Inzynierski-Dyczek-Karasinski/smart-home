@@ -14,9 +14,14 @@ namespace UniversalModuleSystem {
     }
 
     DataManager::DataManager(const std::shared_ptr<ul::Logger> &logger) : mpLogger(logger) {
+        if (logger == nullptr) {
+            mpLogger = std::make_shared<ul::Logger>();
+            mpLogger->error("DataManager", "DataManager's constructor didn't get pointer to logger instance.");
+        }
         mFileAccessMutex = xSemaphoreCreateMutex();
         SPIFFS.begin(true);
         loadBaseConfig(false);
+        mpLogger->verbose("DataManager", "DataManager initialized.");
     };
 
     DataManager::~DataManager() {
@@ -101,7 +106,7 @@ namespace UniversalModuleSystem {
         mpLogger->info("DataManager rm", "Removed file.");
     }
 
-    void DataManager::loadBaseConfig(const bool overrideExistingFiles) {
+    void DataManager::loadBaseConfig(const bool overrideExistingFiles) const {
         File root = SPIFFS.open(ms_ROOT_PATH);
         if (overrideExistingFiles) {
             File file = root.openNextFile();

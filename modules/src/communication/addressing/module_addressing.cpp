@@ -29,7 +29,7 @@ namespace Comms {
             mpLogger->warningv("Addressing TMP", "IP is forced: ", mIPAddress);
         #endif
 
-        mpLogger->info("ModuleAddressing Class", "ModuleAddressing initialized.");
+        mpLogger->verbose("ModuleAddressing Class", "ModuleAddressing initialized.");
     }
 
     uint8_t ModuleAddressing::getConnectionRFChannel() {

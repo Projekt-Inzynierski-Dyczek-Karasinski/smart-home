@@ -34,7 +34,7 @@ namespace Comms {
         #endif
 
         loadModulesAddressingData();
-        mpLogger->info("CentralUnitAddressing Class", "CentralUnitAddressing initialized.");
+        mpLogger->verbose("CentralUnitAddressing Class", "CentralUnitAddressing initialized.");
     }
 
     CentralUnitAddressing::~CentralUnitAddressing() {

@@ -19,7 +19,7 @@ namespace UniversalModuleSystem {
         pinMode(BUTTON_PIN, INPUT_PULLUP);
 
         attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
-        mpLogger->info("PairingButton Class", "PairingButton initialized.");
+        mpLogger->verbose("PairingButton Class", "PairingButton initialized.");
     }
 
     PairingButton::~PairingButton() {

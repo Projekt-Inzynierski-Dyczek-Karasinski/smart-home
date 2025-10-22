@@ -30,9 +30,9 @@ namespace Comms {
         createTransmitTask();
         createHC12MainTask();
 
-        // TODO add check if is proper rf channel set
+        // TODO !pr add check if is proper rf channel set
 
-        mpLogger->info("HC12 Class", "HC12 initialized.");
+        mpLogger->verbose("HC12 Class", "HC12 initialized.");
     }
 
     HC12::~HC12() {

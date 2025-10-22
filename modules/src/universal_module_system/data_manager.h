@@ -5,13 +5,14 @@
 
 #include "utils/logger.h"
 
-namespace ul = Utils::Logging;
-// TODO !pr update comments
+// TODO !pr check comments
 
+namespace ul = Utils::Logging;
 namespace UniversalModuleSystem {
     /**
      * @brief Singleton class responsible for managing data stored in flash memory.
-     * Provides thread-safe file operations for saving and loading JSON data from/to the ESP32's SPIFFS file system.
+     * @details Provides thread-safe file operations for saving and loading JSON data from/to the ESP32's SPIFFS file system.\n
+     * Additionally, handles listing, removing and printing content of files in SPIFFS.
      */
     class DataManager {
     public:
@@ -33,7 +34,7 @@ namespace UniversalModuleSystem {
          * @brief Saves JSON data to a file in SPIFFS.
          *
          * @param path File path where data will be saved\n
-         * (have to start with <b>/</b>).
+         * (have to start with <b>/root</b>).
          * @param data JSON object containing the data to save.
          *
          * @warning If file passed in <code>path</code> exists, it will be overwritten.
@@ -44,7 +45,8 @@ namespace UniversalModuleSystem {
         /**
          * @brief Loads JSON data from a file in SPIFFS.
          *
-         * @param path File path in SPIFFS to load data from.
+         * @param path File path in SPIFFS to load data from.\n
+         * (have to start with <b>/</b>).
          * @return JSON object containing the loaded data (empty JSON object if file doesn't exist).
          *
          * @note Thread-safe.
@@ -80,20 +82,20 @@ namespace UniversalModuleSystem {
         * @brief Removes file from SPIFFS.
         *
         * @param path Path to file.\n
-        * (have to start with <b>/</b>).
+        * (have to start with <b>/root</b>).
         *
         * @note Thread-safe.
         */
         void rm(const char* path) const;
 
         /**
-         * @brief Loads <b>read only</b> base config.
-         * @details If <code>overrideExistingFiles</code> is set to true it will delete/override existing files,\n
-         *          otherwise loads base config only if config files don't exist.
+         * @brief Loads base config.
+         * @details If <code>overrideExistingFiles</code> is set to true it will delete existing \n
+         *          files (in /root directory), otherwise loads base config only if config files don't exist.
          *
-         * @param overrideExistingFiles True for delete/override existing files, default: false.
+         * @param overrideExistingFiles True for delete existing files, default: false.
          */
-        void loadBaseConfig(bool overrideExistingFiles = false);
+        void loadBaseConfig(bool overrideExistingFiles = false) const;
 
         /**
         * @brief Waits for ongoing flash data modification to complete and disables it.
@@ -104,6 +106,8 @@ namespace UniversalModuleSystem {
         /**
          * @brief Private constructor for singleton pattern.
          * Initializes mutex protecting access to files and mounts the SPIFFS file system.
+         *
+         * @param logger Shared pointer to the logger instance.
          *
          * @note Automatically format SPIFFS file system if mounts fail.
          */
