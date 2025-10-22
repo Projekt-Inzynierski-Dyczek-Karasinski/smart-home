@@ -5,12 +5,9 @@
 namespace uah = Utils::ArrayHandlers;
 
 namespace Comms {
-    HC12* HC12::mspHC12 = nullptr;
-
     // ============================ Public ============================
     HC12::HC12(Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
         mpCommunication = communication;
-        mspHC12 = this;
         mpLogger = logger;
 
         pinMode(SET_PIN, OUTPUT);
@@ -174,7 +171,7 @@ namespace Comms {
     }
 
     void HC12::HC12MainTask(void *parameters) {
-        auto &hc12 = *mspHC12;
+        auto& hc12 = *static_cast<HC12*>(parameters);
 
         uint8_t status = DEFAULT_STATUS_NOTIF;
         bool isSetupHC12Working = false;
@@ -248,7 +245,7 @@ namespace Comms {
                 HC12MainTask,
                 "HC12 Main Task",
                 HC12_MAIN_TASK_SIZE,
-                nullptr,
+                this,
                 BACKGROUND_TASK_PRIORITY,
                 &mHC12MainTaskHandle
             );
@@ -265,7 +262,7 @@ namespace Comms {
 
     // ========================== Send Task ===========================
     void HC12::transmitTask(void *parameters) {
-        const auto &hc12 = *mspHC12;
+        const auto& hc12 = *static_cast<HC12*>(parameters);
 
         uint8_t transmitBuffer[PROTOCOL_SIZE];
 
@@ -281,11 +278,10 @@ namespace Comms {
 
                 xSemaphoreTake(hc12.mSendingDataMutex, portMAX_DELAY);
 
-                // TODO consider making this delay more "intelligent" (eg. by cooldown timer)
+                // TODO !pr consider making this delay more "intelligent" (eg. by cooldown timer)
                 // this delay is required for HC12 transmit/receive message properly
                 vTaskDelay(pdMS_TO_TICKS(DELAY_BETWEEN_MESSAGES));
 
-                // TODO remove?
                 uint32_t hc12Respond;
                 // clearing old notification (if exist)
                 xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, 0);
@@ -295,7 +291,7 @@ namespace Comms {
                 // transmitting data
                 hc12.mpSerial->write(transmitBuffer, PROTOCOL_SIZE);
 
-                // TODO change?
+                // TODO !pr add cooldown for this:
                 // wait for confirmation from HC12
                 if (xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
                     hc12.mpLogger->warning("HC12 Transmit", "HC12 module may have insufficient power.");
@@ -318,7 +314,7 @@ namespace Comms {
                 transmitTask,
                 "HC12 Transmit Task",
                 TRANSMIT_TASK_SIZE,
-                nullptr,
+                this,
                 HIGH_TASK_PRIORITY,
                 &mTransmitTaskHandle
             );
@@ -336,7 +332,7 @@ namespace Comms {
 
     // ========================== Setup HC12 ==========================
     void HC12::setupHC12Task(void *parameters) {
-        const auto &hc12 = *mspHC12;
+        const auto& hc12 = *static_cast<HC12*>(parameters);
 
         // prepare commandBuffer
         uint8_t commandBuffer[SETUP_COMMAND_SIZE];
@@ -398,7 +394,7 @@ namespace Comms {
                 setupHC12Task,
                 "HC12 Setup Task",
                 SETUP_HC12_TASK_SIZE,
-                nullptr,
+                this,
                 HIGH_TASK_PRIORITY,
                 &mSetupHC12TaskHandle
             );
@@ -406,6 +402,7 @@ namespace Comms {
             mpLogger->warning("HC12 FreeRTOS", "Can't create setup HC12 task, because task already exist.");
         }
     }
+
     void HC12::deleteSetupHC12Task() {
         if (mSetupHC12TaskHandle != nullptr) {
             vTaskDelete(mSetupHC12TaskHandle);

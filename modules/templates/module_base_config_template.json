@@ -9,6 +9,12 @@
       165,
       200
     ],
-    "rfChannel": 3
+    "rfChannel": 2
+  },
+  "power": {
+    "battery": {
+      "rVCC": 50000,
+      "rGND": 50000
+    }
   }
 }

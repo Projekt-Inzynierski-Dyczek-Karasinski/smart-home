@@ -14,6 +14,14 @@ namespace nl = nlohmann;
 namespace ul = Utils::Logging;
 namespace ums = UniversalModuleSystem;
 
+// TODO !pr resolve remove commented code/rollback atomic
+
+// TODO !pr remove
+void timerCallback(TimerHandle_t xTimer) {
+    auto & powerManager = ums::PowerManager::getInstance(nullptr);
+    powerManager.safeRestart("tmp timer");
+}
+
 void setup() {
     const auto logger = std::make_shared<ul::Logger>();
 
@@ -23,6 +31,17 @@ void setup() {
     const auto debugLed = std::make_shared<ums::DebugLED>(logger);
     auto & communication = Comms::Communication::getInstance(debugLed, logger);
     auto & pairingButton = ums::PairingButton::getInstance(debugLed, &communication, logger);
+
+// TODO !pr remove
+    TimerHandle_t t =xTimerCreate(
+        "tmp timer",
+        // pdMS_TO_TICKS(1000*6),
+        pdMS_TO_TICKS(1000*60*60),
+        pdTRUE,
+        nullptr,
+        timerCallback
+    );
+    xTimerStart(t,portMAX_DELAY);
 
     logger->info("Main", "All components initialized. Deleting functions setup() and loop()...");
     vTaskDelete(nullptr);

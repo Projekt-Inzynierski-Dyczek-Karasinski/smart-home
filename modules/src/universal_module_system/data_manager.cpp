@@ -2,7 +2,7 @@
 
 #include <SPIFFS.h>
 
-#include "../../config/common/freertos_common_config.h"
+#include "../config/universal_module_system_config.h"
 #include "../config/addressing_config.h"
 
 namespace nl = nlohmann;
@@ -55,6 +55,24 @@ namespace UniversalModuleSystem {
         return result;
     }
 
+    String DataManager::tmpLoad(const char *path) const {
+        xSemaphoreTake(mFileAccessMutex, portMAX_DELAY);
+        File file = SPIFFS.open(path, "r");
+        String result = file.readString();
+        file.close();
+        xSemaphoreGive(mFileAccessMutex);
+        return result;
+    }
+
+    void DataManager::tmpSave(const char *path, const char* value) const {
+        xSemaphoreTake(mFileAccessMutex, portMAX_DELAY);
+        File file = SPIFFS.open(path, "a");
+        file.print(value);
+        file.close();
+        xSemaphoreGive(mFileAccessMutex);
+    }
+
+
     bool DataManager::fileExists(const char *path) const {
         return SPIFFS.exists(path);
     }
@@ -96,12 +114,9 @@ namespace UniversalModuleSystem {
             mpLogger->error("DataManager rm", "Files not in /root are read only.");
             return;
         }
-        size_t pathLen = snprintf(nullptr, 0, "%s%s", ms_ROOT_PATH, path);
-        char newPath[pathLen];
-        sprintf(newPath, "%s%s", ms_ROOT_PATH, path);
 
         xSemaphoreTake(mFileAccessMutex, portMAX_DELAY);
-        SPIFFS.remove(newPath);
+        SPIFFS.remove(path);
         xSemaphoreGive(mFileAccessMutex);
         mpLogger->info("DataManager rm", "Removed file.");
     }
@@ -126,6 +141,9 @@ namespace UniversalModuleSystem {
         // TODO add here other files to create
         if (overrideExistingFiles || !SPIFFS.exists(ADDRESSING_DATA_PATH)) {
             saveJson(ADDRESSING_DATA_PATH, baseConfig["addressing"]);
+        }
+        if (overrideExistingFiles || !SPIFFS.exists(POWER_DATA_PATH)) {
+            saveJson(POWER_DATA_PATH, baseConfig["power"]);
         }
     }
 

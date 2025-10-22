@@ -9,8 +9,6 @@ namespace ul = Utils::Logging;
 
 namespace Comms {
     class Communication;
-    // TODO add @pre, @post etc.
-
     /**
      * @brief Driver class for HC12 module. Enables transmitting, receiving data via HC12 module and setting up HC12 module.
      * @warning This class must be initialized only once inside constructor of Communication class (if HC12 module is used).
@@ -150,7 +148,6 @@ namespace Comms {
          */
         void deleteSetupHC12Task();
 
-        static HC12 *mspHC12; // pointer to instance of this class
         Communication *mpCommunication; // pointer to instance of Communication class
         HardwareSerial *mpSerial; // pointer to HardwareSerial
         unsigned long mBaudRate; // TODO remove?

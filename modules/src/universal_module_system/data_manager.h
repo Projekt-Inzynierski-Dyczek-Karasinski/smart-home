@@ -5,8 +5,6 @@
 
 #include "utils/logger.h"
 
-// TODO !pr check comments
-
 namespace ul = Utils::Logging;
 namespace UniversalModuleSystem {
     /**
@@ -52,6 +50,11 @@ namespace UniversalModuleSystem {
          * @note Thread-safe.
          */
         nlohmann::json loadJson(const char *path) const;
+
+        // TODO !pr remove
+        void tmpSave(const char *path, const char* value) const;
+
+        String tmpLoad(const char *path) const;
 
         /**
          * @brief Checks if a file exists in SPIFFS.

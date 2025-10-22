@@ -4,7 +4,7 @@
 // TODO !mm comment/remove DEBUG_MODE
 #define DEBUG_MODE
 #ifdef DEBUG_MODE
-    // TODO !mm remove COMMUNICATION_WITHOUT_SAVING_ADDRESSING
+    // TODO !pr remove COMMUNICATION_WITHOUT_SAVING_ADDRESSING
     // #define COMMUNICATION_WITHOUT_SAVING_ADDRESSING
     // #define TEST_CHECKSUM
 #endif
@@ -37,5 +37,5 @@
 #endif
 
 // module config
-// TODO consider saving that in SPIFFS:
+// TODO !pr consider saving that in SPIFFS:
 // #define AUTO_SLEEP

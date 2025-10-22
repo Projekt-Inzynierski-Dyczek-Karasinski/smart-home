@@ -6,7 +6,7 @@
 #define HIGH_TASK_PRIORITY 4
 #define CRITICAL_TASK_PRIORITY 5
 
-// TODO !mm check stack usage for all FreeRTOS tasks
+// TODO !pr ? check stack usage for all FreeRTOS tasks
 // WARNING: smaller task size than 1024B is NOT recommended (theoretically the smallest task size for ESP32 is 768B)
 #define SMALL_TASK_SIZE 1024 // 1kB
 #define MEDIUM_TASK_SIZE 2048 // 2kB
@@ -35,5 +35,5 @@
 #define CENTRAL_UNIT_ADDRESSING_TASK_SIZE   BIG_TASK_SIZE
 
 // PowerManager
-#define BATTERY_READ_TASK_SIZE MEDIUM_TASK_SIZE
+#define BATTERY_READ_TASK_SIZE BIG_TASK_SIZE // TODO !pr change back to MEDIUM_TASK_SIZE
 #define POWER_MANAGEMENT_SEMAPHORE_TIMEOUT 10000 // 10s

@@ -486,7 +486,6 @@ namespace Comms {
         addressingDataJson[ms_JK_NUM_OF_MODULES_ON_RF_CHANNEL] = nl::json::array();
 
         xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
-        // TODO consider making function in uah
         for (auto & i : mNumOfModulesOnRfChannel) {
             addressingDataJson[ms_JK_NUM_OF_MODULES_ON_RF_CHANNEL].push_back(i);
         }

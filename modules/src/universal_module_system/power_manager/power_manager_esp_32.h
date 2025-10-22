@@ -7,6 +7,7 @@
 #include "i_power_manager.h"
 
 #include <memory>
+#include <nlohmann/json.hpp>
 
 #include "../../utils/logger.h"
 
@@ -103,6 +104,13 @@ namespace UniversalModuleSystem {
         void readBattery();
 
         /**
+         * @brief Converts raw analog read to voltage (in mV).
+         * @param rawAnalogRead Reading from <code>analogRead()</code>.
+         * @return Voltage (in mV) or <code>rawAnalogRead</code> if failed to load power manager data.
+         */
+        uint16_t calculateVoltage(uint16_t rawAnalogRead);
+
+        /**
          * @brief FreeRTOS task for asynchronous battery reading.
          *
          * @param parameters FreeRTOS task parameters (used for passing pointer to instance of PowerManagerESP32).
@@ -128,7 +136,27 @@ namespace UniversalModuleSystem {
          */
         uint32_t getCurrentTime() const;
 
-        std::atomic<uint16_t> mBatteryRead{0}; // TODO add convertion from analog read to voltage
+
+        /**
+         * @brief Data structure for serializing module addressing information.
+         */
+        struct PowerData {
+            /**
+             * @brief Constructor that deserializes addressing data from JSON.
+             * @param json JSON object containing addressing data.
+             */
+            explicit PowerData(const nlohmann::json& json);
+
+            uint32_t vccResistor;
+            uint32_t gndResistor;
+
+        private:
+            static constexpr char ms_DATA_PATH[] = "battery";
+            static constexpr char ms_VCC_RESISTOR_PATH[] = "rVCC";
+            static constexpr char ms_GND_RESISTOR_PATH[] = "rGND";
+        };
+
+        std::atomic<uint16_t> mBatteryRead{0}; // TODO !pr add convertion from analog read to voltage
         std::shared_ptr<ul::Logger> mpLogger;
 
         SemaphoreHandle_t mReadCompleteSemaphore = nullptr; ///< FreeRTOS semaphore to indicate completion of battery read operation.

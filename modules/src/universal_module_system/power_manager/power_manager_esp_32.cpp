@@ -2,8 +2,11 @@
 
 #include <driver/rtc_io.h>
 
+#include "../../../config/universal_module_system_config.h"
 #include "universal_module_system/data_manager.h"
 #include "communication/communication.h"
+
+namespace nl = nlohmann;
 
 namespace UniversalModuleSystem {
     #ifdef AUTO_SLEEP
@@ -99,7 +102,7 @@ namespace UniversalModuleSystem {
     }
 
     void PowerManagerESP32::handleWakeUpReason() {
-        // TODO change logs to verbose
+        // TODO !mm change logs to verbose
         switch (esp_sleep_get_wakeup_cause()) {
             case ESP_SLEEP_WAKEUP_EXT0:
                 mpLogger->info("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
@@ -120,6 +123,42 @@ namespace UniversalModuleSystem {
         }
     }
 
+    uint16_t PowerManagerESP32::calculateVoltage(const uint16_t rawAnalogRead)  {
+        constexpr uint16_t MAX_ANALOG_READ = 4095;
+        constexpr uint16_t MAX_ANALOG_READ_MILLIVOLTAGE = 3300;
+
+        const auto &dataManager = ums::DataManager::getInstance();
+        const nl::json jsonData = dataManager.loadJson(POWER_DATA_PATH);
+        if (jsonData.empty()) {
+            mpLogger->error("PowerManagerESP32 Task", "Failed to load power data from SPISFFS.");
+            return rawAnalogRead;
+        }
+
+        const PowerData powerData(jsonData);
+        // uint64_t to not exceed overflow in calculations
+        uint64_t result = rawAnalogRead;
+        result *= MAX_ANALOG_READ_MILLIVOLTAGE;
+        result *= (powerData.vccResistor + powerData.gndResistor);
+        result /= powerData.gndResistor;
+        result /= MAX_ANALOG_READ;
+
+        // TODO !pr remove
+        size_t size2 = snprintf(nullptr, 0, "%i,", rawAnalogRead);
+        char valueToSave2[size2];
+        sprintf(valueToSave2, "%i,", rawAnalogRead);
+
+        dataManager.tmpSave("/root/raw", valueToSave2);
+
+        // TODO !pr remove
+        size_t size = snprintf(nullptr, 0, "%i,", (uint16_t)result);
+        char valueToSave[size];
+        sprintf(valueToSave, "%i,", (uint16_t)result);
+
+        dataManager.tmpSave("/root/br", valueToSave);
+
+        return (uint16_t)result;
+    }
+
     void PowerManagerESP32::batteryReadTask(void* parameters) {
         auto& pm = *static_cast<PowerManagerESP32*>(parameters);
         constexpr uint16_t timeBetweenReads = 50;
@@ -131,9 +170,10 @@ namespace UniversalModuleSystem {
             batteryReadSum += analogRead(BATTERY_PIN);
         }
 
-        pm.mBatteryRead.store(batteryReadSum / numberOfReads);
-        // TODO add convertion from raw analog read to volts or %
-        pm.mpLogger->debugv("PowerManagerESP32 Task", "Battery charge level is: ", pm.mBatteryRead.load());
+        pm.mBatteryRead.store(pm.calculateVoltage(batteryReadSum /= numberOfReads));
+
+        // TODO !pr change to verbose
+        pm.mpLogger->infov("PowerManagerESP32 Task", "Battery charge level is (mV): ", pm.mBatteryRead.load());
 
         xSemaphoreGive(pm.mReadCompleteSemaphore);
         vTaskDelete(nullptr);
@@ -181,7 +221,14 @@ namespace UniversalModuleSystem {
     uint32_t PowerManagerESP32::getCurrentTime() const {
         struct timeval timeStruct{};
         gettimeofday(&timeStruct, nullptr);
-        // TODO consider making this more accurate+
+        // TODO consider making this more accurate
         return timeStruct.tv_sec * 1000;
     }
+
+    PowerManagerESP32::PowerData::PowerData(const nlohmann::json &json) {
+        nlohmann::json data = json[ms_DATA_PATH];
+        vccResistor = data[ms_VCC_RESISTOR_PATH].get<uint32_t>();
+        gndResistor = data[ms_GND_RESISTOR_PATH].get<uint32_t>();
+    }
+
 }
