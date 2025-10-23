@@ -9,12 +9,9 @@ namespace uah = Utils::ArrayHandlers;
 namespace ums = UniversalModuleSystem;
 
 namespace Comms {
-    ModuleAddressing* ModuleAddressing::mspAddressing = nullptr;
-
     // ============================ Public ============================
     ModuleAddressing::ModuleAddressing(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
         : Addressing(communication, logger) {
-        mspAddressing = this;
         mIPAddress = NULL_IP;
 
         loadAddressingData();
@@ -84,7 +81,7 @@ namespace Comms {
 
     // ===================== Addressing Algorithm =====================
     void ModuleAddressing::addressingTask(void* parameters) {
-        auto &ad = *mspAddressing;
+        auto& ad = *static_cast<ModuleAddressing*>(parameters);
 
         enum class ADDRESSING_STATES : uint8_t {
             START_ADDRESSING = 0,
@@ -253,7 +250,7 @@ namespace Comms {
                 addressingTask,
                 "Addressing Task",
                 MODULE_ADDRESSING_TASK_SIZE,
-                nullptr,
+                this,
                 MEDIUM_TASK_PRIORITY,
                 &mAddressingTaskHandle
             );
@@ -264,8 +261,7 @@ namespace Comms {
 
     // ============================ Timers ============================
     void ModuleAddressing::addressingTimersCallbacks(TimerHandle_t xTimer){
-        auto &ad = *mspAddressing;
-
+        auto &ad = *static_cast<ModuleAddressing*>(pvTimerGetTimerID(xTimer));
         if (xTimer == ad.mAddressingTimeoutTimer) {
             ad.abortAddressingWithAbortMessage();
         }
@@ -277,7 +273,7 @@ namespace Comms {
                 "Addressing Absolute Timeout",
                 pdMS_TO_TICKS(ADDRESSING_ABSOLUTE_TIMEOUT),
                 pdFALSE,
-                nullptr,
+                this,
                 addressingTimersCallbacks
             );
         }

@@ -10,12 +10,9 @@ namespace nl = nlohmann;
 
 
 namespace Comms {
-    CentralUnitAddressing* CentralUnitAddressing::mspAddressing = nullptr;
-
     // ============================ Public ============================
     CentralUnitAddressing::CentralUnitAddressing(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
         : Addressing(communication, logger) {
-        mspAddressing = this;
         mIPAddress = CENTRAL_UNIT_IP;
 
         mModulesAddressingDataMutex = xSemaphoreCreateMutex();
@@ -134,7 +131,7 @@ namespace Comms {
     }
 
     void CentralUnitAddressing::addressingTask(void* parameters) {
-        auto &ad = *mspAddressing;
+        auto& ad = *static_cast<CentralUnitAddressing*>(parameters);
 
         enum ADDRESSING_STATES : uint8_t {
             START_ADDRESSING = 0,
@@ -294,7 +291,7 @@ namespace Comms {
                 addressingTask,
                 "Addressing Task",
                 CENTRAL_UNIT_ADDRESSING_TASK_SIZE,
-                nullptr,
+                this,
                 MEDIUM_TASK_PRIORITY,
                 &mAddressingTaskHandle
             );
@@ -305,8 +302,7 @@ namespace Comms {
 
     // ============================ Timers ============================
     void CentralUnitAddressing::addressingTimersCallbacks(TimerHandle_t xTimer) {
-        auto &ad = *mspAddressing;
-
+        auto& ad = *static_cast<CentralUnitAddressing*>(pvTimerGetTimerID(xTimer));
         if (xTimer == ad.mAddressingTimeoutTimer) {
             ad.abortAddressingWithAbortMessage();
         }
@@ -318,7 +314,7 @@ namespace Comms {
                 "Addressing Absolute Timeout",
                 pdMS_TO_TICKS(ADDRESSING_ABSOLUTE_TIMEOUT),
                 pdFALSE,
-                nullptr,
+                this,
                 addressingTimersCallbacks
             );
         }

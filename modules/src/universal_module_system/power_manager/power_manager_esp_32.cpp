@@ -143,18 +143,18 @@ namespace UniversalModuleSystem {
         result /= MAX_ANALOG_READ;
 
         // TODO !pr remove
-        size_t size2 = snprintf(nullptr, 0, "%i,", rawAnalogRead);
-        char valueToSave2[size2];
-        sprintf(valueToSave2, "%i,", rawAnalogRead);
-
-        dataManager.tmpSave("/root/raw", valueToSave2);
+        // size_t size2 = snprintf(nullptr, 0, "%i,", rawAnalogRead);
+        // char valueToSave2[size2];
+        // sprintf(valueToSave2, "%i,", rawAnalogRead);
+        //
+        // dataManager.tmpSave("/root/raw", valueToSave2);
 
         // TODO !pr remove
-        size_t size = snprintf(nullptr, 0, "%i,", (uint16_t)result);
-        char valueToSave[size];
-        sprintf(valueToSave, "%i,", (uint16_t)result);
-
-        dataManager.tmpSave("/root/br", valueToSave);
+        // size_t size = snprintf(nullptr, 0, "%i,", (uint16_t)result);
+        // char valueToSave[size];
+        // sprintf(valueToSave, "%i,", (uint16_t)result);
+        //
+        // dataManager.tmpSave("/root/br", valueToSave);
 
         return (uint16_t)result;
     }

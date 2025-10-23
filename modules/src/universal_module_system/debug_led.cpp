@@ -10,7 +10,7 @@ namespace UniversalModuleSystem {
         digitalWrite(LED_PIN, LOW);
 
         // TODO !pr remove
-        digitalWrite(LED_PIN, HIGH);
+        // digitalWrite(LED_PIN, HIGH);
 
         mpLogger->verbose("DebugLED Class", "DebugLED initialized.");
     }

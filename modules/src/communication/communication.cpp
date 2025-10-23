@@ -7,8 +7,6 @@
 namespace uah = Utils::ArrayHandlers;
 
 namespace Comms {
-    Communication* Communication::mspCommunication = nullptr;
-
     // ============================ Public ============================
     Communication &Communication::getInstance(const std::shared_ptr<ums::DebugLED> &debugLED, const std::shared_ptr<ul::Logger> &logger) {
         static Communication instance(debugLED, logger);
@@ -87,7 +85,6 @@ namespace Comms {
             mpAddressing(new ModuleAddressing(this, logger))
         #endif
     {
-        mspCommunication = this;
         mpConnection = &Connection::getInstance(this, mpAddressing, mpRfModule, logger);
 
         createCommunicationQueues();
@@ -209,7 +206,7 @@ namespace Comms {
     }
 
     void Communication::communicationMainTask(void* parameters) {
-        auto &com = *mspCommunication;
+        auto& com = *static_cast<Communication*>(parameters);
 
         uint8_t status = DEFAULT_STATUS_NOTIF;
         uint8_t pingAttempts = 0;
@@ -282,7 +279,7 @@ namespace Comms {
                 communicationMainTask,
                 "Communication Main",
                 COMMUNICATION_MAIN_TASK_SIZE,
-                nullptr,
+                this,
                 BACKGROUND_TASK_PRIORITY,
                 &mCommunicationMainTaskHandle
             );
@@ -335,7 +332,7 @@ namespace Comms {
     }
 
     void Communication::decodeMessageTask(void *parameters) {
-        auto &com = *mspCommunication;
+        const auto& com = *static_cast<Communication*>(parameters);
 
         // timeout status/cause
         uint32_t timeoutStatus = DEFAULT_STATUS_NOTIF;
@@ -490,7 +487,7 @@ namespace Comms {
                 decodeMessageTask,
                 "Decode message",
                 DECODE_TASK_SIZE,
-                nullptr,
+                this,
                 LOW_TASK_PRIORITY,
                 &mDecodeMessageTaskHandle
             );
@@ -527,7 +524,7 @@ namespace Comms {
     }
 
     void Communication::encodeMessageTask(void *parameters) {
-        auto &com = *mspCommunication;
+        auto& com = *static_cast<Communication*>(parameters);
 
         // prepare protocol buffer
         // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
@@ -596,7 +593,7 @@ namespace Comms {
                 encodeMessageTask,
                 "Encode Message",
                 ENCODE_TASK_SIZE,
-                nullptr,
+                this,
                 MEDIUM_TASK_PRIORITY,
                 &mEncodeMessageTaskHandle
             );
@@ -615,7 +612,7 @@ namespace Comms {
     // =================== Terminal Input Message =====================
     #ifdef DEBUG_MODE
     void Communication::terminalInputTask(void *parameters) {
-        const auto &com = *mspCommunication;
+        const auto& com = *static_cast<Communication*>(parameters);
 
         // prepare buffer
         uint8_t buffer[MESSAGE_SIZE];
@@ -720,7 +717,7 @@ namespace Comms {
                 terminalInputTask,
                 "Terminal Input Task",
                 TERMINAL_INPUT_TASK_SIZE,
-                nullptr,
+                this,
                 BACKGROUND_TASK_PRIORITY,
                 &mTerminalInputTaskHandle
             );
@@ -743,7 +740,7 @@ namespace Comms {
 
     // ============================ Timers ============================
     void Communication::communicationTimersCallbacks(TimerHandle_t xTimer){
-        const auto &com = *mspCommunication;
+        const auto &com = *static_cast<Communication*>(pvTimerGetTimerID(xTimer));
 
         if (xTimer == com.mReceiveMessageTimeoutTimer) {
             com.mpLogger->debug("Communication Timers", "Message timeout.");
@@ -767,7 +764,7 @@ namespace Comms {
                 "Receive Message Timeout",
                 pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT),
                 pdFALSE,
-                nullptr,
+                this,
                 communicationTimersCallbacks
             );
         }

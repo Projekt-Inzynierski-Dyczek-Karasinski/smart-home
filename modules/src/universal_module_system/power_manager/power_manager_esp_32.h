@@ -156,7 +156,7 @@ namespace UniversalModuleSystem {
             static constexpr char ms_GND_RESISTOR_PATH[] = "rGND";
         };
 
-        std::atomic<uint16_t> mBatteryRead{0}; // TODO !pr add convertion from analog read to voltage
+        std::atomic<uint16_t> mBatteryRead{0};
         std::shared_ptr<ul::Logger> mpLogger;
 
         SemaphoreHandle_t mReadCompleteSemaphore = nullptr; ///< FreeRTOS semaphore to indicate completion of battery read operation.

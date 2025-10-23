@@ -76,7 +76,7 @@ namespace Comms {
     private:
         /**
          * @brief Static FreeRTOS task function. Handles message exchanges and addressing logic for the module.
-         * @param parameters Task parameters (unused).
+         * @param parameters Task parameters.
          */
         static void addressingTask(void* parameters);
         /**
@@ -134,8 +134,6 @@ namespace Comms {
          * @note Thread-safe.
          */
         void loadAddressingData();
-
-        static ModuleAddressing *mspAddressing; ///< Static pointer to a ModuleAddressing instance.
 
         /**
          * @brief Data structure for serializing module addressing information.

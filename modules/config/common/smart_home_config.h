@@ -37,5 +37,5 @@
 #endif
 
 // module config
-// TODO !pr consider saving that in SPIFFS:
+// TODO consider saving that in SPIFFS:
 // #define AUTO_SLEEP
