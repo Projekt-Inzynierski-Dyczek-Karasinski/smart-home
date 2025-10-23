@@ -23,13 +23,6 @@ namespace Comms {
         mNumOfModulesOnRfChannel[0] = 1;
         xSemaphoreGive(mModulesAddressingDataMutex);
 
-        // TODO !mm remove
-        #ifdef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
-            uint8_t tmpMAC[] = {1,1,1,1,1,1};
-            addModule(tmpMAC, true, 2);
-            mpLogger->warning("CentralUnitAddressing TMP", "Hardcoded module");
-        #endif
-
         loadModulesAddressingData();
         mpLogger->verbose("CentralUnitAddressing Class", "CentralUnitAddressing initialized.");
     }
@@ -110,7 +103,7 @@ namespace Comms {
     }
 
     // ===================== Addressing Algorithm =====================
-    void CentralUnitAddressing::prepareSummary(uint8_t *sendBuffer, const ModuleAddressingData *moduleData) {
+    void CentralUnitAddressing::prepareSummary(uint8_t *sendBuffer, const ModuleAddressingData *moduleData) const {
         // TODO change API Calls to numeric values
         // prepare summary data (data without mac)
         const uint8_t summaryData[] = {
@@ -149,6 +142,7 @@ namespace Comms {
 
             ad.setIsStartOfAddressing(true);
             ad.mpCommunication->needRawMessage();
+
             xQueueReceive(ad.mAddressingQueue, receiveBuffer, portMAX_DELAY);
 
             uint8_t attemptCounter = 0;
@@ -238,17 +232,14 @@ namespace Comms {
                             if (uah::areArraysEqual(receiveBuffer, ADDRESSING_SUMMARY_OK)) {
                                 isReceivedPropperMessage = true;
                                 ad.mpLogger->info("CentralUnitAddressing Main", "Addressing complete." );
-                                // TODO !mm remove #ifndef directive and #else section
-                                #ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
-                                    ad.saveModulesAddressingData();
-                                    ad.setTmpModuleIp(NULL_IP);
-                                    ad.mpCommunication->stopAddressingAlgorithm();
-                                    ad.mpCommunication->changeRFChannel(DEFAULT_CHANNEL);
-                                #else
-                                    // TODO !mm remove clearing data
-                                    ad.abortAddressing();
-                                #endif
+                                ad.saveModulesAddressingData();
+                                ad.setTmpModuleIp(NULL_IP);
+
+                                ad.mpCommunication->changeRFChannel(DEFAULT_CHANNEL);
+                                ad.mpCommunication->stopAddressingAlgorithm();
+
                                 for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
+
                             } else if (uah::areArraysEqual(receiveBuffer, ADDRESSING_SUMMARY_BAD)) {
                                 isReceivedPropperMessage = true;
                                 ad.mpLogger->warning("CentralUnitAddressing Main", "Module rejects summary.");

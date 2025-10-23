@@ -423,8 +423,6 @@ namespace Comms {
                         handleIncorrectMessage(isRawMessage);
                         com.mpLogger->warning("Communication Decode", "Bad checksum");
                     }
-                    // TODO !mm remove #ifndef directive
-                    #ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
                     // if MAC is incorrect wait for possible rest of message and ignore it
                     else if (!com.mpAddressing->isMACValid(protocolBuffer[protoBuffMessageIndex])) {
                         xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
@@ -441,7 +439,6 @@ namespace Comms {
                         resetProtocolBuffer();
                         xQueueReset(com.mReceiveByteQueue);
                     }
-                    #endif
                     // if entire message is not ready (message quantity)
                     else if (protocolBuffer[protoBuffMessageIndex][MESSAGES_QUANTITY_INDEX] != 0) {
                         protoBuffMessageIndex++;

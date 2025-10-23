@@ -8,8 +8,6 @@
 #include "utils/logger.h"
 
 #include "universal_module_system/data_manager.h"
-#include <nlohmann/json.hpp>
-namespace nl = nlohmann;
 
 namespace ul = Utils::Logging;
 namespace ums = UniversalModuleSystem;

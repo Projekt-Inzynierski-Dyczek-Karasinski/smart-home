@@ -4,8 +4,6 @@
 // TODO !mm comment/remove DEBUG_MODE
 #define DEBUG_MODE
 #ifdef DEBUG_MODE
-    // TODO !pr remove COMMUNICATION_WITHOUT_SAVING_ADDRESSING
-    // #define COMMUNICATION_WITHOUT_SAVING_ADDRESSING
     // #define TEST_CHECKSUM
 #endif
 

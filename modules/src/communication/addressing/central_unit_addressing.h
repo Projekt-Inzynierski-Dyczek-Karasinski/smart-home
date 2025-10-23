@@ -121,7 +121,7 @@ namespace Comms {
          * @param sendBuffer Buffer to be prepared.
          * @param moduleData Data of the module which is addressing.
          */
-        void prepareSummary(uint8_t *sendBuffer, const ModuleAddressingData *moduleData);
+        void prepareSummary(uint8_t *sendBuffer, const ModuleAddressingData *moduleData) const;
         /**
          * @brief Static FreeRTOS task function. Handles message exchanges and addressing logic of the central unit's addressing procedure.
          * @param parameters Task parameters.

@@ -18,13 +18,6 @@ namespace Comms {
         #endif
         mpLogger = logger;
 
-        // TODO !mm remove
-        #ifdef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
-            const uint8_t tmpMAC[] = {1,1,1,1,1,1};
-            uah::prepareBuffer(mProtocolMACAddress, tmpMAC, 6,6);
-            mpLogger->warninga("Addressing TMP", "Protocol mac is forced: ", mProtocolMACAddress, 6, false);
-        #endif
-
         mAddressingDataMutex = xSemaphoreCreateMutex();
     }
 

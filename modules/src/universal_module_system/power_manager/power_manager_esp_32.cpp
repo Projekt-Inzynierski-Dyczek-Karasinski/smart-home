@@ -172,8 +172,7 @@ namespace UniversalModuleSystem {
 
         pm.mBatteryRead.store(pm.calculateVoltage(batteryReadSum /= numberOfReads));
 
-        // TODO !pr change to verbose
-        pm.mpLogger->infov("PowerManagerESP32 Task", "Battery charge level is (mV): ", pm.mBatteryRead.load());
+        pm.mpLogger->verbosev("PowerManagerESP32 Task", "Battery charge level is (mV): ", pm.mBatteryRead.load());
 
         xSemaphoreGive(pm.mReadCompleteSemaphore);
         vTaskDelete(nullptr);

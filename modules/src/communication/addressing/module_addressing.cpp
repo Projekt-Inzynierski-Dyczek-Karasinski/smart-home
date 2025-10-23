@@ -16,14 +16,6 @@ namespace Comms {
 
         loadAddressingData();
 
-        // TODO !mm remove
-        #ifdef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
-            mIPAddress = 2;
-            mRfChannel.store(2);
-            mpCommunication->changeRFChannel(2);
-            mpLogger->warningv("Addressing TMP", "IP is forced: ", mIPAddress);
-        #endif
-
         mpLogger->verbose("ModuleAddressing Class", "ModuleAddressing initialized.");
     }
 
@@ -76,18 +68,26 @@ namespace Comms {
     void ModuleAddressing::addressingTask(void* parameters) {
         auto& ad = *static_cast<ModuleAddressing*>(parameters);
 
+        // reset mIPAddress if needed
+        xSemaphoreTake(ad.mAddressingDataMutex, portMAX_DELAY);
+        if (ad.mIPAddress != NULL_IP) {
+            ad.mIPAddress = NULL_IP;
+            xSemaphoreGive(ad.mAddressingDataMutex);
+            ad.mpCommunication->resetEncodeMessageTask();
+        } else {
+            xSemaphoreGive(ad.mAddressingDataMutex);
+        }
+
         enum class ADDRESSING_STATES : uint8_t {
             START_ADDRESSING = 0,
             WAIT_FOR_PING,
             REPLY_PING,
             PROCESS_SUMMARY
         };
-
         uint8_t receiveBuffer[MESSAGE_SIZE];
         uint8_t sendBuffer[MESSAGE_SIZE];
 
         xTimerStart(ad.mAddressingTimeoutTimer, portMAX_DELAY);
-
         for (uint8_t absoluteAttemptCounter = 0; absoluteAttemptCounter < ADDRESSING_ABSOLUTE_MAX_ATTEMPTS; absoluteAttemptCounter++) {
             ADDRESSING_STATES addressingState = ADDRESSING_STATES::START_ADDRESSING;
             uint8_t attemptCounter = 0;
@@ -113,6 +113,7 @@ namespace Comms {
                             #error "Not implemented"
                         #endif
                         ad.mpCommunication->needRawMessage();
+
                         ad.mpCommunication->sendMessage(sendBuffer);
                         break;
 
@@ -135,13 +136,9 @@ namespace Comms {
                                 ad.mpCommunication->sendMessage(sendBuffer);
 
                                 ad.mpLogger->info("ModuleAddressing Main", "Addressing complete." );
-                                // TODO !mm remove #ifndef directive and #else section
-                                #ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
-                                    ad.saveAddressingData();
-                                    ad.mpCommunication->stopAddressingAlgorithm();
-                                #else
-                                    ad.abortAddressing();
-                                #endif
+                                ad.saveAddressingData();
+                                ad.mpCommunication->stopAddressingAlgorithm();
+
                                 for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
                             } else {
                                 ad.mpLogger->warning("ModuleAddressing Main", "Central unit send bad data in summary." );
