@@ -39,11 +39,6 @@ namespace Utils {
              */
             explicit Logger(Level level = static_cast<Level>(LOGGING_LEVEL));
 
-            // TODO !mm remove commented code/rollback atomic
-            // /**
-            //  * @brief Cleans up FreeRTOS resources used by the class.
-            //  */
-            // ~Logger();
             ~Logger() = default;
 
             /**
@@ -252,10 +247,7 @@ namespace Utils {
             static xSemaphoreHandle smSerialMutex; ///< Static handle to FreeRTOS mutex protecting changing settings of Serial and printing.
             static bool smIsSerialEnabled; ///< Static flag ensuring that <code>Serial.begin()</code> is called only once.
 
-            // TODO !mm remove commented code/rollback atomic
             std::atomic<Level> mLogLevel{Level::NONE}; ///< Currently set logging level.
-            // Level mLogLevel; ///< Currently set logging level.
-            // xSemaphoreHandle mLogLevelMutex; ///< Handle to FreeRTOS mutex protecting <code>mLogLevel</code>.
 
             const size_t m_LOG_TYPE_LENGTH = 10;
             char mInputBuffer[MESSAGE_SIZE]{};

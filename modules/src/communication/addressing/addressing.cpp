@@ -51,10 +51,6 @@ namespace Comms {
     }
 
     void Addressing::startAddressing() {
-        // TODO !mm remove commented code/rollback atomic
-        // xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
-        // mIsAddressingInProgress = true;
-        // xSemaphoreGive(mAddressingDataMutex);
         mIsAddressingInProgress.store(true);
 
         createAddressingTimer();
@@ -66,20 +62,10 @@ namespace Comms {
         deleteAddressingTask();
         deleteAddressingQueue();
         deleteAddressingTimer();
-
-        // TODO !mm remove commented code/rollback atomic
-        // xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
-        // mIsAddressingInProgress = false;
-        // xSemaphoreGive(mAddressingDataMutex);
         mIsAddressingInProgress.store(false);
     }
 
     bool Addressing::getIsAddressingInProgress() const {
-        // TODO !mm remove commented code/rollback atomic
-        // xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
-        // const bool result = mIsAddressingInProgress;
-        // xSemaphoreGive(mAddressingDataMutex);
-        // return result;
         return mIsAddressingInProgress.load();
     }
 

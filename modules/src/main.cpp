@@ -14,8 +14,6 @@ namespace nl = nlohmann;
 namespace ul = Utils::Logging;
 namespace ums = UniversalModuleSystem;
 
-// TODO !pr resolve remove commented code/rollback atomic
-
 void setup() {
     const auto logger = std::make_shared<ul::Logger>();
 

@@ -16,13 +16,7 @@ namespace Utils::Logging {
     bool Logger::smIsSerialEnabled = false;
 
     Logger::Logger(Level level) {
-        // TODO !mm remove commented code/rollback atomic
-        // mLogLevelMutex = xSemaphoreCreateMutex();
-        // xSemaphoreTake(mLogLevelMutex, portMAX_DELAY);
-        // mLogLevel = level;
-        // xSemaphoreGive(mLogLevelMutex);
         mLogLevel.store(level);
-
 
         #ifndef DEBUG_MODE
             if (msIsLoggingDisabled) {
@@ -40,17 +34,7 @@ namespace Utils::Logging {
         }
     }
 
-    // TODO !mm remove commented code/rollback atomic
-    // Logger::~Logger() {
-    //     vSemaphoreDelete(mLogLevelMutex);
-    // }
-
     Level Logger::getLogLevel() const {
-        // TODO !mm remove commented code/rollback atomic
-        // xSemaphoreTake(mLogLevelMutex, portMAX_DELAY);
-        // const Level level = mLogLevel;
-        // xSemaphoreGive(mLogLevelMutex);
-        // return level;
         return mLogLevel.load();
     }
 

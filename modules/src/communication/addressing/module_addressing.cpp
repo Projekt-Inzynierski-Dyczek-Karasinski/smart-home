@@ -19,8 +19,6 @@ namespace Comms {
         // TODO !mm remove
         #ifdef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
             mIPAddress = 2;
-        // TODO !mm remove commented code/rollback atomic
-            // mRfChannel = 2;
             mRfChannel.store(2);
             mpCommunication->changeRFChannel(2);
             mpLogger->warningv("Addressing TMP", "IP is forced: ", mIPAddress);
@@ -36,10 +34,6 @@ namespace Comms {
     uint8_t ModuleAddressing::getDefaultRFChannel() {
         uint8_t rfChannel = 0;
         #ifdef RF_CHANNELS
-            // TODO !mm remove commented code/rollback atomic
-            // xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
-            // rfChannel = mRfChannel;
-            // xSemaphoreGive(mAddressingDataMutex);
             rfChannel = mRfChannel.load();
         #endif
         return rfChannel;
@@ -64,7 +58,6 @@ namespace Comms {
 
     bool ModuleAddressing::isIpValid(const uint8_t ip) {
         bool result = false;
-        // TODO !mm remove commented code/rollback atomic
         xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
         if ((mIPAddress == NULL_IP && ip == CENTRAL_UNIT_IP) || ip == mIPAddress) {
             result = true;
@@ -293,8 +286,6 @@ namespace Comms {
             xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
             uah::prepareBuffer(mProtocolMACAddress, newMAC, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
             mIPAddress = newIP;
-            // TODO !mm remove commented code/rollback atomic
-            // mRfChannel = newRfChannel;
             mRfChannel.store(newRfChannel);
             xSemaphoreGive(mAddressingDataMutex);
 
