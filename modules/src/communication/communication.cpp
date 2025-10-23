@@ -1,5 +1,7 @@
 #include "communication.h"
 
+#include <optional>
+
 #include "utils/uint8_array_handlers.h"
 #include "universal_module_system/power_manager/power_manager.h"
 #include "universal_module_system/data_manager.h"
@@ -664,18 +666,16 @@ namespace Comms {
                         auto & dataManager = ums::DataManager::getInstance();
                         dataManager.rm((char*)&buffer[strlen("rm") + 1]);
                     } else if (uah::areArraysEqual(buffer, "ip=")) {
-                        if (buffer[6] != '\0') {
-                            com.mpLogger->error("Communication Input", "Bad IP");
+                        std::optional<uint8_t> ip;
+                        try {
+                            ip = std::stoi((char*)&buffer[3]);
+                        } catch (...) {
+                            ip.reset();
+                        }
+                        if (ip.has_value()) {
+                            com.mpAddressing->setProtocolIPAddress(ip.value());
                         } else {
-                            uint16_t ip = 0;
-                            ip += (buffer[3] - (uint8_t)'0') * 100;
-                            ip += (buffer[4] - (uint8_t)'0') * 10;
-                            ip += (buffer[5] - (uint8_t)'0');
-                            if (ip > 255) {
-                                com.mpLogger->error("Communication Input", "Bad IP");
-                            } else {
-                                com.mpAddressing->setProtocolIPAddress((uint8_t)ip);
-                            }
+                            com.mpLogger->error("Communication Input", "Bad IP");
                         }
                     } else if (uah::areArraysEqual(buffer, ConnectionMessages::s_CONNECTION_END)) {
                         uint8_t sendBuffer[MESSAGE_SIZE];
@@ -770,7 +770,7 @@ namespace Comms {
                 "Receive Byte Timeout",
                 pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT),
                 pdFALSE,
-                nullptr,
+                this,
                 communicationTimersCallbacks
             );
         }
@@ -779,7 +779,7 @@ namespace Comms {
                 "Ping Timeout",
                 pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT),
                 pdTRUE,
-                nullptr,
+                this,
                 communicationTimersCallbacks
             );
         }
