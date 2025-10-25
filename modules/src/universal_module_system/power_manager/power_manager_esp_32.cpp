@@ -176,6 +176,7 @@ namespace UniversalModuleSystem {
         vTaskDelete(nullptr);
     }
 
+    // TODO !pr make battery read as sensor in transducers
     void PowerManagerESP32::readBattery() {
         // make sure that semaphore indicates that battery read is not completed
         xSemaphoreTake(mReadCompleteSemaphore, 0);

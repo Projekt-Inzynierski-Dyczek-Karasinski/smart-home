@@ -16,5 +16,13 @@
       "rVCC": 50000,
       "rGND": 50000
     }
-  }
+  },
+  "sensors": [
+    {
+      "type": "batterySensor",
+      "sensorData": {
+
+      }
+    }
+  ]
 }
