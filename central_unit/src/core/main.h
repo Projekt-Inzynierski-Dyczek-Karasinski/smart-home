@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core.h"
-#include "config_manager.h"
+#include "config_manager/config_manager.h"
 
 #include <boost/process.hpp>
 #include <boost/program_options.hpp>

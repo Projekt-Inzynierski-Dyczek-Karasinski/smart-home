@@ -19,9 +19,6 @@ add_executable(smarthomed
         core.cpp
         core_actions.cpp
         api/internal_api.cpp
-        service/service_manager.cpp
-        service/systemd_service.cpp
-        service/standalone_service.cpp
 )
 
 

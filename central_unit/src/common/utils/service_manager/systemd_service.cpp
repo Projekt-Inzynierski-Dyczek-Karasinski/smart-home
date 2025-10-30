@@ -1,20 +1,31 @@
 #ifdef WITH_SYSTEMD
 #include "systemd_service.h"
-#include "../core.h"
-
-#include <iostream>
 
 #include <systemd/sd-daemon.h>
 
-namespace SmartHome::Service {
-    SystemdService::SystemdService(const std::shared_ptr<Utils::Logger> &logger): ServiceManager(logger) {
+namespace SmartHome::Utils {
+    SystemdService::SystemdService(const std::shared_ptr<Logger> &logger,
+                                   const std::string_view serviceName) : ServiceManager(logger, serviceName) {
     }
 
     bool SystemdService::onInitialize() {
+        try {
+            lockFile.emplace(ms_LOCK_FILE_PATH.data() + mServiceName + ".lock");
+        } catch (std::exception &e) {
+            mpLogger->errorf("[SYSTEMD_SERVICE] Service initialization error: %s", e.what());
+            return false;
+        }
+
         if (getenv("NOTIFY_SOCKET")) {
+            if (mpIoContext == nullptr) {
+                mpLogger->error(
+                    "[SYSTEMD_SERVICE] Watchdog is enabled but IoContext was not set. "
+                    "Use ServiceManager.setIoContext(boost::asio::io_context&)");
+                return false;
+            }
             mIsWatchdogEnabled = sd_watchdog_enabled(0, &mWatchdogInterval) > 0;
             if (mIsWatchdogEnabled) {
-                mWatchdogTimer.emplace(Core::Instance().getCoreUtilityIoContext());
+                mWatchdogTimer.emplace(*mpIoContext);
             }
             return true;
         }
@@ -46,9 +57,8 @@ namespace SmartHome::Service {
             // Schedule at half interval value
             timer.expires_after(std::chrono::microseconds(mWatchdogInterval) / 2);
             timer.async_wait([this](const boost::system::error_code &ec) {
-                const auto &core = Core::Instance();
-                // Reschedule if Core is still running
-                if (!ec && core.isRunning()) {
+                // Reschedule if no errors are present
+                if (!ec) {
                     sd_notify(0, "WATCHDOG=1");
                     notifyWatchdog();
                 }

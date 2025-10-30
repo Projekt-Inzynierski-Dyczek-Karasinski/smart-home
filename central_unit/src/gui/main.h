@@ -1,6 +1,6 @@
 #pragma once
 
-#include "config_manager.h"
+#include "config_manager/config_manager.h"
 #include "logger.h"
 
 #include <string_view>

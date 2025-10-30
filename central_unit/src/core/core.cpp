@@ -1,6 +1,5 @@
 #include "core.h"
-#include "config_manager.h"
-#include "service/service_manager.h"
+#include "config_manager/config_manager.h"
 #include "core_actions.h"
 
 #include <chrono>
@@ -36,7 +35,10 @@ namespace SmartHome {
         // Initialize AsyncLogger, using Logger for further initialization
         mpLogger = std::make_shared<Utils::AsyncLogger>(logger, mCoreUtilityIoContext);
 
-        mpService = Service::ServiceManager::create(mpLogger, Utils::ServiceType::AUTO);
+        const std::string serviceName = "smarthome"; //TODO !pr move variable to header?
+        mpService = Utils::ServiceManager::create(logger, serviceName, Utils::ServiceType::AUTO);
+        mpService->setIoContext(mCoreIoContext);
+
         if (!mpService->onInitialize()) {
             logger->error("[CORE] Failed to initialize service");
             stopCoreUtilityThread();
@@ -60,7 +62,7 @@ namespace SmartHome {
         uint ipcThreadCount = getThreadCount(mConfig.ipcServerThreads);
         if (ipcThreadCount > ms_HIGH_THREAD_COUNT_LIMIT) {
             mpLogger->warningf("[CORE] IPC server thread count exceeds recommended limit (%d active threads)",
-                              ipcThreadCount);
+                               ipcThreadCount);
         }
         if (ipcThreadCount < 1) {
             mpLogger->error("[CORE] Invalid IPC server thread count value (less than 1), setting value to default");
@@ -79,7 +81,7 @@ namespace SmartHome {
         uint coreThreadCount = getThreadCount(mConfig.coreMainThreads);
         if (coreThreadCount > ms_HIGH_THREAD_COUNT_LIMIT) {
             mpLogger->warningf("[CORE] Core main thread count exceeds recommended limit (%d active threads)",
-                              coreThreadCount);
+                               coreThreadCount);
         }
         if (coreThreadCount < 1) {
             mpLogger->error("[CORE] Invalid Core main thread count value (less than 1), setting value to default");
@@ -96,7 +98,7 @@ namespace SmartHome {
         uint coreWorkerThreadCount = getThreadCount(mConfig.coreWorkerThreads);
         if (coreWorkerThreadCount > ms_HIGH_THREAD_COUNT_LIMIT) {
             mpLogger->warningf("[CORE] Core worker thread count exceeds recommended limit (%d active threads)",
-                              coreWorkerThreadCount);
+                               coreWorkerThreadCount);
         }
         if (coreWorkerThreadCount < 1) {
             mpLogger->error("[CORE] Invalid Core worker thread count value (less than 1), setting value to default");
@@ -108,7 +110,7 @@ namespace SmartHome {
         for (size_t i = 0; i < coreWorkerThreadCount; i++) {
             ba::post(*mCoreWorkerThreadPool, [this] { mCoreWorkerIoContext.run(); });
         }
-        
+
         mIsInitialized.store(true);
         logger->debug("[CORE] Core successfully initialized");
 
@@ -172,8 +174,8 @@ namespace SmartHome {
         CoreActions::onCoreShutdown();
 
         // Start shutdown timeout timer
-        ba::steady_timer shutdownTimeout(mCoreUtilityIoContext, ms_SHUTDOWN_TIMEOUT);
-        shutdownTimeout.async_wait([this](const bs::error_code &ec) {
+        auto shutdownTimeout = make_shared<ba::steady_timer>(mCoreUtilityIoContext, ms_SHUTDOWN_TIMEOUT);
+        shutdownTimeout->async_wait([this, shutdownTimeout](const bs::error_code &ec) {
             if (!ec) {
                 mCoreWorkerThreadPool->stop();
                 mCoreThreadPool->stop();
@@ -204,6 +206,7 @@ namespace SmartHome {
         }
 
         mpService->onStop();
+        mpService.reset();
 
         // Stop handling signals
         if (mSignals.has_value()) {

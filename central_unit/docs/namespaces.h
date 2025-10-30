@@ -18,18 +18,6 @@ namespace SmartHome {
 }
 
 /**
- * @namespace SmartHome::Service
- * @brief System service management and application lifecycle.
- *
- * @details Contains components responsible for operating system integration:
- * - Systemd integration (Linux)
- * - Standalone mode with multiple instance prevention
- * - Abstractions for different service managers
- */
-namespace SmartHome::Service {
-}
-
-/**
  * @namespace SmartHome::JsonRpcStrings
  * @brief String constants for JSON-RPC protocol implementation.
  *
@@ -78,6 +66,11 @@ namespace SmartHome::IPC {
  *
  * @details Contains shared utilities used by various modules:
  * - ConfigManager - YAML configuration management
+ * - ServiceManager - Contains virtual components responsible for operating system integration:
+ *      - Systemd integration (Linux)
+ *      - Standalone mode with multiple instance prevention
+ *      - Abstractions for different service managers
+ * - Logger - Console and file logging.
  * - FileLock - RAII wrapper for exclusive file locking
  * - Helper functions for conversion and validation
  */

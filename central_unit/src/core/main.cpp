@@ -1,6 +1,5 @@
 #include "main.h"
 #include "core.h"
-#include "config_manager.h"
 #include "logger.h"
 
 #include <iostream>

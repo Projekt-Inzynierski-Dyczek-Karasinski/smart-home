@@ -5,7 +5,7 @@
 
 #include <memory>
 
-namespace SmartHome::Service {
+namespace SmartHome::Utils {
     /**
      * @brief Abstract base class for  service lifecycle management.
      *
@@ -18,10 +18,11 @@ namespace SmartHome::Service {
          * @brief Construct ServiceManage.
          *
          * @param logger Shared pointer instance reference of logger.
+         * @param serviceName Service name used for LockFile.
          */
-        explicit ServiceManager(const std::shared_ptr<Utils::Logger> &logger);
+        explicit ServiceManager(const std::shared_ptr<Logger> &logger, std::string_view serviceName);
 
-        virtual ~ServiceManager() = default;
+        virtual ~ServiceManager();
 
         /**
          * @brief Factory  method to create appropriate service manager.
@@ -30,13 +31,15 @@ namespace SmartHome::Service {
          *          AUTO mode detects systemd presence via NOTIFY_SOCKET environment variable.
          *
          * @param logger Synchronous logger instance needed for initialization.
+         * @param serviceName Service name used for LockFile.
          * @param type Service type to create manager for.
          * @return Unique pointer to created service manager instance.
          *
          * @note Falls back to StandaloneService if systemd is not available.
          */
-        static std::unique_ptr<ServiceManager> create(const std::shared_ptr<Utils::Logger> &logger,
-                                                      Utils::ServiceType type = Utils::ServiceType::AUTO);
+        static std::unique_ptr<ServiceManager> create(const std::shared_ptr<Logger> &logger,
+                                                      std::string_view serviceName,
+                                                      ServiceType type = ServiceType::AUTO);
 
         /**
          * @brief Initialize service infrastructure.
@@ -63,7 +66,16 @@ namespace SmartHome::Service {
          */
         virtual void onStop() = 0;
 
+        //TODO !pr doc
+        void setIoContext(ba::io_context &io_context);
+
     protected:
-        std::shared_ptr<Utils::Logger> mpLogger; ///< Logger instance shared pointer
+        /// Path to lock file
+        static constexpr std::string_view ms_LOCK_FILE_PATH = "/var/lock/";
+
+        std::shared_ptr<Logger> mpLogger; ///< Logger instance shared pointer
+        ba::io_context *mpIoContext{}; ///< Used in systemd service for watchdog timers
+        std::string mServiceName; ///< Used as LockFile name
+        std::optional<FileLock> lockFile; ///< Lock file RAII wrapper instance
     };
 }

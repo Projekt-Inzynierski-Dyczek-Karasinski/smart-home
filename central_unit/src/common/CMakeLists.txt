@@ -20,17 +20,25 @@ find_package(Boost 1.74 REQUIRED COMPONENTS
         regex
 )
 
+if (ENABLE_SYSTEMD)
+    # Required PkgConfig for systemd
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(SYSTEMD REQUIRED libsystemd)
+
+endif ()
+
+
 
 # SMARTHOME LOGGER
 add_library(smarthome_logger STATIC
-        utils/logger/logger.cpp
-        utils/logger/async_logger.cpp
+        logger/logger.cpp
+        logger/async_logger.cpp
 )
 
 add_library(smarthome::logger ALIAS smarthome_logger)
 
 target_include_directories(smarthome_logger PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils/logger>
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/logger>
 )
 
 target_link_libraries(smarthome_logger PRIVATE
@@ -70,8 +78,11 @@ target_link_libraries(smarthome_ipc PRIVATE
 
 # SMARTHOME UTILITY
 add_library(smarthome_utility STATIC
-        utils/config_manager.cpp
         utils/utils.cpp
+        utils/config_manager/config_manager.cpp
+        utils/service_manager/service_manager.cpp
+        utils/service_manager/standalone_service.cpp
+        utils/service_manager/systemd_service.cpp
 )
 
 add_library(smarthome::utility ALIAS smarthome_utility)
@@ -81,6 +92,14 @@ target_include_directories(smarthome_utility PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/utils>
 
 )
+
+if (ENABLE_SYSTEMD)
+    # Add compile flag to signal systemd use
+    target_compile_definitions(smarthome_utility PRIVATE WITH_SYSTEMD)
+    # Link systemd
+    target_link_libraries(smarthome_utility PRIVATE ${SYSTEMD_LIBRARIES})
+    target_include_directories(smarthome_utility PRIVATE ${SYSTEMD_INCLUDE_DIRS})
+endif ()
 
 target_link_libraries(smarthome_utility
         PRIVATE

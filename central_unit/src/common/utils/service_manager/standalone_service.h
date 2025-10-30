@@ -5,7 +5,7 @@
 #include "service_manager.h"
 #include "utils.h"
 
-namespace SmartHome::Service {
+namespace SmartHome::Utils {
     /**
      * @brief Standalone service implementation.
      *
@@ -17,8 +17,9 @@ namespace SmartHome::Service {
          * @brief Construct standalone service manager.
          *
          * @param logger Shared logger instance for service messages.
+         * @param serviceName Service name used for LockFile.
          */
-        explicit StandaloneService(const std::shared_ptr<Utils::Logger> &logger);
+        explicit StandaloneService(const std::shared_ptr<Logger> &logger, std::string_view serviceName);
 
         /**
          * @brief Initialize standalone service.
@@ -48,11 +49,5 @@ namespace SmartHome::Service {
          * @warning Lock file will not be removed if service crashes, may cause file permissions problems.
          */
         void onStop() override;
-
-    private:
-        /// Path to lock file
-        static constexpr std::string_view ms_LOCK_FILE_PATH = "/var/lock/smarthomed.lock";
-        /// Lock file RAII wrapper instance
-        std::optional<Utils::FileLock> lockFile;
     };
 }
