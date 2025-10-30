@@ -1,0 +1,184 @@
+#include "uart_port.h"
+
+namespace SmartHomeMediator {
+    UartPort::UartPort(ba::io_context &ioContext, const std::string_view portName, const uint baudRate)
+        : mPort(ioContext, portName.data()),
+          mIoContext(ioContext),
+          mBuffer(ms_BUFFER_CAPACITY) {
+        // Configure UART with 8N1 format
+        mPort.set_option(ba::serial_port::baud_rate(baudRate));
+        mPort.set_option(ba::serial_port::character_size(8));
+        mPort.set_option(ba::serial_port::parity(ba::serial_port::parity::none));
+        mPort.set_option(ba::serial_port::stop_bits(ba::serial_port::stop_bits::one));
+        mPort.set_option(ba::serial_port::flow_control(ba::serial_port::flow_control::none));
+    }
+
+    UartPort::~UartPort() {
+        mIsShuttingDown = true;
+        cancel();
+        mPort.close();
+    }
+
+    ba::awaitable<void> UartPort::writeAsync(const std::vector<uint8_t> &data) {
+        co_await ba::async_write(
+            mPort,
+            ba::buffer(data),
+            ba::use_awaitable
+        );
+    }
+
+    ba::awaitable<std::vector<uint8_t>> UartPort::readUntilAsync(const std::chrono::milliseconds timeout) {
+        mSyncModeActive = true; // Stop read loop
+
+        cancel(); // Interrupt readLoop
+
+        // Clear buffer
+        mBuffer.consume(mBuffer.size());
+
+        ba::steady_timer timer(mIoContext, timeout);
+        bool timer_fired = false;
+
+        timer.async_wait([this, &timer_fired](const bs::error_code &ec) {
+            if (!ec) {
+                timer_fired = true;
+                cancel(); // Cancel the async read until operation
+            }
+        });
+
+        std::vector<uint8_t> result;
+        try {
+            size_t bytesTransferred = co_await ba::async_read_until(
+                mPort,
+                mBuffer,
+                ms_DELIMITER.data(),
+                ba::use_awaitable
+            );
+
+            timer.cancel();
+
+            //  Restart read loop
+            mSyncModeActive = false;
+            ba::post(mIoContext, [this] {
+                if (!mIsShuttingDown) {
+                    startReadLoop();
+                }
+            });
+
+            const auto buffer = mBuffer.data();
+
+            // Copy data without delimiter
+            if (bytesTransferred >= ms_DELIMITER.size()) {
+                result.assign(
+                    ba::buffers_begin(buffer),
+                    ba::buffers_begin(buffer) + (bytesTransferred - ms_DELIMITER.size())
+                );
+            }
+
+            // Consume data including delimiter
+            mBuffer.consume(bytesTransferred);
+
+            co_return result;
+        } catch (const boost::system::system_error &e) {
+            timer.cancel();
+
+            // Restart read loop
+            mSyncModeActive = false;
+            ba::post(mIoContext, [this] {
+                if (!mIsShuttingDown) {
+                    startReadLoop();
+                }
+            });
+
+            // Return empty string on timeout
+            if (e.code() == ba::error::operation_aborted) {
+                co_return result;
+            }
+
+            // Other errors propagate up
+            throw;
+        }
+    }
+
+    ba::awaitable<std::vector<uint8_t>> UartPort::readAsync() {
+        ba::steady_timer timer(mIoContext);
+
+        while (true) {
+            // Save current buffer size
+            size_t current_size = mBuffer.size();
+
+            // Set timer for inactivity timeout
+            timer.expires_after(ms_READ_ASYNC_WAIT_TIMEOUT); //TODO calculate from baud rate
+
+            // Wait for timeout
+            try {
+                co_await timer.async_wait(ba::use_awaitable);
+            } catch (const bs::system_error &e) {
+                // Timer cancelled - continue
+                if (e.code() == ba::error::operation_aborted) {
+                    continue;
+                }
+                throw; // Other errors propagate up
+            }
+
+            // Check if new data arrived
+            size_t new_size = mBuffer.size();
+
+            if (new_size == current_size) {
+                // No new data arrived for ms_READ_ASYNC_WAIT_TIMEOUT ms
+
+                if (new_size == 0) {
+                    // Continue until read any data
+                    continue;
+                }
+
+                const auto buffer = mBuffer.data();
+                std::vector<uint8_t> result(ba::buffers_begin(buffer), ba::buffers_end(buffer));
+
+                mBuffer.consume(result.size());
+
+                co_return result;
+            }
+        }
+    }
+
+    void UartPort::startReadLoop() {
+        if (mIsShuttingDown || mSyncModeActive) {
+            return;
+        }
+
+        mPort.async_read_some(
+            mBuffer.prepare(ms_READ_CHUNK_SIZE),
+            [this](const bs::error_code &ec, const size_t bytes) {
+                readLoopCallback(ec, bytes);
+            }
+        );
+    }
+
+    void UartPort::setBaudRate(const uint baudRate) {
+        cancel();
+
+        mPort.set_option(ba::serial_port::baud_rate(baudRate));
+
+        if (!mSyncModeActive && !mIsShuttingDown) {
+            ba::post(mIoContext, [this] {
+                startReadLoop();
+            });
+        }
+    }
+
+    void UartPort::cancel() {
+        mPort.cancel();
+    }
+
+    void UartPort::readLoopCallback(const bs::error_code &ec, const size_t bytes_transferred) {
+        if (ec) return;
+
+        // Commit received data to buffer
+        mBuffer.commit(bytes_transferred);
+
+        // Chain next read
+        if (!mSyncModeActive && !mIsShuttingDown) {
+            startReadLoop();
+        }
+    }
+}

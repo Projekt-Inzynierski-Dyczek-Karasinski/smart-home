@@ -53,6 +53,12 @@ namespace SmartHome::IPC {
         */
         virtual ~SocketConnection();
 
+        // TODO !pr
+        bool connect(const bal::stream_protocol::endpoint &udsEndpoint);
+
+        // TODO !pr
+        bool connect(const bai::tcp::endpoint &tcpEndpoint);
+
         /**
         * @brief Synchronously read a message from socket.
         *

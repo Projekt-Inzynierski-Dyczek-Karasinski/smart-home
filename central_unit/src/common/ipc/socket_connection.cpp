@@ -11,6 +11,26 @@ namespace SmartHome::IPC {
         SocketConnection::close();
     }
 
+    bool SocketConnection::connect(const bal::stream_protocol::endpoint &udsEndpoint) {
+        try {
+            std::get<bal::stream_protocol::socket>(mSocket).connect(udsEndpoint);
+        } catch (std::exception &e) {
+            mpLogger->errorf("[SOCKET_CONNECTION] IPC UDS connection attempt failed: %s", e.what());
+            return false;
+        }
+        return true;
+    }
+
+    bool SocketConnection::connect(const bai::tcp::endpoint &tcpEndpoint) {
+        try {
+            std::get<bai::tcp::socket>(mSocket).connect(tcpEndpoint);
+        } catch (std::exception &e) {
+            mpLogger->errorf("[SOCKET_CONNECTION] IPC TCP connection attempt failed: %s", e.what());
+            return false;
+        }
+        return true;
+    }
+
     const boost::regex SocketConnection::ms_DELIMITER_REGEX(ms_MESSAGE_DELIMITER.data());
 
     std::string SocketConnection::read() {
@@ -103,7 +123,7 @@ namespace SmartHome::IPC {
         std::visit([mode](auto &socket) {
             socket.shutdown(mode);
             //TODO Sockets do not close for incoming traffic consistently - more testing needed
-        },mSocket);
+        }, mSocket);
     }
 
     bool SocketConnection::isOpen() const {

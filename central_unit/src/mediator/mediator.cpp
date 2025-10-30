@@ -1,0 +1,264 @@
+#include "mediator.h"
+
+
+namespace SmartHomeMediator {
+    //main file, with mediator.run with main logic
+
+    /*
+     * Start service
+     * Connect to smarthomed
+     * identify connection (implement id handshake in smarthomed)
+     * start rf device (depending on smarthomed config)
+     * start async read functions on IPC and RF with callbacks
+     *  - on IPC message check type (internal/external) handle/execute internal, send external via RF
+     *  - on RF message: decode, check sum, prepare API notification -> send to core (core decides on rf response)
+     *
+     *
+     *  additional classes:
+     *      RfTransceiver (virtual for rf read/write, device lifetime handling, device config)
+     *          - HC12 final
+     *      API client (for smarthomed connection)
+     *      RF connection (with addressing)
+     */
+    Mediator &Mediator::Instance() {
+        static Mediator instance;
+        return instance;
+    }
+
+    bool Mediator::initialize(const Config &configStruct, const std::shared_ptr<su::Logger> &logger) {
+        if (mIsRunning.load(std::memory_order_acquire)) {
+            logger->error("[MEDIATOR] Initialize called while mediator is already initialized");
+            return false;
+        }
+
+        // Initialize AsyncLogger, using Logger for further initialization
+        // mpLogger = std::make_shared<su::AsyncLogger>(logger, mMediatorUtilityIoContext);
+        mpLogger = logger;
+
+        // Start service
+        const std::string serviceName = "smarthome-radiod";
+        mpService = su::ServiceManager::create(logger, serviceName, su::ServiceType::AUTO);
+        mpService->setIoContext(mMediatorIoContext);
+        if (!mpService->onInitialize()) {
+            logger->error("[MEDIATOR] Failed to initialize service");
+            return false;
+        }
+
+        // Enable file logging after service init to avoid overwriting logs of already running instance
+        logger->enableFileLoggingIfConfigured();
+
+        mConfig = configStruct;
+
+        // Attempt establishing connection with SmatHome daemon
+        // mpApiClient = std::make_unique<ApiClient>(&mApiClientIoContext, mpLogger);
+        // bool isConnectionEstablished = false;
+        // if (mConfig.uds.isEnabled) {
+        //     isConnectionEstablished = mpApiClient->connectToServer(mConfig.uds.endpointPath);
+        // }
+        // if (!isConnectionEstablished && mConfig.tcp.isEnabled) {
+        //     isConnectionEstablished = mpApiClient->connectToServer(mConfig.tcp.endpointAddress,
+        //                                                            mConfig.tcp.endpointPort);
+        // }
+        // if (!isConnectionEstablished) {
+        //     logger->error("[MEDIATOR] Failed to connect with SmartHome daemon");
+        //     return false;
+        // }
+
+        // Create thread running io context for signal handling and service manager
+        mMediatorUtilityGuard.emplace(ba::make_work_guard(mMediatorUtilityIoContext));
+        mMediatorUtilityThread = std::thread([this] {
+            mMediatorUtilityIoContext.run();
+        });
+
+        mRfClientGuard.emplace(ba::make_work_guard(mRfClientIoContext));
+        mRfClientThread = std::thread([this] {
+            mRfClientIoContext.run();
+        });
+
+        mApiClientGuard.emplace(ba::make_work_guard(mApiClientIoContext));
+        mApiClientThread = std::thread([this] {
+            mApiClientIoContext.run();
+        });
+
+        mMediatorGuard.emplace(ba::make_work_guard(mMediatorIoContext));
+        mMediatorThread = std::thread([this] {
+            mMediatorIoContext.run();
+        });
+
+        //TODO !pr
+        try {
+            mpRfClient = std::make_unique<RfClient>(
+                mRfClientIoContext,
+                mpLogger,
+                "/dev/serial0",
+                9600
+            );
+            mpLogger->infof("[MEDIATOR] RF client created");
+        } catch (const std::exception &e) {
+            mpLogger->errorf("[MEDIATOR] Failed to create RF client: %s", e.what());
+            return false;
+        }
+
+        mIsInitialized.store(true, std::memory_order_release);
+        logger->debug("[MEDIATOR] Mediator successfully initialized");
+
+        return true;
+    }
+
+    void Mediator::run() {
+        if (!mIsInitialized.load(std::memory_order_acquire)) {
+            mpLogger->error("[MEDIATOR] Mediator not initialized");
+            return;
+        }
+        if (mIsRunning.load(std::memory_order_acquire)) {
+            mpLogger->error("[MEDIATOR] Mediator is already running");
+            return;
+        }
+
+        mIsRunning.store(true, std::memory_order_release);
+        mpLogger->info("[MEDIATOR] Mediator running");
+
+        mpService->onStart();
+
+        // Start signal handling
+        mSignals.emplace(mMediatorUtilityIoContext);
+        for (const auto &sig: ms_SIGNALS_TO_HANDLE) {
+            mSignals->add(sig);
+        }
+
+        mSignals->async_wait([this](const bs::error_code &ec, const int sig) {
+            signalHandler(ec, sig);
+        });
+
+        // mpApiClient->startReceiving(/*TODO !pr add handler */);
+
+        //TODO !pr Start RF client
+
+        mpRfClient->initialize([this](bool success) {
+            if (success) {
+                mpLogger->infof("[MEDIATOR] RF initialized - starting echo mode");
+
+                // Start receive loop
+                mpRfClient->startReceiving([this](const std::vector<uint8_t> &data) {
+                    std::string tmpStr;
+                    for (int i = 8; i < 8 + 6; i++) {
+                        tmpStr += data[i];
+                    }
+                    mpLogger->infof("[MEDIATOR] RF received: %s", tmpStr.c_str());
+                });
+            } else {
+                mpLogger->errorf("[MEDIATOR] RF initialization failed");
+            }
+        });
+
+
+        // Main thread loop
+        mMediatorThread->join();
+        mMediatorThread.reset();
+
+        mpLogger->debug("[TEST] mediator joined");
+
+        // Join threads
+        mApiClientThread->join();
+        mApiClientThread.reset();
+
+        mpLogger->debug("[TEST] api joined");
+
+        mRfClientThread->join(); // TODO !pr RF client hangs on something during shutdown
+        mRfClientThread.reset();
+
+        mpLogger->debug("[TEST] rf joined");
+
+        // Stop utilities
+        mMediatorUtilityGuard.reset();
+        mMediatorUtilityThread->join();
+        mMediatorUtilityThread.reset();
+    }
+
+    void Mediator::shutdown() {
+        bool expected = true;
+        constexpr bool desired = false;
+        if (!mIsRunning.compare_exchange_strong(expected, desired)) {
+            mpLogger->error("[MEDIATOR] Shutdown called while mediator is not running");
+            return;
+        }
+
+        // Start shutdown timeout timer
+        auto shutdownTimeout = std::make_shared<ba::steady_timer>(mMediatorUtilityIoContext, ms_SHUTDOWN_TIMEOUT);
+        shutdownTimeout->async_wait([this, shutdownTimeout](const bs::error_code &ec) {
+            if (!ec) {
+                mMediatorIoContext.stop();
+                mApiClientIoContext.stop();
+                mRfClientIoContext.stop();
+            }
+        });
+
+        mpRfClient.reset();
+
+        // Delete thread guards
+        mMediatorGuard.reset();
+        mApiClientGuard.reset();
+        mRfClientGuard.reset();
+
+        // Stops API client
+        mpApiClient.reset();
+        mpHC12Driver.reset(); //TODO !pr tmp
+
+        mpService->onStop();
+        mpService.reset();
+
+        // Stop handling signals
+        if (mSignals.has_value()) {
+            mSignals->cancel();
+            mSignals.reset();
+        }
+
+        mpLogger->debug("[MEDIATOR] Shutdown complete");
+    }
+
+    bool Mediator::isRunning() const {
+        return mIsRunning.load(std::memory_order_acquire);
+    }
+
+    Mediator::Mediator() = default;
+
+    Mediator::~Mediator() {
+        if (isRunning()) {
+            shutdown();
+        }
+    }
+
+    void Mediator::signalHandler(const boost::system::error_code &ec, const int signal) {
+        mpLogger->debug("[MEDIATOR] signalHandler called");
+        if (!ec) {
+            // Handle signal
+            switch (signal) {
+                case SIGINT:
+                case SIGTERM:
+                    ba::post(mMediatorUtilityIoContext, [this] {
+                        shutdown();
+                    });
+                    return;
+                case SIGHUP:
+                    mpLogger->debug("[MEDIATOR] Signal not implemented");
+                    //TODO implement reload
+                    break;
+                default:
+                    mpLogger->debug("[MEDIATOR] Undefined signal");
+                    break;
+            }
+        } else {
+            // Handle signal error
+            if (ec.value() == ba::error::operation_aborted) {
+                mpLogger->debug("[MEDIATOR] Signal handler aborted");
+            } else {
+                mpLogger->errorf("[MEDIATOR] Signal handler error: %s", ec.message().c_str());
+            }
+        }
+        if (isRunning()) {
+            mSignals->async_wait([this](const bs::error_code &e, const int sig) {
+                signalHandler(e, sig);
+            });
+        }
+    }
+}
