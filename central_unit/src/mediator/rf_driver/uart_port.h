@@ -53,13 +53,13 @@ namespace SmartHomeMediator {
          * @details Stops read loop, clears buffer, reads until CRLF.
          *          Uses timer for timeout. Restarts read loop after completion.
          *
-         * @param timeout Max wait time for response.
+         * @param timeoutDuration Max wait time for response.
          *
          * @return Data without delimiter, or empty string on timeout/error.
          *
          * @throws bs::system_error when awaitable operations throws error.
          */
-        ba::awaitable<std::vector<uint8_t>> readUntilAsync(std::chrono::milliseconds timeout);
+        ba::awaitable<std::vector<uint8_t>> readUntil(std::chrono::milliseconds timeoutDuration);
 
         /**
          * @brief Read with grouping timeout.
@@ -99,7 +99,7 @@ namespace SmartHomeMediator {
          * @details Continuously reads into mBuffer. Chains itself unless mSyncModeActive or shutdown.
          *
          */
-        void readLoopCallback(const bs::error_code &ec, size_t bytes_transferred);
+        void readLoopCallback(const bs::error_code &ec, size_t bytesTransferred);
 
         static constexpr std::string_view ms_DELIMITER = "\r\n";
 

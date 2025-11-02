@@ -100,7 +100,7 @@ namespace SmartHomeMediator {
             }
 
             if (read_error) {
-                ba::steady_timer timer(mIoContext, std::chrono::milliseconds(100));
+                ba::steady_timer timer(mIoContext, 100ms);
                 try {
                     co_await timer.async_wait(ba::use_awaitable);
                 } catch (...) {

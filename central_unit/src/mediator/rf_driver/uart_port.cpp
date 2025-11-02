@@ -27,7 +27,7 @@ namespace SmartHomeMediator {
         );
     }
 
-    ba::awaitable<std::vector<uint8_t>> UartPort::readUntilAsync(const std::chrono::milliseconds timeout) {
+    ba::awaitable<std::vector<uint8_t>> UartPort::readUntil(const std::chrono::milliseconds timeoutDuration) {
         mSyncModeActive = true; // Stop read loop
 
         cancel(); // Interrupt readLoop
@@ -35,12 +35,12 @@ namespace SmartHomeMediator {
         // Clear buffer
         mBuffer.consume(mBuffer.size());
 
-        ba::steady_timer timer(mIoContext, timeout);
-        bool timer_fired = false;
+        ba::steady_timer timer(mIoContext, timeoutDuration);
+        bool timeout = false;
 
-        timer.async_wait([this, &timer_fired](const bs::error_code &ec) {
+        timer.async_wait([this, &timeout](const bs::error_code &ec) {
             if (!ec) {
-                timer_fired = true;
+                timeout = true;
                 cancel(); // Cancel the async read until operation
             }
         });
@@ -89,7 +89,7 @@ namespace SmartHomeMediator {
                 }
             });
 
-            // Return empty string on timeout
+            // Return empty vector on timeout
             if (e.code() == ba::error::operation_aborted) {
                 co_return result;
             }
@@ -104,7 +104,7 @@ namespace SmartHomeMediator {
 
         while (true) {
             // Save current buffer size
-            size_t current_size = mBuffer.size();
+            const size_t currentSize = mBuffer.size();
 
             // Set timer for inactivity timeout
             timer.expires_after(ms_READ_ASYNC_WAIT_TIMEOUT); //TODO calculate from baud rate
@@ -121,12 +121,12 @@ namespace SmartHomeMediator {
             }
 
             // Check if new data arrived
-            size_t new_size = mBuffer.size();
+            size_t newSize = mBuffer.size();
 
-            if (new_size == current_size) {
+            if (newSize == currentSize) {
                 // No new data arrived for ms_READ_ASYNC_WAIT_TIMEOUT ms
 
-                if (new_size == 0) {
+                if (newSize == 0) {
                     // Continue until read any data
                     continue;
                 }
@@ -148,8 +148,8 @@ namespace SmartHomeMediator {
 
         mPort.async_read_some(
             mBuffer.prepare(ms_READ_CHUNK_SIZE),
-            [this](const bs::error_code &ec, const size_t bytes) {
-                readLoopCallback(ec, bytes);
+            [this](const bs::error_code &ec, const size_t bytesTransferred) {
+                readLoopCallback(ec, bytesTransferred);
             }
         );
     }
@@ -170,11 +170,11 @@ namespace SmartHomeMediator {
         mPort.cancel();
     }
 
-    void UartPort::readLoopCallback(const bs::error_code &ec, const size_t bytes_transferred) {
+    void UartPort::readLoopCallback(const bs::error_code &ec, const size_t bytesTransferred) {
         if (ec) return;
 
         // Commit received data to buffer
-        mBuffer.commit(bytes_transferred);
+        mBuffer.commit(bytesTransferred);
 
         // Chain next read
         if (!mSyncModeActive && !mIsShuttingDown) {

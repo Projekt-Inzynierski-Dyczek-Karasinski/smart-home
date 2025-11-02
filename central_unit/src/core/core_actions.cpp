@@ -633,7 +633,7 @@ namespace SmartHome {
 
         // TODO implement core cached data object with getter methods
         // TODO remove - temporary code for API testing
-        static const std::function tmpDataGetter = [](const std::string_view value) {
+        static const auto tmpDataGetter = [](const std::string_view value) {
             const std::map<std::string_view, std::string> tmpMap = {
                 {
                     "modules_status",

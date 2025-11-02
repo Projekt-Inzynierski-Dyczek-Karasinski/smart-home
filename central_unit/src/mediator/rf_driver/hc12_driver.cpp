@@ -52,7 +52,8 @@ namespace SmartHomeMediator {
         // Wait if necessary
         if (elapsed < required) {
             try {
-                ba::steady_timer timer(mIoContext, required - elapsed);
+                const auto executor = co_await ba::this_coro::executor;
+                ba::steady_timer timer(executor, required - elapsed);
                 co_await timer.async_wait(ba::use_awaitable);
             } catch (const std::exception &e) {
                 mpLogger->errorf("[HC12_DRIVER] Write delay error: %s", e.what());
@@ -241,7 +242,7 @@ namespace SmartHomeMediator {
                                                                    const std::chrono::milliseconds timeout) const {
         co_await mpUart->writeAsync(command);
 
-        auto response = co_await mpUart->readUntilAsync(timeout);
+        auto response = co_await mpUart->readUntil(timeout);
 
         mpLogger->debugf("[HC12_DRIVER] AT command: %s -> %s", command.data(), response.data());
 
