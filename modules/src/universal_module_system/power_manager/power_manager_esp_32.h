@@ -54,14 +54,6 @@ namespace UniversalModuleSystem {
         void safeRestart(const char *source) const override;
 
         /**
-         * @brief Gets the value of the battery voltage output, read on startup.
-         *
-         * @return Battery voltage output (0 - 4095 -> 0V - 3.3V).
-         * @warning Waits (and blocks) until the measurement ends.
-         */
-        uint16_t getBatteryRead() const override;
-
-        /**
          * @brief Disables the automatic sleep (if enabled) after waking up ESP by rf module.
          */
         void disableAutoSleep() override;
@@ -99,24 +91,11 @@ namespace UniversalModuleSystem {
         void handleWakeUpReason();
 
         /**
-         * @brief Initiates a FreeRTOS task for battery reading.
-         */
-        void readBattery();
-
-        /**
          * @brief Converts raw analog read to voltage (in mV).
          * @param rawAnalogRead Reading from <code>analogRead()</code>.
          * @return Voltage (in mV) or <code>rawAnalogRead</code> if failed to load power manager data.
          */
         uint16_t calculateVoltage(uint16_t rawAnalogRead);
-
-        /**
-         * @brief FreeRTOS task for asynchronous battery reading.
-         *
-         * @param parameters FreeRTOS task parameters (used for passing pointer to instance of PowerManagerESP32).
-         * @note Deletes itself after readding is ended.
-         */
-        static void batteryReadTask(void* parameters);
 
         /**
          * @brief Enables the automatic sleep functionality.
@@ -158,8 +137,6 @@ namespace UniversalModuleSystem {
 
         std::atomic<uint16_t> mBatteryRead{0};
         std::shared_ptr<ul::Logger> mpLogger;
-
-        SemaphoreHandle_t mReadCompleteSemaphore = nullptr; ///< FreeRTOS semaphore to indicate completion of battery read operation.
 
         TimerHandle_t mAutoSleepTimer = nullptr; ///< FreeRTOS timer handle for managing auto-sleep functionality.
 

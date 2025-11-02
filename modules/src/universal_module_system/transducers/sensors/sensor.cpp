@@ -3,50 +3,54 @@
 #include "universal_module_system/data_manager.h"
 
 namespace UniversalModuleSystem::Transducers {
-    Sensor::Sensor(const std::shared_ptr<ul::Logger> &logger, String dataPath)
-    : mpLogger(logger), mDataPath(std::move(dataPath)), mSensorDataMutex(xSemaphoreCreateMutex()) {}
+    Sensor::Sensor(const std::shared_ptr<ul::Logger> &logger)
+        : mpLogger(logger),
+          mSensorDataMutex(xSemaphoreCreateMutex()),
+          mReadingCompleteSemaphore(xSemaphoreCreateBinary()) {}
 
     Sensor::~Sensor() {
         vSemaphoreDelete(mSensorDataMutex);
+        vSemaphoreDelete(mReadingCompleteSemaphore);
     }
 
-    uint8_t Sensor::getId() {
-        xSemaphoreTake(mSensorDataMutex, portMAX_DELAY);
-        if (!mSensorData.has_value()) {
-            xSemaphoreGive(mSensorDataMutex);
-            mpLogger->error("Sensor class", "Can't get sensor id, sensor data is not loaded.");
-            return 0; // TODO consider throwing error
-        }
-        const uint8_t result = mSensorData.value().id;
-        xSemaphoreGive(mSensorDataMutex);
-
+    String Sensor::getApiFormattedReading() {
+        String result = String(getId());
+        result.concat(':');
+        result.concat(getReading());
         return result;
     }
 
-    void Sensor::onBoot() {
-        loadData();
-        read();
+    uint8_t Sensor::getId() const {
+        xSemaphoreTake(mSensorDataMutex, portMAX_DELAY);
+        const uint8_t result = mCommonSensorData.id;
+        xSemaphoreGive(mSensorDataMutex);
+        return result;
     }
 
-    void Sensor::loadData() {
-        const auto &dataManager = DataManager::getInstance();
-        const nl::json jsonData = dataManager.loadJson(mDataPath.c_str());
+    bool Sensor::init(const nl::json &jsonData) {
+        return loadData(jsonData);
+    }
 
+    bool Sensor::loadData(const nl::json &jsonData) {
+        bool isLoadedSuccessfully = true;
         xSemaphoreTake(mSensorDataMutex, portMAX_DELAY);
         try {
-            mSensorData = SensorData(jsonData);
+            mCommonSensorData = CommonSensorData(jsonData);
         } catch (...) {
-            mpLogger->error("Sensor class", "Failed to load sensor data.");
-            mSensorData.reset();
+            mpLogger->error("Sensor class", "Failed to load common sensor data.");
+            isLoadedSuccessfully = false;
         }
-        loadAdditionalData(jsonData);
+        if (isLoadedSuccessfully) {
+            isLoadedSuccessfully = loadAdditionalData(jsonData);
+        }
         xSemaphoreGive(mSensorDataMutex);
+        return isLoadedSuccessfully;
     }
 
-    Sensor::SensorData::SensorData(const nl::json &json)
-        : id(json[ms_ID]), readPin(json[ms_READ_PIN]), canAwake(json[ms_CAN_AWAKE]) {
-        if (json[ms_POWER_PIN] != 0) {
-            powerPin = json[ms_POWER_PIN];
-        }
-    }
+    Sensor::CommonSensorData::CommonSensorData(const nl::json &json) :
+        id(json[ms_ID]),
+        readPin(json[ms_READ_PIN]),
+        powerPin(json[ms_POWER_PIN]),
+        canAwake(json[ms_CAN_AWAKE]),
+        isLoaded(true) {}
 }

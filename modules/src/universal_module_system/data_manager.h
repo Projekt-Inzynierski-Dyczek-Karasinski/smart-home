@@ -51,11 +51,6 @@ namespace UniversalModuleSystem {
          */
         nlohmann::json loadJson(const char *path) const;
 
-        // TODO !pr remove
-        void tmpSave(const char *path, const char* value) const;
-
-        String tmpLoad(const char *path) const;
-
         /**
          * @brief Checks if a file exists in SPIFFS.
          *
@@ -105,6 +100,9 @@ namespace UniversalModuleSystem {
         */
         void waitAndDisable() const;
 
+        static constexpr char s_BASE_CONFIG_PATH[] = "/base_config.json"; ///< Path to config uploaded by platformio
+
+
     private:
         /**
          * @brief Private constructor for singleton pattern.
@@ -127,6 +125,5 @@ namespace UniversalModuleSystem {
         SemaphoreHandle_t mFileAccessMutex = nullptr; ///< FreeRTOS mutex protecting access to files.
 
         static constexpr char ms_ROOT_PATH[] = "/root"; ///< Prefix for all files stored in SPIFFS due to issues with opening root ("/") directory
-        static constexpr char ms_BASE_CONFIG_PATH[] = "/base_config.json"; ///< Path to config uploaded by platformio
     };
 }

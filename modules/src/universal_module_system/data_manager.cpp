@@ -54,25 +54,7 @@ namespace UniversalModuleSystem {
         }
         return result;
     }
-
-    String DataManager::tmpLoad(const char *path) const {
-        xSemaphoreTake(mFileAccessMutex, portMAX_DELAY);
-        File file = SPIFFS.open(path, "r");
-        String result = file.readString();
-        file.close();
-        xSemaphoreGive(mFileAccessMutex);
-        return result;
-    }
-
-    void DataManager::tmpSave(const char *path, const char* value) const {
-        xSemaphoreTake(mFileAccessMutex, portMAX_DELAY);
-        File file = SPIFFS.open(path, "a");
-        file.print(value);
-        file.close();
-        xSemaphoreGive(mFileAccessMutex);
-    }
-
-
+    
     bool DataManager::fileExists(const char *path) const {
         return SPIFFS.exists(path);
     }
@@ -132,7 +114,7 @@ namespace UniversalModuleSystem {
         }
 
         // logger
-        nl::json baseConfig = loadJson(ms_BASE_CONFIG_PATH);
+        nl::json baseConfig = loadJson(s_BASE_CONFIG_PATH);
         if (baseConfig.empty()) {
             mpLogger->error("DataManager", "Base config not found!");
             return;

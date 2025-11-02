@@ -64,12 +64,6 @@ namespace UniversalModuleSystem {
         esp_deep_sleep_start();
     }
 
-    uint16_t PowerManagerESP32::getBatteryRead() const {
-        xSemaphoreTake(mReadCompleteSemaphore, portMAX_DELAY);
-        xSemaphoreGive(mReadCompleteSemaphore);
-        return mBatteryRead.load();
-    }
-
     void PowerManagerESP32::disableAutoSleep() {
         #ifdef AUTO_SLEEP
             if (mAutoSleepTimer != nullptr) {
@@ -83,13 +77,10 @@ namespace UniversalModuleSystem {
 
     PowerManagerESP32::PowerManagerESP32(const std::shared_ptr<ul::Logger> &logger) : mpLogger(logger) {
         handleWakeUpReason();
-        mReadCompleteSemaphore = xSemaphoreCreateBinary();
-        readBattery();
     }
 
     PowerManagerESP32::~PowerManagerESP32() {
         xTimerDelete(mAutoSleepTimer, portMAX_DELAY);
-        vSemaphoreDelete(mReadCompleteSemaphore);
     }
 
     void PowerManagerESP32::waitAndDisableCriticalFeatures() const {
@@ -141,54 +132,7 @@ namespace UniversalModuleSystem {
         result /= powerData.gndResistor;
         result /= MAX_ANALOG_READ;
 
-        // TODO !pr remove
-        // size_t size2 = snprintf(nullptr, 0, "%i,", rawAnalogRead);
-        // char valueToSave2[size2];
-        // sprintf(valueToSave2, "%i,", rawAnalogRead);
-        //
-        // dataManager.tmpSave("/root/raw", valueToSave2);
-
-        // TODO !pr remove
-        // size_t size = snprintf(nullptr, 0, "%i,", (uint16_t)result);
-        // char valueToSave[size];
-        // sprintf(valueToSave, "%i,", (uint16_t)result);
-        //
-        // dataManager.tmpSave("/root/br", valueToSave);
-
         return (uint16_t)result;
-    }
-
-    void PowerManagerESP32::batteryReadTask(void* parameters) {
-        auto& pm = *static_cast<PowerManagerESP32*>(parameters);
-        constexpr uint16_t timeBetweenReads = 50;
-        constexpr uint8_t numberOfReads = 5;
-        uint16_t batteryReadSum = 0;
-
-        for (uint8_t i = 0; i < numberOfReads; i++) {
-            vTaskDelay(pdMS_TO_TICKS(timeBetweenReads));
-            batteryReadSum += analogRead(BATTERY_PIN);
-        }
-
-        pm.mBatteryRead.store(pm.calculateVoltage(batteryReadSum /= numberOfReads));
-
-        pm.mpLogger->verbosev("PowerManagerESP32 Task", "Battery charge level is (mV): ", pm.mBatteryRead.load());
-        xSemaphoreGive(pm.mReadCompleteSemaphore);
-        vTaskDelete(nullptr);
-    }
-
-    // TODO !pr make battery read as sensor in transducers
-    void PowerManagerESP32::readBattery() {
-        // make sure that semaphore indicates that battery read is not completed
-        xSemaphoreTake(mReadCompleteSemaphore, 0);
-
-        xTaskCreate(
-            batteryReadTask,
-            "Battery Read Task",
-            BATTERY_READ_TASK_SIZE,
-            this,
-            LOW_TASK_PRIORITY,
-            nullptr
-        );
     }
 
     void PowerManagerESP32::enableAutoSleep() {

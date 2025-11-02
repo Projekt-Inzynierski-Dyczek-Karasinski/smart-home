@@ -1,52 +1,119 @@
 #pragma once
 
 #include <memory>
-#include <optional>
 #include <nlohmann/json.hpp>
 
-#include "universal_module_system/transducers/i_transducer.h"
 #include "utils/logger.h"
 
 namespace nl = nlohmann;
 namespace ul = Utils::Logging;
 
 namespace UniversalModuleSystem::Transducers {
-    class Sensor : public ITransducer {
+    /**
+     * @brief Abstract base class for all sensors.
+     * @details Defines the required interface and common data for sensors.
+     */
+    class Sensor {
     public:
-        // TODO consider changing String to char
-        Sensor(const std::shared_ptr<ul::Logger> &logger, String dataPath);
+        /**
+         * @brief Construct the Sensor object, creates FreeRTOS resources common for all sensors.
+         * @param logger Shared pointer to logger.
+         */
+        explicit Sensor(const std::shared_ptr<ul::Logger> &logger);
 
-        ~Sensor() override;
+        /**
+         * @brief Virtual destructor for proper cleanup in derived classes, deletes common FreeRTOS resources.
+         */
+        virtual ~Sensor();
 
-        //virtual uint32_t getRawRead() = 0; // TODO !pr consider removing
-        //virtual uint32_t getFormatedRead() = 0; // TODO !pr consider removing
+        /**
+         * @brief Getter for reading from the sensor.
+         * @return Sensor reading.
+         *
+         * @note This method must be implemented by derived class.
+         */
+        virtual uint32_t getReading() = 0;
 
-        virtual String getApiFormatedRead() = 0;
+        /**
+         * @brief Start acquiring data from the sensor.
+         *
+         * @note This method must be implemented by derived class.
+         */
+        virtual void startReading() = 0;
 
-        virtual void calibrate() = 0;
+        /**
+         * @brief Get the sensor ID (loaded from JSON config file).
+         * @return Sensor ID.
+         *
+         * @note Thread-safe.
+         */
+        uint8_t getId() const;
 
-        uint8_t getId() override;
-        void onBoot() override;
+        /**
+         * @brief Initialize sensor using JSON data.
+         * @param jsonData JSON object containing sensor parameters.
+         * @return True if initialization succeeds, false otherwise.
+         */
+        bool init(const nl::json &jsonData);
+
+        /**
+         * @brief Get formatted reading ("id:value").
+         * @return Reading in API format.
+         */
+        String getApiFormattedReading();
 
     protected:
-        virtual void read() = 0;
+        /**
+         * @brief Load sensor-specific configuration from JSON.
+         *
+         * @param jsonData JSON object containing sensor data.
+         * @return True if loading succeeds, false otherwise.
+         *
+         * @note This method must be implemented by derived class.
+         * @warning Do <b>not</b> take <code>mSensorDataMutex</code> inside this method.
+         * This method is called in <code>loadData()</code>, where this mutex is already taken.
+         */
+        virtual bool loadAdditionalData(const nl::json& jsonData) = 0;
 
-        virtual void loadAdditionalData(const nl::json& json) = 0;
+        /**
+         * @brief Load common sensor parameters from JSON.
+         *
+         * @param jsonData JSON object containing sensor data.
+         * @return True if loading succeeds, false otherwise.
+         *
+         * @note Thread-safe.
+         */
+        bool loadData(const nl::json &jsonData);
 
-        void loadData() override;
+        /**
+         * @brief Structure holding common parameters for all sensors.
+         */
+        struct CommonSensorData {
+            /**
+             * @brief Construct CommonSensorData from JSON parameters.
+             * @param json JSON object with sensor data.
+             */
+            explicit CommonSensorData(const nl::json& json);
 
+            CommonSensorData() = default;
 
-        struct SensorData {
-            explicit SensorData(const nl::json& json);
+            // Sensor common parameters
+            uint8_t id = 0;
+            uint8_t readPin = 0;
+            // TODO object with type e.g.:
+            /*
+             *  "readPin": 12, ->
+             *  "connection": {
+             *      "type": "single_pin",
+             *      "pin": 12
+             *  }
+             */
+            uint8_t powerPin = 0;
+            bool canAwake = false;
+            bool isLoaded = false;
 
-            // TODO !pr remove if not needed
-            // nl::json toJson();
-
-            uint8_t id;
-            uint8_t readPin; // TODO consider making this array
-            std::optional<uint8_t> powerPin;
-            bool canAwake;
         private:
+            // JSON keys
             static constexpr char ms_ID[] = "id";
             static constexpr char ms_READ_PIN[] = "readPin";
             static constexpr char ms_POWER_PIN[] = "powerPin";
@@ -54,9 +121,9 @@ namespace UniversalModuleSystem::Transducers {
         };
 
         std::shared_ptr<ul::Logger> mpLogger;
-        std::optional<SensorData> mSensorData;
-        const String mDataPath;
+        CommonSensorData mCommonSensorData{};
 
-        SemaphoreHandle_t mSensorDataMutex;
+        SemaphoreHandle_t mSensorDataMutex = nullptr; ///< FreeRTOS mutex protecting sensor data.
+        SemaphoreHandle_t mReadingCompleteSemaphore = nullptr; ///< Semaphore indicating if sensor reading is complete.
     };
 }

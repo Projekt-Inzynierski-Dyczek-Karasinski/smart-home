@@ -278,30 +278,28 @@ namespace Comms {
 
                 xSemaphoreTake(hc12.mSendingDataMutex, portMAX_DELAY);
 
+                // TODO consider making this delay more "intelligent" (eg. by cooldown timer)
+                // this delay is required for HC12 transmit/receive message properly
+                vTaskDelay(pdMS_TO_TICKS(DELAY_BETWEEN_MESSAGES));
+
+                // TODO remove?
                 uint32_t hc12Respond;
-
-                // TODO !pr add cooldown for this or remove:
                 // clearing old notification (if exist)
-                // xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, 0);
-                // constexpr uint8_t notificationValue = WAITING_FOR_SEND_CONFIRMATION_NOTIF;
-                // xQueueSendToFront(hc12.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
-
+                xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, 0);
+                constexpr uint8_t notificationValue = WAITING_FOR_SEND_CONFIRMATION_NOTIF;
+                xQueueSendToFront(hc12.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
 
                 // transmitting data
                 hc12.mpSerial->write(transmitBuffer, PROTOCOL_SIZE);
 
-                // this delay is required for HC12 transmit/receive message properly
-                // TODO !pr check if DELAY_BETWEEN_MESSAGES is good
-                vTaskDelay(pdMS_TO_TICKS(DELAY_BETWEEN_MESSAGES));
-
-                // TODO !pr add cooldown for this or remove:
+                // TODO change?
                 // wait for confirmation from HC12
-                // if (xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
-                //     hc12.mpLogger->warning("HC12 Transmit", "HC12 module may have insufficient power.");
-                // } else {
-                //     constexpr uint8_t notificationValue1 = CANCEL_WAITING_FOR_SEND_CONFIRMATION_NOTIF;
-                //     xQueueSendToFront(hc12.mMainNotificationsQueue, &notificationValue1, portMAX_DELAY);
-                // }
+                if (xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
+                    hc12.mpLogger->warning("HC12 Transmit", "HC12 module may have insufficient power.");
+                } else {
+                    constexpr uint8_t notificationValue1 = CANCEL_WAITING_FOR_SEND_CONFIRMATION_NOTIF;
+                    xQueueSendToFront(hc12.mMainNotificationsQueue, &notificationValue1, portMAX_DELAY);
+                }
 
                 xSemaphoreGive(hc12.mSendingDataMutex);
             } else {
@@ -386,7 +384,7 @@ namespace Comms {
         xSemaphoreGive(mFirstSetupSemaphore);
 
         digitalWrite(SET_PIN, LOW);
-        vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_LOW));
+        vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_LOW*2));
 
         if (mSetupHC12TaskHandle == nullptr) {
             xTaskCreate(
