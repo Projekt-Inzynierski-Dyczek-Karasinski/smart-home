@@ -31,13 +31,6 @@ namespace UniversalModuleSystem {
         virtual void safeRestart(const char *source) const = 0;
 
         /**
-         * @brief Gets the value of the battery voltage output.
-         *
-         * @return Battery voltage output.
-         */
-        virtual uint16_t getBatteryRead() const = 0;
-
-        /**
          * @brief Disables the automatic sleep (if enabled) after waking up the module by the rf module.
          */
         virtual void disableAutoSleep() = 0;

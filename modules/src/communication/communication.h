@@ -149,7 +149,7 @@ namespace Comms {
          * Coordinates work of different parts of system.
          * Decide (using receivedMessageDecider() method) what to do with incoming messages.
          * Handles notifications from other tasks/timers.
-         * @param parameters Task parameters (unused).
+         * @param parameters Task parameters.
          * @note This task runs continuously in the background.
          */
         static void communicationMainTask(void *parameters);
@@ -179,7 +179,7 @@ namespace Comms {
 
         /**
          * @brief FreeRTOS task for decoding incoming messages from the byte queue.
-         * @param parameters Task parameters (unused).
+         * @param parameters Task parameters.
          * @note This task is suspended after of no getting bytes from the queue for 10 second and
          * is resumed by when a new byte appear.
          */
@@ -201,7 +201,7 @@ namespace Comms {
         /**
          * @brief FreeRTOS task responsible for encoding outgoing messages and adding them to the transmit queue.
          *        Formats messages according to protocol before transmission.
-         * @param parameters Task parameters (unused).
+         * @param parameters Task parameters.
          * @note This task is suspended after of no getting any message from the queue for 10 second and
          * is resumed by when a new message appear.
          */
@@ -218,7 +218,7 @@ namespace Comms {
         /**
          * @brief FreeRTOS task for handling custom messages sent via Serial (for manual testing).
          *        Passes received commands/messages into protocol or internal processing.
-         * @param parameters Pointer to parameters given by FreeRTOS (usually not used).
+         * @param parameters Pointer to parameters given by FreeRTOS.
          * @note This task runs continuously in the background, but with big delay in main loop to minimize impact to other background tasks.
          */
         static void terminalInputTask(void *parameters);
@@ -254,7 +254,6 @@ namespace Comms {
          */
         void replyToPing() const;
 
-        static Communication *mspCommunication;
         std::shared_ptr<ums::DebugLED> mpDebugLED; ///< Pointer to debugLED class instance.
         std::shared_ptr<ul::Logger> mpLogger;
         Connection *mpConnection; ///< Pointer to Connection class instance.

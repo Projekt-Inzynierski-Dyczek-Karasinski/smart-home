@@ -191,8 +191,6 @@ namespace Comms {
 
         Communication *mpCommunication; ///< Pointer to the Communication class instance (owner class).
 
-        // TODO !mm remove commented code/rollback atomic
-        // bool mIsAddressingInProgress = false; ///< Indicates if addressing algorithm is in progress.
         // WARNING: mIPAddress must be protected by mutex, not std::atomic
         uint8_t mIPAddress = NULL_IP; ///< Current assigned IP address (0 = NULL, 1 = central unit's IP).
         std::atomic<bool> mIsAddressingInProgress{false}; ///< Indicates if addressing algorithm is in progress.

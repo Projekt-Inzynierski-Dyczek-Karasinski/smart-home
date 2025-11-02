@@ -1,0 +1,30 @@
+{
+  "sensors": [
+    {
+      "type": "batterySensor",
+      "sensorData": {
+        "id": 1,
+        "readPin": 16,
+        "powerPin": 0,
+        "canAwake": false,
+        "additional": {
+          "rVCC": 50000,
+          "rGND": 50000
+        }
+      }
+    },
+    {
+      "type": "batterySensor",
+      "sensorData": {
+        "id": 1,
+        "readPin": 12,
+        "powerPin": 0,
+        "canAwake": false,
+        "additional": {
+          "rVCC": 50000,
+          "rGND": 50000
+        }
+      }
+    }
+  ]
+}

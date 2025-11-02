@@ -4,8 +4,11 @@
 #include "universal_module_system/debug_led.h"
 #include "universal_module_system/pairing_button.h"
 #include "universal_module_system/power_manager/power_manager.h"
+#include "universal_module_system/transducers/sensors/sensors_manager.h"
 #include "communication/communication.h"
 #include "utils/logger.h"
+
+#include "universal_module_system/data_manager.h"
 
 namespace ul = Utils::Logging;
 namespace ums = UniversalModuleSystem;
@@ -13,13 +16,14 @@ namespace ums = UniversalModuleSystem;
 void setup() {
     const auto logger = std::make_shared<ul::Logger>();
 
+    auto & dataManager = ums::DataManager::getInstance(logger);
     auto & powerManager = ums::PowerManager::getInstance(logger);
 
     const auto debugLed = std::make_shared<ums::DebugLED>(logger);
     auto & communication = Comms::Communication::getInstance(debugLed, logger);
     auto & pairingButton = ums::PairingButton::getInstance(debugLed, &communication, logger);
 
-    logger->info("Main", "Deleting functions setup() and loop().");
+    logger->info("Main", "All components initialized. Deleting functions setup() and loop()...");
     vTaskDelete(nullptr);
 
     // everything below this comment should never be executed

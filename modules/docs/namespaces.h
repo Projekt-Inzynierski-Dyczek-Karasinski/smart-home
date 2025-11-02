@@ -22,10 +22,22 @@ namespace Comms {}
  * - class PairingButton - class handling button
  * - class DataManager - class handling loading and saving data from/to flash memory
  * - class PowerManager - class responsible for rebooting, putting to sleep and reading battery
+ * - namespace Transducers - namespace for acurators and sensors used in SMART Home system.
  *
  * @warning Class PowerManager works only with ESP32.
  */
 namespace UniversalModuleSystem {}
+
+/**
+ * @namespace UniversalModuleSystem::Transducers
+ * @brief Contains classes for handling acurators and sensors used in SMART Home system.
+ *
+ * @details Contains:
+ * - class SensorManager - singleton handling all module's sensors
+ * - class Sensor - abstract Sensor base class
+ * - multiple derived Sensor classes
+ */
+namespace UniversalModuleSystem::Transducers {}
 
 /**
  * @namespace Utils
@@ -57,3 +69,4 @@ namespace Utils::Logging {}
  * - bool areArraysEqual()
  */
 namespace Utils::ArrayHandlers {}
+

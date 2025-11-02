@@ -76,7 +76,7 @@ namespace Comms {
     private:
         /**
          * @brief Static FreeRTOS task function. Handles message exchanges and addressing logic for the module.
-         * @param parameters Task parameters (unused).
+         * @param parameters Task parameters.
          */
         static void addressingTask(void* parameters);
         /**
@@ -135,8 +135,6 @@ namespace Comms {
          */
         void loadAddressingData();
 
-        static ModuleAddressing *mspAddressing; ///< Static pointer to a ModuleAddressing instance.
-
         /**
          * @brief Data structure for serializing module addressing information.
          */
@@ -170,11 +168,12 @@ namespace Comms {
             static constexpr char ms_JK_IP[] = "ip";
             static constexpr char ms_JK_RF_CHANNEL[] = "rfChannel";
             static constexpr char ms_JK_MAC_ADDRESS[] = "mac";
+
+            // const var
+            static constexpr size_t ms_STRING_MAC_LENGTH = 18;
         };
 
         #ifdef RF_CHANNELS
-            // TODO !mm remove commented code/rollback atomic
-            // uint8_t mRfChannel = DEFAULT_CHANNEL; ///< Module's current RF channel.
             std::atomic<uint8_t> mRfChannel{DEFAULT_CHANNEL}; ///< Module's current RF channel.
         #endif
     };

@@ -10,31 +10,23 @@ namespace uah = Utils::ArrayHandlers;
 namespace ums = UniversalModuleSystem;
 
 namespace Utils::Logging {
+    RTC_DATA_ATTR bool Logger::msIsLoggingDisabled = false;
+
     xSemaphoreHandle Logger::smSerialMutex = xSemaphoreCreateMutex();
     bool Logger::smIsSerialEnabled = false;
 
     Logger::Logger(Level level) {
-        // TODO !mm remove commented code/rollback atomic
-        // mLogLevelMutex = xSemaphoreCreateMutex();
-        // xSemaphoreTake(mLogLevelMutex, portMAX_DELAY);
-        // mLogLevel = level;
-        // xSemaphoreGive(mLogLevelMutex);
         mLogLevel.store(level);
 
-        beginSerial();
-
         #ifndef DEBUG_MODE
-            ums::DataManager& dataManager = ums::DataManager::getInstance();
-            if (dataManager.fileExists(LOGGER_DATA_PATH)) {
-                nl::json loggerData = dataManager.load(LOGGER_DATA_PATH);
-                if (loggerData["disableLogs"] == true) {
-                    mLogLevel.store(Level::NONE);
-                }
+            if (msIsLoggingDisabled) {
+                mLogLevel.store(Level::NONE);
             } else {
-                nl::json loggerData;
-                loggerData["disableLogs"] = true;
-                dataManager.save(LOGGER_DATA_PATH, loggerData);
+                beginSerial();
+                msIsLoggingDisabled = true;
             }
+        #else
+            beginSerial();
         #endif
 
         if (getLogLevel() == Level::DEBUG) {
@@ -42,17 +34,7 @@ namespace Utils::Logging {
         }
     }
 
-    // TODO !mm remove commented code/rollback atomic
-    // Logger::~Logger() {
-    //     vSemaphoreDelete(mLogLevelMutex);
-    // }
-
     Level Logger::getLogLevel() const {
-        // TODO !mm remove commented code/rollback atomic
-        // xSemaphoreTake(mLogLevelMutex, portMAX_DELAY);
-        // const Level level = mLogLevel;
-        // xSemaphoreGive(mLogLevelMutex);
-        // return level;
         return mLogLevel.load();
     }
 
@@ -137,6 +119,16 @@ namespace Utils::Logging {
         log(Level::INFO, name, message, values, len, isAscii);
     }
 
+    void Logger::verbose(const char *name, const char *message) {
+        log(Level::VERBOSE, name, message);
+    }
+    void Logger::verbosev(const char *name, const char *message, const int value) {
+        log(Level::VERBOSE, name, message, value);
+    }
+    void Logger::verbosea(const char *name, const char *message, const uint8_t *values, const uint8_t len, const bool isAscii) {
+        log(Level::VERBOSE, name, message, values, len, isAscii);
+    }
+
     void Logger::debug(const char *name, const char *message) {
         log(Level::DEBUG, name, message);
     }
@@ -157,7 +149,7 @@ namespace Utils::Logging {
 
             char message[35];
             sprintf(message, "Serial began with baudrate %i.", TERMINAL_BAUD_RATE);
-            info("Logger Class", message);
+            verbose("Logger Class", message);
         } else {
             xSemaphoreGive(smSerialMutex);
         }
@@ -168,6 +160,7 @@ namespace Utils::Logging {
             case Level::ERROR: strcpy(buffer, "<ERROR>"); return true;
             case Level::WARNING: strcpy(buffer, "<WARNING>"); return true;
             case Level::INFO: strcpy(buffer, "[INFO]"); return true;
+            case Level::VERBOSE: strcpy(buffer, "[VERBOSE]"); return true;
             case Level::DEBUG: strcpy(buffer, "[DEBUG]"); return true;
             case Level::NONE: strcpy(buffer, "NONE"); return true;
             default:

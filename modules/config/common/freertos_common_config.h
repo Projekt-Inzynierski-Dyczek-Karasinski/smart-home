@@ -6,21 +6,25 @@
 #define HIGH_TASK_PRIORITY 4
 #define CRITICAL_TASK_PRIORITY 5
 
-// TODO !mm check stack usage for all FreeRTOS tasks
+// TODO check stack usage for all FreeRTOS tasks
 // WARNING: smaller task size than 1024B is NOT recommended (theoretically the smallest task size for ESP32 is 768B)
 #define SMALL_TASK_SIZE 1024 // 1kB
 #define MEDIUM_TASK_SIZE 2048 // 2kB
 #define BIG_TASK_SIZE 4096 // 4kB
+//#define TESTING_TASK_SIZE 10000 // 10000B round number for easy calculations - only for testing
 
 // DebugLED
 #define PAIRING_BLINK_TASK_SIZE     SMALL_TASK_SIZE
 #define RESET_BLINK_TASK_SIZE       SMALL_TASK_SIZE
 
+// PairingButton
+#define FACTORY_RESET_TASK_SIZE     BIG_TASK_SIZE
+
 // Communication
 #define COMMUNICATION_MAIN_TASK_SIZE    BIG_TASK_SIZE
 #define ENCODE_TASK_SIZE                MEDIUM_TASK_SIZE
 #define DECODE_TASK_SIZE                BIG_TASK_SIZE
-#define TERMINAL_INPUT_TASK_SIZE        MEDIUM_TASK_SIZE
+#define TERMINAL_INPUT_TASK_SIZE        BIG_TASK_SIZE
 
 // HC12
 #define HC12_MAIN_TASK_SIZE     MEDIUM_TASK_SIZE
@@ -32,5 +36,13 @@
 #define CENTRAL_UNIT_ADDRESSING_TASK_SIZE   BIG_TASK_SIZE
 
 // PowerManager
-#define BATTERY_READ_TASK_SIZE MEDIUM_TASK_SIZE
 #define POWER_MANAGEMENT_SEMAPHORE_TIMEOUT 10000 // 10s
+
+// Sensors
+#define BASE_SENSOR_TASK_SIZE MEDIUM_TASK_SIZE
+#define BATTERY_READ_TASK_SIZE BASE_SENSOR_TASK_SIZE
+
+
+#ifdef TESTING_TASK_SIZE
+#warning "TESTING_TASK_SIZE defined"
+#endif

@@ -9,27 +9,14 @@ namespace uah = Utils::ArrayHandlers;
 namespace ums = UniversalModuleSystem;
 
 namespace Comms {
-    ModuleAddressing* ModuleAddressing::mspAddressing = nullptr;
-
     // ============================ Public ============================
     ModuleAddressing::ModuleAddressing(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
         : Addressing(communication, logger) {
-        mspAddressing = this;
         mIPAddress = NULL_IP;
 
         loadAddressingData();
 
-        // TODO !mm remove
-        #ifdef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
-            mIPAddress = 2;
-        // TODO !mm remove commented code/rollback atomic
-            // mRfChannel = 2;
-            mRfChannel.store(2);
-            mpCommunication->changeRFChannel(2);
-            mpLogger->warningv("Addressing TMP", "IP is forced: ", mIPAddress);
-        #endif
-
-        mpLogger->info("ModuleAddressing Class", "ModuleAddressing initialized.");
+        mpLogger->verbose("ModuleAddressing Class", "ModuleAddressing initialized.");
     }
 
     uint8_t ModuleAddressing::getConnectionRFChannel() {
@@ -39,10 +26,6 @@ namespace Comms {
     uint8_t ModuleAddressing::getDefaultRFChannel() {
         uint8_t rfChannel = 0;
         #ifdef RF_CHANNELS
-            // TODO !mm remove commented code/rollback atomic
-            // xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
-            // rfChannel = mRfChannel;
-            // xSemaphoreGive(mAddressingDataMutex);
             rfChannel = mRfChannel.load();
         #endif
         return rfChannel;
@@ -67,7 +50,6 @@ namespace Comms {
 
     bool ModuleAddressing::isIpValid(const uint8_t ip) {
         bool result = false;
-        // TODO !mm remove commented code/rollback atomic
         xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
         if ((mIPAddress == NULL_IP && ip == CENTRAL_UNIT_IP) || ip == mIPAddress) {
             result = true;
@@ -84,7 +66,17 @@ namespace Comms {
 
     // ===================== Addressing Algorithm =====================
     void ModuleAddressing::addressingTask(void* parameters) {
-        auto &ad = *mspAddressing;
+        auto& ad = *static_cast<ModuleAddressing*>(parameters);
+
+        // reset mIPAddress if needed
+        xSemaphoreTake(ad.mAddressingDataMutex, portMAX_DELAY);
+        if (ad.mIPAddress != NULL_IP) {
+            ad.mIPAddress = NULL_IP;
+            xSemaphoreGive(ad.mAddressingDataMutex);
+            ad.mpCommunication->resetEncodeMessageTask();
+        } else {
+            xSemaphoreGive(ad.mAddressingDataMutex);
+        }
 
         enum class ADDRESSING_STATES : uint8_t {
             START_ADDRESSING = 0,
@@ -92,12 +84,10 @@ namespace Comms {
             REPLY_PING,
             PROCESS_SUMMARY
         };
-
         uint8_t receiveBuffer[MESSAGE_SIZE];
         uint8_t sendBuffer[MESSAGE_SIZE];
 
         xTimerStart(ad.mAddressingTimeoutTimer, portMAX_DELAY);
-
         for (uint8_t absoluteAttemptCounter = 0; absoluteAttemptCounter < ADDRESSING_ABSOLUTE_MAX_ATTEMPTS; absoluteAttemptCounter++) {
             ADDRESSING_STATES addressingState = ADDRESSING_STATES::START_ADDRESSING;
             uint8_t attemptCounter = 0;
@@ -123,6 +113,7 @@ namespace Comms {
                             #error "Not implemented"
                         #endif
                         ad.mpCommunication->needRawMessage();
+
                         ad.mpCommunication->sendMessage(sendBuffer);
                         break;
 
@@ -145,13 +136,9 @@ namespace Comms {
                                 ad.mpCommunication->sendMessage(sendBuffer);
 
                                 ad.mpLogger->info("ModuleAddressing Main", "Addressing complete." );
-                                // TODO !mm remove #ifndef directive and #else section
-                                #ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
-                                    ad.saveAddressingData();
-                                    ad.mpCommunication->stopAddressingAlgorithm();
-                                #else
-                                    ad.abortAddressing();
-                                #endif
+                                ad.saveAddressingData();
+                                ad.mpCommunication->stopAddressingAlgorithm();
+
                                 for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
                             } else {
                                 ad.mpLogger->warning("ModuleAddressing Main", "Central unit send bad data in summary." );
@@ -253,7 +240,7 @@ namespace Comms {
                 addressingTask,
                 "Addressing Task",
                 MODULE_ADDRESSING_TASK_SIZE,
-                nullptr,
+                this,
                 MEDIUM_TASK_PRIORITY,
                 &mAddressingTaskHandle
             );
@@ -264,8 +251,7 @@ namespace Comms {
 
     // ============================ Timers ============================
     void ModuleAddressing::addressingTimersCallbacks(TimerHandle_t xTimer){
-        auto &ad = *mspAddressing;
-
+        auto &ad = *static_cast<ModuleAddressing*>(pvTimerGetTimerID(xTimer));
         if (xTimer == ad.mAddressingTimeoutTimer) {
             ad.abortAddressingWithAbortMessage();
         }
@@ -277,7 +263,7 @@ namespace Comms {
                 "Addressing Absolute Timeout",
                 pdMS_TO_TICKS(ADDRESSING_ABSOLUTE_TIMEOUT),
                 pdFALSE,
-                nullptr,
+                this,
                 addressingTimersCallbacks
             );
         }
@@ -297,8 +283,6 @@ namespace Comms {
             xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
             uah::prepareBuffer(mProtocolMACAddress, newMAC, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
             mIPAddress = newIP;
-            // TODO !mm remove commented code/rollback atomic
-            // mRfChannel = newRfChannel;
             mRfChannel.store(newRfChannel);
             xSemaphoreGive(mAddressingDataMutex);
 
@@ -332,15 +316,15 @@ namespace Comms {
         const nl::json dataToSave = AddressingData(getIPAddress(), macToSave, getDefaultRFChannel()).toJson();
 
         const auto &dataManager = ums::DataManager::getInstance();
-        dataManager.save(ADDRESSING_DATA_PATH, dataToSave);
+        dataManager.saveJson(ADDRESSING_DATA_PATH, dataToSave);
     }
 
     void ModuleAddressing::loadAddressingData() {
         const auto &dataManager = ums::DataManager::getInstance();
-        const nl::json jsonData = dataManager.load(ADDRESSING_DATA_PATH);
+        const nl::json jsonData = dataManager.loadJson(ADDRESSING_DATA_PATH);
         if (jsonData.empty()) return;
 
-        const AddressingData addressingData(jsonData);
+        AddressingData addressingData(jsonData);
         xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
         mIPAddress = addressingData.ipAddress;
         mRfChannel.store(addressingData.rfChannel);
@@ -351,8 +335,16 @@ namespace Comms {
     ModuleAddressing::AddressingData::AddressingData(const nlohmann::json& json) {
         ipAddress = json[ms_JK_IP];
         rfChannel = json[ms_JK_RF_CHANNEL];
+        char tmpMac[ms_STRING_MAC_LENGTH];
+        String(json[ms_JK_MAC_ADDRESS].get<std::string>().c_str()).toCharArray(tmpMac, ms_STRING_MAC_LENGTH);
+        size_t macNumberLength = 2;
         for (uint8_t i = 0; i < MAC_ADDRESS_LENGTH; i++) {
-            macAddress[i] = json[ms_JK_MAC_ADDRESS][i].get<uint8_t>();
+            try {
+                macAddress[i] = std::stoi(&tmpMac[i * (macNumberLength + 1)], &macNumberLength, 16);
+            } catch (...) {
+                ul::Logger logger;
+                logger.error("ModuleAddressing AddressingData()", "Failed to convert string MAC address to uint8_t array.");
+            }
         }
     }
 
@@ -365,10 +357,11 @@ namespace Comms {
         nl::json json;
         json[ms_JK_IP] = ipAddress;
         json[ms_JK_RF_CHANNEL] = rfChannel;
-        json[ms_JK_MAC_ADDRESS] = nl::json::array();
-        for (uint8_t i = 0; i < MAC_ADDRESS_LENGTH; i++) {
-            json[ms_JK_MAC_ADDRESS].push_back(macAddress[i]);
-        }
+
+        char tmpMac[ms_STRING_MAC_LENGTH];
+        snprintf(tmpMac, ms_STRING_MAC_LENGTH, "%X:%X:%X:%X:%X:%X", macAddress[0], macAddress[1],macAddress[2],macAddress[3],macAddress[4],macAddress[5]);
+        json[ms_JK_MAC_ADDRESS] = tmpMac;
+
         return json;
     }
 }

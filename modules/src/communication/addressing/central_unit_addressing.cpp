@@ -10,12 +10,9 @@ namespace nl = nlohmann;
 
 
 namespace Comms {
-    CentralUnitAddressing* CentralUnitAddressing::mspAddressing = nullptr;
-
     // ============================ Public ============================
     CentralUnitAddressing::CentralUnitAddressing(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
         : Addressing(communication, logger) {
-        mspAddressing = this;
         mIPAddress = CENTRAL_UNIT_IP;
 
         mModulesAddressingDataMutex = xSemaphoreCreateMutex();
@@ -26,15 +23,8 @@ namespace Comms {
         mNumOfModulesOnRfChannel[0] = 1;
         xSemaphoreGive(mModulesAddressingDataMutex);
 
-        // TODO !mm remove
-        #ifdef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
-            uint8_t tmpMAC[] = {1,1,1,1,1,1};
-            addModule(tmpMAC, true, 2);
-            mpLogger->warning("CentralUnitAddressing TMP", "Hardcoded module");
-        #endif
-
         loadModulesAddressingData();
-        mpLogger->info("CentralUnitAddressing Class", "CentralUnitAddressing initialized.");
+        mpLogger->verbose("CentralUnitAddressing Class", "CentralUnitAddressing initialized.");
     }
 
     CentralUnitAddressing::~CentralUnitAddressing() {
@@ -113,7 +103,7 @@ namespace Comms {
     }
 
     // ===================== Addressing Algorithm =====================
-    void CentralUnitAddressing::prepareSummary(uint8_t *sendBuffer, const ModuleAddressingData *moduleData) {
+    void CentralUnitAddressing::prepareSummary(uint8_t *sendBuffer, const ModuleAddressingData *moduleData) const {
         // TODO change API Calls to numeric values
         // prepare summary data (data without mac)
         const uint8_t summaryData[] = {
@@ -134,7 +124,7 @@ namespace Comms {
     }
 
     void CentralUnitAddressing::addressingTask(void* parameters) {
-        auto &ad = *mspAddressing;
+        auto& ad = *static_cast<CentralUnitAddressing*>(parameters);
 
         enum ADDRESSING_STATES : uint8_t {
             START_ADDRESSING = 0,
@@ -152,6 +142,7 @@ namespace Comms {
 
             ad.setIsStartOfAddressing(true);
             ad.mpCommunication->needRawMessage();
+
             xQueueReceive(ad.mAddressingQueue, receiveBuffer, portMAX_DELAY);
 
             uint8_t attemptCounter = 0;
@@ -241,17 +232,14 @@ namespace Comms {
                             if (uah::areArraysEqual(receiveBuffer, ADDRESSING_SUMMARY_OK)) {
                                 isReceivedPropperMessage = true;
                                 ad.mpLogger->info("CentralUnitAddressing Main", "Addressing complete." );
-                                // TODO !mm remove #ifndef directive and #else section
-                                #ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
-                                    ad.saveModulesAddressingData();
-                                    ad.setTmpModuleIp(NULL_IP);
-                                    ad.mpCommunication->stopAddressingAlgorithm();
-                                    ad.mpCommunication->changeRFChannel(DEFAULT_CHANNEL);
-                                #else
-                                    // TODO !mm remove clearing data
-                                    ad.abortAddressing();
-                                #endif
+                                ad.saveModulesAddressingData();
+                                ad.setTmpModuleIp(NULL_IP);
+
+                                ad.mpCommunication->changeRFChannel(DEFAULT_CHANNEL);
+                                ad.mpCommunication->stopAddressingAlgorithm();
+
                                 for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
+
                             } else if (uah::areArraysEqual(receiveBuffer, ADDRESSING_SUMMARY_BAD)) {
                                 isReceivedPropperMessage = true;
                                 ad.mpLogger->warning("CentralUnitAddressing Main", "Module rejects summary.");
@@ -294,7 +282,7 @@ namespace Comms {
                 addressingTask,
                 "Addressing Task",
                 CENTRAL_UNIT_ADDRESSING_TASK_SIZE,
-                nullptr,
+                this,
                 MEDIUM_TASK_PRIORITY,
                 &mAddressingTaskHandle
             );
@@ -305,8 +293,7 @@ namespace Comms {
 
     // ============================ Timers ============================
     void CentralUnitAddressing::addressingTimersCallbacks(TimerHandle_t xTimer) {
-        auto &ad = *mspAddressing;
-
+        auto& ad = *static_cast<CentralUnitAddressing*>(pvTimerGetTimerID(xTimer));
         if (xTimer == ad.mAddressingTimeoutTimer) {
             ad.abortAddressingWithAbortMessage();
         }
@@ -318,7 +305,7 @@ namespace Comms {
                 "Addressing Absolute Timeout",
                 pdMS_TO_TICKS(ADDRESSING_ABSOLUTE_TIMEOUT),
                 pdFALSE,
-                nullptr,
+                this,
                 addressingTimersCallbacks
             );
         }
@@ -413,7 +400,7 @@ namespace Comms {
                 }
                 mNumOfModulesOnRfChannel[rfChannelToIndex(rfChannel)]++;
 
-                // (temporary) save data about module
+                // (temporary) saveJson data about module
                 chosenIP = indexToIP(i);
                 mModulesAddressingData[i].ipAddress = chosenIP;
                 uah::prepareBuffer(mModulesAddressingData[i].macAddress, macAddress, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
@@ -465,7 +452,7 @@ namespace Comms {
 
     void CentralUnitAddressing::loadModulesAddressingData() {
         const auto &dataManager = ums::DataManager::getInstance();
-        const nl::json addressingData = dataManager.load(ADDRESSING_DATA_PATH);
+        const nl::json addressingData = dataManager.loadJson(ADDRESSING_DATA_PATH);
         if (addressingData.empty()) return;
 
         xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
@@ -486,7 +473,6 @@ namespace Comms {
         addressingDataJson[ms_JK_NUM_OF_MODULES_ON_RF_CHANNEL] = nl::json::array();
 
         xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
-        // TODO consider making function in uah
         for (auto & i : mNumOfModulesOnRfChannel) {
             addressingDataJson[ms_JK_NUM_OF_MODULES_ON_RF_CHANNEL].push_back(i);
         }
@@ -498,7 +484,7 @@ namespace Comms {
         xSemaphoreGive(mModulesAddressingDataMutex);
 
         const auto &dataManager = ums::DataManager::getInstance();
-        dataManager.save(ADDRESSING_DATA_PATH, addressingDataJson);
+        dataManager.saveJson(ADDRESSING_DATA_PATH, addressingDataJson);
     }
 
     CentralUnitAddressing::ModuleAddressingData::ModuleAddressingData(const nl::json &json) {

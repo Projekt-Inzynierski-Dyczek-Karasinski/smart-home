@@ -121,10 +121,10 @@ namespace Comms {
          * @param sendBuffer Buffer to be prepared.
          * @param moduleData Data of the module which is addressing.
          */
-        void prepareSummary(uint8_t *sendBuffer, const ModuleAddressingData *moduleData);
+        void prepareSummary(uint8_t *sendBuffer, const ModuleAddressingData *moduleData) const;
         /**
          * @brief Static FreeRTOS task function. Handles message exchanges and addressing logic of the central unit's addressing procedure.
-         * @param parameters Task parameters (unused).
+         * @param parameters Task parameters.
          */
         static void addressingTask(void* parameters);
         /**
@@ -237,8 +237,6 @@ namespace Comms {
          * @note Thread-safe.
          */
         void setIsStartOfAddressing(bool value);
-
-        static CentralUnitAddressing *mspAddressing; ///< Static pointer to a CentralUnitAddressing instance.
 
         ModuleAddressingData mModulesAddressingData[MAX_NUM_OF_MODULES]; ///< Array containing addressing data for all registered modules.
         uint8_t mNumOfModulesOnRfChannel[MAX_CHANNEL]{}; ///< Array containing the number of modules assigned to each RF channel.

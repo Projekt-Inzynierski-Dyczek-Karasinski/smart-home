@@ -1,13 +1,14 @@
 #include "communication.h"
 
+#include <optional>
+
 #include "utils/uint8_array_handlers.h"
 #include "universal_module_system/power_manager/power_manager.h"
+#include "universal_module_system/data_manager.h"
 
 namespace uah = Utils::ArrayHandlers;
 
 namespace Comms {
-    Communication* Communication::mspCommunication = nullptr;
-
     // ============================ Public ============================
     Communication &Communication::getInstance(const std::shared_ptr<ums::DebugLED> &debugLED, const std::shared_ptr<ul::Logger> &logger) {
         static Communication instance(debugLED, logger);
@@ -86,7 +87,6 @@ namespace Comms {
             mpAddressing(new ModuleAddressing(this, logger))
         #endif
     {
-        mspCommunication = this;
         mpConnection = &Connection::getInstance(this, mpAddressing, mpRfModule, logger);
 
         createCommunicationQueues();
@@ -97,7 +97,7 @@ namespace Comms {
         createEncodeMessageTask();
         createCommunicationMainTask();
 
-        mpLogger->info("Communication Class", "Communication initialized.");
+        mpLogger->verbose("Communication Class", "Communication initialized.");
     }
 
     Communication::~Communication() {
@@ -208,7 +208,7 @@ namespace Comms {
     }
 
     void Communication::communicationMainTask(void* parameters) {
-        auto &com = *mspCommunication;
+        auto& com = *static_cast<Communication*>(parameters);
 
         uint8_t status = DEFAULT_STATUS_NOTIF;
         uint8_t pingAttempts = 0;
@@ -281,7 +281,7 @@ namespace Comms {
                 communicationMainTask,
                 "Communication Main",
                 COMMUNICATION_MAIN_TASK_SIZE,
-                nullptr,
+                this,
                 BACKGROUND_TASK_PRIORITY,
                 &mCommunicationMainTaskHandle
             );
@@ -334,7 +334,7 @@ namespace Comms {
     }
 
     void Communication::decodeMessageTask(void *parameters) {
-        auto &com = *mspCommunication;
+        const auto& com = *static_cast<Communication*>(parameters);
 
         // timeout status/cause
         uint32_t timeoutStatus = DEFAULT_STATUS_NOTIF;
@@ -425,8 +425,6 @@ namespace Comms {
                         handleIncorrectMessage(isRawMessage);
                         com.mpLogger->warning("Communication Decode", "Bad checksum");
                     }
-                    // TODO !mm remove #ifndef directive
-                    #ifndef COMMUNICATION_WITHOUT_SAVING_ADDRESSING
                     // if MAC is incorrect wait for possible rest of message and ignore it
                     else if (!com.mpAddressing->isMACValid(protocolBuffer[protoBuffMessageIndex])) {
                         xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
@@ -443,7 +441,6 @@ namespace Comms {
                         resetProtocolBuffer();
                         xQueueReset(com.mReceiveByteQueue);
                     }
-                    #endif
                     // if entire message is not ready (message quantity)
                     else if (protocolBuffer[protoBuffMessageIndex][MESSAGES_QUANTITY_INDEX] != 0) {
                         protoBuffMessageIndex++;
@@ -489,7 +486,7 @@ namespace Comms {
                 decodeMessageTask,
                 "Decode message",
                 DECODE_TASK_SIZE,
-                nullptr,
+                this,
                 LOW_TASK_PRIORITY,
                 &mDecodeMessageTaskHandle
             );
@@ -526,7 +523,7 @@ namespace Comms {
     }
 
     void Communication::encodeMessageTask(void *parameters) {
-        auto &com = *mspCommunication;
+        auto& com = *static_cast<Communication*>(parameters);
 
         // prepare protocol buffer
         // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
@@ -550,7 +547,7 @@ namespace Comms {
 
         // task loop
         for (;;) {
-            // wait until the message appears in the queue and save message in local messageBuffer
+            // wait until the message appears in the queue and saveJson message in local messageBuffer
             if (xQueueReceive(com.mEncodeMessagesQueue, &messageBuffer, pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG)) == pdTRUE) {
                 com.mpConnection->sendingHandle(messageBuffer);
                 // only for central unit, because modules IP is constant
@@ -595,7 +592,7 @@ namespace Comms {
                 encodeMessageTask,
                 "Encode Message",
                 ENCODE_TASK_SIZE,
-                nullptr,
+                this,
                 MEDIUM_TASK_PRIORITY,
                 &mEncodeMessageTaskHandle
             );
@@ -614,7 +611,7 @@ namespace Comms {
     // =================== Terminal Input Message =====================
     #ifdef DEBUG_MODE
     void Communication::terminalInputTask(void *parameters) {
-        const auto &com = *mspCommunication;
+        const auto& com = *static_cast<Communication*>(parameters);
 
         // prepare buffer
         uint8_t buffer[MESSAGE_SIZE];
@@ -659,19 +656,26 @@ namespace Comms {
                             powerManager.safeRestart("Communication Input");
                         }
                     #endif
-                    else if (uah::areArraysEqual(buffer, "ip=")) {
-                        if (buffer[6] != '\0') {
-                            com.mpLogger->error("Communication Input", "Bad IP");
+                    else if (uah::areArraysEqual(buffer, "ls")) {
+                        auto & dataManager = ums::DataManager::getInstance();
+                        dataManager.ls();
+                    } else if (uah::areArraysEqual(buffer, "cat")) {
+                        auto & dataManager = ums::DataManager::getInstance();
+                        dataManager.cat((char*)&buffer[strlen("cat") + 1]);
+                    } else if (uah::areArraysEqual(buffer, "rm")) {
+                        auto & dataManager = ums::DataManager::getInstance();
+                        dataManager.rm((char*)&buffer[strlen("rm") + 1]);
+                    } else if (uah::areArraysEqual(buffer, "ip=")) {
+                        std::optional<uint8_t> ip;
+                        try {
+                            ip = std::stoi((char*)&buffer[3]);
+                        } catch (...) {
+                            ip.reset();
+                        }
+                        if (ip.has_value()) {
+                            com.mpAddressing->setProtocolIPAddress(ip.value());
                         } else {
-                            uint16_t ip = 0;
-                            ip += (buffer[3] - (uint8_t)'0') * 100;
-                            ip += (buffer[4] - (uint8_t)'0') * 10;
-                            ip += (buffer[5] - (uint8_t)'0');
-                            if (ip > 255) {
-                                com.mpLogger->error("Communication Input", "Bad IP");
-                            } else {
-                                com.mpAddressing->setProtocolIPAddress((uint8_t)ip);
-                            }
+                            com.mpLogger->error("Communication Input", "Bad IP");
                         }
                     } else if (uah::areArraysEqual(buffer, ConnectionMessages::s_CONNECTION_END)) {
                         uint8_t sendBuffer[MESSAGE_SIZE];
@@ -710,7 +714,7 @@ namespace Comms {
                 terminalInputTask,
                 "Terminal Input Task",
                 TERMINAL_INPUT_TASK_SIZE,
-                nullptr,
+                this,
                 BACKGROUND_TASK_PRIORITY,
                 &mTerminalInputTaskHandle
             );
@@ -733,7 +737,7 @@ namespace Comms {
 
     // ============================ Timers ============================
     void Communication::communicationTimersCallbacks(TimerHandle_t xTimer){
-        const auto &com = *mspCommunication;
+        const auto &com = *static_cast<Communication*>(pvTimerGetTimerID(xTimer));
 
         if (xTimer == com.mReceiveMessageTimeoutTimer) {
             com.mpLogger->debug("Communication Timers", "Message timeout.");
@@ -757,7 +761,7 @@ namespace Comms {
                 "Receive Message Timeout",
                 pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT),
                 pdFALSE,
-                nullptr,
+                this,
                 communicationTimersCallbacks
             );
         }
@@ -766,7 +770,7 @@ namespace Comms {
                 "Receive Byte Timeout",
                 pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT),
                 pdFALSE,
-                nullptr,
+                this,
                 communicationTimersCallbacks
             );
         }
@@ -775,7 +779,7 @@ namespace Comms {
                 "Ping Timeout",
                 pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT),
                 pdTRUE,
-                nullptr,
+                this,
                 communicationTimersCallbacks
             );
         }

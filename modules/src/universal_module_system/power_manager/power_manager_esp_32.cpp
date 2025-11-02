@@ -2,8 +2,11 @@
 
 #include <driver/rtc_io.h>
 
+#include "../../../config/universal_module_system_config.h"
 #include "universal_module_system/data_manager.h"
 #include "communication/communication.h"
+
+namespace nl = nlohmann;
 
 namespace UniversalModuleSystem {
     #ifdef AUTO_SLEEP
@@ -35,7 +38,7 @@ namespace UniversalModuleSystem {
             rtc_gpio_pulldown_dis(RF_MODULE_WAKE_UP_PIN);
             rtc_gpio_pullup_en(RF_MODULE_WAKE_UP_PIN);
             // NOTE: ESP_EXT1_WAKEUP_ALL_LOW is deprecated on ESP32-S3 boards, but ESP_EXT1_WAKEUP_ANY_LOW doesn't exist on ESP32-WROOM
-            // For wake up logic it doesn't matter  if is all or any, because RF_MODULE_WAKE_UP_PIN_BITMASK have only one pin assigned
+            // For wake up logic it doesn't matter if is all or any, because RF_MODULE_WAKE_UP_PIN_BITMASK have only one pin assigned
             #ifdef ESP32_WROOM_BOARD_TYPE
                 esp_sleep_enable_ext1_wakeup(RF_MODULE_WAKE_UP_PIN_BITMASK, ESP_EXT1_WAKEUP_ALL_LOW);
             #else
@@ -61,12 +64,6 @@ namespace UniversalModuleSystem {
         esp_deep_sleep_start();
     }
 
-    uint16_t PowerManagerESP32::getBatteryRead() const {
-        xSemaphoreTake(mReadCompleteSemaphore, portMAX_DELAY);
-        xSemaphoreGive(mReadCompleteSemaphore);
-        return mBatteryRead.load();
-    }
-
     void PowerManagerESP32::disableAutoSleep() {
         #ifdef AUTO_SLEEP
             if (mAutoSleepTimer != nullptr) {
@@ -80,13 +77,10 @@ namespace UniversalModuleSystem {
 
     PowerManagerESP32::PowerManagerESP32(const std::shared_ptr<ul::Logger> &logger) : mpLogger(logger) {
         handleWakeUpReason();
-        mReadCompleteSemaphore = xSemaphoreCreateBinary();
-        readBattery();
     }
 
     PowerManagerESP32::~PowerManagerESP32() {
         xTimerDelete(mAutoSleepTimer, portMAX_DELAY);
-        vSemaphoreDelete(mReadCompleteSemaphore);
     }
 
     void PowerManagerESP32::waitAndDisableCriticalFeatures() const {
@@ -101,55 +95,22 @@ namespace UniversalModuleSystem {
     void PowerManagerESP32::handleWakeUpReason() {
         switch (esp_sleep_get_wakeup_cause()) {
             case ESP_SLEEP_WAKEUP_EXT0:
-                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
+                mpLogger->verbose("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
                 disableAutoSleep();
                 break;
             case ESP_SLEEP_WAKEUP_EXT1:
-                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by rf module.");
+                mpLogger->verbose("PowerManagerESP32 Class", "Module was wake up by rf module.");
                 enableAutoSleep();
                 break;
             case ESP_SLEEP_WAKEUP_TIMER:
-                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by timer.");
+                mpLogger->verbose("PowerManagerESP32 Class", "Module was wake up by timer.");
                 disableAutoSleep();
                 break;
             default:
-                mpLogger->info("PowerManagerESP32 Class", "Module had power loss.");
+                mpLogger->verbose("PowerManagerESP32 Class", "Module had power loss.");
                 disableAutoSleep();
                 break;
         }
-    }
-
-    void PowerManagerESP32::batteryReadTask(void* parameters) {
-        auto& pm = *static_cast<PowerManagerESP32*>(parameters);
-        constexpr uint16_t timeBetweenReads = 50;
-        constexpr uint8_t numberOfReads = 5;
-        uint16_t batteryReadSum = 0;
-
-        for (uint8_t i = 0; i < numberOfReads; i++) {
-            vTaskDelay(pdMS_TO_TICKS(timeBetweenReads));
-            batteryReadSum += analogRead(BATTERY_PIN);
-        }
-
-        pm.mBatteryRead.store(batteryReadSum / numberOfReads);
-        // TODO add convertion from raw analog read to volts or %
-        pm.mpLogger->infov("PowerManagerESP32 Task", "Battery charge level is: ", pm.mBatteryRead.load());
-
-        xSemaphoreGive(pm.mReadCompleteSemaphore);
-        vTaskDelete(nullptr);
-    }
-
-    void PowerManagerESP32::readBattery() {
-        // make sure that semaphore indicates that battery read is not completed
-        xSemaphoreTake(mReadCompleteSemaphore, 0);
-
-        xTaskCreate(
-            batteryReadTask,
-            "Battery Read Task",
-            BATTERY_READ_TASK_SIZE,
-            this,
-            LOW_TASK_PRIORITY,
-            nullptr
-        );
     }
 
     void PowerManagerESP32::enableAutoSleep() {
