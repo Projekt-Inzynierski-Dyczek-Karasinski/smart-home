@@ -91,13 +91,6 @@ namespace UniversalModuleSystem {
         void handleWakeUpReason();
 
         /**
-         * @brief Converts raw analog read to voltage (in mV).
-         * @param rawAnalogRead Reading from <code>analogRead()</code>.
-         * @return Voltage (in mV) or <code>rawAnalogRead</code> if failed to load power manager data.
-         */
-        uint16_t calculateVoltage(uint16_t rawAnalogRead);
-
-        /**
          * @brief Enables the automatic sleep functionality.
          * @note Works only if <code>AUTO_SLEEP</code> is defined in the config.
          */
@@ -115,27 +108,6 @@ namespace UniversalModuleSystem {
          */
         uint32_t getCurrentTime() const;
 
-
-        /**
-         * @brief Data structure for serializing module addressing information.
-         */
-        struct PowerData {
-            /**
-             * @brief Constructor that deserializes addressing data from JSON.
-             * @param json JSON object containing addressing data.
-             */
-            explicit PowerData(const nlohmann::json& json);
-
-            uint32_t vccResistor;
-            uint32_t gndResistor;
-
-        private:
-            static constexpr char ms_DATA_PATH[] = "battery";
-            static constexpr char ms_VCC_RESISTOR_PATH[] = "rVCC";
-            static constexpr char ms_GND_RESISTOR_PATH[] = "rGND";
-        };
-
-        std::atomic<uint16_t> mBatteryRead{0};
         std::shared_ptr<ul::Logger> mpLogger;
 
         TimerHandle_t mAutoSleepTimer = nullptr; ///< FreeRTOS timer handle for managing auto-sleep functionality.

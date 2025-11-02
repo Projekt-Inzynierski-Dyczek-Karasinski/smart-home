@@ -113,28 +113,6 @@ namespace UniversalModuleSystem {
         }
     }
 
-    uint16_t PowerManagerESP32::calculateVoltage(const uint16_t rawAnalogRead)  {
-        constexpr uint16_t MAX_ANALOG_READ = 4095;
-        constexpr uint16_t MAX_ANALOG_READ_MILLIVOLTAGE = 3300;
-
-        const auto &dataManager = ums::DataManager::getInstance();
-        const nl::json jsonData = dataManager.loadJson(POWER_DATA_PATH);
-        if (jsonData.empty()) {
-            mpLogger->error("PowerManagerESP32 Task", "Failed to load power data from SPISFFS.");
-            return rawAnalogRead;
-        }
-
-        const PowerData powerData(jsonData);
-        // uint64_t to not exceed overflow in calculations
-        uint64_t result = rawAnalogRead;
-        result *= MAX_ANALOG_READ_MILLIVOLTAGE;
-        result *= (powerData.vccResistor + powerData.gndResistor);
-        result /= powerData.gndResistor;
-        result /= MAX_ANALOG_READ;
-
-        return (uint16_t)result;
-    }
-
     void PowerManagerESP32::enableAutoSleep() {
         #ifdef AUTO_SLEEP
             // constexpr uint16_t US_TO_MILLISECONDS_FACTOR = 1000;
@@ -166,11 +144,4 @@ namespace UniversalModuleSystem {
         // TODO consider making this more accurate
         return timeStruct.tv_sec * 1000;
     }
-
-    PowerManagerESP32::PowerData::PowerData(const nlohmann::json &json) {
-        nlohmann::json data = json[ms_DATA_PATH];
-        vccResistor = data[ms_VCC_RESISTOR_PATH].get<uint32_t>();
-        gndResistor = data[ms_GND_RESISTOR_PATH].get<uint32_t>();
-    }
-
 }
