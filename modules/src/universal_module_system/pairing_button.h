@@ -57,7 +57,7 @@ namespace UniversalModuleSystem {
         /**
          * @brief FreeRTOS Task handling resting module to factory settings.
          * @details This task exists only because features needed to perform a factory reset
-         * cause "stack canary watchpoint trigger" in <code>buttonPressTimerCallback</code>.
+         * cause a "stack canary watchpoint trigger" in <code>buttonPressTimerCallback</code>.
          * @param parameters FreeRTOS task parameters.
          */
         static void factoryResetTask(void *parameters);

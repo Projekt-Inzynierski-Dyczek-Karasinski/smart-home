@@ -1,64 +1,20 @@
 {
   "addressing": {
-    "mod": [
-      {
-        "imr": true,
-        "ip": 2,
-        "mac": [
-          176,
-          167,
-          50,
-          241,
-          129,
-          60
-        ],
-        "rfChannel": 2
-      },
-      {
-        "imr": true,
-        "ip": 3,
-        "mac": [
-          1,
-          1,
-          1,
-          1,
-          1,
-          1
-        ],
-        "rfChannel": 3
-      },
-      {
-        "imr": true,
-        "ip": 0,
-        "mac": [
-          0,
-          0,
-          0,
-          0,
-          0,
-          0
-        ],
-        "rfChannel": 1
-      }
-    ],
-    "num": [
-      1,
-      1,
-      1,
-      0
-    ]
+    "ip": 2,
+    "mac": "80:B5:4E:C5:A5:C8",
+    "rfChannel": 2
   },
   "sensors": [
     {
       "type": "batterySensor",
       "sensorData": {
         "id": 1,
-        "readPin": 16,
+        "readPin": 12,
         "powerPin": 0,
         "canAwake": false,
         "additional": {
-          "rVCC": 94000,
-          "rGND": 97000
+          "rVCC": 50000,
+          "rGND": 50000
         }
       }
     }

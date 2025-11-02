@@ -324,7 +324,7 @@ namespace Comms {
         const nl::json jsonData = dataManager.loadJson(ADDRESSING_DATA_PATH);
         if (jsonData.empty()) return;
 
-        const AddressingData addressingData(jsonData);
+        AddressingData addressingData(jsonData);
         xSemaphoreTake(mAddressingDataMutex, portMAX_DELAY);
         mIPAddress = addressingData.ipAddress;
         mRfChannel.store(addressingData.rfChannel);
@@ -335,8 +335,16 @@ namespace Comms {
     ModuleAddressing::AddressingData::AddressingData(const nlohmann::json& json) {
         ipAddress = json[ms_JK_IP];
         rfChannel = json[ms_JK_RF_CHANNEL];
+        char tmpMac[ms_STRING_MAC_LENGTH];
+        String(json[ms_JK_MAC_ADDRESS].get<std::string>().c_str()).toCharArray(tmpMac, ms_STRING_MAC_LENGTH);
+        size_t macNumberLength = 2;
         for (uint8_t i = 0; i < MAC_ADDRESS_LENGTH; i++) {
-            macAddress[i] = json[ms_JK_MAC_ADDRESS][i].get<uint8_t>();
+            try {
+                macAddress[i] = std::stoi(&tmpMac[i * (macNumberLength + 1)], &macNumberLength, 16);
+            } catch (...) {
+                ul::Logger logger;
+                logger.error("ModuleAddressing AddressingData()", "Failed to convert string MAC address to uint8_t array.");
+            }
         }
     }
 
@@ -349,10 +357,11 @@ namespace Comms {
         nl::json json;
         json[ms_JK_IP] = ipAddress;
         json[ms_JK_RF_CHANNEL] = rfChannel;
-        json[ms_JK_MAC_ADDRESS] = nl::json::array();
-        for (uint8_t i = 0; i < MAC_ADDRESS_LENGTH; i++) {
-            json[ms_JK_MAC_ADDRESS].push_back(macAddress[i]);
-        }
+
+        char tmpMac[ms_STRING_MAC_LENGTH];
+        snprintf(tmpMac, ms_STRING_MAC_LENGTH, "%X:%X:%X:%X:%X:%X", macAddress[0], macAddress[1],macAddress[2],macAddress[3],macAddress[4],macAddress[5]);
+        json[ms_JK_MAC_ADDRESS] = tmpMac;
+
         return json;
     }
 }

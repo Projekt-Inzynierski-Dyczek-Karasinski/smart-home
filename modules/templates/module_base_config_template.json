@@ -1,14 +1,7 @@
 {
   "addressing": {
     "ip": 2,
-    "mac": [
-      128,
-      181,
-      78,
-      197,
-      165,
-      200
-    ],
+    "mac": "80:B5:4E:C5:A5:C8",
     "rfChannel": 2
   },
   "sensors": [

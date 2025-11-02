@@ -168,6 +168,9 @@ namespace Comms {
             static constexpr char ms_JK_IP[] = "ip";
             static constexpr char ms_JK_RF_CHANNEL[] = "rfChannel";
             static constexpr char ms_JK_MAC_ADDRESS[] = "mac";
+
+            // const var
+            static constexpr size_t ms_STRING_MAC_LENGTH = 18;
         };
 
         #ifdef RF_CHANNELS
