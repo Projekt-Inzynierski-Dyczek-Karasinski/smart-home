@@ -4,6 +4,7 @@
 
 #include "../config/universal_module_system_config.h"
 #include "../config/addressing_config.h"
+#include "../config/ota_config.h"
 
 namespace nl = nlohmann;
 
@@ -124,8 +125,8 @@ namespace UniversalModuleSystem {
         if (overrideExistingFiles || !SPIFFS.exists(ADDRESSING_DATA_PATH)) {
             saveJson(ADDRESSING_DATA_PATH, baseConfig["addressing"]);
         }
-        if (overrideExistingFiles || !SPIFFS.exists(POWER_DATA_PATH)) {
-            saveJson(POWER_DATA_PATH, baseConfig["power"]);
+        if (overrideExistingFiles || !SPIFFS.exists(WIFI_DATA_PATH)) {
+            saveJson(WIFI_DATA_PATH, baseConfig["wifi"]);
         }
     }
 

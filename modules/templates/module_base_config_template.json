@@ -4,6 +4,10 @@
     "mac": "80:B5:4E:C5:A5:C8",
     "rfChannel": 2
   },
+  "wifi": {
+    "ssid": "wifi ssid",
+    "password": "wifi password"
+  },
   "sensors": [
     {
       "type": "batterySensor",
@@ -18,5 +22,6 @@
         }
       }
     }
-  ]
+  ],
+  "version": 1
 }
