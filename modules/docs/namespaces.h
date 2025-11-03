@@ -22,6 +22,7 @@ namespace Comms {}
  * - class PairingButton - class handling button
  * - class DataManager - class handling loading and saving data from/to flash memory
  * - class PowerManager - class responsible for rebooting, putting to sleep and reading battery
+ * - class Ota - class responsible for connecting to Wi-Fi and handling OTA programming
  * - namespace Transducers - namespace for acurators and sensors used in SMART Home system.
  *
  * @warning Class PowerManager works only with ESP32.

@@ -7,6 +7,7 @@
 #include "universal_module_system/transducers/sensors/sensors_manager.h"
 #include "communication/communication.h"
 #include "utils/logger.h"
+#include "universal_module_system/ota/ota.h"
 
 #include "universal_module_system/data_manager.h"
 
@@ -17,6 +18,11 @@ void setup() {
     const auto logger = std::make_shared<ul::Logger>();
 
     auto & dataManager = ums::DataManager::getInstance(logger);
+
+    // start Ota if CONFIG_VERSION and "version" in /data/base_config.json do not match.
+    ums::Ota ota(logger);
+    ota.autoEnableOta();
+
     auto & powerManager = ums::PowerManager::getInstance(logger);
 
     const auto debugLed = std::make_shared<ums::DebugLED>(logger);

@@ -15,5 +15,3 @@
         #define LOGGING_LEVEL 0 // NONE
     #endif
 #endif
-
-#define LOGGER_DATA_PATH "/logger"
