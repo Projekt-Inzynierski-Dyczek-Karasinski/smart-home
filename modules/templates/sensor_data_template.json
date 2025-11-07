@@ -29,6 +29,17 @@
           "Vmax": 4800
         }
       }
+    },
+    {
+      "type": "lightSensor",
+      "sensorData": {
+        "id": 2,
+        "readPin": 17,
+        "powerPin": 13,
+        "canAwake": false,
+        "additional": {
+        }
+      }
     }
   ]
 }

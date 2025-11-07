@@ -66,7 +66,12 @@ namespace UniversalModuleSystem::Transducers {
          */
         uint16_t calculateVoltage(uint16_t rawAnalogRead) const;
 
-        uint8_t calculateBatteryChargePercentege(uint16_t outputVoltage) const;
+        /**
+         * @brief Calculates the battery charge percentage, based on output voltage.
+         * @param outputVoltage Battery output voltage in mV.
+         * @return The battery charge percentage.
+         */
+        uint8_t calculateBatteryChargePercentage(uint16_t outputVoltage) const;
 
         /**
          * @brief Structure holding specific data to BatterySensorESP32.

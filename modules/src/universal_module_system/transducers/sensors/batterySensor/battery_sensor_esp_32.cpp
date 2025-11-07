@@ -41,7 +41,7 @@ namespace UniversalModuleSystem::Transducers {
         return (uint16_t)result;
     }
 
-    uint8_t BatterySensorESP32::calculateBatteryChargePercentege(const uint16_t outputVoltage) const {
+    uint8_t BatterySensorESP32::calculateBatteryChargePercentage(const uint16_t outputVoltage) const {
         if (outputVoltage <= mAdditionalData.minVoltage) return 0;
         if (outputVoltage >= mAdditionalData.maxVoltage) return 100;
 
@@ -78,7 +78,7 @@ namespace UniversalModuleSystem::Transducers {
         }
 
         const uint32_t batteryVoltage = bs.calculateVoltage(batteryReadSum / NUMBER_OF_READS);
-        bs.mBatteryReadPercentage.store(bs.calculateBatteryChargePercentege(batteryVoltage));
+        bs.mBatteryReadPercentage.store(bs.calculateBatteryChargePercentage(batteryVoltage));
         xSemaphoreGive(bs.mSensorDataMutex);
 
         bs.mpLogger->verbosev("BatterySensorESP32 Task", "Battery charge level is (mV): ", batteryVoltage);

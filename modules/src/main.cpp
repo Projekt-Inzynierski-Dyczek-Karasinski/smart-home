@@ -36,6 +36,7 @@ void setup() {
     for (uint8_t i = 0; i < 5; i++) {
         String res = sensorManager.getAllSensorsReport();
         logger->info("Main", res.c_str());
+        vTaskDelay(pdMS_TO_TICKS(10000));
     }
 
     logger->info("Main", "All components initialized. Deleting functions setup() and loop()...");

@@ -11,7 +11,7 @@
 #define SMALL_TASK_SIZE 1024 // 1kB
 #define MEDIUM_TASK_SIZE 2048 // 2kB
 #define BIG_TASK_SIZE 4096 // 4kB
-//#define TESTING_TASK_SIZE 10000 // 10000B round number for easy calculations - only for testing
+// #define TESTING_TASK_SIZE 10000 // 10000B round number for easy calculations - only for testing
 
 // DebugLED
 #define PAIRING_BLINK_TASK_SIZE     SMALL_TASK_SIZE
@@ -41,6 +41,7 @@
 // Sensors
 #define BASE_SENSOR_TASK_SIZE MEDIUM_TASK_SIZE
 #define BATTERY_READ_TASK_SIZE BASE_SENSOR_TASK_SIZE
+#define LIGHT_READ_TASK_SIZE MEDIUM_TASK_SIZE
 
 // Ota
 #define OTA_TASK_SIZE BIG_TASK_SIZE

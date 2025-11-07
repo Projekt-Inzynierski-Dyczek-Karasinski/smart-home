@@ -3,6 +3,7 @@
 #include <nlohmann/json.hpp>
 
 #include "batterySensor/battery_sensor.h"
+#include "lightSensor/light_sensor.h"
 #include "universal_module_system/data_manager.h"
 
 namespace nl = nlohmann;
@@ -77,6 +78,9 @@ namespace UniversalModuleSystem::Transducers {
         ) {
             case STE::BATTERY:
                 return std::make_unique<BatterySensor>(mpLogger);
+
+            case STE::LIGHT:
+                return std::make_unique<LightSensor>(mpLogger);
 
             default:
                 mpLogger->error("SensorsManager", "Got unknown type of sensor.");
