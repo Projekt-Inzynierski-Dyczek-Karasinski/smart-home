@@ -66,6 +66,8 @@ namespace UniversalModuleSystem::Transducers {
          */
         uint16_t calculateVoltage(uint16_t rawAnalogRead) const;
 
+        uint8_t calculateBatteryChargePercentege(uint16_t outputVoltage) const;
+
         /**
          * @brief Structure holding specific data to BatterySensorESP32.
          */
@@ -80,6 +82,8 @@ namespace UniversalModuleSystem::Transducers {
             // BatterySensorESP32 specific parameters
             uint32_t vccResistor = 0;
             uint32_t gndResistor = 0;
+            uint32_t minVoltage = 0; ///< in mV
+            uint32_t maxVoltage = 0; ///< in mV
             bool isLoaded = false;
 
         private:
@@ -87,9 +91,11 @@ namespace UniversalModuleSystem::Transducers {
             static constexpr char ms_DATA[] = "additional";
             static constexpr char ms_VCC_RESISTOR_DATA[] = "rVCC";
             static constexpr char ms_GND_RESISTOR_DATA[] = "rGND";
+            static constexpr char ms_V_MIN_DATA[] = "Vmin";
+            static constexpr char ms_V_MAX_DATA[] = "Vmax";
         };
 
         AdditionalData mAdditionalData{};
-        std::atomic<uint32_t> mBatteryRead{0};
+        std::atomic<uint8_t> mBatteryReadPercentage{0};
     };
 }

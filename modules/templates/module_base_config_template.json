@@ -18,7 +18,9 @@
         "canAwake": false,
         "additional": {
           "rVCC": 50000,
-          "rGND": 50000
+          "rGND": 50000,
+          "Vmin": 4350,
+          "Vmax": 4800
         }
       }
     }

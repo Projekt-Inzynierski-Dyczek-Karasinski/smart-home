@@ -6,7 +6,10 @@ namespace UniversalModuleSystem::Transducers {
     Sensor::Sensor(const std::shared_ptr<ul::Logger> &logger)
         : mpLogger(logger),
           mSensorDataMutex(xSemaphoreCreateMutex()),
-          mReadingCompleteSemaphore(xSemaphoreCreateBinary()) {}
+          mReadingCompleteSemaphore(xSemaphoreCreateBinary()) {
+        //TODO !pr remove
+        mpLogger = std::make_shared<ul::Logger>(ul::Level::VERBOSE);
+    }
 
     Sensor::~Sensor() {
         vSemaphoreDelete(mSensorDataMutex);

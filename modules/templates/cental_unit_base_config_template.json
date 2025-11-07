@@ -58,9 +58,16 @@
         "canAwake": false,
         "additional": {
           "rVCC": 94000,
-          "rGND": 97000
+          "rGND": 97000,
+          "Vmin": 4350,
+          "Vmax": 4800
         }
       }
     }
-  ]
+  ],
+  "version": 1,
+  "wifi": {
+    "ssid": "wifi ssid",
+    "password": "wifi password"
+  }
 }

@@ -5,10 +5,12 @@
 #endif
 
 #include <memory>
-#include <ArduinoOTA.h>
+// TODO !pr uncomment
+// #include <ArduinoOTA.h>
 #include <nlohmann/json.hpp>
 // TODO !o consider changing lib <WiFi.h> to <esp_wifi.h>, because <WiFi.h> uses 445kB of flash memory
-#include <WiFi.h>
+// TODO !pr uncomment
+// #include <WiFi.h>
 #include <esp_wifi.h>
 
 #include "i_ota.h"
