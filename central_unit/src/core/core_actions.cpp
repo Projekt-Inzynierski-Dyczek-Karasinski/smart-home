@@ -8,7 +8,7 @@ using sai = SmartHome::API::InternalApi;
 using namespace std::chrono_literals;
 
 namespace SmartHome {
-    void CoreActions::handleRequest(const API::InternalApi::Request &request, const RequestCallback &callback) {
+    void CoreActions::handleIncomingRequest(const API::InternalApi::Request &request, const RequestCallback &callback) {
         if (!Core::Instance().isRunning()) return;
         const auto logger = Core::Instance().mpLogger;
         const auto requestId = getNextId();
@@ -90,6 +90,10 @@ namespace SmartHome {
             const CommandHandler handler = resolveCommand(command);
             executeCommandAsync(handler, command, requestId);
         }
+    }
+
+    void CoreActions::handleIncomingResponse(const API::InternalApi::Response &response) {
+        //TODO !pr
     }
 
     void CoreActions::onCoreShutdown() {
@@ -375,7 +379,7 @@ namespace SmartHome {
             if (request.pendingCommands.fetch_sub(1) == 1) {
                 if (auto reqTimer = request.requestTimeoutTimer.load()) reqTimer->cancel();
                 ba::post(Core::Instance().getCoreIoContext(), [requestId] {
-                    handleResponse(requestId);
+                    handleOutgoingResponse(requestId);
                     cleanupRequest(requestId);
                 });
             }
@@ -433,7 +437,7 @@ namespace SmartHome {
         msResponses.erase(requestId);
     }
 
-    void CoreActions::handleResponse(const apiId_t responseId) {
+    void CoreActions::handleOutgoingResponse(const apiId_t responseId) {
         const auto logger = Core::Instance().mpLogger;
         RequestCallback requestCallback;
         std::string responseString;
@@ -498,6 +502,10 @@ namespace SmartHome {
         }
 
         requestCallback(id, std::move(responseString));
+    }
+
+    void CoreActions::handleOutgoingRequest(apiId_t requestId) {
+        //TODO !pr
     }
 
     std::unordered_map<CoreActions::CommandKey, CoreActions::CommandHandler, CoreActions::CommandKeyHash>

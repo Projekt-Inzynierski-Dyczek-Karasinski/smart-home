@@ -22,6 +22,17 @@ namespace SmartHomeMediator {
     class HC12Driver final : public RfDriver {
     public:
         /**
+         * @brief Internal option enumeration for type safety.
+         */
+        enum class Hc12Option {
+            UNDEFINED = 0,
+            CHANNEL, // AT+C (001-127)
+            BAUDRATE, // AT+B (1200/2400/.../115200)
+            FU_MODE, // AT+FU (1/2/3/4)
+            POWER // AT+P (1-8)
+        };
+
+        /**
          * @brief Construct HC12 driver.
          *
          * @param ioContext Single-threaded IO context for RF operations.
@@ -43,26 +54,18 @@ namespace SmartHomeMediator {
 
         ba::awaitable<void> write(const std::vector<uint8_t> &data) override;
 
-        ba::awaitable<std::vector<uint8_t>> read() override;
+        ba::awaitable<std::vector<uint8_t> > read() override;
+
 
         ba::awaitable<bool> setOption(std::string_view option, std::string_view value) override;
 
-        ba::awaitable<std::vector<uint8_t>> getOption(std::string_view option) override;
+        ba::awaitable<bool> setOption(Hc12Option option, std::string_view value);
+
+        ba::awaitable<std::vector<uint8_t> > getOption(std::string_view option) override;
 
         ba::awaitable<std::string> getAllOptions() override;
 
     private:
-        /**
-         * @brief Internal option enumeration for type safety.
-         */
-        enum class Hc12Option {
-            UNDEFINED = 0,
-            CHANNEL, // AT+C (001-127)
-            BAUDRATE, // AT+B (1200/2400/.../115200)
-            FU_MODE, // AT+FU (1/2/3/4)
-            POWER // AT+P (1-8)
-        };
-
         /**
          * @brief Enter AT command mode.
          *
@@ -84,8 +87,8 @@ namespace SmartHomeMediator {
          * @param timeout Max wait time for response.
          * @return Response string without CRLF.
          */
-        ba::awaitable<std::vector<uint8_t>> sendAtCommand(const std::vector<uint8_t> &command,
-                                                          std::chrono::milliseconds timeout = 400ms) const;
+        ba::awaitable<std::vector<uint8_t> > sendAtCommand(const std::vector<uint8_t> &command,
+                                                           std::chrono::milliseconds timeout = 400ms) const;
 
         /**
          * @brief Convert string to internal option enum.
@@ -138,7 +141,7 @@ namespace SmartHomeMediator {
         /**
          * @brief Map dBm string to power level (1-8).
          */
-        static std::vector<uint8_t> dbmToPowerLevel(std::string_view dbm) ;
+        static std::vector<uint8_t> dbmToPowerLevel(std::string_view dbm);
 
         // Hardware components
         std::unique_ptr<UartPort> mpUart;

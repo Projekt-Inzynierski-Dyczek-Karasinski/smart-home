@@ -132,7 +132,12 @@ namespace SmartHomeMediator {
         co_return success;
     }
 
-    ba::awaitable<std::vector<uint8_t>> HC12Driver::getOption(const std::string_view option) {
+    ba::awaitable<bool> HC12Driver::setOption(const Hc12Option option, const std::string_view value) {
+        const auto optionStr = optionToString(option);
+        return setOption(optionStr, value);
+    }
+
+    ba::awaitable<std::vector<uint8_t> > HC12Driver::getOption(const std::string_view option) {
         // Try cache first
         const auto iter = mOptionsCache.find(std::string(option));
         if (iter != mOptionsCache.end()) {
@@ -276,7 +281,7 @@ namespace SmartHomeMediator {
                 commandStr = "AT+C" + std::string(3 - value.length(), '0') + std::string(value);
                 break;
             case Hc12Option::BAUDRATE:
-                commandStr =  "AT+B" + std::string(value);
+                commandStr = "AT+B" + std::string(value);
                 break;
             case Hc12Option::FU_MODE:
                 commandStr = "AT+FU" + std::string(value);
@@ -289,7 +294,6 @@ namespace SmartHomeMediator {
         }
 
         return {commandStr.begin(), commandStr.end()};
-
     }
 
     std::vector<uint8_t> HC12Driver::buildGetCommand(const Hc12Option option) {
@@ -381,7 +385,7 @@ namespace SmartHomeMediator {
         }
 
         // Default for FU1, FU3, or unknown
-        return 80ms;  // Most reliable value (lower values caused data loss)
+        return 80ms; // Most reliable value (lower values caused data loss)
     }
 
     std::string_view HC12Driver::powerLevelToDbm(const std::string_view level) {

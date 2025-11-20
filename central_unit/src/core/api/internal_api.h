@@ -24,6 +24,7 @@ namespace SmartHome::API {
             // Basic actions
             GET,
             SET,
+            NOTIFY,
             EXECUTE,
             //Debug actions
             ECHO_REQUEST,
@@ -95,6 +96,7 @@ namespace SmartHome::API {
         private:
             static constexpr std::string_view msGET_STRING = "get";
             static constexpr std::string_view msSET_STRING = "set";
+            static constexpr std::string_view msNOTIFY_STRING = "notify";
             static constexpr std::string_view msEXECUTE_STRING = "execute";
             static constexpr std::string_view msECHO_STRING = "echo";
             static constexpr std::string_view msPING_STRING = "ping";
@@ -226,24 +228,24 @@ namespace SmartHome::API {
         ~InternalApi() override = default;
 
         /**
-         * @brief Handle incoming API request.
+         * @brief Handle incoming API message.
          *
-         * @details Parses request string (JSON-RPC or raw format), creates internal
+         * @details Parses message string (JSON-RPC or raw format), creates internal
          *          command structure, and forwards to CoreActions for processing.
          *
          * @param connectionId Connection identifier for response routing.
-         * @param request Request string to process.
+         * @param message Message string to process.
          */
-        void handleRequest(connectionId_t connectionId, std::string &&request) override;
+        void handleIncoming(connectionId_t connectionId, std::string &&message) override;
 
         /**
-         * @brief Handle outgoing API response.
+         * @brief Handle outgoing API message.
          *
-         * @details Posts response to IPC socket server for transmission to client.
+         * @details Posts message to IPC socket server for transmission to client.
          *
          * @param connectionId Connection identifier for response routing.
-         * @param response Response string to send.
+         * @param message Message string to send.
          */
-        void handleResponse(connectionId_t connectionId, std::string &&response) override;
+        void handleOutgoing(connectionId_t connectionId, std::string &&message) override;
     };
 }

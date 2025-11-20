@@ -2,7 +2,6 @@
 
 
 namespace SmartHomeMediator {
-    //main file, with mediator.run with main logic
 
     /*
      * Start service
@@ -99,6 +98,17 @@ namespace SmartHomeMediator {
             return false;
         }
 
+        bool isRfClientInitialized = false;
+        mpRfClient->initialize([this, &isRfClientInitialized](const bool isSuccessful) {
+            if (isSuccessful) {
+                mpLogger->infof("[MEDIATOR] RF initialized");
+            } else {
+                mpLogger->errorf("[MEDIATOR] RF initialization failed");
+            }
+            isRfClientInitialized = isSuccessful;
+        });
+        if (!isRfClientInitialized) return false;
+
         mIsInitialized.store(true, std::memory_order_release);
         logger->debug("[MEDIATOR] Mediator successfully initialized");
 
@@ -130,27 +140,21 @@ namespace SmartHomeMediator {
             signalHandler(ec, sig);
         });
 
-        // mpApiClient->startReceiving(/*TODO !pr add handler */);
+        mpRfApi = std::make_unique<RfApi>(mpRfClient, mpApiClient);
 
-        //TODO !pr Start RF client
-
-        mpRfClient->initialize([this](bool success) {
-            if (success) {
-                mpLogger->infof("[MEDIATOR] RF initialized - starting echo mode");
-
-                // Start receive loop
-                mpRfClient->startReceiving([this](const std::vector<uint8_t> &data) {
-                    std::string tmpStr;
-                    for (int i = 8; i < 8 + 6; i++) {
-                        tmpStr += data[i];
-                    }
-                    mpLogger->infof("[MEDIATOR] RF received: %s", tmpStr.c_str());
-                });
-            } else {
-                mpLogger->errorf("[MEDIATOR] RF initialization failed");
-            }
+        static constexpr int nullConnection = 0;
+        mMediatorIoContext.post([this] {
+            mpApiClient->run([this](const std::string &message) {
+                mpRfApi->handleIncoming(nullConnection, message.data());
+            });
         });
 
+
+        mMediatorIoContext.post([this] {
+            mpRfClient->run([this](const std::string &message) {
+                mpRfApi->handleOutgoing(nullConnection, message.data());
+            });
+        });
 
         // Main thread loop
         mMediatorThread->join();
@@ -202,7 +206,6 @@ namespace SmartHomeMediator {
 
         // Stops API client
         mpApiClient.reset();
-        mpHC12Driver.reset(); //TODO !pr tmp
 
         mpService->onStop();
         mpService.reset();
@@ -218,6 +221,10 @@ namespace SmartHomeMediator {
 
     bool Mediator::isRunning() const {
         return mIsRunning.load(std::memory_order_acquire);
+    }
+
+    ba::io_context &Mediator::getIoContext() {
+        return mMediatorIoContext;
     }
 
     Mediator::Mediator() = default;

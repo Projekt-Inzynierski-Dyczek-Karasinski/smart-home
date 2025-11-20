@@ -38,18 +38,22 @@ namespace SmartHomeMediator {
         return true;
     }
 
-    void ApiClient::startReceiving(const std::function<void(const std::string &message)> &handleMessage) {
+    void ApiClient::run(const std::function<void(const std::string &message)> &handleMessage) {
+        mMessageHandler = std::move(handleMessage);
+    }
+
+    void ApiClient::startReceiving() {
         if (!mConnection || !mConnection->isOpen()) {
             mpLogger->error("[API_CLIENT] Error while listening: no connection");
             return;
         }
 
-        auto onRead = [handleMessage, this](const std::string &message) {
-            handleMessage(message);
+        auto onRead = [this](const std::string &message) {
+            mMessageHandler(message);
 
             if (mConnection && mConnection->isOpen()) {
-                ba::post(*mpIoContext, [this, handleMessage] {
-                    startReceiving(handleMessage);
+                ba::post(*mpIoContext, [this] {
+                    startReceiving();
                 });
             }
         };

@@ -17,6 +17,8 @@ add_executable(smarthome-mediator
         rf_driver/hc12_driver.cpp
         rf_driver/uart_port.cpp
         rf_driver/gpio_handler.cpp
+        rf_api.cpp
+        rf_api.h
 )
 
 

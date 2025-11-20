@@ -19,13 +19,17 @@ namespace SmartHomeMediator {
 
         bool connectToServer(std::string_view ipAddress, int port);
 
-        void startReceiving(const std::function<void(const std::string &message)> &handleMessage);
+        void run(const std::function<void(const std::string &message)> &handleMessage);
 
         void send(std::string_view message);
 
     private:
+        void startReceiving();
+
         ba::io_context *mpIoContext;
         std::shared_ptr<su::Logger> mpLogger;
         std::optional<si::SocketConnection> mConnection;
+
+        std::function<void(const std::string &message)> mMessageHandler;
     };
 }

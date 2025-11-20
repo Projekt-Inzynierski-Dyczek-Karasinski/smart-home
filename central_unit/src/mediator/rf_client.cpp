@@ -2,6 +2,8 @@
 
 #include <chrono>
 
+#include "mediator.h"
+
 namespace SmartHomeMediator {
     RfClient::RfClient(ba::io_context &ioContext,
                        const std::shared_ptr<su::Logger> &logger,
@@ -9,7 +11,7 @@ namespace SmartHomeMediator {
                        const uint uartBaudRate)
         : mIoContext(ioContext), mpLogger(logger) {
         try {
-            mpDriver = std::make_unique<HC12Driver>(
+            mpDriver = std::make_shared<HC12Driver>(
                 mIoContext,
                 mpLogger,
                 uartPortName,
@@ -21,6 +23,8 @@ namespace SmartHomeMediator {
             mpLogger->errorf("[RF_CLIENT] Failed to create RF client: %s", e.what());
             throw;
         }
+
+        msDefaultChannel = 1; //TODO !pr read from conf
     }
 
     RfClient::~RfClient() {
@@ -37,7 +41,8 @@ namespace SmartHomeMediator {
 
             // Set channel to default
             try {
-                success = co_await mpDriver->setOption("channel", "1");
+                success = co_await mpDriver->setOption(HC12Driver::Hc12Option::CHANNEL,
+                                                       std::to_string(msDefaultChannel));
             } catch (const std::exception &e) {
                 mpLogger->errorf("[RF_CLIENT] Initialization error: %s", e.what());
                 onComplete(false);
@@ -55,84 +60,168 @@ namespace SmartHomeMediator {
         }, ba::detached);
     }
 
-    void RfClient::startReceiving(const std::function<void(const std::vector<uint8_t> &)> &onDataReceived) {
+    ba::awaitable<void> RfClient::run(std::function<void(const std::string &message)> handleMessage) {
+        auto &mediator = Mediator::Instance();
+        mMessageHandler = std::move(handleMessage);
+
+        startReceiving();
+        boost::asio::steady_timer timer(co_await boost::asio::this_coro::executor);
+
+        while (!mIsShuttingDown) {
+            if (mSessionQueue.empty()) {
+                // Wait before next pooling
+                timer.expires_after(25ms);
+                co_await timer.async_wait(boost::asio::use_awaitable);
+                continue;
+            }
+
+            Session::Metadata meta;
+            // Get next session metadata
+            {
+                std::scoped_lock lock(sessionQueueMutex);
+                meta = mSessionQueue.front();
+                mSessionQueue.pop();
+            }
+
+            mCurrentSession = std::make_unique<Session>(meta, mpDriver);
+
+            auto result = co_await mCurrentSession->execute();
+
+            mediator.getIoContext().post([this, result] {
+                mMessageHandler(result);
+            });
+        }
+    }
+
+    void RfClient::addToQueue(Session::Metadata &&metadata) {
+        std::scoped_lock lock(sessionQueueMutex);
+        mSessionQueue.push(metadata);
+    }
+
+    uint8_t RfClient::getDefaultChannel() {
+        return msDefaultChannel;
+    }
+
+    void RfClient::startReceiving() {
         if (mIsReceiving) {
+            //TODO change for atomic?
             mpLogger->warning("[RF_CLIENT] Already receiving");
             return;
         }
 
         mIsReceiving = true;
-        mpLogger->info("[RF_CLIENT] Starting receive loop (echo mode)");
 
-        ba::co_spawn(mIoContext, receiveLoop(onDataReceived), ba::detached);
+        mpLogger->info("[RF_CLIENT] Starting receive loop");
+        ba::co_spawn(mIoContext, receiveLoop(), ba::detached);
     }
 
-    void RfClient::send(const std::vector<uint8_t> &data,
-                        const std::function<void(bool)> &onComplete) const {
-        ba::co_spawn(mIoContext, [this, data, onComplete]() -> ba::awaitable<void> {
-            bool success = false;
+    // void RfClient::send(const std::vector<uint8_t> &data,
+    //                     const std::function<void(bool)> &onComplete) const {
+    //     ba::co_spawn(mIoContext, [this, data, onComplete]() -> ba::awaitable<void> {
+    //         bool success = false;
+    //
+    //         // Write data
+    //         try {
+    //             co_await mpDriver->write(data);
+    //             success = true;
+    //             mpLogger->debugf("[RF_CLIENT] Sent %zu bytes", data.size());
+    //         } catch (const std::exception &e) {
+    //             mpLogger->errorf("[RF_CLIENT] Send error: %s", e.what());
+    //         }
+    //
+    //         onComplete(success);
+    //         co_return;
+    //     }, ba::detached);
+    // }
 
-            // Write data
-            try {
-                co_await mpDriver->write(data);
-                success = true;
-                mpLogger->debugf("[RF_CLIENT] Sent %zu bytes", data.size());
-            } catch (const std::exception &e) {
-                mpLogger->errorf("[RF_CLIENT] Send error: %s", e.what());
-            }
+    ba::awaitable<void> RfClient::receiveLoop() {
+        auto loggerAggregateTimer = ba::steady_timer(co_await ba::this_coro::executor);
+        std::atomic<uint> packetReceived = 0;
+        std::atomic<uint> packetInvalid = 0;
+        std::atomic<uint> packetEmpty = 0;
 
-            onComplete(success);
-            co_return;
-        }, ba::detached);
-    }
-
-    ba::awaitable<void> RfClient::receiveLoop(std::function<void(const std::vector<uint8_t> &)> onDataReceived) const {
-        int tmpMessageCount = 0;
         while (mIsReceiving) {
             std::vector<uint8_t> data;
-            bool read_error = false;
 
             try {
                 data = co_await mpDriver->read();
+                ++packetReceived;
             } catch (const std::exception &e) {
                 mpLogger->errorf("[RF_CLIENT] Receive error: %s", e.what());
-                read_error = true;
-            }
-
-            if (read_error) {
-                ba::steady_timer timer(mIoContext, 100ms);
-                try {
-                    co_await timer.async_wait(ba::use_awaitable);
-                } catch (...) {
-                    break;
-                }
-                continue;
             }
 
             if (data.empty()) {
+                mpLogger->debug("[RF_CLIENT] Receive data is empty");
+                ++packetEmpty;
                 continue;
             }
 
-            std::string tmpStr;
-            for (auto byte: data) {
-                tmpStr += std::to_string(byte);
+            const auto packet = Packet::from_vector(data);
+
+            if (!packet.isValid()) {
+                mpLogger->debug("[RF_CLIENT] Received invalid packet");
+                ++packetInvalid;
+                continue;
             }
 
-            mpLogger->debugf("[RF_CLIENT] [MESSAGE_%d] Received %zu bytes: %s",
-                             tmpMessageCount++,
-                             data.size(), tmpStr.c_str());
+            if (mCurrentSession) {
+                mCurrentSession->addReceivedPacket(packet);
+            } else {
+                auto meta = Session::Metadata{
+                    .sessionType = Session::Type::NOTIFICATION_FROM_MODULE,
+                    .rfChannel = msDefaultChannel,
+                    .targetLogicAddress = packet.logicAddress
+                };
 
-            onDataReceived(data);
+                std::queue<Session::Metadata> tmpQueue;
+                tmpQueue.emplace(std::move(meta));
 
-            // try {
-            //     std::vector<uint8_t> echo_data(data.begin(), data.end());
-            //     co_await mpDriver->write(echo_data);
-            //
-            //     mpLogger->debugf("[RF_CLIENT] Echoed back %zu bytes", echo_data.size());
-            // } catch (const std::exception &e) {
-            //     mpLogger->errorf("[RF_CLIENT] Echo error: %s", e.what());
-            // }
+                // Emplace notification in first place of session queue
+                {
+                    std::scoped_lock lock(sessionQueueMutex);
+
+                    while (!mSessionQueue.empty()) {
+                        tmpQueue.push(mSessionQueue.front());
+                        mSessionQueue.pop();
+                    }
+                    mSessionQueue = std::move(tmpQueue);
+                }
+            };
+
+            // Aggregate packet info for logging
+            loggerAggregateTimer.cancel();
+            loggerAggregateTimer.expires_after(msAGGREGATE_RECEIVED_PACKET_INFO_TIMEOUT);
+            loggerAggregateTimer.async_wait(
+                [this, &packetReceived, &packetInvalid, &packetEmpty](const bs::error_code &ec) {
+                    if (!ec && packetReceived > 0) {
+                        mpLogger->infof(
+                            "[RF_CLIENT] Received %d packets, %2.2f\\% packet loss (%d invalid, %d dropped)",
+                            packetReceived.load(),
+                            (packetInvalid + packetEmpty) / static_cast<float>(packetReceived),
+                            packetInvalid.load(),
+                            packetEmpty.load());
+                        packetReceived = 0;
+                        packetInvalid = 0;
+                        packetEmpty = 0;
+                    }
+                });
         }
+
+
+        /*
+         * TODO
+         *  - Session class który zarządza przebiegiem sesji (send, wait for response, end, notify, ack, etc)
+         *  - Session manager działa na pętli z co_await gdzie czeka i bierze z kolejki request API tworzy sesje
+         *      dla sesji dostaje informacje o kanale i ip modułu, potem za pomcą innej klasy dzieli wiadomość na pakiety
+         *      po przesłaniu wiadomości robi logike odpowiedzi acknowledge repeat i end
+         *      caly przebieg sesji jest w metodzie sesion execute i jest oparta na coro
+         *  - Session manager zarządza kanałami?
+         *  - Do kolejki session managera trafiają request z rfClient, config omija session managera, zatrzymujac loop sesji
+         *  - W ramach requesta przekazywyany jest callback dla responsa apiClient
+         *  - Jeżeli między requestami rfClient odbierze notyfikacje od modułu to stworzy się osobna sesja notyfikacji
+         *  - zmiana klasy Trasmission na coś bardziej odpowiadającego za zarządzanie pakietami, może klasa packet?
+         *
+         */
 
         mpLogger->info("[RF_CLIENT] Receive loop stopped");
         co_return;

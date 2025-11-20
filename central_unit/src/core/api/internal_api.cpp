@@ -146,22 +146,25 @@ namespace SmartHome::API {
         : params(std::move(params)), commandId(id), method(method), target(target) {
     }
 
-    void InternalApi::handleRequest(const apiId_t connectionId, std::string &&request) {
-        boost::algorithm::trim(request);
-        std::string_view requestView(request);
+    void InternalApi::handleIncoming(const apiId_t connectionId, std::string &&message) {
+        boost::algorithm::trim(message);
+        std::string_view messageView(message);
+
+
+        //TODO !pr check if response is incoming: if not continue with request parseing
 
         Request requestStruct = {
             .connectionId = connectionId,
         };
 
         const auto logger = Core::Instance().mpLogger;
-        logger->debug("[INTERNAL_API] handleRequest");
+        logger->debug("[INTERNAL_API] handleIncoming");
 
         ApiError e;
-        if (nlohmann::json::accept(requestView)) {
+        if (nlohmann::json::accept(messageView)) {
             //Setting structured result when trimmedRequest contains json object
             requestStruct.isResultStructured = true;
-            nlohmann::json requestJson = nlohmann::json::parse(requestView);
+            nlohmann::json requestJson = nlohmann::json::parse(messageView);
 
             if (requestJson.is_array()) {
                 // Parse JSON-RPC batch request by filling Request struct commands vector with parsed ApiRequest structs
@@ -201,7 +204,7 @@ namespace SmartHome::API {
         } else {
             // Parse string-based request (from CLI)
             try {
-                requestStruct.commands.emplace_back(ApiRequest(requestView));
+                requestStruct.commands.emplace_back(ApiRequest(messageView));
             } catch (const std::exception &exception) {
                 e.code = ErrorCodes::PARSE_ERROR;
                 e.data = exception.what();
@@ -223,19 +226,19 @@ namespace SmartHome::API {
                 result = "[ERROR] " + e.message + " - " + e.data;
             }
 
-            handleResponse(connectionId, std::move(result));
+            handleOutgoing(connectionId, std::move(result));
             return;
         }
 
         logger->debug("[INTERNAL_API] handler call");
-        CoreActions::handleRequest(requestStruct, [this](const connectionId_t id, std::string &&response) {
-            handleResponse(id, std::move(response));
+        CoreActions::handleIncomingRequest(requestStruct, [this](const connectionId_t id, std::string &&response) {
+            handleOutgoing(id, std::move(response));
         });
     }
 
-    void InternalApi::handleResponse(const apiId_t connectionId, std::string &&response) {
-        Core::Instance().mpLogger->debug("[INTERNAL_API] handle response called");
-        ba::post(*IPC::SocketServer::Instance().getIoContext(), [connectionId, message = std::string(response)] {
+    void InternalApi::handleOutgoing(const apiId_t connectionId, std::string &&message) {
+        Core::Instance().mpLogger->debug("[INTERNAL_API] handle outgoing called");
+        ba::post(*IPC::SocketServer::Instance().getIoContext(), [connectionId, message = std::string(message)] {
             auto &socketServer = IPC::SocketServer::Instance();
             if (!socketServer.isRunning()) return;
 

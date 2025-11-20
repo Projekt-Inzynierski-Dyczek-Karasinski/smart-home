@@ -28,7 +28,9 @@ namespace SmartHome {
          * @param request Internal API request structure.
          * @param callback Function called when request processing completes.
          */
-        static void handleRequest(const API::InternalApi::Request &request, const RequestCallback &callback);
+        static void handleIncomingRequest(const API::InternalApi::Request &request, const RequestCallback &callback);
+
+        static void handleIncomingResponse(const API::InternalApi::Response &response);
 
         /**
          * @brief Cleanup handler for core shutdown.
@@ -269,7 +271,9 @@ namespace SmartHome {
          *
          * @param responseId Response identifier matching request ID.
          */
-        static void handleResponse(apiId_t responseId);
+        static void handleOutgoingResponse(apiId_t responseId);
+
+        static void handleOutgoingRequest(apiId_t requestId);
 
         /// Registry mapping command keys to handler functions
         static std::unordered_map<CommandKey, CommandHandler, CommandKeyHash> msCommandsRegistry;

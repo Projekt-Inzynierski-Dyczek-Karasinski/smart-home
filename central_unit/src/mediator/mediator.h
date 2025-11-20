@@ -2,9 +2,10 @@
 
 #include "async_logger.h"
 #include "socket_server.h"
+#include "service_manager/service_manager.h"
 #include "api_client.h"
 #include "rf_client.h"
-#include "service_manager/service_manager.h"
+#include "rf_api.h"
 
 #include <memory>
 
@@ -82,6 +83,8 @@ namespace SmartHomeMediator {
          */
         bool isRunning() const;
 
+        ba::io_context &getIoContext();
+
         std::shared_ptr<su::Logger> mpLogger;
 
     private:
@@ -95,9 +98,9 @@ namespace SmartHomeMediator {
         Config mConfig;
 
         std::unique_ptr<su::ServiceManager> mpService;
-        std::unique_ptr<ApiClient> mpApiClient;
-        std::unique_ptr<RfClient> mpRfClient;
-        std::unique_ptr<HC12Driver> mpHC12Driver; //TODO !pr tmp
+        std::unique_ptr<RfApi> mpRfApi;
+        std::shared_ptr<ApiClient> mpApiClient;
+        std::shared_ptr<RfClient> mpRfClient;
 
         // IPC API client resources
         ba::io_context mApiClientIoContext; //TODO make strand

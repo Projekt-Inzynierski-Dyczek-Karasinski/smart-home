@@ -27,6 +27,7 @@ namespace SmartHome::JsonRpcStrings {
         inline constexpr std::string_view PARAMS = "params";
     }
 
+    // TODO consider moving target to method value (eg. "core.get", "module_mediator.set"), for params object simplification
     /// Custom parameter keys for SmartHome API
     namespace ParamsKeys {
         inline constexpr std::string_view TARGET = "target";
@@ -305,7 +306,6 @@ namespace SmartHome::API {
         /// Update response from JSON string.
         ApiResponse operator()(std::string_view value);
 
-
     private:
         /**
          * @brief Setter for struct variables.
@@ -328,17 +328,17 @@ namespace SmartHome::API {
          * @brief Handle incoming API request.
          *
          * @param connectionId Connection identifier for response routing.
-         * @param request Request string to process.
+         * @param message Message string to process.
          */
-        virtual void handleRequest(connectionId_t connectionId, std::string &&request) = 0;
+        virtual void handleIncoming(connectionId_t connectionId, std::string &&message) = 0;
 
         /**
-         * @brief Handle outgoing API response.
+         * @brief Handle outgoing API message.
          *
          * @param connectionId Connection identifier.
-         * @param response Response string to process.
+         * @param message Message string to process.
          */
-        virtual void handleResponse(connectionId_t connectionId, std::string &&response) = 0;
+        virtual void handleOutgoing(connectionId_t connectionId, std::string &&message) = 0;
     };
 
 
