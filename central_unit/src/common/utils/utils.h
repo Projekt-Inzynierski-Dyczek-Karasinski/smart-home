@@ -3,7 +3,11 @@
 #include "exceptions.hpp"
 
 #include <optional>
+#include <span>
 #include <string>
+#include <algorithm>
+#include <array>
+#include <memory>
 
 namespace SmartHome::Utils {
     /**

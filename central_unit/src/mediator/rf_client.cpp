@@ -115,6 +115,7 @@ namespace SmartHomeMediator {
         ba::co_spawn(mIoContext, receiveLoop(), ba::detached);
     }
 
+    // TODO !pr implement send ?
     // void RfClient::send(const std::vector<uint8_t> &data,
     //                     const std::function<void(bool)> &onComplete) const {
     //     ba::co_spawn(mIoContext, [this, data, onComplete]() -> ba::awaitable<void> {
@@ -168,7 +169,7 @@ namespace SmartHomeMediator {
                 mCurrentSession->addReceivedPacket(packet);
             } else {
                 auto meta = Session::Metadata{
-                    .sessionType = Session::Type::NOTIFICATION_FROM_MODULE,
+                    .sessionType = Session::Type::FROM_MODULE,
                     .rfChannel = msDefaultChannel,
                     .targetLogicAddress = packet.logicAddress
                 };
@@ -206,22 +207,6 @@ namespace SmartHomeMediator {
                     }
                 });
         }
-
-
-        /*
-         * TODO
-         *  - Session class który zarządza przebiegiem sesji (send, wait for response, end, notify, ack, etc)
-         *  - Session manager działa na pętli z co_await gdzie czeka i bierze z kolejki request API tworzy sesje
-         *      dla sesji dostaje informacje o kanale i ip modułu, potem za pomcą innej klasy dzieli wiadomość na pakiety
-         *      po przesłaniu wiadomości robi logike odpowiedzi acknowledge repeat i end
-         *      caly przebieg sesji jest w metodzie sesion execute i jest oparta na coro
-         *  - Session manager zarządza kanałami?
-         *  - Do kolejki session managera trafiają request z rfClient, config omija session managera, zatrzymujac loop sesji
-         *  - W ramach requesta przekazywyany jest callback dla responsa apiClient
-         *  - Jeżeli między requestami rfClient odbierze notyfikacje od modułu to stworzy się osobna sesja notyfikacji
-         *  - zmiana klasy Trasmission na coś bardziej odpowiadającego za zarządzanie pakietami, może klasa packet?
-         *
-         */
 
         mpLogger->info("[RF_CLIENT] Receive loop stopped");
         co_return;

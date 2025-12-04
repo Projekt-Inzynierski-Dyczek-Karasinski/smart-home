@@ -79,38 +79,48 @@ namespace SmartHomeMediator {
         return calculateChecksum(packet) % msCHECKSUM_MODULO == 0;
     }
 
+    ba::awaitable<void> Session::send(std::vector<uint8_t> message) {
+        // TODO separate message into packets and send them via RfClient send
+    }
+
+    ba::awaitable<std::vector<uint8_t> > Session::receive() {
+        // TODO read packets saved via Session::addReceivedPacket and join them
+        // TODO !pr return only joined payload (raw RfCommand) wait for all of the packets
+        // add timeout - return empty vector on t/o
+    }
+
     ba::awaitable<bool> Session::changeChannel(const uint8_t channel) const {
         auto retryTimer = ba::steady_timer(co_await ba::this_coro::executor);
-        bool success = false;
+        bool isSuccessful = false;
         for (int i = 0; i < 3; i++) {
-            success = co_await mpRfDriver->setOption(HC12Driver::Hc12Option::CHANNEL,
-                                                     std::to_string(channel));
-            if (success) co_return success;
+            isSuccessful = co_await mpRfDriver->setOption(HC12Driver::Hc12Option::CHANNEL,
+                                                          std::to_string(channel));
+            if (isSuccessful) co_return isSuccessful;
             retryTimer.expires_after(100ms);
             co_await retryTimer.async_wait(ba::use_awaitable);
         }
 
-        co_return success;
+        co_return isSuccessful;
     }
 
-    uint8_t Session::joinHalfBytesIntoByte(const uint8_t value1, const uint8_t value2) {
-        return value1 << 4 | value2;
-    }
-
-    uint8_t Session::getSpecialByte(RfCommands command, const uint8_t numberOfParameters) {
-        return joinHalfBytesIntoByte(static_cast<uint8_t>(command), numberOfParameters);
-    }
-
-    uint8_t Session::getSpecialByte(RfCommandsParameterTypes parameterType, const uint8_t parameterSize) {
-        return joinHalfBytesIntoByte(static_cast<uint8_t>(parameterType), parameterSize);
-    }
-
-    std::pair<uint8_t, uint8_t> Session::parseSpecialByte(const uint8_t specialByte) {
-        //TODO !pr test
-        uint8_t first = specialByte & 0xF0 >> 4;
-        uint8_t second = specialByte & 0x0F;
-        return {first, second};
-    }
+    // uint8_t Session::joinHalfBytesIntoByte(const uint8_t value1, const uint8_t value2) {
+    //     return value1 << 4 | value2;
+    // }
+    //
+    // uint8_t Session::getSpecialByte(RfCommands command, const uint8_t numberOfParameters) {
+    //     return joinHalfBytesIntoByte(static_cast<uint8_t>(command), numberOfParameters);
+    // }
+    //
+    // uint8_t Session::getSpecialByte(RfCommandsParameterTypes parameterType, const uint8_t parameterSize) {
+    //     return joinHalfBytesIntoByte(static_cast<uint8_t>(parameterType), parameterSize);
+    // }
+    //
+    // std::pair<uint8_t, uint8_t> Session::parseSpecialByte(const uint8_t specialByte) {
+    //     //TODO !pr test
+    //     uint8_t first = specialByte & 0xF0 >> 4;
+    //     uint8_t second = specialByte & 0x0F;
+    //     return {first, second};
+    // }
 
     Session::Session(const Metadata &metadata, const std::shared_ptr<HC12Driver> &rfDriver)
         : mMetadata(metadata),
@@ -119,7 +129,7 @@ namespace SmartHomeMediator {
 
     ba::awaitable<std::string> Session::execute() {
         std::string result;
-        // auto timer = ba::steady_timer(co_await ba::this_coro::executor);
+        auto timer = ba::steady_timer(co_await ba::this_coro::executor);
 
         // Change channel to target's channel
         bool isChannelChangeSuccessful = co_await changeChannel(mMetadata.rfChannel);
@@ -127,10 +137,122 @@ namespace SmartHomeMediator {
             // TODO return error
         }
 
+        // TODO !pr add module initialized session handling
+        State previousState = State::NEXT_COMMAND;
+        State state = State::NEXT_COMMAND;
+
+        auto changeState = [&previousState, &state](const State newState) {
+            previousState = state;
+            state = newState;
+        };
+
+        RfApi::RfCommand currentCommand;
+        RfApi::RfCommand commandResponse;
+        std::vector<uint8_t> lastSendMessage;
+        std::vector<uint8_t> receivedMessage;
+
+        uint retries = 0;
+        size_t commandsVectorIndex = 0;
+
+        while (state != State::FINISHED) {
+            switch (state) {
+                case State::SEND_MESSAGE:
+                    lastSendMessage = currentCommand.to_vector();
+                    co_await send(lastSendMessage);
+                    changeState(State::AWAIT_RESPONSE);
+                    break;
 
 
-        // TODO !pr whole session logic
+                case State::AWAIT_RESPONSE:
+                    receivedMessage = co_await receive();
+                    if (receivedMessage.empty()) {
+                        changeState(State::RESEND_LAST_MESSAGE);
+                        break;
+                    }
 
+                    try {
+                        commandResponse = RfApi::RfCommand(receivedMessage);
+                    } catch (const std::exception &e) {
+                        // TODO handle error
+                        break;
+                    }
+
+                    // Check if received acknowledge as response to notify
+                    if (currentCommand.commandType == RfApi::CommandTypes::NOTIFY) {
+                        if (commandResponse.commandType == RfApi::CommandTypes::ACKNOWLEDGE) {
+                            changeState(State::NEXT_COMMAND);
+                            break;
+                        }
+                        changeState(State::SEND_REPEAT_LAST_MESSAGE);
+                        break;
+                    }
+
+
+                    if (commandResponse.commandType != RfApi::CommandTypes::RESPONSE) {
+                        changeState(State::SEND_REPEAT_LAST_MESSAGE);
+                        break;
+                    }
+
+                    // TODO iterate trough parameters adding them to response along with request ID, no ID -> error
+                    changeState(State::NEXT_COMMAND);
+                    break;
+
+
+                case State::RESEND_LAST_MESSAGE:
+                    if (retries++ >= ms_MAX_REATTEMPTS) {
+                        // TODO Add error response
+                        changeState(State::NEXT_COMMAND);
+                        break;
+                    }
+                    co_await send(lastSendMessage);
+                    changeState(previousState);
+                    break;
+
+
+                case State::SEND_REPEAT_LAST_MESSAGE: {
+                    if (retries++ >= ms_MAX_REATTEMPTS) {
+                        // TODO Add error response
+                        changeState(State::NEXT_COMMAND);
+                        break;
+                    }
+                    RfApi::RfCommand command;
+                    command.commandType = RfApi::CommandTypes::REPEAT;
+                    co_await send(command.to_vector());
+
+                    changeState(previousState);
+                    break;
+                }
+
+
+                case State::SEND_END_COMMAND: {
+                    RfApi::RfCommand command;
+                    command.commandType = RfApi::CommandTypes::END;
+                    co_await send(command.to_vector());
+                    changeState(State::FINISHED);
+                    break;
+                }
+
+
+                case State::FINISHED: break;
+                case State::NEXT_COMMAND:
+                default: {
+                    retries = 0;
+                    if (mMetadata.commands.empty()) {
+                        changeState(State::SEND_END_COMMAND);
+                        break;
+                    }
+
+                    if (commandsVectorIndex < mMetadata.commands.size()) {
+                        currentCommand = mMetadata.commands[commandsVectorIndex++];
+                        changeState(State::SEND_MESSAGE);
+                        break;
+                    }
+
+                    changeState(State::SEND_END_COMMAND);
+                    break;
+                }
+            }
+        }
 
 
         // Return to default channel
@@ -140,6 +262,10 @@ namespace SmartHomeMediator {
         }
 
         co_return result;
+    }
+
+    void Session::addReceivedPacket(Packet packet) {
+        // TODO verify and save packet
     }
 
 

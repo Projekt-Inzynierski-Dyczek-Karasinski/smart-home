@@ -38,6 +38,8 @@ namespace SmartHome::API {
                 return msGET_STRING;
             case MethodTypes::SET:
                 return msSET_STRING;
+            case MethodTypes::NOTIFY:
+                return msNOTIFY_STRING;
             case MethodTypes::EXECUTE:
                 return msEXECUTE_STRING;
             case MethodTypes::ECHO_REQUEST:
@@ -53,6 +55,7 @@ namespace SmartHome::API {
         static const std::unordered_map<std::string_view, MethodTypes> strToActMap{
             {msGET_STRING, MethodTypes::GET},
             {msSET_STRING, MethodTypes::SET},
+            {msNOTIFY_STRING, MethodTypes::NOTIFY},
             {msEXECUTE_STRING, MethodTypes::EXECUTE},
             {msECHO_STRING, MethodTypes::ECHO_REQUEST},
             {msPING_STRING, MethodTypes::PING_REQUEST},

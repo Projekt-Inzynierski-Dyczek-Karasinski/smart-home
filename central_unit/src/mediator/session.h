@@ -1,5 +1,6 @@
 #pragma once
 #include "rf_driver/hc12_driver.h"
+#include "rf_api.h"
 
 #include <string>
 #include <array>
@@ -68,18 +69,15 @@ namespace SmartHomeMediator {
     class Session {
     public:
         enum class Type : uint8_t {
-            REQUEST,
-            NOTIFICATION,
-            NOTIFICATION_FROM_MODULE
+            FROM_CENTRAL_UNIT,
+            FROM_MODULE
         };
 
         struct Metadata {
             Type sessionType;
             uint8_t rfChannel;
             uint8_t targetLogicAddress;
-            std::string command;
-            std::optional<std::string> parameters;
-            std::optional<size_t> requestId;
+            std::vector<RfApi::RfCommand> commands;
         };
 
         Session(const Metadata &metadata, const std::shared_ptr<HC12Driver> &rfDriver);
@@ -92,15 +90,22 @@ namespace SmartHomeMediator {
 
     private:
         enum class State : uint8_t {
-            SENDING_REQUEST,
-            SENDING_NOTIFICATION,
-            SENDING_COMMAND,
-            SENDING_NOTIFICATION_ACKNOWLEDGMENT,
-            SENDING_REPEAT_LAST_MESSAGE,
-            SENDING_END_SESSION,
-            AWAITING_RESPONSE,
-            AWAITING_ACKNOWLEDGMENT,
-            RESENDING_LAST_MESSAGE,
+            NEXT_COMMAND,
+            SEND_MESSAGE,
+            AWAIT_RESPONSE,
+            RESEND_LAST_MESSAGE,
+            SEND_REPEAT_LAST_MESSAGE,
+            SEND_PING,
+            AWAIT_REPING,
+            SEND_END_COMMAND,
+            FINISHED
+
+            // SENDING_NOTIFICATION_ACKNOWLEDGMENT,
+            // SENDING_REPEAT_LAST_MESSAGE,
+            // SENDING_END_SESSION,
+            // AWAITING_RESPONSE,
+            // AWAITING_ACKNOWLEDGMENT,
+            // RESENDING_LAST_MESSAGE,
         };
 
 
@@ -111,40 +116,40 @@ namespace SmartHomeMediator {
 
         ba::awaitable<bool> changeChannel(uint8_t channel) const;
 
-        /**
-         * @brief Joins 2 uint numbers (with values less than 16) to one byte value using bit shift.
-         *
-         * @param value1 Half byte that is shifted to more significant bits.
-         * @param value2 Half byte that is joined as less significant half of byte.
-         *
-         * @return 4 bits of value1 joined with 4 bits of value2.
-         * @note Both values must be 4 bit (less than 16).
-         */
-        static uint8_t joinHalfBytesIntoByte(uint8_t value1, uint8_t value2);
-
-
-        /**
-         * @brief Get special byte for RfCommand with number of fallowing parameters.
-         *
-         * @param command RfCommand to be sent/executed, saved in more significant half of a byte.
-         * @param numberOfParameters Numbers of parameters to be read, saved in less significant half of byte.
-         *
-         * @return Special byte with first 4 bits representing RfCommand and later 4 bits numbers of params following.
-         */
-        static uint8_t getSpecialByte(RfCommands command, uint8_t numberOfParameters);
-
-
-        /**
-         * @brief Get special byte for RfCommandParameter with param type and size.
-         *
-         * @param parameterType Parameter type, saved in more significant half of byte.
-         * @param parameterSize Parameter size, saved in less significant half of byte.
-         *
-         * @return Special byte with first 4 bits representing param type and later 4 bits parameter size in bytes.
-         */
-        static uint8_t getSpecialByte(RfCommandsParameterTypes parameterType, uint8_t parameterSize);
-
-        static std::pair<uint8_t, uint8_t> parseSpecialByte(uint8_t specialByte);
+        // /**
+        //  * @brief Joins 2 uint numbers (with values less than 16) to one byte value using bit shift.
+        //  *
+        //  * @param value1 Half byte that is shifted to more significant bits.
+        //  * @param value2 Half byte that is joined as less significant half of byte.
+        //  *
+        //  * @return 4 bits of value1 joined with 4 bits of value2.
+        //  * @note Both values must be 4 bit (less than 16).
+        //  */
+        // static uint8_t joinHalfBytesIntoByte(uint8_t value1, uint8_t value2);
+        //
+        //
+        // /**
+        //  * @brief Get special byte for RfCommand with number of fallowing parameters.
+        //  *
+        //  * @param command RfCommand to be sent/executed, saved in more significant half of a byte.
+        //  * @param numberOfParameters Numbers of parameters to be read, saved in less significant half of byte.
+        //  *
+        //  * @return Special byte with first 4 bits representing RfCommand and later 4 bits numbers of params following.
+        //  */
+        // static uint8_t getSpecialByte(RfCommands command, uint8_t numberOfParameters);
+        //
+        //
+        // /**
+        //  * @brief Get special byte for RfCommandParameter with param type and size.
+        //  *
+        //  * @param parameterType Parameter type, saved in more significant half of byte.
+        //  * @param parameterSize Parameter size, saved in less significant half of byte.
+        //  *
+        //  * @return Special byte with first 4 bits representing param type and later 4 bits parameter size in bytes.
+        //  */
+        // static uint8_t getSpecialByte(RfCommandsParameterTypes parameterType, uint8_t parameterSize);
+        //
+        // static std::pair<uint8_t, uint8_t> parseSpecialByte(uint8_t specialByte);
 
         static constexpr uint ms_MAX_REATTEMPTS = 3;
         static constexpr auto ms_SESSION_TIMEOUT = 10s;

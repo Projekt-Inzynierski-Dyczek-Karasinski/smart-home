@@ -291,8 +291,12 @@ namespace SmartHome::API {
                 return "Invalid params";
             case ErrorCodes::INTERNAL_ERROR:
                 return "Internal error";
-            default:
+            case ErrorCodes::MODULE_RUNTIME_ERROR:
+                return "Module runtime error";
+            case ErrorCodes::UNKNOWN_ERROR:
                 return "Unknown error";
+            default:
+                return "Undefined error";
         }
     }
 

@@ -145,6 +145,9 @@ namespace SmartHome::API {
         METHOD_NOT_FOUND = -32601,
         INVALID_PARAMS = -32602,
         INTERNAL_ERROR = -32603,
+        // custom errors
+        UNKNOWN_ERROR = -32000,
+        MODULE_RUNTIME_ERROR = -32001,
     };
 
     /**
