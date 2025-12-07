@@ -62,19 +62,9 @@ namespace UniversalModuleSystem::Transducers {
 
         xSemaphoreTake(bs.mSensorDataMutex, portMAX_DELAY);
 
-        if (bs.mCommonSensorData.powerPin != 0) {
-            // TODO check after adding pin to control BatterySensor
-            pinMode(bs.mCommonSensorData.powerPin, OUTPUT);
-            digitalWrite(bs.mCommonSensorData.powerPin, HIGH);
-        }
-
         for (uint8_t i = 0; i < NUMBER_OF_READS; i++) {
             vTaskDelay(pdMS_TO_TICKS(TIME_BETWEEN_READS));
             batteryReadSum += analogRead(bs.mCommonSensorData.readPin);
-        }
-        if (bs.mCommonSensorData.powerPin != 0) {
-            // TODO check after adding pin to control BatterySensor
-            digitalWrite(bs.mCommonSensorData.powerPin, LOW);
         }
 
         const uint32_t batteryVoltage = bs.calculateVoltage(batteryReadSum / NUMBER_OF_READS);

@@ -50,10 +50,13 @@ namespace UniversalModuleSystem::Transducers {
         return isLoadedSuccessfully;
     }
 
+    bool Sensor::loadAdditionalData(const nl::json& jsonData) {
+        return true;
+    }
+
     Sensor::CommonSensorData::CommonSensorData(const nl::json &json) :
         id(json[ms_ID]),
         readPin(json[ms_READ_PIN]),
-        powerPin(json[ms_POWER_PIN]),
         canAwake(json[ms_CAN_AWAKE]),
         isLoaded(true) {}
 }

@@ -72,6 +72,13 @@ namespace Comms {
         mpRfModule->sleep();
     }
 
+    void Communication::endConnection() const {
+        uint8_t sendBuffer[MESSAGE_SIZE];
+        uah::prepareBuffer(sendBuffer, ConnectionMessages::s_CONNECTION_END, MESSAGE_SIZE);
+        sendMessage(sendBuffer);
+        mpConnection->endConnection();
+    }
+
     // ================== Constructor and Destructor ==================
     Communication::Communication(const std::shared_ptr<ums::DebugLED> &debugLED, const std::shared_ptr<ul::Logger> &logger) :
         mpDebugLED(debugLED),
@@ -678,10 +685,7 @@ namespace Comms {
                             com.mpLogger->error("Communication Input", "Bad IP");
                         }
                     } else if (uah::areArraysEqual(buffer, ConnectionMessages::s_CONNECTION_END)) {
-                        uint8_t sendBuffer[MESSAGE_SIZE];
-                        uah::prepareBuffer(sendBuffer, ConnectionMessages::s_CONNECTION_END, MESSAGE_SIZE);
-                        com.sendMessage(sendBuffer);
-                        com.mpConnection->endConnection();
+                        com.endConnection();
                     }
                     // rest
                     else {

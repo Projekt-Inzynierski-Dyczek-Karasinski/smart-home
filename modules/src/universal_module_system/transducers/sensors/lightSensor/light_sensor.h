@@ -16,8 +16,6 @@ namespace UniversalModuleSystem::Transducers {
         void startReading() override;
 
     private:
-        bool loadAdditionalData(const nl::json &jsonData) override;
-
         uint8_t calculateLightPercentage(uint16_t rawReading);
 
         /**

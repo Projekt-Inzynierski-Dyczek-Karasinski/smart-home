@@ -40,45 +40,29 @@ namespace UniversalModuleSystem::Transducers {
 
 
     void LightSensor::lightReadTask(void *parameters) {
-        auto& bs = *static_cast<LightSensor*>(parameters);
+        auto& ls = *static_cast<LightSensor*>(parameters);
         constexpr uint16_t TIME_BETWEEN_READS = 50; // ms
         constexpr uint8_t NUMBER_OF_READS = 5;
         uint16_t lightReadSum = 0;
 
-        xSemaphoreTake(bs.mSensorDataMutex, portMAX_DELAY);
+        xSemaphoreTake(ls.mSensorDataMutex, portMAX_DELAY);
 
-        if (bs.mCommonSensorData.powerPin != 0) {
-            pinMode(bs.mCommonSensorData.powerPin, OUTPUT);
-            digitalWrite(bs.mCommonSensorData.powerPin, HIGH);
-        }
+        ls.mpLogger->errorv("LightSensor test", "read: ",ls.mCommonSensorData.readPin);
 
         for (uint8_t i = 0; i < NUMBER_OF_READS; i++) {
             vTaskDelay(pdMS_TO_TICKS(TIME_BETWEEN_READS));
-            lightReadSum += analogRead(bs.mCommonSensorData.readPin);
-        }
-        if (bs.mCommonSensorData.powerPin != 0) {
-            digitalWrite(bs.mCommonSensorData.powerPin, LOW);
+            lightReadSum += analogRead(ls.mCommonSensorData.readPin);
         }
 
-        bs.mLightPercentage.store(bs.calculateLightPercentage(lightReadSum / NUMBER_OF_READS));
-        xSemaphoreGive(bs.mSensorDataMutex);
+        ls.mLightPercentage.store(ls.calculateLightPercentage(lightReadSum / NUMBER_OF_READS));
+        xSemaphoreGive(ls.mSensorDataMutex);
 
-        bs.mpLogger->verbosev("LightSensor Task", "Light (%): ", bs.mLightPercentage.load());
-        xSemaphoreGive(bs.mReadingCompleteSemaphore);
+        ls.mpLogger->verbosev("LightSensor Task", "Light (%): ", ls.mLightPercentage.load());
+        xSemaphoreGive(ls.mReadingCompleteSemaphore);
 
         vTaskDelete(nullptr);
     }
 
-    bool LightSensor::loadAdditionalData(const nl::json &jsonData) {
-        // bool isLoadedSuccessfully = true;
-        // try {
-        //     mAdditionalData = AdditionalData(jsonData);
-        // } catch (...) {
-        //     mpLogger->error("BatterySensorESP32 class", "Failed to load additional sensor data.");
-        //     isLoadedSuccessfully = false;
-        // }
-        return true;
-    }
 
     // LightSensor::AdditionalData::AdditionalData(const nl::json &json) :
     //     vccResistor(json[ms_DATA][ms_VCC_RESISTOR_DATA]),

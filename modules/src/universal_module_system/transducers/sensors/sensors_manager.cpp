@@ -4,6 +4,7 @@
 
 #include "batterySensor/battery_sensor.h"
 #include "lightSensor/light_sensor.h"
+#include "dht_22_sensor/dht_22_sensor.h"
 #include "universal_module_system/data_manager.h"
 
 namespace nl = nlohmann;
@@ -25,12 +26,18 @@ namespace UniversalModuleSystem::Transducers {
     String SensorsManager::getAllSensorsReport() {
         const auto &dataManager = DataManager::getInstance();
         nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
+        nl::json & sensorsData = jsonData[ms_ALL_SENSORS_DATA];
 
-        const size_t numOfSensors = jsonData[ms_SENSORS_ARRAY].size();
+        // power on sensors
+        const uint8_t powerPin = sensorsData[ms_POWER_PIN].get<uint8_t>();
+        pinMode(powerPin, OUTPUT);
+        digitalWrite(powerPin, HIGH);
+
+        // init sensors
+        const size_t numOfSensors = sensorsData[ms_SENSORS_ARRAY].size();
         std::unique_ptr<Sensor> sensors[numOfSensors];
         uint8_t sensorsIndex = 0;
-
-        for (auto &jsonSensor : jsonData[ms_SENSORS_ARRAY]) {
+        for (auto &jsonSensor : sensorsData[ms_SENSORS_ARRAY]) {
             sensors[sensorsIndex] = createSensor(jsonSensor[ms_SENSOR_TYPE].get<std::string>().c_str());
 
             if (sensors[numOfSensors] != nullptr) {
@@ -41,16 +48,22 @@ namespace UniversalModuleSystem::Transducers {
             }
         }
 
+        // get sensors readings
         String result;
         const uint8_t numOfLoadedSensors = sensorsIndex;
         for (sensorsIndex = 0; sensorsIndex < numOfLoadedSensors; sensorsIndex++) {
             result.concat(sensors[sensorsIndex]->getApiFormattedReading());
             result.concat('|');
         }
+
+        // power off sensors
+        digitalWrite(powerPin, LOW);
+
         result.remove(result.length() - 1, 1);
         return result;
     }
 
+    // TODO !pr add powering on sensors
     String SensorsManager::getSensorReport(const uint8_t sensorId) {
         const auto &dataManager = DataManager::getInstance();
         nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
@@ -81,6 +94,9 @@ namespace UniversalModuleSystem::Transducers {
 
             case STE::LIGHT:
                 return std::make_unique<LightSensor>(mpLogger);
+
+            case STE::DHT22:
+                return std::make_unique<Dht22Sensor>(mpLogger);
 
             default:
                 mpLogger->error("SensorsManager", "Got unknown type of sensor.");

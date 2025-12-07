@@ -26,6 +26,7 @@ namespace UniversalModuleSystem::Transducers {
          */
         virtual ~Sensor();
 
+        // TODO !pr change to new API format
         /**
          * @brief Getter for reading from the sensor.
          * @return Sensor reading.
@@ -63,6 +64,7 @@ namespace UniversalModuleSystem::Transducers {
         String getApiFormattedReading();
 
     protected:
+        // TODO !pr update comment (now class Sensor implement default)
         /**
          * @brief Load sensor-specific configuration from JSON.
          *
@@ -73,7 +75,7 @@ namespace UniversalModuleSystem::Transducers {
          * @warning Do <b>not</b> take <code>mSensorDataMutex</code> inside this method.
          * This method is called in <code>loadData()</code>, where this mutex is already taken.
          */
-        virtual bool loadAdditionalData(const nl::json& jsonData) = 0;
+        virtual bool loadAdditionalData(const nl::json& jsonData);
 
         /**
          * @brief Load common sensor parameters from JSON.
@@ -108,7 +110,6 @@ namespace UniversalModuleSystem::Transducers {
              *      "pin": 12
              *  }
              */
-            uint8_t powerPin = 0;
             bool canAwake = false;
             bool isLoaded = false;
 
@@ -116,7 +117,6 @@ namespace UniversalModuleSystem::Transducers {
             // JSON keys
             static constexpr char ms_ID[] = "id";
             static constexpr char ms_READ_PIN[] = "readPin";
-            static constexpr char ms_POWER_PIN[] = "powerPin";
             static constexpr char ms_CAN_AWAKE[] = "canAwake";
         };
 

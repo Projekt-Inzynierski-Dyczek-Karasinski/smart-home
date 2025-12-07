@@ -26,7 +26,7 @@ namespace UniversalModuleSystem::Transducers {
          *
          * @warning First call must pass a pointer to a logger.
          */
-        static SensorsManager& getInstance(const std::shared_ptr<ul::Logger> &logger);
+        static SensorsManager& getInstance(const std::shared_ptr<ul::Logger> &logger = nullptr);
 
         // Delete copy constructor and assignment operator
         SensorsManager(const SensorsManager&) = delete;
@@ -66,6 +66,7 @@ namespace UniversalModuleSystem::Transducers {
             enum class SensorTypeEnum : uint8_t {
                 BATTERY,
                 LIGHT,
+                DHT22,
                 UNKNOWN
             };
 
@@ -81,11 +82,13 @@ namespace UniversalModuleSystem::Transducers {
             // sensor types
             static constexpr char s_BATTERY_SENSOR[] = "batterySensor";
             static constexpr char s_LIGHT_SENSOR[] = "lightSensor";
+            static constexpr char s_DHT22_SENSOR[] = "DHT22";
 
             // Lookup table mapping sensor type strings to internal enumerator values.
             inline static const std::map<const char*, SensorTypeEnum, Comparator> sensorMap {
                 {s_BATTERY_SENSOR, SensorTypeEnum::BATTERY},
                 {s_LIGHT_SENSOR, SensorTypeEnum::LIGHT},
+                {s_DHT22_SENSOR, SensorTypeEnum::DHT22},
             };
         };
 
@@ -106,6 +109,8 @@ namespace UniversalModuleSystem::Transducers {
         // JSON keys
         static constexpr char ms_SENSORS_ARRAY[] = "sensors";
         static constexpr char ms_SENSOR_TYPE[] = "type";
+        static constexpr char ms_ALL_SENSORS_DATA[] = "sensorsData";
+        static constexpr char ms_POWER_PIN[] = "powerPin";
         static constexpr char ms_SENSOR_DATA[] = "sensorData";
         static constexpr char ms_SENSOR_ID[] = "id";
     };

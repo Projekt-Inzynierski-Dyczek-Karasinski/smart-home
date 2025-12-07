@@ -110,6 +110,11 @@ namespace Comms {
          */
         void putRfModuleToSleep() const;
 
+        /**
+         * @brief Sends "end" message and ends connection.
+         */
+        void endConnection() const;
+
     private:
         /**
          * @brief Private constructor for singleton pattern.

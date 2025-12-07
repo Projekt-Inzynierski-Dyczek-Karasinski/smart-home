@@ -2,6 +2,7 @@
 
 #include "communication/communication.h"
 #include "universal_module_system/power_manager/power_manager.h"
+#include "universal_module_system/transducers/sensors/sensors_manager.h"
 
 namespace Comms {
     // ============================ Public ============================
@@ -50,9 +51,16 @@ namespace Comms {
                 break;
 
             case CME::TEST_GET:
-                uah::prepareBuffer(sendBuffer,  CM::s_CONNECTION_RE_TEST_GET, MESSAGE_SIZE);
+                {
+                auto & sensorManager = ums::Transducers::SensorsManager::getInstance(mpLogger);
+                const String res = sensorManager.getAllSensorsReport();
+
+                uah::prepareBuffer(sendBuffer,  res.c_str(), MESSAGE_SIZE);
+                
+                // uah::prepareBuffer(sendBuffer,  CM::s_CONNECTION_RE_TEST_GET, MESSAGE_SIZE);
                 mpCommunication->sendMessage(sendBuffer);
                 break;
+            }
 
             case CME::RE_TEST_GET:
                 uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_END, MESSAGE_SIZE);
