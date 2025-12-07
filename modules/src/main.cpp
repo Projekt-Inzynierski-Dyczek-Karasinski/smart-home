@@ -17,7 +17,8 @@ namespace ul = Utils::Logging;
 namespace ums = UniversalModuleSystem;
 
 void setup() {
-    const auto logger = std::make_shared<ul::Logger>();
+    // TODO !pr remove VERBOSE
+    const auto logger = std::make_shared<ul::Logger>(ul::Level::VERBOSE);
 
     auto & dataManager = ums::DataManager::getInstance(logger);
 
@@ -32,12 +33,12 @@ void setup() {
     auto & pairingButton = ums::PairingButton::getInstance(debugLed, &communication, logger);
 
     // TODO !pr remove
-    auto & sensorManager = ums::Transducers::SensorsManager::getInstance(logger);
-    for (uint8_t i = 0; i < 5; i++) {
-        String res = sensorManager.getAllSensorsReport();
-        logger->info("Main", res.c_str());
-        vTaskDelay(pdMS_TO_TICKS(10000));
-    }
+    // auto & sensorManager = ums::Transducers::SensorsManager::getInstance(logger);
+    // for (uint8_t i = 0; i < 5; i++) {
+    //     String res = sensorManager.getAllSensorsReport();
+    //     logger->info("Main", res.c_str());
+    //     vTaskDelay(pdMS_TO_TICKS(10000));
+    // }
 
     logger->info("Main", "All components initialized. Deleting functions setup() and loop()...");
     vTaskDelete(nullptr);

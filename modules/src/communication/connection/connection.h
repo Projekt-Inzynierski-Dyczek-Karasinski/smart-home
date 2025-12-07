@@ -8,6 +8,7 @@
 #include "../config/communication_config.h"
 
 #include "utils/uint8_array_handlers.h"
+#include "communication/api/command_handler.h"
 
 #ifdef CENTRAL_UNIT
     #include "communication/addressing/central_unit_addressing.h"
@@ -122,6 +123,9 @@ namespace Comms {
          * @param receivedMessage Array of <code>MESSAGE_SIZE</code> bytes containing the received message.
          */
         void messageDecider(const uint8_t receivedMessage[MESSAGE_SIZE]);
+
+        // TODO !pr add comment
+        void messageDecider2(const uint8_t receivedMessage[MESSAGE_SIZE]);
 
         /**
          * @brief Handle connection when receiving new RF message.

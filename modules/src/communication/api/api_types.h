@@ -1,0 +1,73 @@
+#pragma once
+
+#include <cstdint>
+#include <variant>
+
+namespace Comms::API {
+    enum class commandTypes : uint8_t {
+        UNKNOWN = 0,
+        ACKNOWLEDGE = 1,
+        NEGATIVE = 2,
+        REPEAT = 3,
+        END = 4,
+        PING = 5,
+        REPING = 6,
+        SLEEP = 7,
+        DEEP_SLEEP = 8,
+        GET = 9,
+        SET = 10,
+        RESPONSE = 11,
+        NOTIFY = 12
+    };
+
+    enum class parametersTypes : uint8_t {
+        UNKNOWN = 0,
+        UINT = 1,
+        INT = 2,
+        FLOAT = 3,
+        ASCII = 4,
+        RAW = 5,
+        ERROR = 6
+    };
+
+    enum class errorTypes : uint8_t {
+        UNKNOWN = 0,
+        VALUE = 1,
+        ARGUMENT = 2,
+        INTERNAL_TIMEOUT = 3
+    };
+
+    using parameterVariant = std::variant<
+        std::monostate,
+        uint8_t,
+        uint16_t,
+        uint32_t,
+        uint64_t,
+        int8_t,
+        int16_t,
+        int32_t,
+        int64_t,
+        float,
+        double,
+        const char*,
+        const uint8_t*
+        // const char*, // TODO !pr remove?
+        // const uint8_t*
+    >;
+
+    enum class ParameterVariantEnum : uint8_t {
+        MONOSTATE = 0,
+        UINT8  = 1,
+        UINT16 = 2,
+        UINT32 = 3,
+        UINT64 = 4,
+        INT8   = 5,
+        INT16  = 6,
+        INT32  = 7,
+        INT64  = 8,
+        FLOAT  = 9,
+        DOUBLE = 10,
+        ASCII  = 11,
+        RAW  = 12
+    };
+}

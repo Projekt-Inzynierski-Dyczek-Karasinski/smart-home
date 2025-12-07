@@ -5,6 +5,7 @@
 #include "utils/uint8_array_handlers.h"
 #include "universal_module_system/power_manager/power_manager.h"
 #include "universal_module_system/data_manager.h"
+#include "api/command_handler.h"
 
 namespace uah = Utils::ArrayHandlers;
 
@@ -47,7 +48,7 @@ namespace Comms {
     }
 
     void Communication::sendMessage(const uint8_t message[MESSAGE_SIZE]) const {
-        xQueueSend(mEncodeMessagesQueue, message , portMAX_DELAY);
+        xQueueSend(mEncodeMessagesQueue, message, portMAX_DELAY);
         vTaskResume(mEncodeMessageTaskHandle);
     }
 
@@ -185,12 +186,7 @@ namespace Comms {
                 }
             #endif
             else {
-                mpLogger->warninga(
-                    "Communication Main",
-                    "Received custom message.\nIgnored message: ",
-                    buffer,
-                    MESSAGE_SIZE
-                );
+                mpConnection->messageDecider2(buffer);
             }
             *isReadingRawMessage = false;
         }
@@ -565,8 +561,14 @@ namespace Comms {
 
                 int8_t messagesQuantity = 0;
                 uint8_t messageIndex = 0;
+
                 // calc messageQuantity
-                const uint8_t messageLen = uah::calcLenOfDataInArray(messageBuffer, MESSAGE_SIZE);
+                // const uint8_t messageLen = uah::calcLenOfDataInArray(messageBuffer, MESSAGE_SIZE);
+                uint8_t messageLen = MESSAGE_SIZE - 1;// TODO !pr check if it breaks something
+                while (messageBuffer[messageLen] == '\0') {
+                    messageLen--;
+                }
+                messageLen++;
                 messagesQuantity = messageLen / PROTOCOL_MESSAGE_LENGTH;
                 if (messageLen % PROTOCOL_MESSAGE_LENGTH == 0) {
                     messagesQuantity--;
@@ -686,6 +688,19 @@ namespace Comms {
                         }
                     } else if (uah::areArraysEqual(buffer, ConnectionMessages::s_CONNECTION_END)) {
                         com.endConnection();
+                    } else if (uah::areArraysEqual(buffer, ConnectionMessages::s_CONNECTION_TEST_GET)) {
+                        API::CommandHandler ch(API::commandTypes::GET);
+                        constexpr uint32_t TEST_UID = 123;
+                        constexpr uint8_t TEST_SENSOR_ID = 1;
+
+                        API::APIParameter uid(TEST_UID);
+                        API::APIParameter sensorId(TEST_SENSOR_ID);
+                        ch.addParameter(uid);
+                        ch.addParameter(sensorId);
+
+                        uint8_t message[MESSAGE_SIZE] = {};
+                        ch.generateMessage(message);
+                        xQueueSend(com.mEncodeMessagesQueue, &message, portMAX_DELAY);
                     }
                     // rest
                     else {

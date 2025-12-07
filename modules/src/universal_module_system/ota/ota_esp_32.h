@@ -6,11 +6,11 @@
 
 #include <memory>
 // TODO !pr uncomment
-// #include <ArduinoOTA.h>
+#include <ArduinoOTA.h>
 #include <nlohmann/json.hpp>
 // TODO !o consider changing lib <WiFi.h> to <esp_wifi.h>, because <WiFi.h> uses 445kB of flash memory
 // TODO !pr uncomment
-// #include <WiFi.h>
+#include <WiFi.h>
 #include <esp_wifi.h>
 
 #include "i_ota.h"
@@ -105,6 +105,8 @@ namespace UniversalModuleSystem {
         // JSON keys
         static constexpr char ms_WIFI_PATH[] = "/root/wifi";
         static constexpr char ms_CONFIG_PATH[] = "/base_config.json";
+        static constexpr char ms_OTA_DATA[] = "ota";
         static constexpr char ms_VERSION[] = "version";
+        static constexpr char ms_ENABLE_OTA_PIN[] = "ota_pin";
     };
 }
