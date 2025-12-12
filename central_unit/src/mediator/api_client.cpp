@@ -40,6 +40,12 @@ namespace SmartHomeMediator {
 
     void ApiClient::run(const std::function<void(const std::string &message)> &handleMessage) {
         mMessageHandler = std::move(handleMessage);
+
+        startReceiving();
+    }
+
+    void ApiClient::handleOutgoing(SmartHome::connectionId_t connectionId, std::string &&message) {
+        send(message);
     }
 
     void ApiClient::startReceiving() {
@@ -68,4 +74,5 @@ namespace SmartHomeMediator {
             mpLogger->error("[API_CLIENT] Error while sending message: no connection");
         }
     }
+
 }

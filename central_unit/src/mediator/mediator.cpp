@@ -140,7 +140,7 @@ namespace SmartHomeMediator {
             signalHandler(ec, sig);
         });
 
-        mpRfApi = std::make_unique<RfApi>(mpRfClient, mpApiClient);
+        mpRfApi = std::make_unique<RfApi>(mpRfClient);
 
         static constexpr int nullConnection = 0;
         mMediatorIoContext.post([this] {
@@ -149,10 +149,9 @@ namespace SmartHomeMediator {
             });
         });
 
-
         mMediatorIoContext.post([this] {
             mpRfClient->run([this](const std::string &message) {
-                mpRfApi->handleOutgoing(nullConnection, message.data());
+                mpApiClient->handleOutgoing(nullConnection, message.data());
             });
         });
 

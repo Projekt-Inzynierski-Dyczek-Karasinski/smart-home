@@ -1,5 +1,6 @@
 #include "rf_api.h"
 #include "mediator.h"
+#include "rf_client.h"
 
 #include <boost/algorithm/string/case_conv.hpp>
 
@@ -438,6 +439,7 @@ namespace SmartHomeMediator {
                     error.message = SmartHome::API::errorCodeToString(error.code);
 
                     RfErrorCodes rfErrorCode;
+                    // TODO replace memcpy with copy_n and bit_cast
                     memcpy(&rfErrorCode, rfCommand.parameters[0].value.data(), rfCommand.parameters[0].value.size());
                     error.data = getStringFromRfErrorCode(rfErrorCode);
                     response.error = error;
@@ -481,45 +483,43 @@ namespace SmartHomeMediator {
             return notify.to_string();
         }
 
+        // TODO !pr remove throws - replace them with error ApiResponses
         throw std::invalid_argument("Invalid command");
     }
 
-    RfApi::RfApi(const std::shared_ptr<RfClient> &pRfClient,
-                 const std::shared_ptr<ApiClient> &pApiClient) : mpRfClient(pRfClient),
-                                                                 mpApiClient(pApiClient) {
+    RfApi::RfApi(const std::shared_ptr<RfClient> &pRfClient) : mpRfClient(pRfClient) {
     }
 
-    void RfApi::handleOutgoing(SmartHome::connectionId_t connectionId, std::string &&message) {
-        const std::string resultMessage = message;
-        //TODO !pr result message is either JSON-RPC response/notification or a batch
-        mpApiClient->send(resultMessage);
-    }
+    // void RfApi::handleOutgoing(SmartHome::connectionId_t connectionId, std::string &&message) {
+    //     const std::string resultMessage = message;
+    //     //TODO !pr result message is either JSON-RPC response/notification or a batch
+    //     mpApiClient->send(resultMessage);
+    // }
 
     void RfApi::handleIncoming(SmartHome::connectionId_t connectionId, std::string &&message) {
-        const auto &mediator = Mediator::Instance();
+        const auto &pLogger = Mediator::Instance().mpLogger;
         sa::ApiRequest request;
-        const auto messageView = std::string_view(message);
 
 
         // TODO !pr przyjmowanie batch requestów (i pojedyńczych), modyfikacja sesji do obsługi batch requestów
         //  (batch requesty będą przsyłały klika rzeczy w jednej sesji np request i sleep)
 
         try {
-            request(messageView);
+            request(messageCopy);
         } catch (...) {
-            mediator.mpLogger->error("[RF_API] Failed to parse incoming message");
+            pLogger->error("[RF_API] Failed to parse incoming message");
             return;
         }
 
         if (!request.params.has_value() && request.params->contains(sj::ParamsKeys::METHOD_PARAMS)) {
-            mediator.mpLogger->error("[RF_API] Request has no params");
+            pLogger->error("[RF_API] Request has no params");
             return;
         }
 
         auto &params = request.params.value()[sj::ParamsKeys::METHOD_PARAMS];
         // params must have at least module info struct and command type
         if (!params.is_array() && params.size() < 2) {
-            mediator.mpLogger->error("[RF_API] Request has invalid params");
+            pLogger->error("[RF_API] Request has invalid params");
             return;
         }
 
@@ -528,6 +528,7 @@ namespace SmartHomeMediator {
         Session::Metadata metadata;
 
         try {
+            // TODO !pr change
             metadata = {
                 .rfChannel = params[0]["module_rf_channel"].get<uint8_t>(),
                 .targetLogicAddress = params[0]["module_id"].get<uint8_t>(),
@@ -549,12 +550,12 @@ namespace SmartHomeMediator {
 
             if (!tmpMetaParams.empty()) metadata.parameters = tmpMetaParams;
         } catch (const std::exception &e) {
-            mediator.mpLogger->errorf("[RF_API] Failed to convert API request to Rf session", e.what());
+            pLogger->errorf("[RF_API] Failed to convert API request to Rf session", e.what());
             return;
         }
 
 
-        mpRfClient->addToQueue(std::move(metadata));
+        mpRfClient->addSession(std::move(metadata));
     }
 
     uint8_t getSpecialByte(const uint8_t firstHalf, const uint8_t secondHalf) {

@@ -2,14 +2,17 @@
 
 #include "socket_connection.h"
 #include "async_logger.h"
+#include "api.h"
 
 #include <string_view>
 
+
 namespace si = SmartHome::IPC;
 namespace su = SmartHome::Utils;
+namespace sa = SmartHome::API;
 
 namespace SmartHomeMediator {
-    class ApiClient {
+    class ApiClient : public sa::Api {
     public:
         explicit ApiClient(ba::io_context *io_context, const std::shared_ptr<su::Logger> &logger);
 
@@ -21,10 +24,12 @@ namespace SmartHomeMediator {
 
         void run(const std::function<void(const std::string &message)> &handleMessage);
 
-        void send(std::string_view message);
+        void handleOutgoing(SmartHome::connectionId_t connectionId, std::string &&message) override;
 
     private:
         void startReceiving();
+
+        void send(std::string_view message);
 
         ba::io_context *mpIoContext;
         std::shared_ptr<su::Logger> mpLogger;

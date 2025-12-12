@@ -2,7 +2,6 @@
 
 #include "api.h"
 #include "api_client.h"
-#include "rf_client.h"
 #include "../core/api/internal_api.h"
 
 #include <boost/algorithm/string/case_conv.hpp>
@@ -10,11 +9,15 @@
 namespace sa = SmartHome::API;
 
 namespace SmartHomeMediator {
+    class RfClient;
+
     class RfApi final : public sa::Api {
     public:
         enum class RfErrorCodes: uint8_t {
             UNKNOWN = 0,
-            //TODO add error codes
+            BAD_COMMAND,
+            BAD_ARGUMENT,
+            INTERNAL_ERROR
         };
 
         enum class ParameterTypes: uint8_t {
@@ -109,7 +112,7 @@ namespace SmartHomeMediator {
 
             explicit RfCommand(std::vector<uint8_t> rawData);
 
-            CommandTypes commandType;
+            CommandTypes commandType = CommandTypes::UNDEFINED;
 
             // TODO !pr move optionals into parameters
             std::optional<std::variant<GetTypes, SetTypes, NotificationTypes> > requestType;
@@ -135,15 +138,15 @@ namespace SmartHomeMediator {
 
         static std::string toApiString(RfCommand rfCommand);
 
-        RfApi(const std::shared_ptr<RfClient> &pRfClient, const std::shared_ptr<ApiClient> &pApiClient);
+        RfApi(const std::shared_ptr<RfClient> &pRfClient);
 
-        void handleOutgoing(SmartHome::connectionId_t connectionId, std::string &&message) override;
+        // void handleOutgoing(SmartHome::connectionId_t connectionId, std::string &&message) override;
 
         void handleIncoming(SmartHome::connectionId_t connectionId, std::string &&message) override;
 
     private:
         std::shared_ptr<RfClient> mpRfClient;
-        std::shared_ptr<ApiClient> mpApiClient;
+        // std::shared_ptr<ApiClient> mpApiClient;
 
         static constexpr auto msMAX_PARAMETERS = 16;
         static constexpr auto msMAX_COMMANDS = msMAX_PARAMETERS;

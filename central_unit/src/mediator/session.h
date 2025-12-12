@@ -29,11 +29,11 @@ namespace SmartHomeMediator {
 
     public:
         std::array<uint8_t, 6> macAddress;
-        uint8_t logicAddress;
-        uint8_t packetsLeft;
+        uint8_t logicAddress{};
+        uint8_t packetsLeft{};
         std::array<uint8_t, msPAYLOAD_MAX_SIZE> payload;
-        uint8_t checksum;
-        uint8_t endMarker;
+        uint8_t checksum{};
+        uint8_t endMarker{};
 
         static Packet from_bytes(std::span<const uint8_t> data);
 
@@ -74,15 +74,13 @@ namespace SmartHomeMediator {
         };
 
         struct Metadata {
-            Type sessionType;
-            uint8_t rfChannel;
-            uint8_t targetLogicAddress;
-            std::vector<RfApi::RfCommand> commands;
+            Type sessionType = Type::FROM_CENTRAL_UNIT;
+            uint8_t rfChannel{};
+            uint8_t targetLogicAddress{};
+            std::vector<RfApi::RfCommand> commands{};
         };
 
-        Session(const Metadata &metadata, const std::shared_ptr<HC12Driver> &rfDriver);
-
-        ~Session();
+        Session(const Metadata &metadata, const std::shared_ptr<HC12Driver> &rfDriver, const std::shared_ptr<RfClient> &rfClient);
 
         ba::awaitable<std::string> execute();
 
@@ -99,91 +97,30 @@ namespace SmartHomeMediator {
             AWAIT_REPING,
             SEND_END_COMMAND,
             FINISHED
-
-            // SENDING_NOTIFICATION_ACKNOWLEDGMENT,
-            // SENDING_REPEAT_LAST_MESSAGE,
-            // SENDING_END_SESSION,
-            // AWAITING_RESPONSE,
-            // AWAITING_ACKNOWLEDGMENT,
-            // RESENDING_LAST_MESSAGE,
         };
 
 
-        ba::awaitable<void> send(std::vector<uint8_t> message);
+        ba::awaitable<void> send(const std::vector<uint8_t> &message) const;
 
         ba::awaitable<std::vector<uint8_t> > receive();
 
-
         ba::awaitable<bool> changeChannel(uint8_t channel) const;
 
-        // /**
-        //  * @brief Joins 2 uint numbers (with values less than 16) to one byte value using bit shift.
-        //  *
-        //  * @param value1 Half byte that is shifted to more significant bits.
-        //  * @param value2 Half byte that is joined as less significant half of byte.
-        //  *
-        //  * @return 4 bits of value1 joined with 4 bits of value2.
-        //  * @note Both values must be 4 bit (less than 16).
-        //  */
-        // static uint8_t joinHalfBytesIntoByte(uint8_t value1, uint8_t value2);
-        //
-        //
-        // /**
-        //  * @brief Get special byte for RfCommand with number of fallowing parameters.
-        //  *
-        //  * @param command RfCommand to be sent/executed, saved in more significant half of a byte.
-        //  * @param numberOfParameters Numbers of parameters to be read, saved in less significant half of byte.
-        //  *
-        //  * @return Special byte with first 4 bits representing RfCommand and later 4 bits numbers of params following.
-        //  */
-        // static uint8_t getSpecialByte(RfCommands command, uint8_t numberOfParameters);
-        //
-        //
-        // /**
-        //  * @brief Get special byte for RfCommandParameter with param type and size.
-        //  *
-        //  * @param parameterType Parameter type, saved in more significant half of byte.
-        //  * @param parameterSize Parameter size, saved in less significant half of byte.
-        //  *
-        //  * @return Special byte with first 4 bits representing param type and later 4 bits parameter size in bytes.
-        //  */
-        // static uint8_t getSpecialByte(RfCommandsParameterTypes parameterType, uint8_t parameterSize);
-        //
-        // static std::pair<uint8_t, uint8_t> parseSpecialByte(uint8_t specialByte);
-
-        static constexpr uint ms_MAX_REATTEMPTS = 3;
-        static constexpr auto ms_SESSION_TIMEOUT = 10s;
+        static constexpr uint msMAX_REATTEMPTS = 3;
+        static constexpr auto msSESSION_TIMEOUT = 10s;
+        static constexpr auto msRECEIVE_MESSAGE_TIMEOUT = 2s;
+        static constexpr auto msPOOLING_DELAY = 10ms;
 
         const Metadata mMetadata;
         std::shared_ptr<HC12Driver> mpRfDriver;
+        std::shared_ptr<RfClient> mpRfClient;
 
         State mSessionCurrentState{};
 
+        std::vector<uint8_t> mReceivedBuffer;
+        std::mutex mReceiveMutex;
+        std::atomic_bool mIsReceivedBufferReady{false};
+
         uint mFailedAttempts = 0;
-
-
-        // public:
-        //     Session(uint8_t logicAddress, std::string_view macAddress, std::string_view message);
-        //
-        //     explicit Session(const Packet &packet);
-        //
-        //     std::optional<Packet> getOutgoingPacket();
-        //
-        //     void addIncomingPacket(const Packet &packet);
-        //
-        // private:
-        //     Packet createNextPacket();
-        //
-        //     static inline std::array<uint8_t, 6> stringMacToArray(std::string_view macAddress);
-        //
-        //     // static inline std::string arrayMacToString(const std::array<uint8_t, 6> &macAddress);
-        //
-        //     const std::array<uint8_t, 6> mMacAddress = stringMacToArray("30:9c:23:a2:02:e8"); //TODO !pr config
-        //
-        //     const uint8_t mLogicAddress;
-        //     std::vector<uint8_t> mMessage;
-        //
-        //     size_t mMessageOffset = 0;
-        //     size_t mPacketsLeft{};
     };
 }

@@ -148,6 +148,8 @@ namespace SmartHome::API {
         // custom errors
         UNKNOWN_ERROR = -32000,
         MODULE_RUNTIME_ERROR = -32001,
+        MEDIATOR_COMMUNICATION_ERROR = -32002,
+        MEDIATOR_RUNTIME_ERROR = -32003,
     };
 
     /**
