@@ -96,10 +96,9 @@ namespace Comms {
         /**
          * @brief Decides what to do with output from HC12 module.
          * @param hc12Output Pointer to variable storing output from HC12 module.
-         * @param isSetupHC12Working Pointer to if the setup task is sending commands to HC12.
          * @param isWaitingForSendConfirmation Pointer to variable if is being waited for confirmation from HC12.
          */
-        void hc12OutputDecider(const uint8_t *hc12Output, const bool *isSetupHC12Working, bool *isWaitingForSendConfirmation) const;
+        void hc12OutputDecider(const uint8_t *hc12Output, bool *isWaitingForSendConfirmation) const;
         /**
          * @brief Main HC12 FreeRTOS task. Reads all output from HC12 module and passes it to Communication class.
          * This task is responsible for suspending/deleting resuming/creating other HC12 tasks.
@@ -166,6 +165,8 @@ namespace Comms {
 
         SemaphoreHandle_t mSendingDataMutex = nullptr; ///< Handle to FreeRTOS mutex protecting access to UART transmission to HC12 module.
         SemaphoreHandle_t mFirstSetupSemaphore = nullptr; ///< Handle to FreeRTOS binary semaphore indicating that setup should be done first.
+        // TODO !pr change comment
+        SemaphoreHandle_t mSetupWorkingSemaphore = nullptr; ///< Handle to FreeRTOS binary semaphore indicating that setup should be done first.
 
         QueueHandle_t mMainNotificationsQueue = nullptr; ///< Handle to FreeRTOS queue for notifications for the Main task, queue length: 5 bytes (uint8_t).
         QueueHandle_t mTransmitQueue = nullptr; ///< Handle to FreeRTOS queue for (encoded) messages to transmit, queue length: 11x16 bytes (uint8_t).
