@@ -143,66 +143,134 @@ namespace Comms {
 
     void Connection::messageDecider2(const uint8_t receivedMessage[MESSAGE_SIZE]) {
         uint8_t sendBuffer[MESSAGE_SIZE] = {};
-
-        API::CommandHandler receivedCommand(receivedMessage);
-
         using CT = API::commandTypes;
+        using ET = API::errorTypes;
+        std::optional<API::CommandHandler> receivedCommand;
+
+        // decode command and handle decoding failure
+        try {
+            receivedCommand.emplace(receivedMessage);
+        } catch (std::exception &e) {
+            mpLogger->error("Connection messageDecider", "Failed to decode received command." );
+            mpLogger->error("Connection messageDecider", e.what());
+            receivedCommand.reset();
+        }
+        if (!receivedCommand.has_value()) {
+            std::optional<API::CommandHandler> errorCommand;
+            try {
+                errorCommand.emplace(CT::RESPONSE);
+                errorCommand->addParameter(API::APIParameter((uint8_t)ET::BAD_COMMAND, true));
+            } catch (std::exception &e) {
+                mpLogger->error("Connection messageDecider", "Failed to create error command." );
+                mpLogger->error("Connection messageDecider", e.what());
+            }
+
+            if (errorCommand.has_value()) {
+                errorCommand->generateMessage(sendBuffer);
+                mpCommunication->sendMessage(sendBuffer);
+            }
+            return;
+        }
 
         //TODO !pr remove
         using CM = ConnectionMessages;
         using CME = ConnectionMessages::MessagesEnum;
 
-        switch (receivedCommand.getCommandType()) {
-            case CT::GET: {
-                mpLogger->verbose("TEST", "get");
-                try {
-                    constexpr uint8_t TMP_READING = 55;
-                    uint32_t receivedUID = receivedCommand.getParameterValue<uint32_t>(0);
-                    mpLogger->verbosev("TEST", "receivedUID: ", receivedUID);
-                    uint8_t sensorID = receivedCommand.getParameterValue<uint8_t>(1);
-                    mpLogger->verbosev("TEST", "sensorID: ", sensorID);
+        std::optional<API::CommandHandler> responseCommand;
 
-                    // TODO add reading data from sensor
-                    mpLogger->warning("Connection messageDecider", "Fake reading");
-
-                    API::CommandHandler responseCommand(CT::RESPONSE);
-                    API::APIParameter<uint32_t> uid(receivedUID);
-                    API::APIParameter<uint8_t> reading(TMP_READING);
-                    responseCommand.addParameter(uid);
-                    responseCommand.addParameter(reading);
-                    responseCommand.generateMessage(sendBuffer);
-
-                    mpCommunication->sendMessage(sendBuffer);
-                    uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_END, MESSAGE_SIZE);
-                    mpCommunication->sendMessage(sendBuffer);
-                    endConnection();
-                } catch (std::exception &e) {
-                    // TODO add sending error command
-                    mpLogger->error("Connection messageDecider2", e.what());
-                    endConnection();
+        switch (receivedCommand->getCommandType()) {
+            case CT::ACKNOWLEDGE:
+                mpLogger->info("Connection messageDecide", "Got acknowledge.");
+                if (mConnectionTimeoutTimer != nullptr) {
+                    xTimerStop(mConnectionTimeoutTimer, portMAX_DELAY);
                 }
                 break;
-            }
 
-            case CT::RESPONSE: {
-                const uint32_t receivedUID = receivedCommand.getParameterValue<uint32_t>(0);
-                const uint8_t receivedValue = receivedCommand.getParameterValue<uint8_t>(1);
-                mpLogger->infov("Connection messageDecider", "uid: ", receivedUID);
-                mpLogger->infov("Connection messageDecider", "receivedValue: ", receivedValue);
+            case CT::NEGATIVE:
+                mpLogger->warning("Connection messageDecide", "Got negative.");
+                if (mConnectionTimeoutTimer != nullptr) {
+                    xTimerStop(mConnectionTimeoutTimer, portMAX_DELAY);
+                }
+                break;
 
-                //TODO !pr change to API command
-                uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_END, MESSAGE_SIZE);
-                mpCommunication->sendMessage(sendBuffer);
+            case CT::REPEAT:
+                repeatLastTransmittedMessage(); break;
+
+            case CT::END:
                 endConnection();
                 break;
-            }
+
+            case CT::PING:
+                try {
+                    responseCommand.emplace(CT::REPING);
+                } catch (std::exception &e) {
+                    receivedCommand.reset();
+                    mpLogger->error("Connection messageDecider", "Failed to create reping command." );
+                    mpLogger->error("Connection messageDecider", e.what());
+                }
+
+                break;
+
+
+            // case CT::GET: {
+            //     mpLogger->verbose("TEST", "get");
+            //     try {
+            //         constexpr uint8_t TMP_READING = 55;
+            //         uint32_t receivedUID = receivedCommand->getParameterValue<uint32_t>(0);
+            //         mpLogger->verbosev("TEST", "receivedUID: ", receivedUID);
+            //         uint8_t sensorID = receivedCommand->getParameterValue<uint8_t>(1);
+            //         mpLogger->verbosev("TEST", "sensorID: ", sensorID);
+            //
+            //         // TODO add reading data from sensor
+            //         mpLogger->warning("Connection messageDecider", "Fake reading");
+            //
+            //         API::CommandHandler responseCommand(CT::RESPONSE);
+            //         API::APIParameter<uint32_t> uid(receivedUID);
+            //         API::APIParameter<uint8_t> reading(TMP_READING);
+            //         responseCommand.addParameter(uid);
+            //         responseCommand.addParameter(reading);
+            //         responseCommand.generateMessage(sendBuffer);
+            //
+            //         mpCommunication->sendMessage(sendBuffer);
+            //         uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_END, MESSAGE_SIZE);
+            //         mpCommunication->sendMessage(sendBuffer);
+            //         endConnection();
+            //     } catch (std::exception &e) {
+            //         // TODO add sending error command
+            //         mpLogger->error("Connection messageDecider2", e.what());
+            //         endConnection();
+            //     }
+            //     break;
+            // }
+
+            // case CT::RESPONSE: {
+                // const uint32_t receivedUID = receivedCommand.getParameterValue<uint32_t>(0);
+                // const uint8_t receivedValue = receivedCommand.getParameterValue<uint8_t>(1);
+                // mpLogger->infov("Connection messageDecider", "uid: ", receivedUID);
+                // mpLogger->infov("Connection messageDecider", "receivedValue: ", receivedValue);
+                //
+                // //TODO !pr change to API command
+                // uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_END, MESSAGE_SIZE);
+                // mpCommunication->sendMessage(sendBuffer);
+                // endConnection();
+                // break;
+            // }
 
             default:
-                mpLogger->error("Connection messageDecider1", "Received unknown command type.");
-                // throw std::invalid_argument("unknow command");
+                try {
+                    responseCommand.emplace(CT::RESPONSE);
+                    responseCommand->addParameter(API::APIParameter((uint8_t)ET::UNKNOWN_COMMAND, true));
+                } catch (std::exception &e) {
+                    mpLogger->error("Connection messageDecider", e.what());
+                }
+                mpLogger->errorv("Connection messageDecider", "Received unknown command type: ", (int)receivedCommand->getCommandType());
+        }
+
+        if (responseCommand.has_value()) {
+            responseCommand->generateMessage(sendBuffer);
+            mpCommunication->sendMessage(sendBuffer);
         }
     }
-
 
     void Connection::receivingHandle(const uint8_t ip) {
         if (mpAddressing->getIsAddressingInProgress()) return;

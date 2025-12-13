@@ -20,8 +20,8 @@ namespace Comms::API {
         const SpecialByteParameter sb1(parameter[0]);
         const SpecialByteParameter sb2(tmp, 0);
 
-        if (sb1.getSpecialByte() != sb2.getSpecialByte()) {
-            throw std::invalid_argument("invalid type");
+        if (sb1.getSpecialByte() != sb2.getSpecialByte() && sb1.getType() != (uint8_t)parametersTypes::ERROR) {
+            throw std::invalid_argument("APIParameter() invalid type");
         }
 
         std::memcpy(mBytesRepresentation, parameter, sizeof(T) + 1);
@@ -74,7 +74,7 @@ namespace Comms::API {
                 break;
             }
             default:
-                throw std::invalid_argument("invalid type");
+                throw std::invalid_argument("hton invalid type");
         }
     }
 
@@ -104,7 +104,7 @@ namespace Comms::API {
                 break;
             }
             default:
-                throw std::invalid_argument("invalid type");
+                throw std::invalid_argument("ntoh invalid type");
         }
     }
 

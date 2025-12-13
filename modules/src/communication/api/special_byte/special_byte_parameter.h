@@ -48,7 +48,7 @@ namespace Comms::API {
                     case (uint8_t)PVE::ASCII:
                     case (uint8_t)PVE::RAW:
                     default:
-                        throw std::invalid_argument("invalid type");
+                        throw std::invalid_argument("SpecialByteParameter() invalid type");
                 }
             } else {
                 switch (pv.index()) {
@@ -70,7 +70,7 @@ namespace Comms::API {
                     case (uint8_t)PVE::FLOAT:
                     case (uint8_t)PVE::DOUBLE:
                     default:
-                        throw std::invalid_argument("SpecialByteParameter invalid type");
+                        throw std::invalid_argument("SpecialByteParameter(*) invalid type");
                 }
             }
 

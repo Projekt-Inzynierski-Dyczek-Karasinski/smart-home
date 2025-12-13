@@ -29,12 +29,13 @@ namespace Comms::API {
         RAW = 5,
         ERROR = 6
     };
-
+    
     enum class errorTypes : uint8_t {
         UNKNOWN = 0,
-        VALUE = 1,
-        ARGUMENT = 2,
-        INTERNAL_TIMEOUT = 3
+        BAD_COMMAND = 1,
+        UNKNOWN_COMMAND = 2,
+        BAD_ARGUMENT = 3,
+        INTERNAL_ERROR = 4,
     };
 
     using parameterVariant = std::variant<
