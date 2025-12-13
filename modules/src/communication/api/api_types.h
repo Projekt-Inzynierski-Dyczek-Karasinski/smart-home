@@ -29,7 +29,7 @@ namespace Comms::API {
         RAW = 5,
         ERROR = 6
     };
-    
+
     enum class errorTypes : uint8_t {
         UNKNOWN = 0,
         BAD_COMMAND = 1,

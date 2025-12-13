@@ -25,6 +25,26 @@ namespace Comms::API {
     commandTypes CommandHandler::getCommandType() const {
         return mSpecialByteCommand.getCommandType();
     }
+
+    String CommandHandler::getCommandTypeString() const {
+        using CT = commandTypes;
+        switch (getCommandType()) {
+            case CT::ACKNOWLEDGE:          return "ACKNOWLEDGE";
+            case commandTypes::NEGATIVE:   return "NEGATIVE";
+            case commandTypes::REPEAT:     return "REPEAT";
+            case commandTypes::END:        return "END";
+            case commandTypes::PING:       return "PING";
+            case commandTypes::REPING:     return "REPING";
+            case commandTypes::SLEEP:      return "SLEEP";
+            case commandTypes::DEEP_SLEEP: return "DEEP_SLEEP";
+            case commandTypes::GET:        return "GET";
+            case commandTypes::SET:        return "SET";
+            case commandTypes::RESPONSE:   return "RESPONSE";
+            case commandTypes::NOTIFY:     return "NOTIFY";
+            default:                       return "UNKNOWN";
+        }
+    }
+
     size_t CommandHandler::getNumberOfParameters() const {
         return mCommandParameters.size();
     }

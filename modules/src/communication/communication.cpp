@@ -465,10 +465,10 @@ namespace Comms {
                         // send decoded message to queue
                         if (isRawMessage) {
                             isRawMessage = false;
-                            com.mpLogger->infoa("Communication Decode", "Received raw message: ", protocolBuffer[0], PROTOCOL_SIZE, false);
+                            com.mpLogger->debuga("Communication Decode", "Received raw message: ", protocolBuffer[0], PROTOCOL_SIZE, false);
                             xQueueSend(com.mReceiveMessageQueue, protocolBuffer[0], portMAX_DELAY);
                         } else {
-                            com.mpLogger->infoa("Communication Decode", "Received message: ", messageBuffer, MESSAGE_SIZE);
+                            com.mpLogger->debuga("Communication Decode", "Received message: ", messageBuffer, MESSAGE_SIZE);
                             xQueueSend(com.mReceiveMessageQueue, messageBuffer, portMAX_DELAY);
                         }
 
@@ -701,6 +701,47 @@ namespace Comms {
                         uint8_t message[MESSAGE_SIZE] = {};
                         ch.generateMessage(message);
                         xQueueSend(com.mEncodeMessagesQueue, &message, portMAX_DELAY);
+                    }
+                    // sleep command
+                    else if (uah::areArraysEqual(buffer, "sl")) {
+                        std::optional<uint32_t> sleepTime;
+                        try {
+                            sleepTime = std::stoi((char*)&buffer[2]);
+                            com.mpLogger->errorv("Communication Input", "good sleep time:", sleepTime.value());
+                        } catch (...) {
+                            com.mpLogger->error("Communication Input", "Bad sleep time.");
+                        }
+
+                        if (sleepTime.has_value()) {
+                            API::CommandHandler ch(API::commandTypes::SLEEP);
+                            ch.addParameter(API::APIParameter<uint32_t>(88888));
+                            ch.addParameter(API::APIParameter(sleepTime.value()));
+                            uint8_t message[MESSAGE_SIZE] = {};
+                            ch.generateMessage(message);
+                            //todo !pr remove
+                            Serial.println();
+                            uah::printArrayAsInt(message, MESSAGE_SIZE);
+                            Serial.println();
+                            com.sendMessage(message);
+                        }
+                    }
+                    // deep sleep command
+                    else if (uah::areArraysEqual(buffer, "dsl")) {
+                        std::optional<uint32_t> sleepTime;
+                        try {
+                            sleepTime = std::stoi((char*)&buffer[3]);
+                        } catch (...) {
+                            com.mpLogger->error("Communication Input", "Bad sleep time.");
+                        }
+
+                        if (sleepTime.has_value()) {
+                            API::CommandHandler ch(API::commandTypes::DEEP_SLEEP);
+                            ch.addParameter(API::APIParameter<uint32_t>(88888));
+                            ch.addParameter(API::APIParameter(sleepTime.value()));
+                            uint8_t message[MESSAGE_SIZE] = {};
+                            ch.generateMessage(message);
+                            com.sendMessage(message);
+                        }
                     }
                     // rest
                     else {

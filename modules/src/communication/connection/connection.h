@@ -187,6 +187,8 @@ namespace Comms {
          */
         ~Connection();
 
+        void responseWithError(std::optional<API::CommandHandler>& responseCommand, API::errorTypes errorType, std::optional<uint32_t> uid) const;
+
         /**
          * @brief Static callback function for FreeRTOS timer.
          * @details Calls <code>endConnection()</code> method when connection timeout occurs.

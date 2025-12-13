@@ -8,11 +8,11 @@ namespace Comms {
     // ============================ Public ============================
     Connection &Connection::getInstance(
         Communication *communication,
-        #ifdef CENTRAL_UNIT
-            const std::shared_ptr<CentralUnitAddressing> &addressing,
-        #else
-            const std::shared_ptr<ModuleAddressing> &addressing,
-        #endif
+#ifdef CENTRAL_UNIT
+        const std::shared_ptr<CentralUnitAddressing> &addressing,
+#else
+        const std::shared_ptr<ModuleAddressing> &addressing,
+#endif
         const std::shared_ptr<HC12> &rfModule,
         const std::shared_ptr<ul::Logger> &logger
     ) {
@@ -28,7 +28,7 @@ namespace Comms {
         // TODO !mm remove test messages
         // TODO consider ignoring 2 first letters in if statements (these letters are already checked)
         switch (
-            const auto it = CM::messagesMap.find((char*)receivedMessage);
+            const auto it = CM::messagesMap.find((char *) receivedMessage);
             it != CM::messagesMap.end() ? it->second : CME::UNKNOWN
         ) {
             case CME::END:
@@ -50,13 +50,12 @@ namespace Comms {
                 mpCommunication->sendMessage(sendBuffer);
                 break;
 
-            case CME::TEST_GET:
-                {
-                auto & sensorManager = ums::Transducers::SensorsManager::getInstance(mpLogger);
+            case CME::TEST_GET: {
+                auto &sensorManager = ums::Transducers::SensorsManager::getInstance(mpLogger);
                 const String res = sensorManager.getAllSensorsReport();
 
-                uah::prepareBuffer(sendBuffer,  res.c_str(), MESSAGE_SIZE);
-                
+                uah::prepareBuffer(sendBuffer, res.c_str(), MESSAGE_SIZE);
+
                 // uah::prepareBuffer(sendBuffer,  CM::s_CONNECTION_RE_TEST_GET, MESSAGE_SIZE);
                 mpCommunication->sendMessage(sendBuffer);
                 break;
@@ -75,7 +74,7 @@ namespace Comms {
             case CME::GO_TO_NORMAL_SLEEP: {
                 std::optional<uint32_t> sleepTime;
                 try {
-                    sleepTime = std::stoi((char*)&receivedMessage[strlen(CM::s_CONNECTION_GO_TO_NORMAL_SLEEP)]);
+                    sleepTime = std::stoi((char *) &receivedMessage[strlen(CM::s_CONNECTION_GO_TO_NORMAL_SLEEP)]);
                 } catch (...) {
                     sleepTime.reset(); // make sure that sleepTime is null if error occurs
                     mpLogger->error("Connection Message Decider", "Received sleep time is not a number.");
@@ -108,7 +107,7 @@ namespace Comms {
             case CME::CHANGE_CHANNEL: {
                 std::optional<uint8_t> newChannel;
                 try {
-                    newChannel = std::stoi((char*)&receivedMessage[strlen(CM::s_CONNECTION_CHANGE_CHANNEL)]);
+                    newChannel = std::stoi((char *) &receivedMessage[strlen(CM::s_CONNECTION_CHANGE_CHANNEL)]);
                 } catch (...) {
                     newChannel.reset(); // make sure that newChannel is null if error occurs
                     mpLogger->error("Connection Message Decider", "Received rf channel is not a number.");
@@ -132,10 +131,10 @@ namespace Comms {
 
             default:
                 mpLogger->warninga(
-                   "Connection Message Decider",
-                   "Received custom receivedMessage.\nIgnored receivedMessage: ",
-                   receivedMessage,
-                   MESSAGE_SIZE
+                    "Connection Message Decider",
+                    "Received custom receivedMessage.\nIgnored receivedMessage: ",
+                    receivedMessage,
+                    MESSAGE_SIZE
                 );
                 break;
         }
@@ -151,7 +150,7 @@ namespace Comms {
         try {
             receivedCommand.emplace(receivedMessage);
         } catch (std::exception &e) {
-            mpLogger->error("Connection messageDecider", "Failed to decode received command." );
+            mpLogger->error("Connection messageDecider", "Failed to decode received command.");
             mpLogger->error("Connection messageDecider", e.what());
             receivedCommand.reset();
         }
@@ -159,9 +158,9 @@ namespace Comms {
             std::optional<API::CommandHandler> errorCommand;
             try {
                 errorCommand.emplace(CT::RESPONSE);
-                errorCommand->addParameter(API::APIParameter((uint8_t)ET::BAD_COMMAND, true));
+                errorCommand->addParameter(API::APIParameter((uint8_t) ET::BAD_COMMAND, true));
             } catch (std::exception &e) {
-                mpLogger->error("Connection messageDecider", "Failed to create error command." );
+                mpLogger->error("Connection messageDecider", "Failed to create error command.");
                 mpLogger->error("Connection messageDecider", e.what());
             }
 
@@ -177,40 +176,153 @@ namespace Comms {
         using CME = ConnectionMessages::MessagesEnum;
 
         std::optional<API::CommandHandler> responseCommand;
+        std::optional<uint32_t> uid;
 
         switch (receivedCommand->getCommandType()) {
+            // TODO !pr move RESPONSE to group below
+            case CT::RESPONSE: {
+                mpLogger->warning("MessageDecider TMP", "response: ");
+                uah::printArrayAsInt(receivedMessage, MESSAGE_SIZE);
+                try {
+                    responseCommand.emplace(CT::END);
+                } catch (std::exception &e) {
+                    receivedCommand.reset();
+                    mpLogger->error("MessageDecider CT::RESPONSE", e.what());
+                }
+                break;
+            }
+
+            // TESTME messages
             case CT::ACKNOWLEDGE:
-                mpLogger->info("Connection messageDecide", "Got acknowledge.");
-                if (mConnectionTimeoutTimer != nullptr) {
-                    xTimerStop(mConnectionTimeoutTimer, portMAX_DELAY);
-                }
-                break;
-
             case CT::NEGATIVE:
-                mpLogger->warning("Connection messageDecide", "Got negative.");
+            case CT::REPING: {
+                size_t size = snprintf(nullptr, 0, "Got %s", receivedCommand->getCommandTypeString().c_str());
+                char warningMessage[size];
+                sprintf(warningMessage, "Got %s", receivedCommand->getCommandTypeString().c_str());
+                mpLogger->warning("Connection messageDecide", warningMessage);
+
                 if (mConnectionTimeoutTimer != nullptr) {
                     xTimerStop(mConnectionTimeoutTimer, portMAX_DELAY);
                 }
                 break;
+            }
 
+            // TESTME REPEAT
             case CT::REPEAT:
-                repeatLastTransmittedMessage(); break;
+                repeatLastTransmittedMessage();
+                break;
 
             case CT::END:
                 endConnection();
                 break;
 
-            case CT::PING:
+            // TESTME PING
+            case CT::PING: {
+                try {
+                    uid = receivedCommand->getParameterValue<uint32_t>(0);
+                } catch (std::exception &e) {
+                    mpLogger->error("MessageDecider CT::PING", e.what());
+                    uid.reset();
+                }
+                if (!uid.has_value()) {
+                    responseWithError(responseCommand, ET::BAD_ARGUMENT, uid);
+                }
+
                 try {
                     responseCommand.emplace(CT::REPING);
+                    responseCommand->addParameter(API::APIParameter(uid.value()));
                 } catch (std::exception &e) {
                     receivedCommand.reset();
-                    mpLogger->error("Connection messageDecider", "Failed to create reping command." );
-                    mpLogger->error("Connection messageDecider", e.what());
+                    mpLogger->error("MessageDecider CT::REPING", e.what());
+                }
+                break;
+            }
+
+            // TESTME SLEEP
+            case CT::SLEEP: {
+                std::optional<uint32_t> sleepTime;
+                mpLogger->error("TMP", "CT::SLEEP");
+                try {
+                    uid = receivedCommand->getParameterValue<uint32_t>(0);
+                    sleepTime = receivedCommand->getParameterValue<uint32_t>(1);
+                } catch (std::exception &e) {
+                    uid.reset();
+                    sleepTime.reset();
+                }
+                mpLogger->error("TMP", "try catch");
+
+                if (!uid.has_value() || !sleepTime.has_value()) {
+                    mpLogger->error("MessageDecider CT::SLEEP", "Did not get uid and/or sleepTime");
+                    responseWithError(responseCommand, ET::BAD_ARGUMENT, uid);
+                    break;
+                }
+                mpLogger->errorv("TMP", "uid:", uid.value());
+                mpLogger->errorv("TMP", "sleeptime:", sleepTime.value());
+
+                xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+                mSleepTime = sleepTime.value();
+                xSemaphoreGive(mConnectionDataMutex);
+
+                try {
+                    responseCommand.emplace(CT::RESPONSE);
+                    responseCommand->addParameter(API::APIParameter(uid.value()));
+                    responseCommand->addParameter(API::APIParameter(sleepTime.value()));
+                } catch (std::exception &e) {
+                    receivedCommand.reset();
+                    mpLogger->error("MessageDecider CT::SLEEP", e.what());
                 }
 
                 break;
+            }
 
+            // TESTME DEEP_SLEEP
+            case CT::DEEP_SLEEP: {
+                std::optional<uint32_t> sleepTime;
+                try {
+                    uid = receivedCommand->getParameterValue<uint32_t>(0);
+                    sleepTime = receivedCommand->getParameterValue<uint32_t>(1);
+                } catch (std::exception &e) {
+                    uid.reset();
+                    sleepTime.reset();
+                }
+
+                if (!uid.has_value() || !sleepTime.has_value()) {
+                    mpLogger->error("MessageDecider CT::SLEEP", "Did not get uid and/or sleepTime");
+                    responseWithError(responseCommand, ET::BAD_ARGUMENT, uid);
+                    break;
+                }
+
+                xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+                mSleepTime = sleepTime.value();
+                mIsDeepSleep = true;
+                xSemaphoreGive(mConnectionDataMutex);
+
+                responseCommand.emplace(CT::RESPONSE);
+                responseCommand->addParameter(API::APIParameter(uid.value()));
+                responseCommand->addParameter(API::APIParameter(sleepTime.value()));
+
+                break;
+            }
+
+            // TESTME GET
+            case CT::GET: {
+                break;
+            }
+
+            // TESTME SET
+            case CT::SET: {
+                break;
+            }
+
+            case CT::NOTIFY: {
+                try {
+                    responseCommand.emplace(CT::ACKNOWLEDGE);
+                } catch (std::exception &e) {
+                    receivedCommand.reset();
+                    mpLogger->error("MessageDecider CT::NOTIFY", e.what());
+                }
+                break;
+            }
 
             // case CT::GET: {
             //     mpLogger->verbose("TEST", "get");
@@ -243,32 +355,41 @@ namespace Comms {
             //     break;
             // }
 
-            // case CT::RESPONSE: {
-                // const uint32_t receivedUID = receivedCommand.getParameterValue<uint32_t>(0);
-                // const uint8_t receivedValue = receivedCommand.getParameterValue<uint8_t>(1);
-                // mpLogger->infov("Connection messageDecider", "uid: ", receivedUID);
-                // mpLogger->infov("Connection messageDecider", "receivedValue: ", receivedValue);
-                //
-                // //TODO !pr change to API command
-                // uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_END, MESSAGE_SIZE);
-                // mpCommunication->sendMessage(sendBuffer);
-                // endConnection();
-                // break;
-            // }
-
             default:
-                try {
-                    responseCommand.emplace(CT::RESPONSE);
-                    responseCommand->addParameter(API::APIParameter((uint8_t)ET::UNKNOWN_COMMAND, true));
-                } catch (std::exception &e) {
-                    mpLogger->error("Connection messageDecider", e.what());
-                }
-                mpLogger->errorv("Connection messageDecider", "Received unknown command type: ", (int)receivedCommand->getCommandType());
+                responseWithError(responseCommand, ET::UNKNOWN_COMMAND, uid);
+                mpLogger->errorv(
+                    "Connection messageDecider",
+                    "Received unknown command type: ",
+                    (int)receivedCommand->getCommandType()
+                );
         }
 
         if (responseCommand.has_value()) {
             responseCommand->generateMessage(sendBuffer);
             mpCommunication->sendMessage(sendBuffer);
+        }
+    }
+
+    void Connection::responseWithError(std::optional<API::CommandHandler> &responseCommand, API::errorTypes errorType, const std::optional<uint32_t> uid) const {
+        using CT = API::commandTypes;
+        if (!uid.has_value()) {
+            try {
+                responseCommand.emplace(CT::RESPONSE);
+                responseCommand->addParameter(API::APIParameter((uint8_t) errorType, true));
+            } catch (std::exception &e) {
+                responseCommand.reset();
+                mpLogger->error("Connection messageDecider", e.what());
+            }
+           return;
+        }
+
+        try {
+            responseCommand.emplace(CT::RESPONSE);
+            responseCommand->addParameter(API::APIParameter(uid.value()));
+            responseCommand->addParameter(API::APIParameter((uint8_t) errorType, true));
+        } catch (std::exception &e) {
+            responseCommand.reset();
+            mpLogger->error("Connection messageDecider", e.what());
         }
     }
 
@@ -279,7 +400,7 @@ namespace Comms {
         createConnectionTimer();
         xTimerStart(mConnectionTimeoutTimer, portMAX_DELAY);
         if (!mIsConnected) {
-            auto & powerManager = ums::PowerManager::getInstance(mpLogger);
+            auto &powerManager = ums::PowerManager::getInstance(mpLogger);
             powerManager.disableAutoSleep();
 
             mpLogger->debug("Connection Class", "Connection start.");
@@ -344,11 +465,11 @@ namespace Comms {
     // ================== Constructor and Destructor ==================
     Connection::Connection(
         Communication *communication,
-        #ifdef CENTRAL_UNIT
-            const std::shared_ptr<CentralUnitAddressing> &addressing,
-        #else
-            const std::shared_ptr<ModuleAddressing> &addressing,
-        #endif
+#ifdef CENTRAL_UNIT
+        const std::shared_ptr<CentralUnitAddressing> &addressing,
+#else
+        const std::shared_ptr<ModuleAddressing> &addressing,
+#endif
         const std::shared_ptr<HC12> &rfModule,
         const std::shared_ptr<ul::Logger> &logger
     ) : mpCommunication(communication), mpAddressing(addressing), mpRfModule(rfModule), mpLogger(logger) {
@@ -438,14 +559,14 @@ namespace Comms {
     void Connection::afterConnectionEndHandler() const {
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
         // changing rf channel
-        #ifdef RF_CHANNELS
-            mpRfModule->firstChangeRFChannel(mpAddressing->getDefaultRFChannel());
-        #else
-            #error "Not implemented"
-        #endif
+#ifdef RF_CHANNELS
+        mpRfModule->firstChangeRFChannel(mpAddressing->getDefaultRFChannel());
+#else
+#error "Not implemented"
+#endif
         // going to sleep
         if (mSleepTime != 0) {
-            auto & powerManager = ums::PowerManager::getInstance(mpLogger);
+            auto &powerManager = ums::PowerManager::getInstance(mpLogger);
             powerManager.enterSleep(mSleepTime, !mIsDeepSleep);
         }
         xSemaphoreGive(mConnectionDataMutex);
@@ -457,5 +578,4 @@ namespace Comms {
         const uint16_t result = s_TIMEOUTS[attempts] + offset;
         return result;
     }
-
 }

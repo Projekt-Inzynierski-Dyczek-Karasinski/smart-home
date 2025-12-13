@@ -31,6 +31,7 @@ namespace Comms::API {
         explicit CommandHandler(commandTypes commandType);
 
         commandTypes getCommandType() const;
+        String getCommandTypeString() const;
         size_t getNumberOfParameters() const;
 
         void addParameter(APIParameterVariant APIParameter);
