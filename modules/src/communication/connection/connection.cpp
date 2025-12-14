@@ -207,7 +207,6 @@ namespace Comms {
                 break;
             }
 
-            // TESTME REPEAT
             case CT::REPEAT:
                 mpLogger->verbose("MessageDecider", "CT::REPEAT");
                 repeatLastTransmittedMessage();
@@ -485,9 +484,19 @@ namespace Comms {
     void Connection::transmitRepeatMessage() const {
         xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
         if (mIsConnected || mpAddressing->getIsAddressingInProgress()) {
-            uint8_t buffer[MESSAGE_SIZE];
-            uah::prepareBuffer(buffer, ConnectionMessages::s_CONNECTION_REPEAT_MESSAGE, MESSAGE_SIZE);
-            mpCommunication->sendPriorityMessage(buffer);
+            std::optional<API::CommandHandler> responseCommand;
+            try {
+                responseCommand.emplace(API::commandTypes::REPEAT);
+            } catch (std::exception &e) {
+                mpLogger->error("Connection transmitRepeatMessage", "Failed to create REPEAT command.");
+                mpLogger->error("Connection messageDecider", e.what());
+            }
+
+            if (responseCommand.has_value()) {
+                uint8_t buffer[MESSAGE_SIZE] = {};
+                responseCommand->generateMessage(buffer);
+                mpCommunication->sendPriorityMessage(buffer);
+            }
         }
         xSemaphoreGive(mConnectionDataMutex);
     }
