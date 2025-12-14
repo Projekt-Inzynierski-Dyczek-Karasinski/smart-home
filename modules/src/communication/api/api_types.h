@@ -35,7 +35,8 @@ namespace Comms::API {
         BAD_COMMAND = 1,
         UNKNOWN_COMMAND = 2,
         BAD_ARGUMENT = 3,
-        INTERNAL_ERROR = 4,
+        NOT_IMPLEMENTED = 4,
+        INTERNAL_ERROR = 5,
     };
 
     using parameterVariant = std::variant<

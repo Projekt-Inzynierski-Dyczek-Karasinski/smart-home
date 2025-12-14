@@ -515,8 +515,8 @@ namespace Comms {
 
         #ifdef TEST_CHECKSUM
             // force bad checksum
-            pinMode(12, INPUT_PULLUP);
-            if (digitalRead(12) == LOW) {
+            pinMode(18, INPUT_PULLUP);
+            if (digitalRead(18) == LOW) {
                 checkSum++;
             }
         #endif

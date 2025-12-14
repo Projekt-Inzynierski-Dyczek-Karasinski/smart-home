@@ -353,7 +353,7 @@ namespace Comms {
                 vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_LOW*2));
 
 
-                hc12.mpLogger->infoa("HC12 Setup", "Received command: ", commandBuffer, SETUP_COMMAND_SIZE);
+                hc12.mpLogger->verbosea("HC12 Setup", "Received command: ", commandBuffer, SETUP_COMMAND_SIZE);
 
                 // TODO !o add better protection against bad commands
                 if (!(commandBuffer[0] == (uint8_t)'H' && commandBuffer[1] == (uint8_t)'C')) {

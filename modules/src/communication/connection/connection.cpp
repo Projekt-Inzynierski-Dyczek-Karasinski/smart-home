@@ -240,40 +240,6 @@ namespace Comms {
                 break;
             }
 
-            //  {
-            //     mpLogger->verbose("MessageDecider", "CT::SLEEP");
-            //
-            //     std::optional<uint32_t> sleepTime;
-            //     try {
-            //         uid = receivedCommand->getParameterValue<uint32_t>(0);
-            //         sleepTime = receivedCommand->getParameterValue<uint32_t>(1);
-            //     } catch (std::exception &e) {
-            //         uid.reset();
-            //         sleepTime.reset();
-            //     }
-            //
-            //     if (!uid.has_value() || !sleepTime.has_value()) {
-            //         mpLogger->error("MessageDecider CT::SLEEP", "Did not get uid and/or sleepTime");
-            //         responseWithError(responseCommand, ET::BAD_ARGUMENT, uid);
-            //         break;
-            //     }
-            //
-            //     xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
-            //     mSleepTime = sleepTime.value();
-            //     xSemaphoreGive(mConnectionDataMutex);
-            //
-            //     try {
-            //         responseCommand.emplace(CT::RESPONSE);
-            //         responseCommand->addParameter(API::APIParameter(uid.value()));
-            //         responseCommand->addParameter(API::APIParameter(sleepTime.value()));
-            //     } catch (std::exception &e) {
-            //         receivedCommand.reset();
-            //         mpLogger->error("MessageDecider CT::SLEEP", e.what());
-            //     }
-            //
-            //     break;
-            // }
-
             case CT::DEEP_SLEEP:
                 isDeepSleep = true;
             case CT::SLEEP: {
@@ -313,6 +279,7 @@ namespace Comms {
             // TESTME GET
             case CT::GET: {
                 mpLogger->verbose("MessageDecider", "CT::GET");
+                responseWithError(responseCommand, ET::NOT_IMPLEMENTED, uid);
 
                 break;
             }
@@ -320,6 +287,7 @@ namespace Comms {
             // TESTME SET
             case CT::SET: {
                 mpLogger->verbose("MessageDecider", "CT::SET");
+                responseWithError(responseCommand, ET::NOT_IMPLEMENTED, uid);
 
                 break;
             }
