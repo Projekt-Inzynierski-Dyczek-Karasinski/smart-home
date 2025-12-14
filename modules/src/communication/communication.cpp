@@ -61,7 +61,7 @@ namespace Comms {
         xQueueSend(mReceiveMessageQueue, message, portMAX_DELAY);
     }
 
-    void Communication::changeRFChannel(uint8_t channel) const {
+    void Communication::changeRFChannel(const uint8_t channel) const {
         mpRfModule->firstChangeRFChannel(channel);
     }
 
@@ -74,8 +74,9 @@ namespace Comms {
     }
 
     void Communication::endConnection() const {
-        uint8_t sendBuffer[MESSAGE_SIZE];
-        uah::prepareBuffer(sendBuffer, ConnectionMessages::s_CONNECTION_END, MESSAGE_SIZE);
+        uint8_t sendBuffer[MESSAGE_SIZE] = {};
+        API::CommandHandler ch(API::commandTypes::END);
+        ch.generateMessage(sendBuffer);
         sendMessage(sendBuffer);
         mpConnection->endConnection();
     }
@@ -686,7 +687,7 @@ namespace Comms {
                         } else {
                             com.mpLogger->error("Communication Input", "Bad IP");
                         }
-                    } else if (uah::areArraysEqual(buffer, ConnectionMessages::s_CONNECTION_END)) {
+                    } else if (uah::areArraysEqual(buffer, "end")) {
                         com.endConnection();
                     } else if (uah::areArraysEqual(buffer, ConnectionMessages::s_CONNECTION_TEST_GET)) {
                         API::CommandHandler ch(API::commandTypes::GET);
@@ -718,10 +719,6 @@ namespace Comms {
                             ch.addParameter(API::APIParameter(sleepTime.value()));
                             uint8_t message[MESSAGE_SIZE] = {};
                             ch.generateMessage(message);
-                            //todo !pr remove
-                            Serial.println();
-                            uah::printArrayAsInt(message, MESSAGE_SIZE);
-                            Serial.println();
                             com.sendMessage(message);
                         }
                     }
@@ -742,6 +739,20 @@ namespace Comms {
                             ch.generateMessage(message);
                             com.sendMessage(message);
                         }
+                    }
+                    // notif test
+                    else if (uah::areArraysEqual(buffer, "notif")) {
+                        API::CommandHandler ch(API::commandTypes::NOTIFY);
+                        ch.addParameter(API::APIParameter((uint8_t)1));
+                        uint8_t message[MESSAGE_SIZE] = {};
+                        ch.generateMessage(message);
+                        com.sendMessage(message);
+                    } else if (uah::areArraysEqual(buffer, "ping")) {
+                        API::CommandHandler ch(API::commandTypes::PING);
+                        ch.addParameter(API::APIParameter((uint8_t)12));
+                        uint8_t message[MESSAGE_SIZE] = {};
+                        ch.generateMessage(message);
+                        com.sendMessage(message);
                     }
                     // rest
                     else {

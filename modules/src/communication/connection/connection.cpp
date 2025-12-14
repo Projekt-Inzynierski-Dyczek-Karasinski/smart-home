@@ -177,11 +177,12 @@ namespace Comms {
 
         std::optional<API::CommandHandler> responseCommand;
         std::optional<uint32_t> uid;
+        bool isDeepSleep = false;
 
         switch (receivedCommand->getCommandType()) {
             // TODO !pr move RESPONSE to group below
             case CT::RESPONSE: {
-                mpLogger->warning("MessageDecider TMP", "response: ");
+                mpLogger->info("MessageDecider TMP", "response: ");
                 uah::printArrayAsInt(receivedMessage, MESSAGE_SIZE);
                 try {
                     responseCommand.emplace(CT::END);
@@ -192,7 +193,6 @@ namespace Comms {
                 break;
             }
 
-            // TESTME messages
             case CT::ACKNOWLEDGE:
             case CT::NEGATIVE:
             case CT::REPING: {
@@ -209,15 +209,18 @@ namespace Comms {
 
             // TESTME REPEAT
             case CT::REPEAT:
+                mpLogger->verbose("MessageDecider", "CT::REPEAT");
                 repeatLastTransmittedMessage();
                 break;
 
             case CT::END:
+                mpLogger->verbose("MessageDecider", "CT::END");
                 endConnection();
                 break;
 
-            // TESTME PING
             case CT::PING: {
+                mpLogger->verbose("MessageDecider", "CT::PING");
+
                 try {
                     uid = receivedCommand->getParameterValue<uint32_t>(0);
                 } catch (std::exception &e) {
@@ -238,10 +241,46 @@ namespace Comms {
                 break;
             }
 
-            // TESTME SLEEP
+            //  {
+            //     mpLogger->verbose("MessageDecider", "CT::SLEEP");
+            //
+            //     std::optional<uint32_t> sleepTime;
+            //     try {
+            //         uid = receivedCommand->getParameterValue<uint32_t>(0);
+            //         sleepTime = receivedCommand->getParameterValue<uint32_t>(1);
+            //     } catch (std::exception &e) {
+            //         uid.reset();
+            //         sleepTime.reset();
+            //     }
+            //
+            //     if (!uid.has_value() || !sleepTime.has_value()) {
+            //         mpLogger->error("MessageDecider CT::SLEEP", "Did not get uid and/or sleepTime");
+            //         responseWithError(responseCommand, ET::BAD_ARGUMENT, uid);
+            //         break;
+            //     }
+            //
+            //     xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
+            //     mSleepTime = sleepTime.value();
+            //     xSemaphoreGive(mConnectionDataMutex);
+            //
+            //     try {
+            //         responseCommand.emplace(CT::RESPONSE);
+            //         responseCommand->addParameter(API::APIParameter(uid.value()));
+            //         responseCommand->addParameter(API::APIParameter(sleepTime.value()));
+            //     } catch (std::exception &e) {
+            //         receivedCommand.reset();
+            //         mpLogger->error("MessageDecider CT::SLEEP", e.what());
+            //     }
+            //
+            //     break;
+            // }
+
+            case CT::DEEP_SLEEP:
+                isDeepSleep = true;
             case CT::SLEEP: {
+                mpLogger->verbose("MessageDecider", "CT::DEEP_SLEEP");
+
                 std::optional<uint32_t> sleepTime;
-                mpLogger->error("TMP", "CT::SLEEP");
                 try {
                     uid = receivedCommand->getParameterValue<uint32_t>(0);
                     sleepTime = receivedCommand->getParameterValue<uint32_t>(1);
@@ -249,18 +288,16 @@ namespace Comms {
                     uid.reset();
                     sleepTime.reset();
                 }
-                mpLogger->error("TMP", "try catch");
 
                 if (!uid.has_value() || !sleepTime.has_value()) {
                     mpLogger->error("MessageDecider CT::SLEEP", "Did not get uid and/or sleepTime");
                     responseWithError(responseCommand, ET::BAD_ARGUMENT, uid);
                     break;
                 }
-                mpLogger->errorv("TMP", "uid:", uid.value());
-                mpLogger->errorv("TMP", "sleeptime:", sleepTime.value());
 
                 xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
                 mSleepTime = sleepTime.value();
+                mIsDeepSleep = isDeepSleep;
                 xSemaphoreGive(mConnectionDataMutex);
 
                 try {
@@ -269,52 +306,27 @@ namespace Comms {
                     responseCommand->addParameter(API::APIParameter(sleepTime.value()));
                 } catch (std::exception &e) {
                     receivedCommand.reset();
-                    mpLogger->error("MessageDecider CT::SLEEP", e.what());
+                    mpLogger->error("MessageDecider CT::DEEP_SLEEP", e.what());
                 }
-
-                break;
-            }
-
-            // TESTME DEEP_SLEEP
-            case CT::DEEP_SLEEP: {
-                std::optional<uint32_t> sleepTime;
-                try {
-                    uid = receivedCommand->getParameterValue<uint32_t>(0);
-                    sleepTime = receivedCommand->getParameterValue<uint32_t>(1);
-                } catch (std::exception &e) {
-                    uid.reset();
-                    sleepTime.reset();
-                }
-
-                if (!uid.has_value() || !sleepTime.has_value()) {
-                    mpLogger->error("MessageDecider CT::SLEEP", "Did not get uid and/or sleepTime");
-                    responseWithError(responseCommand, ET::BAD_ARGUMENT, uid);
-                    break;
-                }
-
-                xSemaphoreTake(mConnectionDataMutex, portMAX_DELAY);
-                mSleepTime = sleepTime.value();
-                mIsDeepSleep = true;
-                xSemaphoreGive(mConnectionDataMutex);
-
-                responseCommand.emplace(CT::RESPONSE);
-                responseCommand->addParameter(API::APIParameter(uid.value()));
-                responseCommand->addParameter(API::APIParameter(sleepTime.value()));
-
                 break;
             }
 
             // TESTME GET
             case CT::GET: {
+                mpLogger->verbose("MessageDecider", "CT::GET");
+
                 break;
             }
 
             // TESTME SET
             case CT::SET: {
+                mpLogger->verbose("MessageDecider", "CT::SET");
+
                 break;
             }
 
             case CT::NOTIFY: {
+                mpLogger->verbose("MessageDecider", "CT::NOTIFY");
                 try {
                     responseCommand.emplace(CT::ACKNOWLEDGE);
                 } catch (std::exception &e) {
@@ -356,17 +368,35 @@ namespace Comms {
             // }
 
             default:
-                responseWithError(responseCommand, ET::UNKNOWN_COMMAND, uid);
                 mpLogger->errorv(
                     "Connection messageDecider",
                     "Received unknown command type: ",
                     (int)receivedCommand->getCommandType()
                 );
+                responseWithError(responseCommand, ET::UNKNOWN_COMMAND, uid);
+                break;
         }
 
+        // TODO !pr remove
+        // if (!responseCommand.has_value()) {
+        //     mpLogger->error("Connection MessageDecider", "ET::INTERNAL_ERROR");
+        //     try {
+        //         responseCommand.emplace(CT::RESPONSE);
+        //         responseCommand->addParameter(API::APIParameter((uint8_t)ET::INTERNAL_ERROR, true));
+        //     } catch (std::exception &e) {
+        //         receivedCommand.reset();
+        //         mpLogger->error("MessageDecider ET::INTERNAL_ERROR", e.what());
+        //     }
+        // }
+
+        // send response if successfully created command
         if (responseCommand.has_value()) {
             responseCommand->generateMessage(sendBuffer);
             mpCommunication->sendMessage(sendBuffer);
+
+            // TODO !mm remove
+            if (responseCommand->getCommandType() == CT::END)
+                endConnection();
         }
     }
 
