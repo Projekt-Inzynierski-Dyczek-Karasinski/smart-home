@@ -1,52 +1,12 @@
 {
   "addressing": {
-    "mod": [
-      {
-        "imr": true,
-        "ip": 2,
-        "mac": [
-          176,
-          167,
-          50,
-          241,
-          129,
-          60
-        ],
-        "rfChannel": 2
-      },
-      {
-        "imr": true,
-        "ip": 3,
-        "mac": [
-          1,
-          1,
-          1,
-          1,
-          1,
-          1
-        ],
-        "rfChannel": 3
-      },
-      {
-        "imr": true,
-        "ip": 4,
-        "mac": [
-          1,
-          1,
-          1,
-          1,
-          1,
-          1
-        ],
-        "rfChannel": 4
-      }
-    ],
-    "num": [
-      1,
-      1,
-      1,
-      1
-    ]
+    "ip": 2,
+    "mac": "80:B5:4E:C5:A5:C8",
+    "rfChannel": 2
+  },
+  "wifi": {
+    "ssid": "wifi ssid",
+    "password": "wifi password"
   },
   "sensorsData": {
     "powerPin": 13,
@@ -55,33 +15,14 @@
         "type": "batterySensor",
         "sensorData": {
           "id": 1,
-          "readPin": 16,
+          "readPin": 12,
+          "powerPin": 0,
           "canAwake": false,
           "additional": {
-            "rVCC": 94000,
-            "rGND": 97000,
+            "rVCC": 50000,
+            "rGND": 50000,
             "Vmin": 4350,
             "Vmax": 4800
-          }
-        }
-      },
-      {
-        "type": "lightSensor",
-        "sensorData": {
-          "id": 2,
-          "readPin": 17,
-          "canAwake": false,
-          "additional": {
-          }
-        }
-      },
-      {
-        "type": "DHT22",
-        "sensorData": {
-          "id": 3,
-          "readPin": 12,
-          "canAwake": false,
-          "additional": {
           }
         }
       }
@@ -90,9 +31,5 @@
   "ota": {
     "version": 1,
     "ota_pin": 3
-  },
-  "wifi": {
-    "ssid": "wifi ssid",
-    "password": "wifi password"
   }
 }
