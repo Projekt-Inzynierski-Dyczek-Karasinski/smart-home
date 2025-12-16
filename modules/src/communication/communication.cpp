@@ -81,19 +81,23 @@ namespace Comms {
         mpConnection->endConnection();
     }
 
+    uint8_t Communication::getDefaultRfChannel() const {
+        return mpAddressing->getDefaultRFChannel();
+    }
+
     // ================== Constructor and Destructor ==================
     Communication::Communication(const std::shared_ptr<ums::DebugLED> &debugLED, const std::shared_ptr<ul::Logger> &logger) :
         mpDebugLED(debugLED),
         mpLogger(logger),
+        #ifdef CENTRAL_UNIT
+            mpAddressing(new CentralUnitAddressing(this, logger)),
+        #else
+            mpAddressing(new ModuleAddressing(this, logger)),
+        #endif
         #ifdef HC12_MODULE
-            mpRfModule(new HC12(this, logger)),
+            mpRfModule(new HC12(this, logger))
         #else
             #error "Not implemented"
-        #endif
-        #ifdef CENTRAL_UNIT
-            mpAddressing(new CentralUnitAddressing(this, logger))
-        #else
-            mpAddressing(new ModuleAddressing(this, logger))
         #endif
     {
         mpConnection = &Connection::getInstance(this, mpAddressing, mpRfModule, logger);
@@ -689,19 +693,25 @@ namespace Comms {
                         }
                     } else if (uah::areArraysEqual(buffer, "end")) {
                         com.endConnection();
-                    } else if (uah::areArraysEqual(buffer, ConnectionMessages::s_CONNECTION_TEST_GET)) {
+                    } else if (uah::areArraysEqual(buffer, "test")) {
                         API::CommandHandler ch(API::commandTypes::GET);
-                        constexpr uint32_t TEST_UID = 123;
-                        constexpr uint8_t TEST_SENSOR_ID = 1;
+                        std::optional<uint8_t> getType;
+                        try {
+                            getType = std::stoi((char*)&buffer[4]);
+                        } catch (...) {
+                            com.mpLogger->error("Communication Input", "Bad sleep getType.");
+                        }
+                        if (getType.has_value()) {
+                            constexpr uint32_t TEST_UID = 88888;
+                            API::APIParameter uid(TEST_UID);
+                            API::APIParameter getTypeParam(getType.value());
+                            ch.addParameter(uid);
+                            ch.addParameter(getTypeParam);
 
-                        API::APIParameter uid(TEST_UID);
-                        API::APIParameter sensorId(TEST_SENSOR_ID);
-                        ch.addParameter(uid);
-                        ch.addParameter(sensorId);
-
-                        uint8_t message[MESSAGE_SIZE] = {};
-                        ch.generateMessage(message);
-                        xQueueSend(com.mEncodeMessagesQueue, &message, portMAX_DELAY);
+                            uint8_t message[MESSAGE_SIZE] = {};
+                            ch.generateMessage(message);
+                            xQueueSend(com.mEncodeMessagesQueue, &message, portMAX_DELAY);
+                        }
                     }
                     // sleep command
                     else if (uah::areArraysEqual(buffer, "sl")) {

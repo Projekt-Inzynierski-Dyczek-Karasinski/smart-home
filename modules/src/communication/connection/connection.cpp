@@ -224,10 +224,8 @@ namespace Comms {
                     uid = receivedCommand->getParameterValue<uint32_t>(0);
                 } catch (std::exception &e) {
                     mpLogger->error("MessageDecider CT::PING", e.what());
-                    uid.reset();
-                }
-                if (!uid.has_value()) {
                     responseWithError(responseCommand, ET::BAD_ARGUMENT, uid);
+                    break;
                 }
 
                 try {
@@ -250,11 +248,6 @@ namespace Comms {
                     uid = receivedCommand->getParameterValue<uint32_t>(0);
                     sleepTime = receivedCommand->getParameterValue<uint32_t>(1);
                 } catch (std::exception &e) {
-                    uid.reset();
-                    sleepTime.reset();
-                }
-
-                if (!uid.has_value() || !sleepTime.has_value()) {
                     mpLogger->error("MessageDecider CT::SLEEP", "Did not get uid and/or sleepTime");
                     responseWithError(responseCommand, ET::BAD_ARGUMENT, uid);
                     break;
@@ -276,19 +269,68 @@ namespace Comms {
                 break;
             }
 
-            // TESTME GET
             case CT::GET: {
                 mpLogger->verbose("MessageDecider", "CT::GET");
-                responseWithError(responseCommand, ET::NOT_IMPLEMENTED, uid);
+
+                // get always required arguments for CT::GET
+                std::optional<uint8_t> getType;
+                try {
+                    uid = receivedCommand->getParameterValue<uint32_t>(0);
+                    getType = receivedCommand->getParameterValue<uint8_t>(1);
+                } catch (std::exception &e) {
+                    responseWithError(responseCommand, ET::NOT_IMPLEMENTED, uid);
+                    break;
+                }
+
+                using GT = API::getTypes;
+                switch (getType.value()) {
+                    case (uint8_t)GT::SENSOR_VALUE:
+                        mpLogger->verbose("MessageDecider TMP", "CT::SENSOR_VALUE");
+                        responseWithError(responseCommand, ET::NOT_IMPLEMENTED, uid);
+                        break;
+
+                    case (uint8_t)GT::CONFIG_VALUE:
+                        mpLogger->verbose("MessageDecider TMP", "CT::CONFIG_VALUE");
+
+                        responseWithError(responseCommand, ET::NOT_IMPLEMENTED, uid);
+                        break;
+
+                    case (uint8_t)GT::SENSOR_LIST:
+                        mpLogger->verbose("MessageDecider TMP", "CT::SENSOR_LIST");
+
+                        responseWithError(responseCommand, ET::NOT_IMPLEMENTED, uid);
+                        break;
+
+                    case (uint8_t)GT::LOGS:
+                        mpLogger->verbose("MessageDecider TMP", "CT::LOGS");
+                        responseWithError(responseCommand, ET::NOT_IMPLEMENTED, uid);
+                        break;
+
+                    case (uint8_t)GT::BATTERY_STATE:
+                        mpLogger->verbose("MessageDecider TMP", "CT::BATTERY_STATE");
+                        responseWithError(responseCommand, ET::NOT_IMPLEMENTED, uid);
+                        break;
+
+                    default:
+                        mpLogger->errorv("MessageDecider CT::GET", "Got unknown get type: ", getType.value());
+                        responseWithError(responseCommand, ET::BAD_ARGUMENT, uid);
+                        break;
+                }
 
                 break;
             }
 
-            // TESTME SET
+            // TESTME GET TYPE
             case CT::SET: {
                 mpLogger->verbose("MessageDecider", "CT::SET");
-                responseWithError(responseCommand, ET::NOT_IMPLEMENTED, uid);
 
+                // TODO add handling for set
+                try {
+                    uid = receivedCommand->getParameterValue<uint32_t>(0);
+                } catch (std::exception &e) {
+                    uid.reset();
+                }
+                responseWithError(responseCommand, ET::NOT_IMPLEMENTED, uid);
                 break;
             }
 
@@ -303,6 +345,7 @@ namespace Comms {
                 break;
             }
 
+            // TODO !pr remove
             // case CT::GET: {
             //     mpLogger->verbose("TEST", "get");
             //     try {

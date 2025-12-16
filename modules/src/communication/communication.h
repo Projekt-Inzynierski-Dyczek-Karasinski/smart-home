@@ -8,7 +8,7 @@
 #ifdef HC12_MODULE
     #include "communication/hc12.h"
 #endif
-#ifdef CENTRAL_UNIT 
+#ifdef CENTRAL_UNIT
     #include "communication/addressing/central_unit_addressing.h"
 #else
     #include "communication/addressing/module_addressing.h"
@@ -114,6 +114,12 @@ namespace Comms {
          * @brief Sends "end" message and ends connection.
          */
         void endConnection() const;
+
+        /**
+         * @brief Gets default RF channel.
+         * @return Default RF channel.
+         */
+        uint8_t getDefaultRfChannel() const;
 
     private:
         /**

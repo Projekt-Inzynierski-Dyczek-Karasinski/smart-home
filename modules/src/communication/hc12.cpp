@@ -6,10 +6,8 @@ namespace uah = Utils::ArrayHandlers;
 
 namespace Comms {
     // ============================ Public ============================
-    HC12::HC12(Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
-        mpCommunication = communication;
-        mpLogger = logger;
-
+    HC12::HC12(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
+        : mpCommunication(communication), mpLogger(logger) {
         pinMode(SET_PIN, OUTPUT);
         digitalWrite(SET_PIN, HIGH);
         vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_HIGH));
@@ -25,12 +23,10 @@ namespace Comms {
         mpSerial = new HardwareSerial(HARDWARE_SERIAL_UART_NR);
         mpSerial->begin(mBaudRate, SERIAL_8N1, RX_PIN, TX_PIN);
 
-        createTransmitTask();
-        createHC12MainTask();
         createSetupHC12Queues();
         createSetupHC12Task();
-
-        // TODO !mm add check if is proper rf channel set
+        createTransmitTask();
+        createHC12MainTask();
 
         mpLogger->verbose("HC12 Class", "HC12 initialized.");
     }
@@ -186,6 +182,8 @@ namespace Comms {
         while (hc12.mpSerial->available() > 0) {
             hc12.mpSerial->read();
         }
+
+        hc12.firstChangeRFChannel(hc12.mpCommunication->getDefaultRfChannel());
 
         for (;;) {
             // change status

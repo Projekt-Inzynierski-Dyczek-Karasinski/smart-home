@@ -4,6 +4,24 @@
 #include <variant>
 
 namespace Comms::API {
+    enum class errorTypes : uint8_t {
+        UNKNOWN = 0,
+        BAD_COMMAND = 1,
+        UNKNOWN_COMMAND = 2,
+        BAD_ARGUMENT = 3,
+        NOT_IMPLEMENTED = 4,
+        INTERNAL_ERROR = 5,
+    };
+
+    enum class getTypes : uint8_t {
+        UNKNOWN = 0,
+        SENSOR_VALUE = 1,
+        CONFIG_VALUE = 2,
+        SENSOR_LIST = 3,
+        LOGS = 4,
+        BATTERY_STATE = 5
+    };
+
     enum class commandTypes : uint8_t {
         UNKNOWN = 0,
         ACKNOWLEDGE = 1,
@@ -28,15 +46,6 @@ namespace Comms::API {
         ASCII = 4,
         RAW = 5,
         ERROR = 6
-    };
-
-    enum class errorTypes : uint8_t {
-        UNKNOWN = 0,
-        BAD_COMMAND = 1,
-        UNKNOWN_COMMAND = 2,
-        BAD_ARGUMENT = 3,
-        NOT_IMPLEMENTED = 4,
-        INTERNAL_ERROR = 5,
     };
 
     using parameterVariant = std::variant<
