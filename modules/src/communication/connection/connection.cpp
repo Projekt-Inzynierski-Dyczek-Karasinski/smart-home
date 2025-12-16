@@ -284,37 +284,45 @@ namespace Comms {
 
                 using GT = API::getTypes;
                 switch (getType.value()) {
-                    case (uint8_t)GT::SENSOR_VALUE:
+                    case (uint8_t)GT::SENSOR_VALUE: {
                         mpLogger->verbose("MessageDecider TMP", "CT::SENSOR_VALUE");
                         responseWithError(responseCommand, ET::NOT_IMPLEMENTED, uid);
                         break;
+                    }
 
-                    case (uint8_t)GT::CONFIG_VALUE:
+                    case (uint8_t)GT::CONFIG_VALUE: {
                         mpLogger->verbose("MessageDecider TMP", "CT::CONFIG_VALUE");
 
                         responseWithError(responseCommand, ET::NOT_IMPLEMENTED, uid);
                         break;
+                    }
 
-                    case (uint8_t)GT::SENSOR_LIST:
+                    case (uint8_t)GT::SENSOR_LIST: {
                         mpLogger->verbose("MessageDecider TMP", "CT::SENSOR_LIST");
 
                         responseWithError(responseCommand, ET::NOT_IMPLEMENTED, uid);
                         break;
+                    }
 
-                    case (uint8_t)GT::LOGS:
+                    case (uint8_t)GT::LOGS: {
                         mpLogger->verbose("MessageDecider TMP", "CT::LOGS");
                         responseWithError(responseCommand, ET::NOT_IMPLEMENTED, uid);
                         break;
+                    }
 
-                    case (uint8_t)GT::BATTERY_STATE:
+                    case (uint8_t)GT::BATTERY_STATE: {
+                        // auto & sensorManager = ums::Transducers::SensorsManager::getInstance(mpLogger);
+
                         mpLogger->verbose("MessageDecider TMP", "CT::BATTERY_STATE");
                         responseWithError(responseCommand, ET::NOT_IMPLEMENTED, uid);
                         break;
+                    }
 
-                    default:
+                    default:  {
                         mpLogger->errorv("MessageDecider CT::GET", "Got unknown get type: ", getType.value());
                         responseWithError(responseCommand, ET::BAD_ARGUMENT, uid);
                         break;
+                    }
                 }
 
                 break;

@@ -701,6 +701,7 @@ namespace Comms {
                         } catch (...) {
                             com.mpLogger->error("Communication Input", "Bad sleep getType.");
                         }
+
                         if (getType.has_value()) {
                             constexpr uint32_t TEST_UID = 88888;
                             API::APIParameter uid(TEST_UID);

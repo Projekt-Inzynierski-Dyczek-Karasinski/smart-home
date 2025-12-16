@@ -1,5 +1,3 @@
-// TODO !pr change base_config.json to module's base_config.json
-
 #include <Arduino.h>
 #include <memory>
 

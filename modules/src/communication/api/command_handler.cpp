@@ -69,6 +69,7 @@ namespace Comms::API {
     }
 
     APIParameterVariant CommandHandler::getParameter(const uint8_t index) const {
+        if (index >= getNumberOfParameters()) throw std::invalid_argument("Index too big.");
         return mCommandParameters[index];
     }
 
@@ -124,6 +125,8 @@ namespace Comms::API {
 
     template<typename T>
     T CommandHandler::getParameterValue(const uint8_t index) {
+        if (index >= getNumberOfParameters()) throw std::invalid_argument("Index too big.");
+
         using PT = parametersTypes;
         switch (mParametersSpecialBytes[index].getType()) {
             case (uint8_t)PT::UINT:
