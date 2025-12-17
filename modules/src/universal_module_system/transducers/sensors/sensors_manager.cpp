@@ -52,7 +52,7 @@ namespace UniversalModuleSystem::Transducers {
         String result;
         const uint8_t numOfLoadedSensors = sensorsIndex;
         for (sensorsIndex = 0; sensorsIndex < numOfLoadedSensors; sensorsIndex++) {
-            result.concat(sensors[sensorsIndex]->getApiFormattedReading());
+            result.concat(sensors[sensorsIndex]->getApiFormattedReadingOLD());
             result.concat('|');
         }
 
@@ -76,10 +76,45 @@ namespace UniversalModuleSystem::Transducers {
 
             if (sensor->init(jsonSensor[ms_SENSOR_DATA])) {
                 sensor->startReading();
-                return sensor->getApiFormattedReading();
+                return sensor->getApiFormattedReadingOLD();
             }
         }
         return "";
+    }
+
+    // TODO !pr add powering on sensors (above todo)
+    API::APIParameterVariant SensorsManager::getSensorReading(const uint8_t sensorId) {
+                mpLogger->errorv("TMP", "5: ",sensorId);
+
+        using ET = API::errorTypes;
+
+        // TODO !pr add for rest sensors
+        if (sensorId != 1) return API::APIParameter((uint8_t)ET::NOT_IMPLEMENTED, true);
+
+        const auto &dataManager = DataManager::getInstance();
+        nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
+        if (jsonData.empty()) return API::APIParameter((uint8_t)ET::INTERNAL_ERROR, true);
+
+        // TODO !pr change "sensorsData"
+        for (auto &jsonSensor : jsonData["sensorsData"][ms_SENSORS_ARRAY]) {
+            Serial.println("----------");
+            Serial.println((int)jsonSensor[ms_SENSOR_DATA][ms_SENSOR_ID].get<uint8_t>());
+            Serial.println("----------");
+            if (jsonSensor[ms_SENSOR_DATA][ms_SENSOR_ID].get<uint8_t>() != sensorId) continue;
+
+            std::unique_ptr<Sensor> sensor = createSensor(jsonSensor[ms_SENSOR_TYPE].get<std::string>().c_str());
+            if (sensor == nullptr) return API::APIParameter((uint8_t)ET::INTERNAL_ERROR, true);
+
+            if (sensor->init(jsonSensor[ms_SENSOR_DATA])) {
+                mpLogger->error("TMP", "2");
+
+                sensor->startReading();
+                return sensor->getApiFormattedReading();
+            }
+        }
+                mpLogger->error("TMP", "1");
+
+        return API::APIParameter((uint8_t)ET::BAD_ARGUMENT, true);
     }
 
     std::unique_ptr<Sensor> SensorsManager::createSensor(const char *sensorName) {
@@ -90,6 +125,7 @@ namespace UniversalModuleSystem::Transducers {
             it != ST::sensorMap.end() ? it->second : STE::UNKNOWN
         ) {
             case STE::BATTERY:
+                mpLogger->error("TMP", "1");
                 return std::make_unique<BatterySensor>(mpLogger);
 
             case STE::LIGHT:

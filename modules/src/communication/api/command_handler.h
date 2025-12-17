@@ -1,6 +1,5 @@
 #pragma once
 
-#include <variant>
 #include <vector>
 
 #include "api_types.h"
@@ -9,21 +8,6 @@
 #include "special_byte/special_byte_parameter.h"
 
 namespace Comms::API {
-    using APIParameterVariant = std::variant<
-        APIParameter<uint8_t>,
-        APIParameter<uint16_t>,
-        APIParameter<uint32_t>,
-        APIParameter<uint64_t>,
-        APIParameter<int8_t>,
-        APIParameter<int16_t>,
-        APIParameter<int32_t>,
-        APIParameter<int64_t>,
-        APIParameter<float>,
-        APIParameter<double>,
-        APIParameter<char*>,
-        APIParameter<uint8_t*>
-    >;
-
     class CommandHandler {
     public:
         explicit CommandHandler(const uint8_t *message);

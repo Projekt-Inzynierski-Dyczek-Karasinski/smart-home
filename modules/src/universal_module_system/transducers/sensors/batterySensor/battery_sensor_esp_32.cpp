@@ -3,7 +3,19 @@
 namespace UniversalModuleSystem::Transducers {
     BatterySensorESP32::BatterySensorESP32(const std::shared_ptr<ul::Logger> &logger) : Sensor(logger) {}
 
-    uint32_t BatterySensorESP32::getReading() {
+    API::APIParameterVariant BatterySensorESP32::getApiFormattedReading() {
+        xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
+        xSemaphoreGive(mReadingCompleteSemaphore);
+        // if reading was newer started
+        if (mBatteryReadPercentage.load() == 0) {
+            startReading();
+            xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
+            xSemaphoreGive(mReadingCompleteSemaphore);
+        }
+        return API::APIParameter(mBatteryReadPercentage.load());
+    }
+
+    uint32_t BatterySensorESP32::getReadingOLD() {
         xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
         xSemaphoreGive(mReadingCompleteSemaphore);
         // if reading was newer started

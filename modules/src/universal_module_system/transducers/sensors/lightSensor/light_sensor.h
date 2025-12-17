@@ -11,7 +11,7 @@ namespace UniversalModuleSystem::Transducers {
          */
         explicit LightSensor(const std::shared_ptr<ul::Logger> &logger);
 
-        uint32_t getReading() override;
+        uint32_t getReadingOLD() override;
 
         void startReading() override;
 

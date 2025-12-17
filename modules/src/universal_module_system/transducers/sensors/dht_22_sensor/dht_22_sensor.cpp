@@ -5,7 +5,7 @@
 namespace UniversalModuleSystem::Transducers {
     Dht22Sensor::Dht22Sensor(const std::shared_ptr<ul::Logger> &logger) : Sensor(logger) {}
 
-    uint32_t Dht22Sensor::getReading() {
+    uint32_t Dht22Sensor::getReadingOLD() {
         xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
         xSemaphoreGive(mReadingCompleteSemaphore);
 

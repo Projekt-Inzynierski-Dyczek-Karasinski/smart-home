@@ -3,7 +3,7 @@
 namespace UniversalModuleSystem::Transducers {
     LightSensor::LightSensor(const std::shared_ptr<ul::Logger> &logger) : Sensor(logger) {}
 
-    uint32_t LightSensor::getReading() {
+    uint32_t LightSensor::getReadingOLD() {
         xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
         xSemaphoreGive(mReadingCompleteSemaphore);
         // if reading was newer started

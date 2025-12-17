@@ -708,6 +708,10 @@ namespace Comms {
                             API::APIParameter getTypeParam(getType.value());
                             ch.addParameter(uid);
                             ch.addParameter(getTypeParam);
+                            if (getType.value() == (uint8_t)API::getTypes::BATTERY_STATE) {
+                                constexpr uint8_t BATTERY_ID = 1;
+                                ch.addParameter(API::APIParameter(BATTERY_ID));
+                            }
 
                             uint8_t message[MESSAGE_SIZE] = {};
                             ch.generateMessage(message);

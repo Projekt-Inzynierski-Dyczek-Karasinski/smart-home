@@ -16,11 +16,15 @@ namespace UniversalModuleSystem::Transducers {
         vSemaphoreDelete(mReadingCompleteSemaphore);
     }
 
-    String Sensor::getApiFormattedReading() {
+    String Sensor::getApiFormattedReadingOLD() {
         String result = String(getId());
         result.concat(':');
-        result.concat(getReading());
+        result.concat(getReadingOLD());
         return result;
+    }
+
+    API::APIParameterVariant Sensor::getApiFormattedReading() {
+        return API::APIParameter((uint8_t)API::errorTypes::NOT_IMPLEMENTED, true);
     }
 
     uint8_t Sensor::getId() const {

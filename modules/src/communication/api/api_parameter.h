@@ -68,4 +68,19 @@ namespace Comms::API {
      template class APIParameter<char*>;
      // raw
      template class APIParameter<uint8_t*>;
+
+    using APIParameterVariant = std::variant<
+        APIParameter<uint8_t>,
+        APIParameter<uint16_t>,
+        APIParameter<uint32_t>,
+        APIParameter<uint64_t>,
+        APIParameter<int8_t>,
+        APIParameter<int16_t>,
+        APIParameter<int32_t>,
+        APIParameter<int64_t>,
+        APIParameter<float>,
+        APIParameter<double>,
+        APIParameter<char*>,
+        APIParameter<uint8_t*>
+    >;
 }

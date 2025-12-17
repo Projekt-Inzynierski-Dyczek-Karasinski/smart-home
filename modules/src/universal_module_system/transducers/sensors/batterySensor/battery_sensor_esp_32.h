@@ -22,12 +22,20 @@ namespace UniversalModuleSystem::Transducers {
         explicit BatterySensorESP32(const std::shared_ptr<ul::Logger> &logger);
 
         /**
+         * @brief Get battery percentage reading.
+         * @return Battery voltage.
+         *
+         * @note Thread-safe.
+         */
+        API::APIParameterVariant getApiFormattedReading() override;
+
+        /**
          * @brief Get the latest measured battery voltage reading in millivolts (mV).
          * @return Battery voltage in mV.
          *
          * @note Thread-safe.
          */
-        uint32_t getReading() override;
+        uint32_t getReadingOLD() override;
 
         /**
          * @brief Begin an asynchronous measurement of the battery voltage.

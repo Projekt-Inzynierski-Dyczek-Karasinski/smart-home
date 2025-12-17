@@ -4,9 +4,11 @@
 #include <nlohmann/json.hpp>
 
 #include "utils/logger.h"
+#include "communication/api/api_parameter.h"
 
 namespace nl = nlohmann;
 namespace ul = Utils::Logging;
+namespace API = Comms::API;
 
 namespace UniversalModuleSystem::Transducers {
     /**
@@ -26,14 +28,14 @@ namespace UniversalModuleSystem::Transducers {
          */
         virtual ~Sensor();
 
-        // TODO !pr change to new API format
+        // TODO !pr remove
         /**
          * @brief Getter for reading from the sensor.
          * @return Sensor reading.
          *
          * @note This method must be implemented by derived class.
          */
-        virtual uint32_t getReading() = 0;
+        virtual uint32_t getReadingOLD() = 0;
 
         /**
          * @brief Start acquiring data from the sensor.
@@ -41,6 +43,14 @@ namespace UniversalModuleSystem::Transducers {
          * @note This method must be implemented by derived class.
          */
         virtual void startReading() = 0;
+
+        // TODO !pr make pure virtual
+        /**
+         * @brief Get formatted reading (APIParameterVariant).
+         * @return Reading in API format.
+         * @note This method must be implemented by derived class.
+         */
+        virtual API::APIParameterVariant getApiFormattedReading();
 
         /**
          * @brief Get the sensor ID (loaded from JSON config file).
@@ -57,11 +67,12 @@ namespace UniversalModuleSystem::Transducers {
          */
         bool init(const nl::json &jsonData);
 
+        // TODO !pr remove
         /**
          * @brief Get formatted reading ("id:value").
          * @return Reading in API format.
          */
-        String getApiFormattedReading();
+        String getApiFormattedReadingOLD();
 
     protected:
         // TODO !pr update comment (now class Sensor implement default)
