@@ -123,7 +123,6 @@ namespace Comms::API {
         }
     }
 
-    // TODO !pr move content of this method to APIParameter class
     template<typename T>
     T CommandHandler::getParameterValue(const uint8_t index) {
         if (index >= getNumberOfParameters()) throw std::invalid_argument("Index too big.");

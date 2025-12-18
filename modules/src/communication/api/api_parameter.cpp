@@ -108,71 +108,6 @@ namespace Comms::API {
         }
     }
 
-    // TODO !pr remove
-    // template<>
-    // void APIParameter<uint8_t>::customHton(const uint8_t input) {
-    //     mBytesRepresentation[1] = input;
-    // }
-    //
-    //
-    // template<>
-    // void APIParameter<float>::customHton(const float* input) {
-    //     constexpr uint8_t BITS_IN_BYTE = 8;
-    //
-    //     uint32_t input2;
-    //     std::memcpy(&input2, input, sizeof(*input));
-    //
-    //     uint8_t offset = BITS_IN_BYTE * (sizeof(*input) - 1);
-    //     for (uint8_t i = 1; i <= sizeof(*input); i++) {
-    //         mBytesRepresentation[i] = input2 >> offset;
-    //         offset -= BITS_IN_BYTE;
-    //     }
-    // }
-    //
-    // template<>
-    // void APIParameter<double>::customHton(const double* input) {
-    //     constexpr uint8_t BITS_IN_BYTE = 8;
-    //
-    //     uint64_t input2;
-    //     std::memcpy(&input2, input, sizeof(*input));
-    //
-    //     uint8_t offset = BITS_IN_BYTE * (sizeof(*input) - 1);
-    //     for (uint8_t i = 1; i <= sizeof(*input); i++) {
-    //         mBytesRepresentation[i] = input2 >> offset;
-    //         offset -= BITS_IN_BYTE;
-    //     }
-    // }
-    //
-    // template<>
-    // void APIParameter<>::customNtoh(const uint8_t* input) {
-    //     constexpr uint8_t BITS_IN_BYTE = 8;
-    //
-    //     uint8_t* data = (uint8_t*)&mValue;
-    //     uint8_t offset = BITS_IN_BYTE * (sizeof(T) - 1);
-    //     for (uint8_t i = 1; i < sizeof(T); i++) {
-    //         data[i] = *input >> offset;
-    //         offset -= BITS_IN_BYTE;
-    //     }
-    // }
-    //
-    // template<>
-    // void APIParameter<float>::customNtoh(const uint8_t* input) {
-    //     constexpr uint8_t BITS_IN_BYTE = 8;
-    //
-    //     uint32_t tmp;
-    //     uint8_t* data = (uint8_t*)&tmp;
-    //     uint8_t offset = BITS_IN_BYTE * (sizeof(mValue) - 1);
-    //     for (uint8_t i = 1; i < sizeof(mValue); i++) {
-    //         data[i] = *input >> offset;
-    //         offset -= BITS_IN_BYTE;
-    //     }
-    //
-    //     std::memcpy(&mValue, &tmp, sizeof(mValue));
-    // }
-    // TODO !pr remove
-
-
-
     template<typename T>
     APIParameter<T *>::APIParameter(const T *parameter, const size_t length) {
         mBytesRepresentation.reserve(length + 1);
@@ -211,28 +146,4 @@ namespace Comms::API {
     void APIParameter<T *>::getBytesRepresentation(uint8_t* outputArray) {
         std::copy(mBytesRepresentation.begin(), mBytesRepresentation.end(), outputArray);
     }
-    //
-    // template<typename T>
-    // void APIParameter<T *>::calculateSpecialByte(T parameter) {
-    //
-    // }
-    //
-    // template<typename T>
-    // void APIParameter<T *>::getValue() {
-
-    // }
-
-
-
-
-
-    // template<typename T>
-    // void APIParameter<T>::calculateSpecialByte() {
-    //     uint8_t type;
-    //
-    //
-    //     // const SpecialByteParameter mSpecialByte(type, sizeof(T));
-    //     // mBytesRepresentation[0] = mSpecialByte.getSpecialByte();
-    // }
-
 }
