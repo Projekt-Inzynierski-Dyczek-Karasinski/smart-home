@@ -120,7 +120,7 @@ namespace UniversalModuleSystem::Transducers {
         static constexpr char ms_SENSOR_TYPE[] = "type";
         static constexpr char ms_ALL_SENSORS_DATA[] = "sensorsData";
         static constexpr char ms_POWER_PIN[] = "powerPin";
-        static constexpr char ms_SENSOR_DATA[] = "sensorData";
+        static constexpr char ms_SENSOR_DATA[] = "data";
         static constexpr char ms_SENSOR_ID[] = "id";
     };
 }

@@ -67,8 +67,9 @@ namespace UniversalModuleSystem::Transducers {
     String SensorsManager::getSensorReport(const uint8_t sensorId) {
         const auto &dataManager = DataManager::getInstance();
         nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
+        nl::json &sensorData = jsonData[ms_ALL_SENSORS_DATA];
 
-        for (auto &jsonSensor : jsonData[ms_SENSORS_ARRAY]) {
+        for (auto &jsonSensor : sensorData[ms_SENSORS_ARRAY]) {
             if (jsonSensor[ms_SENSOR_DATA][ms_SENSOR_ID] != sensorId) continue;
 
             std::unique_ptr<Sensor> sensor = createSensor(jsonSensor[ms_SENSOR_TYPE].get<std::string>().c_str());
@@ -84,8 +85,6 @@ namespace UniversalModuleSystem::Transducers {
 
     // TODO !pr add powering on sensors (above todo)
     API::APIParameterVariant SensorsManager::getSensorReading(const uint8_t sensorId) {
-                mpLogger->errorv("TMP", "5: ",sensorId);
-
         using ET = API::errorTypes;
 
         // TODO !pr add for rest sensors
@@ -93,13 +92,10 @@ namespace UniversalModuleSystem::Transducers {
 
         const auto &dataManager = DataManager::getInstance();
         nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
+        nl::json &sensorData = jsonData[ms_ALL_SENSORS_DATA];
         if (jsonData.empty()) return API::APIParameter((uint8_t)ET::INTERNAL_ERROR, true);
 
-        // TODO !pr change "sensorsData"
-        for (auto &jsonSensor : jsonData["sensorsData"][ms_SENSORS_ARRAY]) {
-            Serial.println("----------");
-            Serial.println((int)jsonSensor[ms_SENSOR_DATA][ms_SENSOR_ID].get<uint8_t>());
-            Serial.println("----------");
+        for (auto &jsonSensor : sensorData[ms_SENSORS_ARRAY]) {
             if (jsonSensor[ms_SENSOR_DATA][ms_SENSOR_ID].get<uint8_t>() != sensorId) continue;
 
             std::unique_ptr<Sensor> sensor = createSensor(jsonSensor[ms_SENSOR_TYPE].get<std::string>().c_str());
@@ -112,7 +108,6 @@ namespace UniversalModuleSystem::Transducers {
                 return sensor->getApiFormattedReading();
             }
         }
-                mpLogger->error("TMP", "1");
 
         return API::APIParameter((uint8_t)ET::BAD_ARGUMENT, true);
     }

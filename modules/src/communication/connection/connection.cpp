@@ -340,7 +340,6 @@ namespace Comms {
                             responseWithError(sendCommand, ET::INTERNAL_ERROR, uid);
                             break;
                         }
-
                         break;
                     }
 
@@ -350,7 +349,6 @@ namespace Comms {
                         break;
                     }
                 }
-
                 break;
             }
 

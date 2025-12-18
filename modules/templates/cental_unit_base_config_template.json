@@ -53,7 +53,7 @@
     "sensors": [
       {
         "type": "batterySensor",
-        "sensorData": {
+        "data": {
           "id": 1,
           "readPin": 16,
           "canAwake": false,
@@ -67,7 +67,7 @@
       },
       {
         "type": "lightSensor",
-        "sensorData": {
+        "data": {
           "id": 2,
           "readPin": 17,
           "canAwake": false,
@@ -77,11 +77,22 @@
       },
       {
         "type": "DHT22",
-        "sensorData": {
+        "data": {
           "id": 3,
           "readPin": 12,
           "canAwake": false,
           "additional": {
+          }
+        }
+      },
+      {
+        "type": "BME280",
+        "data": {
+          "id": 4,
+          "readPin": 8,
+          "canAwake": false,
+          "additional": {
+            "readPin2": 9
           }
         }
       }
