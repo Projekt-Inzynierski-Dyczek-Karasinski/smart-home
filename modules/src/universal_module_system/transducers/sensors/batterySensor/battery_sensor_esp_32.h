@@ -30,14 +30,6 @@ namespace UniversalModuleSystem::Transducers {
         API::APIParameterVariant getApiFormattedReading() override;
 
         /**
-         * @brief Get the latest measured battery voltage reading in millivolts (mV).
-         * @return Battery voltage in mV.
-         *
-         * @note Thread-safe.
-         */
-        uint32_t getReadingOLD() override;
-
-        /**
          * @brief Begin an asynchronous measurement of the battery voltage.
          * @details Creates a FreeRTOS task to perform multiple ADC samples and stores the calculated voltage.
          * This task deletes itself after end measurement.

@@ -15,18 +15,6 @@ namespace UniversalModuleSystem::Transducers {
         return API::APIParameter(mBatteryReadPercentage.load());
     }
 
-    uint32_t BatterySensorESP32::getReadingOLD() {
-        xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
-        xSemaphoreGive(mReadingCompleteSemaphore);
-        // if reading was newer started
-        if (mBatteryReadPercentage.load() == 0) {
-            startReading();
-            xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
-            xSemaphoreGive(mReadingCompleteSemaphore);
-        }
-        return mBatteryReadPercentage.load();
-    }
-
     void BatterySensorESP32::startReading() {
         xSemaphoreTake(mReadingCompleteSemaphore, 0); // make sure that semaphore indicates that reading is not completed
         xTaskCreate(

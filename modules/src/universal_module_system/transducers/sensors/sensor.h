@@ -35,7 +35,7 @@ namespace UniversalModuleSystem::Transducers {
          *
          * @note This method must be implemented by derived class.
          */
-        virtual uint32_t getReadingOLD() = 0;
+        virtual uint32_t getReadingOLD();
 
         /**
          * @brief Start acquiring data from the sensor.
@@ -67,12 +67,6 @@ namespace UniversalModuleSystem::Transducers {
          */
         bool init(const nl::json &jsonData);
 
-        // TODO !pr remove
-        /**
-         * @brief Get formatted reading ("id:value").
-         * @return Reading in API format.
-         */
-        String getApiFormattedReadingOLD();
 
     protected:
         // TODO !pr update comment (now class Sensor implement default)

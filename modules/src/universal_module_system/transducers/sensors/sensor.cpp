@@ -6,22 +6,18 @@ namespace UniversalModuleSystem::Transducers {
     Sensor::Sensor(const std::shared_ptr<ul::Logger> &logger)
         : mpLogger(logger),
           mSensorDataMutex(xSemaphoreCreateMutex()),
-          mReadingCompleteSemaphore(xSemaphoreCreateBinary()) {
-        //TODO !pr remove
-        mpLogger = std::make_shared<ul::Logger>(ul::Level::VERBOSE);
-    }
+          mReadingCompleteSemaphore(xSemaphoreCreateBinary()) {}
 
     Sensor::~Sensor() {
         vSemaphoreDelete(mSensorDataMutex);
         vSemaphoreDelete(mReadingCompleteSemaphore);
     }
 
-    String Sensor::getApiFormattedReadingOLD() {
-        String result = String(getId());
-        result.concat(':');
-        result.concat(getReadingOLD());
-        return result;
-    }
+    // TODO !pr remove
+    uint32_t Sensor::getReadingOLD() {
+        mpLogger->error("Sensor OLD", "getReadingOLD");
+        return 1;
+    };
 
     API::APIParameterVariant Sensor::getApiFormattedReading() {
         return API::APIParameter((uint8_t)API::errorTypes::NOT_IMPLEMENTED, true);

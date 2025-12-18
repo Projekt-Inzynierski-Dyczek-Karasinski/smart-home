@@ -10,7 +10,6 @@
 // #include "universal_module_system/ota/ota.h"
 
 #include "universal_module_system/data_manager.h"
-#include "communication/api/command_handler.h"
 
 namespace ul = Utils::Logging;
 namespace ums = UniversalModuleSystem;
@@ -32,12 +31,16 @@ void setup() {
     auto & pairingButton = ums::PairingButton::getInstance(debugLed, &communication, logger);
 
     // TODO !pr remove
-    auto & sensorManager = ums::Transducers::SensorsManager::getInstance(logger);
-    auto batteryReadParam = sensorManager.getSensorReading(1);
-    // API::CommandHandler ch(API::commandTypes::ACKNOWLEDGE);
-    // ch.addParameter(batteryReadParam);
+    // auto & sensorManager = ums::Transducers::SensorsManager::getInstance(logger);
+    // auto batteryReadParamV = sensorManager.getSensorReading(1);
+    // if (auto *batteryReadParam = std::get_if<API::APIParameter<uint8_t>>(&batteryReadParamV)) {
+    //     logger->errorv("Main TMP", "battery %: ", batteryReadParam->getValue());
+    // }
     //
-    // logger->errorv("Main TMP", "battery %: ", ch.getParameterValue<uint8_t>(0));
+    // auto lightReadParamV = sensorManager.getSensorReading(2);
+    // if (auto *lightReadParam = std::get_if<API::APIParameter<uint8_t>>(&lightReadParamV)) {
+    //     logger->errorv("Main TMP", "battery %: ", lightReadParam->getValue());
+    // }
 
     logger->info("Main", "All components initialized. Deleting functions setup() and loop()...");
     vTaskDelete(nullptr);

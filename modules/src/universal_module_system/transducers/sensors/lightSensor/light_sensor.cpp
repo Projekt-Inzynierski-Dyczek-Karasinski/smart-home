@@ -1,9 +1,10 @@
 #include "light_sensor.h"
 
 namespace UniversalModuleSystem::Transducers {
-    LightSensor::LightSensor(const std::shared_ptr<ul::Logger> &logger) : Sensor(logger) {}
+    LightSensor::LightSensor(const std::shared_ptr<ul::Logger> &logger) : Sensor(logger) {
+    }
 
-    uint32_t LightSensor::getReadingOLD() {
+    API::APIParameterVariant LightSensor::getApiFormattedReading() {
         xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
         xSemaphoreGive(mReadingCompleteSemaphore);
         // if reading was newer started
@@ -12,11 +13,12 @@ namespace UniversalModuleSystem::Transducers {
             xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
             xSemaphoreGive(mReadingCompleteSemaphore);
         }
-        return mLightPercentage.load();
+        return API::APIParameter(mLightPercentage.load());
     }
 
     void LightSensor::startReading() {
-        xSemaphoreTake(mReadingCompleteSemaphore, 0); // make sure that semaphore indicates that reading is not completed
+        xSemaphoreTake(mReadingCompleteSemaphore, 0);
+        // make sure that semaphore indicates that reading is not completed
         xTaskCreate(
             lightReadTask,
             "Light Read Task",
@@ -35,19 +37,19 @@ namespace UniversalModuleSystem::Transducers {
         result *= 100;
         result /= MAX_ANALOG_READ;
 
-        return (uint8_t)result;
+        return (uint8_t) result;
     }
 
 
     void LightSensor::lightReadTask(void *parameters) {
-        auto& ls = *static_cast<LightSensor*>(parameters);
+        auto &ls = *static_cast<LightSensor *>(parameters);
         constexpr uint16_t TIME_BETWEEN_READS = 50; // ms
         constexpr uint8_t NUMBER_OF_READS = 5;
         uint16_t lightReadSum = 0;
 
         xSemaphoreTake(ls.mSensorDataMutex, portMAX_DELAY);
 
-        ls.mpLogger->errorv("LightSensor test", "read: ",ls.mCommonSensorData.readPin);
+        ls.mpLogger->errorv("LightSensor test", "read: ", ls.mCommonSensorData.readPin);
 
         for (uint8_t i = 0; i < NUMBER_OF_READS; i++) {
             vTaskDelay(pdMS_TO_TICKS(TIME_BETWEEN_READS));
@@ -62,9 +64,4 @@ namespace UniversalModuleSystem::Transducers {
 
         vTaskDelete(nullptr);
     }
-
-
-    // LightSensor::AdditionalData::AdditionalData(const nl::json &json) :
-    //     vccResistor(json[ms_DATA][ms_VCC_RESISTOR_DATA]),
-    //     isLoaded(true) {}
 }

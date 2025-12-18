@@ -11,8 +11,19 @@ namespace UniversalModuleSystem::Transducers {
          */
         explicit LightSensor(const std::shared_ptr<ul::Logger> &logger);
 
-        uint32_t getReadingOLD() override;
+        /**
+         * @brief Get the sensor reading.
+         * @return Sensor reading.
+         *
+         * @note Thread-safe.
+         */
+        API::APIParameterVariant getApiFormattedReading() override;
 
+        /**
+         * @brief Begin an asynchronous measurement of the sensor.
+         * @details Creates a FreeRTOS task to perform multiple ADC samples and stores the calculated voltage.
+         * This task deletes itself after end measurement.
+         */
         void startReading() override;
 
     private:
@@ -28,28 +39,6 @@ namespace UniversalModuleSystem::Transducers {
         */
         static void lightReadTask(void *parameters);
 
-        /**
-         * @brief Structure holding specific data to BatterySensorESP32.
-         */
-        // struct AdditionalData {
-        //     /**
-        //      * @brief Construct AdditionalData from JSON parameters.
-        //      * @param json JSON object with sensor data.
-        //      */
-        //     explicit AdditionalData(const nl::json& json);
-        //     AdditionalData() = default;
-        //
-        //     // BatterySensorESP32 specific parameters
-        //     uint32_t vccResistor = 0;
-        //     bool isLoaded = false;
-        //
-        // private:
-        //     // JSON keys
-        //     static constexpr char ms_DATA[] = "additional";
-        //     static constexpr char ms_VCC_RESISTOR_DATA[] = "rVCC";
-        // };
-
-        // AdditionalData mAdditionalData{};
         std::atomic<uint8_t> mLightPercentage{0};
     };
 }

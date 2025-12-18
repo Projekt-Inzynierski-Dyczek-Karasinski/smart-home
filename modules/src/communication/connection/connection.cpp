@@ -53,11 +53,8 @@ namespace Comms {
 
             case CME::TEST_GET: {
                 auto &sensorManager = ums::Transducers::SensorsManager::getInstance(mpLogger);
-                const String res = sensorManager.getAllSensorsReport();
 
-                uah::prepareBuffer(sendBuffer, res.c_str(), MESSAGE_SIZE);
-
-                // uah::prepareBuffer(sendBuffer,  CM::s_CONNECTION_RE_TEST_GET, MESSAGE_SIZE);
+                uah::prepareBuffer(sendBuffer,  CM::s_CONNECTION_RE_TEST_GET, MESSAGE_SIZE);
                 mpCommunication->sendMessage(sendBuffer);
                 break;
             }
