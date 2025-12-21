@@ -1,5 +1,3 @@
-#pragma once
-
 #include "sensor.h"
 
 #include "universal_module_system/data_manager.h"

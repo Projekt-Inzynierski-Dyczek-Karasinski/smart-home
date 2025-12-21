@@ -697,9 +697,11 @@ namespace Comms {
                         API::CommandHandler ch(API::commandTypes::GET);
                         std::optional<uint8_t> getType;
                         try {
+                            char buffer2[MESSAGE_SIZE];
+                            std::memcpy(buffer2,buffer,MESSAGE_SIZE);
                             getType = std::stoi((char*)&buffer[4]);
                         } catch (...) {
-                            com.mpLogger->error("Communication Input", "Bad sleep getType.");
+                            com.mpLogger->error("Communication Input", "Bad getType");
                         }
 
                         if (getType.has_value()) {
@@ -711,6 +713,16 @@ namespace Comms {
                             if (getType.value() == (uint8_t)API::getTypes::BATTERY_STATE) {
                                 constexpr uint8_t BATTERY_ID = 1;
                                 ch.addParameter(API::APIParameter(BATTERY_ID));
+                            } else if (getType.value() == (uint8_t)API::getTypes::SENSOR_VALUE) {
+                                std::optional<uint8_t> sensorId;
+                                try {
+                                    sensorId = std::stoi((char*)&buffer[6]);
+                                } catch (...) {
+                                    com.mpLogger->error("Communication Input", "Bad sensorId");
+                                }
+                                if (sensorId.has_value()) {
+                                    ch.addParameter(API::APIParameter(sensorId.value()));
+                                }
                             }
 
                             uint8_t message[MESSAGE_SIZE] = {};

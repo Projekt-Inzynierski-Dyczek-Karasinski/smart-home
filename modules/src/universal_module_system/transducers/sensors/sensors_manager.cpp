@@ -45,7 +45,7 @@ namespace UniversalModuleSystem::Transducers {
 
             std::unique_ptr<Sensor> sensor = createSensor(jsonSensor[ms_SENSOR_TYPE].get<std::string>().c_str());
             if (sensor == nullptr)
-                return std::vector<API::APIParameterVariant> {API::APIParameter((uint8_t)ET::INTERNAL_ERROR, true)};
+                return std::vector<API::APIParameterVariant> {API::APIParameter((uint8_t)ET::BAD_ARGUMENT, true)};
 
             if (sensor->init(jsonSensor[ms_SENSOR_DATA])) {
                 sensor->startReading();
@@ -64,7 +64,6 @@ namespace UniversalModuleSystem::Transducers {
             it != ST::sensorMap.end() ? it->second : STE::UNKNOWN
         ) {
             case STE::BATTERY:
-                mpLogger->error("TMP", "1");
                 return std::make_unique<BatterySensor>(mpLogger);
 
             case STE::LIGHT:

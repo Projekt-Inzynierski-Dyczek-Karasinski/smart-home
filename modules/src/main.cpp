@@ -31,23 +31,23 @@ void setup() {
     auto &pairingButton = ums::PairingButton::getInstance(debugLed, &communication, logger);
 
     // TODO !pr remove
-    auto &sensorManager = ums::Transducers::SensorsManager::getInstance(logger);
-    auto batteryReadParamV = sensorManager.getSensorReading(1)[0];
-    if (auto *batteryReadParam = std::get_if<API::APIParameter<uint8_t> >(&batteryReadParamV)) {
-        logger->errorv("Main TMP", "battery %: ", batteryReadParam->getValue());
-    }
-
-    auto lightReadParamV = sensorManager.getSensorReading(2)[0];
-    if (auto *lightReadParam = std::get_if<API::APIParameter<uint8_t> >(&lightReadParamV)) {
-        logger->errorv("Main TMP", "battery %: ", lightReadParam->getValue());
-    }
-
-    auto dhtParamV = sensorManager.getSensorReading(3);
-    for (auto &param: dhtParamV) {
-        if (auto *p = std::get_if<API::APIParameter<float> >(&param)) {
-            logger->errorv("Main TMP", "dht : ", p->getValue());
-        }
-    }
+    // auto &sensorManager = ums::Transducers::SensorsManager::getInstance(logger);
+    // auto batteryReadParamV = sensorManager.getSensorReading(1)[0];
+    // if (auto *batteryReadParam = std::get_if<API::APIParameter<uint8_t> >(&batteryReadParamV)) {
+    //     logger->errorv("Main TMP", "battery %: ", batteryReadParam->getValue());
+    // }
+    //
+    // auto lightReadParamV = sensorManager.getSensorReading(2)[0];
+    // if (auto *lightReadParam = std::get_if<API::APIParameter<uint8_t> >(&lightReadParamV)) {
+    //     logger->errorv("Main TMP", "battery %: ", lightReadParam->getValue());
+    // }
+    //
+    // auto dhtParamV = sensorManager.getSensorReading(3);
+    // for (auto &param: dhtParamV) {
+    //     if (auto *p = std::get_if<API::APIParameter<float> >(&param)) {
+    //         logger->errorv("Main TMP", "dht : ", p->getValue());
+    //     }
+    // }
     // TODO !pr remove
 
     logger->info("Main", "All components initialized. Deleting functions setup() and loop()...");
