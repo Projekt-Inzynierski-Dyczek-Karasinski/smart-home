@@ -89,10 +89,11 @@
         "type": "BME280",
         "data": {
           "id": 4,
-          "readPin": 8,
+          "readPin": 9,
           "canAwake": false,
           "additional": {
-            "readPin2": 9
+            "readPin2": 8,
+            "I2CAddress": 118
           }
         }
       }

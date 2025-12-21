@@ -191,10 +191,20 @@ namespace Comms {
 
                 try {
                     const float humidity = receivedCommand->getParameterValue<float>(1);
-                    const float temperature = receivedCommand->getParameterValue<float>(2);
-                    mpLogger->infov("MessageDecider TEST", "humidity*10: ", (int)(humidity*10));
-                    mpLogger->infov("MessageDecider TEST", "temperature*10: ", (int)(temperature*10));
-                } catch (...) {}
+                    const float pressure = receivedCommand->getParameterValue<float>(2);
+                    const float temperature = receivedCommand->getParameterValue<float>(3);
+                    mpLogger->infov("MessageDecider TEST", "humidity: ", (int)(humidity));
+                    mpLogger->infov("MessageDecider TEST", "pressure: ", (int)(pressure));
+                    mpLogger->infov("MessageDecider TEST", "temperature: ", (int)(temperature));
+                } catch (...) {
+                    try {
+                        const float humidity = receivedCommand->getParameterValue<float>(1);
+                        const float temperature = receivedCommand->getParameterValue<float>(2);
+                        mpLogger->infov("MessageDecider TEST", "humidity: ", (int)(humidity));
+                        mpLogger->infov("MessageDecider TEST", "temperature: ", (int)(temperature));
+                    } catch (...) {}
+                }
+
 
                 try {
                     sendCommand.emplace(CT::END);

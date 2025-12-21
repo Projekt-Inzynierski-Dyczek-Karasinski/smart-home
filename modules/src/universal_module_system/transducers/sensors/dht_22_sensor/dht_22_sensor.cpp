@@ -39,7 +39,10 @@ namespace UniversalModuleSystem::Transducers {
 
     void Dht22Sensor::dht22ReadTask(void *parameters) {
         auto& dht = *static_cast<Dht22Sensor*>(parameters);
+
+        xSemaphoreTake(dht.mSensorDataMutex, portMAX_DELAY);
         DHT dhtLib(dht.mCommonSensorData.readPin, DHT22);
+        xSemaphoreGive(dht.mSensorDataMutex);
 
         vTaskDelay(pdMS_TO_TICKS(1000));
         dhtLib.begin();

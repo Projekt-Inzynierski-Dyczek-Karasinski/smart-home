@@ -61,6 +61,7 @@ namespace UniversalModuleSystem::Transducers {
                 BATTERY,
                 LIGHT,
                 DHT22,
+                BME280,
                 UNKNOWN
             };
 
@@ -77,12 +78,14 @@ namespace UniversalModuleSystem::Transducers {
             static constexpr char s_BATTERY_SENSOR[] = "batterySensor";
             static constexpr char s_LIGHT_SENSOR[] = "lightSensor";
             static constexpr char s_DHT22_SENSOR[] = "DHT22";
+            static constexpr char s_BME280_SENSOR[] = "BME280";
 
             // Lookup table mapping sensor type strings to internal enumerator values.
             inline static const std::map<const char*, SensorTypeEnum, Comparator> sensorMap {
                 {s_BATTERY_SENSOR, SensorTypeEnum::BATTERY},
                 {s_LIGHT_SENSOR, SensorTypeEnum::LIGHT},
                 {s_DHT22_SENSOR, SensorTypeEnum::DHT22},
+                {s_BME280_SENSOR, SensorTypeEnum::BME280},
             };
         };
 
