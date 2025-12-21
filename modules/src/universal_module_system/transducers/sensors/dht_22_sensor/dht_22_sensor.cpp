@@ -5,7 +5,7 @@
 namespace UniversalModuleSystem::Transducers {
     Dht22Sensor::Dht22Sensor(const std::shared_ptr<ul::Logger> &logger) : Sensor(logger) {}
 
-    uint32_t Dht22Sensor::getReadingOLD() {
+    std::vector<API::APIParameterVariant> Dht22Sensor::getApiFormattedReading() {
         xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
         xSemaphoreGive(mReadingCompleteSemaphore);
 
@@ -16,14 +16,13 @@ namespace UniversalModuleSystem::Transducers {
             xSemaphoreGive(mReadingCompleteSemaphore);
         }
 
-        // TODO !pr change after adding new API format
-        if (mHumidity.load() == -1) {
-            mpLogger->error("Dht22Sensor reading", "Failed to read sensor.");
-            return 0; // read failed
-        }
-        mpLogger->infov("Dht22Sensor reading", "Humidity (%): ", mHumidity.load());
-        mpLogger->infov("Dht22Sensor reading", "Temperature (C): ", mTemperature.load());
-        return 1; // read success
+        mpLogger->verbosev("Dht22Sensor reading", "Humidity (%): ", mHumidity.load());
+        mpLogger->verbosev("Dht22Sensor reading", "Temperature (C): ", mTemperature.load());
+
+        return std::vector<API::APIParameterVariant> {
+            API::APIParameter(mHumidity.load()),
+            API::APIParameter(mTemperature.load())
+        };
     }
 
     void Dht22Sensor::startReading() {
@@ -31,9 +30,9 @@ namespace UniversalModuleSystem::Transducers {
         xTaskCreate(
             dht22ReadTask,
             "Dht22Sensor Read Task",
-            LIGHT_READ_TASK_SIZE,
-            this,
             DHT22_READ_TASK_SIZE,
+            this,
+            HIGH_TASK_PRIORITY,
             nullptr
         );
     }
@@ -48,15 +47,10 @@ namespace UniversalModuleSystem::Transducers {
 
         dht.mHumidity.store(dhtLib.readHumidity());
         dht.mTemperature.store(dhtLib.readTemperature());
-
-        dht.mHumidity.store(dhtLib.readHumidity());
-        dht.mTemperature.store(dhtLib.readTemperature());
-
+        dht.mpLogger->verbosev("Dht22Sensor Read Task", "Humidity: ", (int)(dhtLib.readHumidity()*10));
+        dht.mpLogger->verbosev("Dht22Sensor Read Task", "Temperature: ", (int)(dhtLib.readTemperature()*10));
         xSemaphoreGive(dht.mReadingCompleteSemaphore);
 
-        uint32_t tmp = uxTaskGetStackHighWaterMark(nullptr);
-        dht.mpLogger->warningv("Dht22Sensor TMP", "Task watermark:", tmp*4); // TODO !pr remove
         vTaskDelete(nullptr);
     }
-
 }

@@ -331,7 +331,8 @@ namespace Comms {
                         
                         try {
                             sendCommand->addParameter(API::APIParameter(uid.value()));
-                            sendCommand->addParameter(sensorManager.getSensorReading(BATTERY_SENSOR_ID));
+                            for (const auto& param : sensorManager.getSensorReading(BATTERY_SENSOR_ID))
+                                sendCommand->addParameter(param);
                         } catch (std::exception &e) {
                             sendCommand.reset();
                             responseWithError(sendCommand, ET::INTERNAL_ERROR, uid);

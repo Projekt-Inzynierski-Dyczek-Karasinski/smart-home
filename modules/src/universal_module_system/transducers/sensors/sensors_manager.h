@@ -34,28 +34,12 @@ namespace UniversalModuleSystem::Transducers {
         SensorsManager(const SensorsManager&) = delete;
         SensorsManager& operator = (const SensorsManager&) = delete;
 
-        // TODO !pr remove
-        // /**
-        //  * @brief Get a report of all sensors.
-        //  * @details Separately initialize and gets reading for better handling asynchronous readings.
-        //  * @return String containing the API formatted report of all sensors.
-        //  */
-        // String getAllSensorsReport();
-        //
-        // /**
-        //  * @brief Get a report of one sensor.
-        //  *
-        //  * @param sensorId Sensor ID.
-        //  * @return String containing the API formatted report of one sensor.
-        //  */
-        // String getSensorReport(uint8_t sensorId);
-
         /**
          * @brief Get a reading of sensor.
          * @param sensorId Sensor ID.
          * @return Reading of the sensor.
          */
-        API::APIParameterVariant getSensorReading(uint8_t sensorId);
+        std::vector<API::APIParameterVariant> getSensorReading(uint8_t sensorId);
 
     private:
         /**

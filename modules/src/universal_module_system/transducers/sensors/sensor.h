@@ -1,6 +1,8 @@
 #pragma once
 
 #include <memory>
+#include <vector>
+
 #include <nlohmann/json.hpp>
 
 #include "utils/logger.h"
@@ -28,15 +30,6 @@ namespace UniversalModuleSystem::Transducers {
          */
         virtual ~Sensor();
 
-        // TODO !pr remove
-        /**
-         * @brief Getter for reading from the sensor.
-         * @return Sensor reading.
-         *
-         * @note This method must be implemented by derived class.
-         */
-        virtual uint32_t getReadingOLD();
-
         /**
          * @brief Start acquiring data from the sensor.
          *
@@ -47,10 +40,10 @@ namespace UniversalModuleSystem::Transducers {
         // TODO !pr make pure virtual
         /**
          * @brief Get formatted reading (APIParameterVariant).
-         * @return Reading in API format.
+         * @return Array of readings in API format.
          * @note This method must be implemented by derived class.
          */
-        virtual API::APIParameterVariant getApiFormattedReading();
+        virtual std::vector<API::APIParameterVariant> getApiFormattedReading() = 0;
 
         /**
          * @brief Get the sensor ID (loaded from JSON config file).

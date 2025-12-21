@@ -4,7 +4,7 @@ namespace UniversalModuleSystem::Transducers {
     LightSensor::LightSensor(const std::shared_ptr<ul::Logger> &logger) : Sensor(logger) {
     }
 
-    API::APIParameterVariant LightSensor::getApiFormattedReading() {
+    std::vector<API::APIParameterVariant> LightSensor::getApiFormattedReading() {
         xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
         xSemaphoreGive(mReadingCompleteSemaphore);
         // if reading was newer started
@@ -13,7 +13,8 @@ namespace UniversalModuleSystem::Transducers {
             xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
             xSemaphoreGive(mReadingCompleteSemaphore);
         }
-        return API::APIParameter(mLightPercentage.load());
+
+        return std::vector<API::APIParameterVariant> {API::APIParameter(mLightPercentage.load())};
     }
 
     void LightSensor::startReading() {
@@ -22,9 +23,9 @@ namespace UniversalModuleSystem::Transducers {
         xTaskCreate(
             lightReadTask,
             "Light Read Task",
-            LIGHT_READ_TASK_SIZE,
+            DHT22_READ_TASK_SIZE,
             this,
-            LOW_TASK_PRIORITY,
+            HIGH_TASK_PRIORITY,
             nullptr
         );
     }

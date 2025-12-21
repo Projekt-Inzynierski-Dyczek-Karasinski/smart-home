@@ -30,61 +30,22 @@ namespace UniversalModuleSystem::Transducers {
         mpLogger->verbose("SensorsManager", "SensorsManager initialized.");
     }
 
-    // TODO !pr remove
-    // String SensorsManager::getAllSensorsReport() {
-    //     const auto &dataManager = DataManager::getInstance();
-    //     nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
-    //     nl::json & sensorsData = jsonData[ms_ALL_SENSORS_DATA];
-    //
-    //     // power on sensors
-    //     const uint8_t powerPin = sensorsData[ms_POWER_PIN].get<uint8_t>();
-    //     pinMode(powerPin, OUTPUT);
-    //     digitalWrite(powerPin, HIGH);
-    //
-    //     // init sensors
-    //     const size_t numOfSensors = sensorsData[ms_SENSORS_ARRAY].size();
-    //     std::unique_ptr<Sensor> sensors[numOfSensors];
-    //     uint8_t sensorsIndex = 0;
-    //     for (auto &jsonSensor : sensorsData[ms_SENSORS_ARRAY]) {
-    //         sensors[sensorsIndex] = createSensor(jsonSensor[ms_SENSOR_TYPE].get<std::string>().c_str());
-    //
-    //         if (sensors[numOfSensors] != nullptr) {
-    //             if (sensors[sensorsIndex]->init(jsonSensor[ms_SENSOR_DATA])) {
-    //                 sensors[sensorsIndex]->startReading();
-    //             }
-    //             sensorsIndex++;
-    //         }
-    //     }
-    //
-    //     // get sensors readings
-    //     String result;
-    //     const uint8_t numOfLoadedSensors = sensorsIndex;
-    //     for (sensorsIndex = 0; sensorsIndex < numOfLoadedSensors; sensorsIndex++) {
-    //         result.concat(sensors[sensorsIndex]->getApiFormattedReadingOLD());
-    //         result.concat('|');
-    //     }
-    //
-    //     // power off sensors
-    //     digitalWrite(powerPin, LOW);
-    //
-    //     result.remove(result.length() - 1, 1);
-    //     return result;
-    // }
-
     // TODO !pr add powering on sensors
-    API::APIParameterVariant SensorsManager::getSensorReading(const uint8_t sensorId) {
+    std::vector<API::APIParameterVariant> SensorsManager::getSensorReading(const uint8_t sensorId) {
         using ET = API::errorTypes;
 
         const auto &dataManager = DataManager::getInstance();
         nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
         nl::json &sensorData = jsonData[ms_ALL_SENSORS_DATA];
-        if (jsonData.empty()) return API::APIParameter((uint8_t)ET::INTERNAL_ERROR, true);
+        if (jsonData.empty())
+            return std::vector<API::APIParameterVariant> {API::APIParameter((uint8_t)ET::INTERNAL_ERROR, true)};
 
         for (auto &jsonSensor : sensorData[ms_SENSORS_ARRAY]) {
             if (jsonSensor[ms_SENSOR_DATA][ms_SENSOR_ID].get<uint8_t>() != sensorId) continue;
 
             std::unique_ptr<Sensor> sensor = createSensor(jsonSensor[ms_SENSOR_TYPE].get<std::string>().c_str());
-            if (sensor == nullptr) return API::APIParameter((uint8_t)ET::INTERNAL_ERROR, true);
+            if (sensor == nullptr)
+                return std::vector<API::APIParameterVariant> {API::APIParameter((uint8_t)ET::INTERNAL_ERROR, true)};
 
             if (sensor->init(jsonSensor[ms_SENSOR_DATA])) {
                 sensor->startReading();
@@ -92,7 +53,7 @@ namespace UniversalModuleSystem::Transducers {
             }
         }
 
-        return API::APIParameter((uint8_t)ET::BAD_ARGUMENT, true);
+        return std::vector<API::APIParameterVariant> {API::APIParameter((uint8_t)ET::BAD_ARGUMENT, true)};
     }
 
     std::unique_ptr<Sensor> SensorsManager::createSensor(const char *sensorName) {

@@ -27,7 +27,7 @@ namespace UniversalModuleSystem::Transducers {
          *
          * @note Thread-safe.
          */
-        API::APIParameterVariant getApiFormattedReading() override;
+        std::vector<API::APIParameterVariant> getApiFormattedReading() override;
 
         /**
          * @brief Begin an asynchronous measurement of the battery voltage.

@@ -7,7 +7,7 @@ namespace UniversalModuleSystem::Transducers {
     public:
         explicit Dht22Sensor(const std::shared_ptr<ul::Logger> &logger);
 
-        uint32_t getReadingOLD() override;
+        std::vector<API::APIParameterVariant> getApiFormattedReading() override;
 
         void startReading() override;
 

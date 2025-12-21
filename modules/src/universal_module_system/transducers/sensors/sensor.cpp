@@ -1,3 +1,5 @@
+#pragma once
+
 #include "sensor.h"
 
 #include "universal_module_system/data_manager.h"
@@ -11,16 +13,6 @@ namespace UniversalModuleSystem::Transducers {
     Sensor::~Sensor() {
         vSemaphoreDelete(mSensorDataMutex);
         vSemaphoreDelete(mReadingCompleteSemaphore);
-    }
-
-    // TODO !pr remove
-    uint32_t Sensor::getReadingOLD() {
-        mpLogger->error("Sensor OLD", "getReadingOLD");
-        return 1;
-    };
-
-    API::APIParameterVariant Sensor::getApiFormattedReading() {
-        return API::APIParameter((uint8_t)API::errorTypes::NOT_IMPLEMENTED, true);
     }
 
     uint8_t Sensor::getId() const {

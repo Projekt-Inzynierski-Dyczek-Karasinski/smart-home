@@ -18,29 +18,37 @@ void setup() {
     // TODO !pr remove VERBOSE
     const auto logger = std::make_shared<ul::Logger>(ul::Level::VERBOSE);
 
-    auto & dataManager = ums::DataManager::getInstance(logger);
+    auto &dataManager = ums::DataManager::getInstance(logger);
 
     // start Ota if CONFIG_VERSION and "version" in /data/base_config.json do not match.
     // ums::Ota ota(logger);
     // ota.autoEnableOta();
 
-    auto & powerManager = ums::PowerManager::getInstance(logger);
+    auto &powerManager = ums::PowerManager::getInstance(logger);
 
     const auto debugLed = std::make_shared<ums::DebugLED>(logger);
-    auto & communication = Comms::Communication::getInstance(debugLed, logger);
-    auto & pairingButton = ums::PairingButton::getInstance(debugLed, &communication, logger);
+    auto &communication = Comms::Communication::getInstance(debugLed, logger);
+    auto &pairingButton = ums::PairingButton::getInstance(debugLed, &communication, logger);
 
     // TODO !pr remove
-    // auto & sensorManager = ums::Transducers::SensorsManager::getInstance(logger);
-    // auto batteryReadParamV = sensorManager.getSensorReading(1);
-    // if (auto *batteryReadParam = std::get_if<API::APIParameter<uint8_t>>(&batteryReadParamV)) {
-    //     logger->errorv("Main TMP", "battery %: ", batteryReadParam->getValue());
-    // }
-    //
-    // auto lightReadParamV = sensorManager.getSensorReading(2);
-    // if (auto *lightReadParam = std::get_if<API::APIParameter<uint8_t>>(&lightReadParamV)) {
-    //     logger->errorv("Main TMP", "battery %: ", lightReadParam->getValue());
-    // }
+    auto &sensorManager = ums::Transducers::SensorsManager::getInstance(logger);
+    auto batteryReadParamV = sensorManager.getSensorReading(1)[0];
+    if (auto *batteryReadParam = std::get_if<API::APIParameter<uint8_t> >(&batteryReadParamV)) {
+        logger->errorv("Main TMP", "battery %: ", batteryReadParam->getValue());
+    }
+
+    auto lightReadParamV = sensorManager.getSensorReading(2)[0];
+    if (auto *lightReadParam = std::get_if<API::APIParameter<uint8_t> >(&lightReadParamV)) {
+        logger->errorv("Main TMP", "battery %: ", lightReadParam->getValue());
+    }
+
+    auto dhtParamV = sensorManager.getSensorReading(3);
+    for (auto &param: dhtParamV) {
+        if (auto *p = std::get_if<API::APIParameter<float> >(&param)) {
+            logger->errorv("Main TMP", "dht : ", p->getValue());
+        }
+    }
+    // TODO !pr remove
 
     logger->info("Main", "All components initialized. Deleting functions setup() and loop()...");
     vTaskDelete(nullptr);
