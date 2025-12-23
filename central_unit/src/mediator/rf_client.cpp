@@ -21,8 +21,8 @@ namespace SmartHomeMediator {
             throw;
         }
 
-        msDefaultChannel = 1; //TODO !pr read from conf
-        msDefaultMac = {1,1,1,1,1,1}; //TODO !pr read from conf
+        mDefaultChannel = 1; //TODO !pr read from conf
+        mDefaultMac = {1, 1, 1, 1, 1, 1}; //TODO !pr read from conf
     }
 
     RfClient::~RfClient() {
@@ -39,7 +39,7 @@ namespace SmartHomeMediator {
             // Set channel to default
             try {
                 success = co_await mpDriver->setOption(HC12Driver::Hc12Option::CHANNEL,
-                                                       std::to_string(msDefaultChannel));
+                                                       std::to_string(mDefaultChannel));
             } catch (const std::exception &e) {
                 mpLogger->errorf("[RF_CLIENT] Initialization error: %s", e.what());
                 onComplete(false);
@@ -73,7 +73,7 @@ namespace SmartHomeMediator {
                 continue;
             }
 
-            Session::Metadata meta;
+            RfTypes::SessionMetadata meta;
             // Get next session metadata
             {
                 std::scoped_lock lock(mSessionQueueMutex);
@@ -89,6 +89,7 @@ namespace SmartHomeMediator {
 
             mediator.getIoContext().post([this, result] {
                 mMessageHandler(result);
+
             });
         }
         mpLogger->info("[RF_CLIENT] Stopping RfClient");
@@ -96,7 +97,7 @@ namespace SmartHomeMediator {
         mIsSending = false;
     }
 
-    void RfClient::addSession(Session::Metadata &&metadata) {
+    void RfClient::addSession(RfTypes::SessionMetadata &&metadata) {
         std::scoped_lock lock(mSessionQueueMutex);
         mSessionQueue.push(std::move(metadata));
     }
@@ -107,16 +108,16 @@ namespace SmartHomeMediator {
     }
 
     uint8_t RfClient::getDefaultChannel() {
-        return msDefaultChannel;
+        return mDefaultChannel;
     }
 
     std::array<uint8_t, 6> RfClient::getDefaultMacAddress() {
-        return msDefaultMac;
+        return mDefaultMac;
     }
 
     void RfClient::startReceiving() {
         bool expected = false;
-        bool desired = true;
+        constexpr bool desired = true;
         if (mIsReceiving.compare_exchange_strong(expected, desired)) {
             mpLogger->warning("[RF_CLIENT] Already receiving");
             return;
@@ -128,7 +129,7 @@ namespace SmartHomeMediator {
 
     void RfClient::startSending() {
         bool expected = false;
-        bool desired = true;
+        constexpr bool desired = true;
         if (mIsSending.compare_exchange_strong(expected, desired)) {
             mpLogger->warning("[RF_CLIENT] Already sending");
             return;
@@ -160,7 +161,7 @@ namespace SmartHomeMediator {
                 continue;
             }
 
-            const auto packet = Packet::from_vector(data);
+            const auto packet = RfTypes::Packet::from_vector(data);
 
             if (!packet.isValid()) {
                 mpLogger->debug("[RF_CLIENT] Received invalid packet");
@@ -171,13 +172,13 @@ namespace SmartHomeMediator {
             if (mCurrentSession) {
                 mCurrentSession->addReceivedPacket(packet);
             } else {
-                auto meta = Session::Metadata{
-                    .sessionType = Session::Type::FROM_MODULE,
-                    .rfChannel = msDefaultChannel,
+                auto meta = RfTypes::SessionMetadata{
+                    .sessionType = RfTypes::SessionType::FROM_MODULE,
+                    .rfChannel = mDefaultChannel,
                     .targetLogicAddress = packet.logicAddress
                 };
 
-                std::queue<Session::Metadata> tmpQueue;
+                std::queue<RfTypes::SessionMetadata> tmpQueue;
                 tmpQueue.emplace(std::move(meta));
 
                 // Emplace notification in first place of session queue
@@ -201,7 +202,7 @@ namespace SmartHomeMediator {
                         mpLogger->infof(
                             "[RF_CLIENT] Received %d packets, %2.2f\\% packet loss (%d invalid, %d dropped)",
                             packetReceived.load(),
-                            (packetInvalid + packetEmpty) / static_cast<float>(packetReceived),
+                            (packetInvalid + packetEmpty) / static_cast<double>(packetReceived),
                             packetInvalid.load(),
                             packetEmpty.load());
                         packetReceived = 0;
@@ -234,7 +235,7 @@ namespace SmartHomeMediator {
                 mSendQueue.pop();
             }
 
-            co_await mpDriver->write(std::move(data));
+            co_await mpDriver->write(data);
         }
         mpLogger->info("[RF_CLIENT] Send loop stopped");
         co_return;

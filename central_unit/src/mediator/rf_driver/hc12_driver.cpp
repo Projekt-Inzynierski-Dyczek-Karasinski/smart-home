@@ -43,7 +43,7 @@ namespace SmartHomeMediator {
         mpLogger->info("[HC12_DRIVER] Driver shutdown");
     }
 
-    ba::awaitable<void> HC12Driver::write(const std::vector<uint8_t> &data) {
+    ba::awaitable<void> HC12Driver::write(std::vector<uint8_t> data) {
         // Calculate required delay based on FU mode
         const auto now = std::chrono::steady_clock::now();
         const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - mLastWriteTime);
@@ -80,8 +80,8 @@ namespace SmartHomeMediator {
         }
     }
 
-    ba::awaitable<bool> HC12Driver::setOption(const std::string_view option,
-                                              const std::string_view value) {
+    ba::awaitable<bool> HC12Driver::setOption(std::string option,
+                                              std::string value) {
         // Convert to enum for validation
         const Hc12Option parsedOption = stringToOption(option);
         if (parsedOption == Hc12Option::UNDEFINED) {
@@ -132,12 +132,12 @@ namespace SmartHomeMediator {
         co_return success;
     }
 
-    ba::awaitable<bool> HC12Driver::setOption(const Hc12Option option, const std::string_view value) {
+    ba::awaitable<bool> HC12Driver::setOption(const Hc12Option option, const std::string& value) {
         const auto optionStr = optionToString(option);
         return setOption(optionStr, value);
     }
 
-    ba::awaitable<std::vector<uint8_t> > HC12Driver::getOption(const std::string_view option) {
+    ba::awaitable<std::vector<uint8_t> > HC12Driver::getOption(const std::string option) {
         // Try cache first
         const auto iter = mOptionsCache.find(std::string(option));
         if (iter != mOptionsCache.end()) {
@@ -243,7 +243,7 @@ namespace SmartHomeMediator {
         mpLogger->debugf("[HC12_DRIVER] Exited config mode");
     }
 
-    ba::awaitable<std::vector<uint8_t> > HC12Driver::sendAtCommand(const std::vector<uint8_t> &command,
+    ba::awaitable<std::vector<uint8_t> > HC12Driver::sendAtCommand(std::vector<uint8_t> command,
                                                                    const std::chrono::milliseconds timeout) const {
         co_await mpUart->writeAsync(command);
 

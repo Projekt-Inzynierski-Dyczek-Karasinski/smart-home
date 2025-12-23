@@ -2,7 +2,6 @@
 
 
 namespace SmartHomeMediator {
-
     /*
      * Start service
      * Connect to smarthomed
@@ -49,19 +48,19 @@ namespace SmartHomeMediator {
         mConfig = configStruct;
 
         // Attempt establishing connection with SmatHome daemon
-        // mpApiClient = std::make_unique<ApiClient>(&mApiClientIoContext, mpLogger);
-        // bool isConnectionEstablished = false;
-        // if (mConfig.uds.isEnabled) {
-        //     isConnectionEstablished = mpApiClient->connectToServer(mConfig.uds.endpointPath);
-        // }
-        // if (!isConnectionEstablished && mConfig.tcp.isEnabled) {
-        //     isConnectionEstablished = mpApiClient->connectToServer(mConfig.tcp.endpointAddress,
-        //                                                            mConfig.tcp.endpointPort);
-        // }
-        // if (!isConnectionEstablished) {
-        //     logger->error("[MEDIATOR] Failed to connect with SmartHome daemon");
-        //     return false;
-        // }
+        mpApiClient = std::make_unique<ApiClient>(&mApiClientIoContext, mpLogger);
+        bool isConnectionEstablished = false;
+        if (mConfig.uds.isEnabled) {
+            isConnectionEstablished = mpApiClient->connectToServer(mConfig.uds.endpointPath);
+        }
+        if (!isConnectionEstablished && mConfig.tcp.isEnabled) {
+            isConnectionEstablished = mpApiClient->connectToServer(mConfig.tcp.endpointAddress,
+                                                                   mConfig.tcp.endpointPort);
+        }
+        if (!isConnectionEstablished) {
+            logger->error("[MEDIATOR] Failed to connect with SmartHome daemon");
+            return false;
+        }
 
         // Create thread running io context for signal handling and service manager
         mMediatorUtilityGuard.emplace(ba::make_work_guard(mMediatorUtilityIoContext));
@@ -140,18 +139,21 @@ namespace SmartHomeMediator {
             signalHandler(ec, sig);
         });
 
-        mpRfApi = std::make_unique<RfApi>(mpRfClient);
-
         static constexpr int nullConnection = 0;
+        mpRfApi = std::make_unique<RfApi>(mpRfClient);
+        mpRfApi->initialize([this](const std::string &message) {
+            mpApiClient->handleOutgoing(nullConnection, message.data());
+        });
+
         mMediatorIoContext.post([this] {
-            mpApiClient->run([this](const std::string &message) {
+            mpApiClient->initialize([this](const std::string &message) {
                 mpRfApi->handleIncoming(nullConnection, message.data());
             });
         });
 
         mMediatorIoContext.post([this] {
             mpRfClient->run([this](const std::string &message) {
-                mpApiClient->handleOutgoing(nullConnection, message.data());
+                mpRfApi->handleOutgoing(nullConnection, message.data());
             });
         });
 

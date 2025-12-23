@@ -2,12 +2,14 @@
 
 #include "rf_driver/hc12_driver.h"
 #include "async_logger.h"
+#include "rf_types.h"
 #include "session.h"
 
 #include <functional>
 #include <memory>
 #include <vector>
 #include <queue>
+
 
 
 namespace ba = boost::asio;
@@ -50,13 +52,13 @@ namespace SmartHomeMediator {
 
         ba::awaitable<void> run(std::function<void(const std::string &message)> handleMessage);
 
-        void addSession(Session::Metadata &&metadata);
+        void addSession(RfTypes::SessionMetadata &&metadata);
 
         void addMessageToSend(std::vector<uint8_t> &&message);
 
-        static uint8_t getDefaultChannel();
+        uint8_t getDefaultChannel();
 
-        static std::array<uint8_t, 6> getDefaultMacAddress();
+        std::array<uint8_t, 6> getDefaultMacAddress();
 
     private:
         /**
@@ -81,14 +83,14 @@ namespace SmartHomeMediator {
         static constexpr auto msAGGREGATE_RECEIVED_PACKET_INFO_TIMEOUT = 1s;
         static constexpr auto msPOOLING_DELAY = 10ms;
 
-        static uint8_t msDefaultChannel;
-        static std::array<uint8_t,6> msDefaultMac;
+        uint8_t mDefaultChannel;
+        std::array<uint8_t,6> mDefaultMac;
 
         std::shared_ptr<HC12Driver> mpDriver;
         ba::io_context &mIoContext;
         std::shared_ptr<su::Logger> mpLogger;
 
-        std::queue<Session::Metadata> mSessionQueue{};
+        std::queue<RfTypes::SessionMetadata> mSessionQueue{};
         std::mutex mSessionQueueMutex;
         std::unique_ptr<Session> mCurrentSession{};
 

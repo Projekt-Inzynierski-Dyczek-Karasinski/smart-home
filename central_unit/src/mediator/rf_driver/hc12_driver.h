@@ -52,16 +52,16 @@ namespace SmartHomeMediator {
 
         HC12Driver &operator=(const HC12Driver &) = delete;
 
-        ba::awaitable<void> write(const std::vector<uint8_t> &data) override;
+        ba::awaitable<void> write(std::vector<uint8_t> data) override;
 
         ba::awaitable<std::vector<uint8_t> > read() override;
 
 
-        ba::awaitable<bool> setOption(std::string_view option, std::string_view value) override;
+        ba::awaitable<bool> setOption(std::string option, std::string value) override;
 
-        ba::awaitable<bool> setOption(Hc12Option option, std::string_view value);
+        ba::awaitable<bool> setOption(Hc12Option option, const std::string& value);
 
-        ba::awaitable<std::vector<uint8_t> > getOption(std::string_view option) override;
+        ba::awaitable<std::vector<uint8_t> > getOption(std::string option) override;
 
         ba::awaitable<std::string> getAllOptions() override;
 
@@ -87,7 +87,7 @@ namespace SmartHomeMediator {
          * @param timeout Max wait time for response.
          * @return Response string without CRLF.
          */
-        ba::awaitable<std::vector<uint8_t> > sendAtCommand(const std::vector<uint8_t> &command,
+        ba::awaitable<std::vector<uint8_t> > sendAtCommand(std::vector<uint8_t> command,
                                                            std::chrono::milliseconds timeout = 400ms) const;
 
         /**

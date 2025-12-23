@@ -158,7 +158,7 @@ namespace SmartHome::IPC {
         // Start reading incoming messages
         connection->asyncReadLoop([this, connectionId](const std::string &message) {
             mpLogger->debugf("[SOCKET_SERVER] Message received: %s", message.c_str());
-            mpApi->handleRequest(connectionId, message.data());
+            mpApi->handleIncoming(connectionId, message.data());
         });
     }
 
@@ -274,6 +274,15 @@ namespace SmartHome::IPC {
             return nullptr;
         }
         return std::shared_ptr(iter->second);
+    }
+
+    std::unordered_set<connectionId_t> SocketServer::getActiveConnections() {
+        std::unordered_set<connectionId_t> activeConnections;
+        std::scoped_lock lock(mActiveConnectionsMutex);
+        for (const connectionId_t id: mActiveConnections | std::views::keys) {
+            activeConnections.insert(id);
+        }
+        return activeConnections;
     }
 
     ba::io_context *SocketServer::getIoContext() const {

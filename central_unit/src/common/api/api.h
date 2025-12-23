@@ -31,7 +31,13 @@ namespace SmartHome::JsonRpcStrings {
     /// Custom parameter keys for SmartHome API
     namespace ParamsKeys {
         inline constexpr std::string_view TARGET = "target";
+        inline constexpr std::string_view MODULE_INFO = "module_info";
         inline constexpr std::string_view METHOD_PARAMS = "method_params";
+    }
+
+    namespace ModuleInfoKeys {
+        inline constexpr std::string_view LOGIC_ADDRESS = "logic_address";
+        inline constexpr std::string_view RF_CHANNEL = "rf_channel";
     }
 
     /// JSON-RPC response-specific keys

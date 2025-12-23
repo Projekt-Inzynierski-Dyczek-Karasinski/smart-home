@@ -14,11 +14,12 @@ add_executable(smarthome-mediator
         mediator.cpp
         api_client.cpp
         rf_client.cpp
+        session.cpp
+        rf_api.cpp
+        rf_types.cpp
         rf_driver/hc12_driver.cpp
         rf_driver/uart_port.cpp
         rf_driver/gpio_handler.cpp
-        rf_api.cpp
-        rf_api.h
 )
 
 

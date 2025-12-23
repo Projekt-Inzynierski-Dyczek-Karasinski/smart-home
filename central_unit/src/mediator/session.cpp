@@ -1,115 +1,48 @@
 #include "session.h"
 #include "rf_driver/hc12_driver.h"
 #include "rf_client.h"
+#include "rf_api.h"
 
 #include <charconv>
 #include <cmath>
 #include <cstring>
 #include <stdexcept>
+#include <utility>
+
 
 
 namespace SmartHomeMediator {
-    Packet Packet::from_bytes(const std::span<const uint8_t> data) {
-        if (data.size() != sizeof(Packet)) {
-            throw std::invalid_argument("Invalid size");
-        }
 
-        Packet packet{};
-        packet = std::bit_cast<Packet>(data); // TODO !pr test
-        // std::memcpy(&packet, data.data(), data.size());
-        return packet;
-    }
-
-    Packet Packet::from_vector(const std::vector<uint8_t> &data) {
-        return from_bytes(data);
-    }
-
-    std::span<const uint8_t> Packet::as_bytes() const {
-        return {reinterpret_cast<const uint8_t *>(this), sizeof(*this)};
-    }
-
-    std::vector<uint8_t> Packet::to_vector() const {
-        auto bytes = as_bytes();
-        return {bytes.begin(), bytes.end()};
-    }
-
-    bool Packet::isValid() const {
-        return endMarker == msEND_MARKER && verifyChecksum(*this);
-    }
-
-    bool Packet::isLastPacket() const {
-        return packetsLeft == 0;
-    }
-
-    // std::vector<uint8_t> Packet::getPayload() const {
-    //     return {payload.begin(), payload.end()};
-    // }
-
-    uint8_t Packet::getPayloadMaxSize() {
-        return msPAYLOAD_MAX_SIZE;
-    }
-
-    uint8_t Packet::getEndMarker() {
-        return msEND_MARKER;
-    }
-
-    uint8_t Packet::getFillSymbol() {
-        return msFILL_SYMBOL;
-    }
-
-    void Packet::insertChecksum() {
-        checksum = 0;
-        const auto tmpChecksum = calculateChecksum(*this);
-
-        checksum = (msCHECKSUM_MODULO - (tmpChecksum % msCHECKSUM_MODULO)) % msCHECKSUM_MODULO;
-    }
-
-    void Packet::insertEndMarker() {
-        endMarker = msEND_MARKER;
-    }
-
-    uint16_t Packet::calculateChecksum(const Packet &packet) {
-        uint16_t tmpChecksum = 0;
-        for (const auto &byte: packet.as_bytes()) {
-            tmpChecksum += byte;
-        }
-        return tmpChecksum;
-    }
-
-    bool Packet::verifyChecksum(const Packet &packet) {
-        return calculateChecksum(packet) % msCHECKSUM_MODULO == 0;
-    }
-
-    Session::Session(const Metadata &metadata,
+    Session::Session(RfTypes::SessionMetadata metadata,
                      const std::shared_ptr<HC12Driver> &rfDriver,
                      const std::shared_ptr<RfClient> &rfClient)
-        : mMetadata(metadata),
+        : mMetadata(std::move(metadata)),
           mpRfDriver(rfDriver),
           mpRfClient(rfClient) {
     }
 
     ba::awaitable<std::string> Session::execute() {
         std::vector<uint8_t> receivedMessage;
-        RfApi::RfCommand commandResponse;
+        RfTypes::RfCommand commandResponse;
 
 
-        auto timer = ba::steady_timer(co_await ba::this_coro::executor); //TODO !pr add to
+        auto timer = ba::steady_timer(co_await ba::this_coro::executor); //TODO !pr add t/o
 
         // Handle session engaged by module, await for notification
-        if (mMetadata.sessionType == Type::FROM_MODULE) {
-            RfApi::RfCommand errorCommand;
-            errorCommand.commandType = RfApi::CommandTypes::NEGATIVE;
+        if (mMetadata.sessionType == RfTypes::SessionType::FROM_MODULE) {
+            RfTypes::RfCommand errorCommand;
+            errorCommand.commandType = RfTypes::CommandTypes::NEGATIVE;
 
             receivedMessage = co_await receive();
             if (receivedMessage.empty()) co_return ""; // return empty if nothing was received
 
             try {
-                commandResponse = RfApi::RfCommand(receivedMessage);
+                commandResponse = RfTypes::RfCommand(receivedMessage);
             } catch (...) {
                 // ignore catch - commandResponse.commandType is undefined
             }
 
-            if (commandResponse.commandType == RfApi::CommandTypes::NOTIFY) {
+            if (commandResponse.commandType == RfTypes::CommandTypes::NOTIFY) {
                 try {
                     co_return RfApi::toApiString(commandResponse);
                 } catch (...) {
@@ -147,7 +80,7 @@ namespace SmartHomeMediator {
         };
 
         std::vector<uint8_t> lastSendMessage;
-        RfApi::RfCommand currentCommand;
+        RfTypes::RfCommand currentCommand;
         std::vector<std::string> resultVector;
 
         uint retries = 0;
@@ -170,15 +103,15 @@ namespace SmartHomeMediator {
                     }
 
                     try {
-                        commandResponse = RfApi::RfCommand(receivedMessage);
+                        commandResponse = RfTypes::RfCommand(receivedMessage);
                     } catch (...) {
                         changeState(State::SEND_REPEAT_LAST_MESSAGE);
                         break;
                     }
 
                     // Check if received acknowledge as response to notify
-                    if (currentCommand.commandType == RfApi::CommandTypes::NOTIFY) {
-                        if (commandResponse.commandType == RfApi::CommandTypes::ACKNOWLEDGE) {
+                    if (currentCommand.commandType == RfTypes::CommandTypes::NOTIFY) {
+                        if (commandResponse.commandType == RfTypes::CommandTypes::ACKNOWLEDGE) {
                             changeState(State::NEXT_COMMAND);
                             break;
                         }
@@ -186,12 +119,19 @@ namespace SmartHomeMediator {
                         break;
                     }
 
-                    if (commandResponse.commandType != RfApi::CommandTypes::RESPONSE) {
+                    if (commandResponse.commandType != RfTypes::CommandTypes::RESPONSE &&
+                        commandResponse.commandType != RfTypes::CommandTypes::PING) {
                         changeState(State::SEND_REPEAT_LAST_MESSAGE);
                         break;
                     }
 
-                    resultVector.push_back(RfApi::toApiString(commandResponse));
+                    try {
+                        resultVector.push_back(RfApi::toApiString(commandResponse));
+                    }catch (...) {
+                        // Invalid response, request repeat
+                        changeState(State::SEND_REPEAT_LAST_MESSAGE);
+                        break;
+                    }
 
                     changeState(State::NEXT_COMMAND);
                     break;
@@ -204,7 +144,7 @@ namespace SmartHomeMediator {
                         error.data = "No response from module";
 
                         response.error = error;
-                        response.id = currentCommand.requestId.value_or(nullptr);
+                        response.id = currentCommand.requestId.value();
 
                         resultVector.push_back(response.to_string());
 
@@ -223,15 +163,19 @@ namespace SmartHomeMediator {
                         error.data = "Module sent invalid response";
 
                         response.error = error;
-                        response.id = currentCommand.requestId.value_or(nullptr);
+
+                        if (currentCommand.requestId.has_value())
+                            response.id = currentCommand.requestId.value();
+                        else
+                            response.id = nullptr;
 
                         resultVector.push_back(response.to_string());
 
                         changeState(State::NEXT_COMMAND);
                         break;
                     }
-                    RfApi::RfCommand command;
-                    command.commandType = RfApi::CommandTypes::REPEAT;
+                    RfTypes::RfCommand command;
+                    command.commandType = RfTypes::CommandTypes::REPEAT;
                     co_await send(command.to_vector());
 
                     changeState(previousState);
@@ -240,8 +184,8 @@ namespace SmartHomeMediator {
 
 
                 case State::SEND_END_COMMAND: {
-                    RfApi::RfCommand command;
-                    command.commandType = RfApi::CommandTypes::END;
+                    RfTypes::RfCommand command;
+                    command.commandType = RfTypes::CommandTypes::END;
                     co_await send(command.to_vector());
                     changeState(State::FINISHED);
                     break;
@@ -259,6 +203,19 @@ namespace SmartHomeMediator {
 
                     if (commandsVectorIndex < mMetadata.commands.size()) {
                         currentCommand = mMetadata.commands[commandsVectorIndex++];
+
+                        if (currentCommand.commandType == RfTypes::CommandTypes::UNDEFINED) {
+                            error.code = sa::ErrorCodes::MEDIATOR_COMMUNICATION_ERROR;
+                            error.message = SmartHome::API::errorCodeToString(error.code);
+                            error.data = "Failed to parse RfCommand";
+
+                            response.error = error;
+                            response.id = currentCommand.requestId.value();
+
+                            resultVector.push_back(response.to_string());
+                            break;
+                        }
+
                         changeState(State::SEND_MESSAGE);
                         break;
                     }
@@ -277,7 +234,7 @@ namespace SmartHomeMediator {
         co_return to_string(resultJsonArray);
     }
 
-    void Session::addReceivedPacket(Packet packet) {
+    void Session::addReceivedPacket(RfTypes::Packet packet) {
         if (!packet.isValid() ||
             packet.macAddress != mpRfClient->getDefaultMacAddress() ||
             packet.logicAddress != mMetadata.targetLogicAddress)
@@ -289,7 +246,7 @@ namespace SmartHomeMediator {
     }
 
     ba::awaitable<void> Session::send(const std::vector<uint8_t> &message) const {
-        const auto maxPayloadSize = Packet::getPayloadMaxSize();
+        const auto maxPayloadSize = RfTypes::Packet::getPayloadMaxSize();
         const auto messageSize = message.size();
 
         if (messageSize == 0)
@@ -300,14 +257,14 @@ namespace SmartHomeMediator {
         for (auto offset = 0; offset < messageSize; offset += maxPayloadSize) {
             const size_t payloadSize = std::min(static_cast<size_t>(maxPayloadSize), messageSize - offset);
 
-            Packet packet{
+            RfTypes::Packet packet{
                 .macAddress = mpRfClient->getDefaultMacAddress(),
                 .logicAddress = mMetadata.targetLogicAddress,
                 .packetsLeft = --numOfPackets,
             };
 
-            std::ranges::fill(packet.payload, Packet::getFillSymbol());
-            std::copy_n(message.begin() + offset, payloadSize, packet.payload);
+            std::ranges::fill(packet.payload, RfTypes::Packet::getFillSymbol());
+            std::copy_n(message.begin() + offset, payloadSize, packet.payload.begin());
 
             packet.insertEndMarker();
             packet.insertChecksum();

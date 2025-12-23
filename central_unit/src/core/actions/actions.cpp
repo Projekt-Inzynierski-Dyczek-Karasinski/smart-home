@@ -1,14 +1,12 @@
-#include "core_actions.h"
-#include "core.h"
+#include "actions.h"
 
 #include <memory>
-#include <boost/algorithm/string/case_conv.hpp>
 
-using sai = SmartHome::API::InternalApi;
-using namespace std::chrono_literals;
+#include "core_actions.h"
+#include "mediator_actions.h"
 
 namespace SmartHome {
-    void CoreActions::handleIncomingRequest(const API::InternalApi::Request &request, const RequestCallback &callback) {
+    void Actions::handleIncomingRequest(const API::InternalApi::Request &request, const RequestCallback &callback) {
         if (!Core::Instance().isRunning()) return;
         const auto logger = Core::Instance().mpLogger;
         const auto requestId = getNextId();
@@ -92,11 +90,69 @@ namespace SmartHome {
         }
     }
 
-    void CoreActions::handleIncomingResponse(const API::InternalApi::Response &response) {
-        //TODO !pr
+    void Actions::handleIncomingResponse(const API::InternalApi::Response &response) {
+        //TODO !pr handle incoming repsponse
     }
 
-    void CoreActions::onCoreShutdown() {
+    void Actions::handleOutgoingRequest(const connectionId_t connectionId,
+                                        API::ApiRequest &&apiRequest,
+                                        const std::shared_ptr<std::promise<API::ApiResponse> > &pResponsePromise) {
+        // TODO !pr
+
+        std::scoped_lock lockRequestMap(msOutgoingRequestsLock);
+
+        if (!msOutgoingRequests.contains(connectionId)) {
+            msOutgoingRequests[connectionId] = {};
+        }
+        auto &outgoingRequest = msOutgoingRequests.at(connectionId);
+        std::scoped_lock lockRequestMetadata(outgoingRequest->metadataMutex);
+
+        outgoingRequest->sendTimer->cancel();
+
+
+        outgoingRequest->requestsToSend.push_back(apiRequest);
+        if (apiRequest.id.hasValue()) {
+            if (!outgoingRequest->requestsPromises.contains(apiRequest.id.value()))
+                outgoingRequest->requestsPromises[apiRequest.id.value()] = pResponsePromise;
+            else
+                Core::Instance().mpLogger->warning(
+                    "[ACTIONS] [HANDLE_OUTGOING_REQUEST] ApiRequest with duplicate id ignored");
+        }
+
+        outgoingRequest->sendTimer->expires_after(10ms);
+        outgoingRequest->sendTimer->async_wait([outgoingRequest, connectionId](const bs::error_code &sendEc) {
+            if (!sendEc) {
+                std::scoped_lock sendLock(outgoingRequest->metadataMutex, msOutgoingRequestsLock);
+
+                //TODO !pr join request into batch if multiple and send, remove already send requests
+                outgoingRequest->requestsToSend.clear();
+                outgoingRequest->timeoutTimer->expires_after(ms_REQUEST_TIMEOUT);
+                outgoingRequest->timeoutTimer->async_wait([outgoingRequest, connectionId](const bs::error_code &timeOutEc) {
+                    if (!timeOutEc) {
+                        std::scoped_lock timeOutLock(outgoingRequest->metadataMutex, msOutgoingRequestsLock);
+                        for (const auto & promise : outgoingRequest->requestsPromises | std::views::values) {
+                            promise->set_exception(std::make_exception_ptr(std::runtime_error("Request timeout")));
+                        }
+
+                        if (outgoingRequest->requestsToSend.empty()) {
+                            msOutgoingRequests.erase(connectionId);
+                        }
+                    }
+                });
+            }
+        });
+    }
+
+
+    std::optional<API::InternalApi::Request> Actions::getRequest(const apiId_t requestId) {
+        std::scoped_lock lock(msActiveRequestsLock);
+
+        const auto iter = msActiveRequests.find(requestId);
+
+        return iter == msActiveRequests.end() ? std::nullopt : std::optional(iter->second.request);
+    }
+
+    void Actions::onCoreShutdown() {
         auto cleanupTimeout = std::make_shared<ba::steady_timer>(Core::Instance().getCoreUtilityIoContext(),
                                                                  ms_CLEANUP_TIMEOUT);
         std::atomic_bool cleanupTimeoutCalled = false;
@@ -145,34 +201,34 @@ namespace SmartHome {
         }
     }
 
-    CoreActions::CommandKey::CommandKey(const sai::TargetTypes newTarget, const sai::MethodTypes newAction) {
+    Actions::CommandKey::CommandKey(const sai::TargetTypes newTarget, const sai::MethodTypes newAction) {
         target = newTarget;
         action = newAction;
     }
 
-    CoreActions::CommandKey::CommandKey(const API::InternalApi::Command &command) {
+    Actions::CommandKey::CommandKey(const API::InternalApi::Command &command) {
         target = command.target.type;
         action = command.method.type;
     }
 
-    bool CoreActions::CommandKey::operator==(const CommandKey &other) const {
+    bool Actions::CommandKey::operator==(const CommandKey &other) const {
         return target == other.target && action == other.action;
     }
 
 
-    std::size_t CoreActions::CommandKeyHash::operator()(const CommandKey &key) const {
+    std::size_t Actions::CommandKeyHash::operator()(const CommandKey &key) const {
         return static_cast<size_t>(key.target) << 8 | static_cast<size_t>(key.action);
     }
 
-    CoreActions::CommandMetadata::CommandMetadata(API::InternalApi::Command command,
-                                                  std::shared_ptr<ba::steady_timer> commandTimeoutTimer,
-                                                  const apiId_t requestId)
+    Actions::CommandMetadata::CommandMetadata(API::InternalApi::Command command,
+                                              std::shared_ptr<ba::steady_timer> commandTimeoutTimer,
+                                              const apiId_t requestId)
         : command(std::move(command)),
           commandTimeoutTimer(std::move(commandTimeoutTimer)),
           requestId(requestId) {
     }
 
-    bool CoreActions::CommandMetadata::cancel() {
+    bool Actions::CommandMetadata::cancel() {
         if (auto timer = commandTimeoutTimer.exchange(nullptr)) timer->cancel();
         auto expected = State::PENDING;
         if (state.compare_exchange_strong(expected, State::CANCELLED)) return true;
@@ -180,7 +236,7 @@ namespace SmartHome {
     }
 
 
-    bool CoreActions::CommandMetadata::isPending() const {
+    bool Actions::CommandMetadata::isPending() const {
         if (state.load(std::memory_order::relaxed) == State::PENDING) {
             return true;
         }
@@ -188,17 +244,17 @@ namespace SmartHome {
     }
 
 
-    CoreActions::RequestMetadata::RequestMetadata(API::InternalApi::Request request,
-                                                  std::shared_ptr<ba::steady_timer> requestTimeoutTimer,
-                                                  const size_t pendingCommands,
-                                                  RequestCallback onComplete)
+    Actions::RequestMetadata::RequestMetadata(API::InternalApi::Request request,
+                                              std::shared_ptr<ba::steady_timer> requestTimeoutTimer,
+                                              const size_t pendingCommands,
+                                              RequestCallback onComplete)
         : request(std::move(request)),
           requestTimeoutTimer(std::move(requestTimeoutTimer)),
           pendingCommands(pendingCommands),
           onComplete(std::move(onComplete)) {
     }
 
-    void CoreActions::RequestMetadata::cancel() {
+    void Actions::RequestMetadata::cancel() {
         if (pendingCommands == 0) return;
 
         if (auto reqTimer = requestTimeoutTimer.exchange(nullptr)) reqTimer->cancel();
@@ -208,20 +264,20 @@ namespace SmartHome {
         }
     }
 
-    apiId_t CoreActions::getNextId() {
+    apiId_t Actions::getNextId() {
         static std::atomic<apiId_t> id{0};
         return id.fetch_add(1, std::memory_order::seq_cst) + 1;
     }
 
 
-    CoreActions::CommandHandler CoreActions::resolveCommand(const API::InternalApi::Command &command) {
+    Actions::CommandHandler Actions::resolveCommand(const API::InternalApi::Command &command) {
         const auto iter = msCommandsRegistry.find(CommandKey(command));
         return iter != msCommandsRegistry.end() ? iter->second : nullptr;
     }
 
-    void CoreActions::executeCommandAsync(CommandHandler handler,
-                                          API::InternalApi::Command newCommand,
-                                          apiId_t requestId) {
+    void Actions::executeCommandAsync(CommandHandler handler,
+                                      API::InternalApi::Command newCommand,
+                                      apiId_t requestId) {
         auto commandMetadata = std::make_shared<CommandMetadata>(
             newCommand,
             std::make_shared<ba::steady_timer>(Core::Instance().getCoreUtilityIoContext()),
@@ -281,8 +337,8 @@ namespace SmartHome {
     }
 
 
-    ba::awaitable<void> CoreActions::processCommand(std::shared_ptr<CommandMetadata> commandMetadata,
-                                                    const CommandHandler handler) {
+    ba::awaitable<void> Actions::processCommand(std::shared_ptr<CommandMetadata> commandMetadata,
+                                                const CommandHandler handler) {
         API::ApiResponse response;
 
         try {
@@ -302,7 +358,7 @@ namespace SmartHome {
         co_return;
     }
 
-    void CoreActions::startCommandTimeoutTimer(const std::shared_ptr<CommandMetadata> &commandMetadata) {
+    void Actions::startCommandTimeoutTimer(const std::shared_ptr<CommandMetadata> &commandMetadata) {
         if (auto timer = commandMetadata->commandTimeoutTimer.load()) {
             timer->expires_after(ms_COMMAND_TIMEOUT);
             timer->async_wait([commandMetadata](const bs::error_code &ec) {
@@ -316,8 +372,8 @@ namespace SmartHome {
     }
 
 
-    void CoreActions::handleCommandResult(const std::shared_ptr<CommandMetadata> &commandMetadata,
-                                          API::ApiResponse &&commandResult) {
+    void Actions::handleCommandResult(const std::shared_ptr<CommandMetadata> &commandMetadata,
+                                      API::ApiResponse &&commandResult) {
         if (auto timer = commandMetadata->commandTimeoutTimer.exchange(nullptr)) timer->cancel();
 
         auto expected = CommandMetadata::State::PENDING;
@@ -333,7 +389,7 @@ namespace SmartHome {
         updateRequestStatus(commandMetadata->requestId);
     }
 
-    void CoreActions::handleCommandTimeout(const std::shared_ptr<CommandMetadata> &commandMetadata) {
+    void Actions::handleCommandTimeout(const std::shared_ptr<CommandMetadata> &commandMetadata) {
         if (auto timer = commandMetadata->commandTimeoutTimer.exchange(nullptr)) timer->cancel();
 
         auto expected = CommandMetadata::State::PENDING;
@@ -362,8 +418,8 @@ namespace SmartHome {
                                               : "null");
     }
 
-    void CoreActions::addCommandResultToResponse(const std::shared_ptr<CommandMetadata> &commandMetadata,
-                                                 API::ApiResponse &&apiResponse) {
+    void Actions::addCommandResultToResponse(const std::shared_ptr<CommandMetadata> &commandMetadata,
+                                             API::ApiResponse &&apiResponse) {
         std::scoped_lock lock(msResponsesLock);
         auto iter = msResponses.find(commandMetadata->requestId);
         if (iter != msResponses.end()) {
@@ -371,7 +427,7 @@ namespace SmartHome {
         }
     }
 
-    void CoreActions::updateRequestStatus(const apiId_t requestId, const bool lockMutex) {
+    void Actions::updateRequestStatus(const apiId_t requestId, const bool lockMutex) {
         if (lockMutex) std::scoped_lock lock(msActiveRequestsLock);
         auto iter = msActiveRequests.find(requestId);
         if (iter != msActiveRequests.end()) {
@@ -386,7 +442,7 @@ namespace SmartHome {
         }
     }
 
-    void CoreActions::handleRequestTimeout(const apiId_t requestId) {
+    void Actions::handleRequestTimeout(const apiId_t requestId) {
         Core::Instance().mpLogger->errorf("[CORE_ACTIONS] Request timeout - request ID: %d", requestId);
 
         std::vector<CommandMetadataPtr> commandsMD;
@@ -421,7 +477,7 @@ namespace SmartHome {
         }
     }
 
-    void CoreActions::cleanupRequest(const apiId_t requestId) {
+    void Actions::cleanupRequest(const apiId_t requestId) {
         std::scoped_lock lock(msActiveRequestsLock, msResponsesLock);
 
         auto iter = msActiveRequests.find(requestId);
@@ -437,7 +493,7 @@ namespace SmartHome {
         msResponses.erase(requestId);
     }
 
-    void CoreActions::handleOutgoingResponse(const apiId_t responseId) {
+    void Actions::handleOutgoingResponse(const apiId_t responseId) {
         const auto logger = Core::Instance().mpLogger;
         RequestCallback requestCallback;
         std::string responseString;
@@ -504,24 +560,21 @@ namespace SmartHome {
         requestCallback(id, std::move(responseString));
     }
 
-    void CoreActions::handleOutgoingRequest(apiId_t requestId) {
-        //TODO !pr
-    }
 
-    std::unordered_map<CoreActions::CommandKey, CoreActions::CommandHandler, CoreActions::CommandKeyHash>
-    CoreActions::msCommandsRegistry =
+    std::unordered_map<Actions::CommandKey, Actions::CommandHandler, Actions::CommandKeyHash>
+    Actions::msCommandsRegistry =
     {
         // TODO implement actions needed for basic functionality
         //Core
-        {{sai::TargetTypes::CORE, sai::MethodTypes::GET}, coreGetHandler},
-        {{sai::TargetTypes::CORE, sai::MethodTypes::SET}, placeholderHandler},
+        {{sai::TargetTypes::CORE, sai::MethodTypes::GET}, CoreActions::coreGetHandler},
+        {{sai::TargetTypes::CORE, sai::MethodTypes::SET}, CoreActions::coreSetHandler},
         {{sai::TargetTypes::CORE, sai::MethodTypes::EXECUTE}, placeholderHandler},
-        {{sai::TargetTypes::CORE, sai::MethodTypes::ECHO_REQUEST}, coreEchoHandler},
+        {{sai::TargetTypes::CORE, sai::MethodTypes::ECHO_REQUEST}, CoreActions::coreEchoHandler},
         {{sai::TargetTypes::CORE, sai::MethodTypes::PING_REQUEST}, placeholderHandler},
         //Mediator
         {{sai::TargetTypes::MODULE_MEDIATOR, sai::MethodTypes::GET}, placeholderHandler},
         {{sai::TargetTypes::MODULE_MEDIATOR, sai::MethodTypes::SET}, placeholderHandler},
-        {{sai::TargetTypes::MODULE_MEDIATOR, sai::MethodTypes::EXECUTE}, placeholderHandler},
+        {{sai::TargetTypes::MODULE_MEDIATOR, sai::MethodTypes::EXECUTE}, MediatorActions::mediatorExecuteHandler},
         {{sai::TargetTypes::MODULE_MEDIATOR, sai::MethodTypes::PING_REQUEST}, placeholderHandler},
         //Database
         {{sai::TargetTypes::DATABASE, sai::MethodTypes::GET}, placeholderHandler},
@@ -541,18 +594,26 @@ namespace SmartHome {
         {{sai::TargetTypes::WEB_SERVER, sai::MethodTypes::PING_REQUEST}, placeholderHandler}
     };
 
-    std::unordered_map<apiId_t, CoreActions::RequestMetadata> CoreActions::msActiveRequests;
+    std::unordered_map<apiId_t, Actions::RequestMetadata> Actions::msActiveRequests;
 
-    std::mutex CoreActions::msActiveRequestsLock;
+    std::mutex Actions::msActiveRequestsLock;
 
-    std::unordered_map<apiId_t, API::InternalApi::Response> CoreActions::msResponses;
+    std::unordered_map<apiId_t, API::InternalApi::Response> Actions::msResponses;
 
-    std::mutex CoreActions::msResponsesLock;
+    std::mutex Actions::msResponsesLock;
+
+    std::unordered_map<connectionId_t, sai::TargetTypes> Actions::msConnectionsMap;
+
+    std::mutex Actions::msConnectionsMapLock;
+
+    std::unordered_map<sai::TargetTypes, std::unordered_set<connectionId_t> > Actions::msConnectionTypeMap;
+
+    std::mutex Actions::msConnectionTypeMapLock;
 
     // ======================================== CommandHandler functions ========================================
 
     // THIS PLACEHOLDER IS AN EXAMPLE AND IT SHOULD BE USED AS A TEMPLATE FOR OTHER COMMAND HANDLERS.
-    ba::awaitable<API::ApiResponse> CoreActions::placeholderHandler(
+    ba::awaitable<API::ApiResponse> Actions::placeholderHandler(
         const std::shared_ptr<CommandMetadata> &commandMetadata) {
         // Optional debug log
         Core::Instance().mpLogger->debug("[CORE_ACTIONS] [PLACEHOLDER] called");
@@ -609,109 +670,6 @@ namespace SmartHome {
                 e.what()
             );
         }
-        co_return commandResult;
-    }
-
-    ba::awaitable<API::ApiResponse> CoreActions::coreEchoHandler(
-        const std::shared_ptr<CommandMetadata> &commandMetadata) {
-        Core::Instance().mpLogger->debug("[CORE_ACTIONS] [CORE_ECHO] called");
-        const auto &command = commandMetadata->command;
-        API::ApiResponse commandResult;
-        commandResult.id = command.commandId;
-
-        std::string message;
-
-        if (command.params.has_value()) {
-            const auto &params = command.params.value();
-            message = params.dump();
-        }
-
-        commandResult.result = "Core Echo response: " + message;
-
-        co_return commandResult;
-    }
-
-    ba::awaitable<API::ApiResponse> CoreActions::coreGetHandler(
-        const std::shared_ptr<CommandMetadata> &commandMetadata) {
-        Core::Instance().mpLogger->debug("[CORE_ACTIONS] [CORE_GET] called");
-        const auto &command = commandMetadata->command;
-        API::ApiResponse commandResult;
-        commandResult.id = command.commandId;
-
-
-        // TODO implement core cached data object with getter methods
-        // TODO remove - temporary code for API testing
-        static const auto tmpDataGetter = [](const std::string_view value) {
-            const std::map<std::string_view, std::string> tmpMap = {
-                {
-                    "modules_status",
-                    R"([{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"2","name":"Thermometer","description":"Thermometer + Hygrometer","values":[{"name":"Temperature","value":"22C"},{"name":"Humidity","value":"44%"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"},{"name":"Update Values","method":"updateValues"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]},{"id":"1","name":"Lightning","description":"LED lights","values":[{"name":"Brightness","value":"75%"},{"name":"Temperature","value":"3200K"}],"actions":[{"name":"Turn On","method":"turnOn"},{"name":"Turn Off","method":"turnOff"}]}])"
-                },
-                {
-                    "module_status",
-                    R"({"Id":22,"Status":"Online","Battery":"56%","Logs":["Received status request","Woke from sleep - incoming traffic","Going to sleep for 30000000ms","Sent requested value","Received read value request"]})"
-                }
-            };
-
-            const auto iter = tmpMap.find(boost::algorithm::to_lower_copy(std::string(value)));
-            std::string result = (iter != tmpMap.end()) ? iter->second.data() : "";
-
-            return result;
-        };
-
-
-        std::string queryResponse;
-
-        bool invalidParamsFlag = false;
-        if (command.params.has_value()) {
-            const auto &params = command.params.value();
-            size_t paramsSize = 0;
-
-            // params must be an array
-            if (params.is_array()) {
-                paramsSize = params.size();
-            } else {
-                invalidParamsFlag = true;
-            }
-
-            // params must have at least a query target
-            if (!invalidParamsFlag && paramsSize > 0 && params[0].is_string()) {
-                // TODO pass query target into target resolver
-                queryResponse = tmpDataGetter(params[0].get<std::string>());
-                // TODO remove - temporary code for API testing
-                commandResult.result = queryResponse;
-            } else {
-                invalidParamsFlag = true;
-            }
-
-            // params might have query conditions object
-            if (!invalidParamsFlag && paramsSize > 1 && params[1].is_object()) {
-                nlohmann::json conditionParam = params[1];
-                // TODO implement condition handler
-
-                // TODO remove - temporary code for API testing
-                auto indx = conditionParam.find("id");
-                if (indx != conditionParam.end()) {
-                    if (conditionParam["id"] == 22) {
-                        nlohmann::json response;
-                        response["id"] = 22;
-                        response["object"] = queryResponse;
-                        commandResult.result = nlohmann::to_string(response);
-                    }
-                }
-            }
-
-            //TODO pass query and condition to coreCachedDataGetter
-        }
-
-        if (invalidParamsFlag || !commandResult.result.has_value()) {
-            commandResult.error = API::ApiError(
-                API::ErrorCodes::INVALID_PARAMS,
-                API::errorCodeToString(API::ErrorCodes::INVALID_PARAMS).data(),
-                "Query failed"
-            );
-        }
-
         co_return commandResult;
     }
 }

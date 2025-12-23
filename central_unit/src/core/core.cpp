@@ -1,6 +1,6 @@
 #include "core.h"
 #include "config_manager/config_manager.h"
-#include "core_actions.h"
+#include "actions/actions.h"
 
 #include <chrono>
 #include <cmath>
@@ -171,7 +171,7 @@ namespace SmartHome {
         auto &ipcServer = IPC::SocketServer::Instance();
         ipcServer.stopAcceptors();
 
-        CoreActions::onCoreShutdown();
+        Actions::onCoreShutdown();
 
         // Start shutdown timeout timer
         auto shutdownTimeout = make_shared<ba::steady_timer>(mCoreUtilityIoContext, ms_SHUTDOWN_TIMEOUT);

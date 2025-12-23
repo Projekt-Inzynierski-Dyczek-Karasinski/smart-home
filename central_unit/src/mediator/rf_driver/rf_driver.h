@@ -31,7 +31,7 @@ namespace SmartHomeMediator {
          * @return Awaitable that completes when write finishes.
          * @throws boost::system::system_error on communication error.
          */
-        virtual ba::awaitable<void> write(const std::vector<uint8_t>& data) = 0;
+        virtual ba::awaitable<void> write(std::vector<uint8_t> data) = 0;
 
         /**
          * @brief Read data from RF module in transparent mode.
@@ -48,7 +48,7 @@ namespace SmartHomeMediator {
          * @param value Option value as string.
          * @return Awaitable with true on success, false on failure.
          */
-        virtual ba::awaitable<bool> setOption(std::string_view option, std::string_view value) = 0;
+        virtual ba::awaitable<bool> setOption(std::string option, std::string value) = 0;
 
         /**
          * @brief Get RF module configuration option.
@@ -56,7 +56,7 @@ namespace SmartHomeMediator {
          * @param option Option name.
          * @return Awaitable with option value, or empty string on error.
          */
-        virtual ba::awaitable<std::vector<uint8_t>> getOption(std::string_view option) = 0;
+        virtual ba::awaitable<std::vector<uint8_t>> getOption(std::string option) = 0;
 
         /**
          * @brief Get all RF module configuration options.

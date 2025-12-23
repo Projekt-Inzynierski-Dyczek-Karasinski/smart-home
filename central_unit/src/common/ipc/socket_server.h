@@ -7,6 +7,7 @@
 #include <utility>
 #include <unordered_map>
 #include <mutex>
+#include <unordered_set>
 
 #include <boost/asio.hpp>
 
@@ -126,6 +127,14 @@ namespace SmartHome::IPC {
          * @return Shared pointer to SocketServerConnection instance.
          */
         std::shared_ptr<SocketServerConnection> getConnection(connectionId_t connectionId);
+
+
+        /**
+         * TODO !pr
+         *
+         * @return
+         */
+        std::unordered_set<connectionId_t> getActiveConnections();
 
         /**
          * @brief IO context getter.

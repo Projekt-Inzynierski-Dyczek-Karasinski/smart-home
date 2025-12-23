@@ -1,6 +1,6 @@
 #include "internal_api.h"
 #include "../core.h"
-#include "../core_actions.h"
+#include "../actions/actions.h"
 
 #include <unordered_map>
 
@@ -154,7 +154,8 @@ namespace SmartHome::API {
         std::string_view messageView(message);
 
 
-        //TODO !pr check if response is incoming: if not continue with request parseing
+        // TODO !pr check if response is incoming: if not continue with request parsing
+        // TODO !pr handle incoming response
 
         Request requestStruct = {
             .connectionId = connectionId,
@@ -234,13 +235,14 @@ namespace SmartHome::API {
         }
 
         logger->debug("[INTERNAL_API] handler call");
-        CoreActions::handleIncomingRequest(requestStruct, [this](const connectionId_t id, std::string &&response) {
+        Actions::handleIncomingRequest(requestStruct, [this](const connectionId_t id, std::string &&response) {
             handleOutgoing(id, std::move(response));
         });
     }
 
     void InternalApi::handleOutgoing(const apiId_t connectionId, std::string &&message) {
         Core::Instance().mpLogger->debug("[INTERNAL_API] handle outgoing called");
+        Core::Instance().mpLogger->debug("[INTERNAL_API] outgoing: " + message);
         ba::post(*IPC::SocketServer::Instance().getIoContext(), [connectionId, message = std::string(message)] {
             auto &socketServer = IPC::SocketServer::Instance();
             if (!socketServer.isRunning()) return;

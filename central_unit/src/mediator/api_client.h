@@ -12,21 +12,25 @@ namespace su = SmartHome::Utils;
 namespace sa = SmartHome::API;
 
 namespace SmartHomeMediator {
-    class ApiClient : public sa::Api {
+    class ApiClient final : public sa::Api {
     public:
         explicit ApiClient(ba::io_context *io_context, const std::shared_ptr<su::Logger> &logger);
 
-        ~ApiClient();
+        ~ApiClient() override;
 
         bool connectToServer(std::string_view udsPath);
 
         bool connectToServer(std::string_view ipAddress, int port);
 
-        void run(const std::function<void(const std::string &message)> &handleMessage);
+        void initialize(const std::function<void(const std::string &message)> &messageHandler);
 
         void handleOutgoing(SmartHome::connectionId_t connectionId, std::string &&message) override;
 
+        void handleIncoming(SmartHome::connectionId_t connectionId, std::string &&message) override;
+
     private:
+        bool handshake();
+
         void startReceiving();
 
         void send(std::string_view message);

@@ -261,12 +261,15 @@ namespace SmartHome::API {
                     JsonRpcStrings::Constants::VERSION.data());
             throw std::invalid_argument(errorMessage);
         }
-        if (!(json.contains(JsonRpcStrings::Keys::ID) && !json[JsonRpcStrings::Keys::ID].get<std::string>().empty())) {
+        if (!json.contains(JsonRpcStrings::Keys::ID)) {
             throw std::invalid_argument("Invalid JSON-RPC request: response must contain id");
         }
 
-        if (json.contains(JsonRpcStrings::ResponseKeys::RESULT) && !json.contains(JsonRpcStrings::ResponseKeys::ERROR))
-            result = json[JsonRpcStrings::ResponseKeys::RESULT];
+        if (json.contains(JsonRpcStrings::ResponseKeys::RESULT) && !json.contains(JsonRpcStrings::ResponseKeys::ERROR)) {
+            auto &jsonResult = json[JsonRpcStrings::ResponseKeys::RESULT];
+            if (jsonResult.is_string()) result = jsonResult.get<std::string>();
+            else result = jsonResult.dump();
+        }
         else if (json.contains(JsonRpcStrings::ResponseKeys::ERROR) && !json.contains(
                      JsonRpcStrings::ResponseKeys::RESULT))
             error.emplace(

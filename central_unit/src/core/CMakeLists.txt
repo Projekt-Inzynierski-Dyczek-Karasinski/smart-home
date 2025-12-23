@@ -17,8 +17,10 @@ endif ()
 add_executable(smarthomed
         main.cpp
         core.cpp
-        core_actions.cpp
         api/internal_api.cpp
+        actions/actions.cpp
+        actions/core_actions.cpp
+        actions/mediator_actions.cpp
 )
 
 
