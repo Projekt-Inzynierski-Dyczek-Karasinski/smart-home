@@ -185,6 +185,11 @@ namespace Comms {
                 uah::printArrayAsInt(receivedMessage, MESSAGE_SIZE);
 
                 try {
+                    const uint32_t resUid = receivedCommand->getParameterValue<uint32_t>(0);
+                    mpLogger->infov("MessageDecider TEST", "uid: ", (int)resUid);
+                } catch (...) {}
+
+                try {
                     const uint8_t batteryRead = receivedCommand->getParameterValue<uint8_t>(1);
                     mpLogger->infov("MessageDecider TEST", "Battery read %: ", batteryRead);
                 } catch (...) {}
@@ -305,7 +310,11 @@ namespace Comms {
                 }
 
                 using GT = API::getTypes;
+                auto & sensorManager = ums::Transducers::SensorsManager::getInstance(mpLogger);
                 switch (getType.value()) {
+                    case (uint8_t)GT::SENSOR_VALUE_WITH_FORCE_NEW_READING:
+                        mpLogger->verbose("MessageDecider CT::GET", "CT::SENSOR_VALUE_WITH_FORCE_NEW_READING");
+                        sensorManager.clearCachedReadings();
                     case (uint8_t)GT::SENSOR_VALUE: {
                         mpLogger->verbose("MessageDecider CT::GET", "CT::SENSOR_VALUE");
                         std::optional<uint8_t> sensorId;
@@ -324,7 +333,6 @@ namespace Comms {
                             break;
                         }
 
-                        auto & sensorManager = ums::Transducers::SensorsManager::getInstance(mpLogger);
                         try {
                             sendCommand->addParameter(API::APIParameter(uid.value()));
                             for (const auto& param : sensorManager.getSensorReading(sensorId.value()))

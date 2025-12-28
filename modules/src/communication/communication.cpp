@@ -713,7 +713,10 @@ namespace Comms {
                             if (getType.value() == (uint8_t)API::getTypes::BATTERY_STATE) {
                                 constexpr uint8_t BATTERY_ID = 1;
                                 ch.addParameter(API::APIParameter(BATTERY_ID));
-                            } else if (getType.value() == (uint8_t)API::getTypes::SENSOR_VALUE) {
+                            } else if (
+                                getType.value() == (uint8_t)API::getTypes::SENSOR_VALUE ||
+                                getType.value() == (uint8_t)API::getTypes::SENSOR_VALUE_WITH_FORCE_NEW_READING
+                            ) {
                                 std::optional<uint8_t> sensorId;
                                 try {
                                     sensorId = std::stoi((char*)&buffer[6]);

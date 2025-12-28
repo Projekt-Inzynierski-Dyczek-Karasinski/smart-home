@@ -19,7 +19,8 @@ namespace Comms::API {
         CONFIG_VALUE = 2,
         SENSOR_LIST = 3,
         LOGS = 4,
-        BATTERY_STATE = 5
+        BATTERY_STATE = 5,
+        SENSOR_VALUE_WITH_FORCE_NEW_READING = 6
     };
 
     enum class commandTypes : uint8_t {
