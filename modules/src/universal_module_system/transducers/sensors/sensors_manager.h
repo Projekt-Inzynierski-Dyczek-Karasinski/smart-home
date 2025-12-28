@@ -48,6 +48,12 @@ namespace UniversalModuleSystem::Transducers {
          */
         void clearCachedReadings();
 
+        /**
+         * @brief Get sensors IDs.
+         * @return Sensors IDs.
+         */
+        std::vector<API::APIParameterVariant> getSensorsIds() const;
+
     private:
         /**
          * @brief Get a reading of sensor.

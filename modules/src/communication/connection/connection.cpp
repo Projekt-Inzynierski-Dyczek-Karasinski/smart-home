@@ -54,7 +54,7 @@ namespace Comms {
             case CME::TEST_GET: {
                 auto &sensorManager = ums::Transducers::SensorsManager::getInstance(mpLogger);
 
-                uah::prepareBuffer(sendBuffer,  CM::s_CONNECTION_RE_TEST_GET, MESSAGE_SIZE);
+                uah::prepareBuffer(sendBuffer, CM::s_CONNECTION_RE_TEST_GET, MESSAGE_SIZE);
                 mpCommunication->sendMessage(sendBuffer);
                 break;
             }
@@ -170,10 +170,6 @@ namespace Comms {
             return;
         }
 
-        //TODO !pr remove
-        using CM = ConnectionMessages;
-        using CME = ConnectionMessages::MessagesEnum;
-
         std::optional<API::CommandHandler> sendCommand;
         std::optional<uint32_t> uid;
         bool isDeepSleep = false;
@@ -181,13 +177,18 @@ namespace Comms {
         switch (receivedCommand->getCommandType()) {
             // TODO !pr move RESPONSE to group below
             case CT::RESPONSE: {
-                mpLogger->info("MessageDecider TEST", "response: ");
+                mpLogger->infov(
+                    "MessageDecider TEST",
+                    "response with num of parameters: ",
+                    receivedCommand->getNumberOfParameters()
+                );
                 uah::printArrayAsInt(receivedMessage, MESSAGE_SIZE);
 
                 try {
                     const uint32_t resUid = receivedCommand->getParameterValue<uint32_t>(0);
-                    mpLogger->infov("MessageDecider TEST", "uid: ", (int)resUid);
-                } catch (...) {}
+                    mpLogger->infov("MessageDecider TEST", "uid: ", (int) resUid);
+                } catch (...) {
+                }
 
                 try {
                     const uint8_t batteryRead = receivedCommand->getParameterValue<uint8_t>(1);
@@ -198,16 +199,17 @@ namespace Comms {
                     const float humidity = receivedCommand->getParameterValue<float>(1);
                     const float pressure = receivedCommand->getParameterValue<float>(2);
                     const float temperature = receivedCommand->getParameterValue<float>(3);
-                    mpLogger->infov("MessageDecider TEST", "humidity: ", (int)(humidity));
-                    mpLogger->infov("MessageDecider TEST", "pressure: ", (int)(pressure));
-                    mpLogger->infov("MessageDecider TEST", "temperature: ", (int)(temperature));
+                    mpLogger->infov("MessageDecider TEST", "humidity: ", (int) (humidity));
+                    mpLogger->infov("MessageDecider TEST", "pressure: ", (int) (pressure));
+                    mpLogger->infov("MessageDecider TEST", "temperature: ", (int) (temperature));
                 } catch (...) {
                     try {
                         const float humidity = receivedCommand->getParameterValue<float>(1);
                         const float temperature = receivedCommand->getParameterValue<float>(2);
-                        mpLogger->infov("MessageDecider TEST", "humidity: ", (int)(humidity));
-                        mpLogger->infov("MessageDecider TEST", "temperature: ", (int)(temperature));
-                    } catch (...) {}
+                        mpLogger->infov("MessageDecider TEST", "humidity: ", (int) (humidity));
+                        mpLogger->infov("MessageDecider TEST", "temperature: ", (int) (temperature));
+                    } catch (...) {
+                    }
                 }
 
 
@@ -310,12 +312,12 @@ namespace Comms {
                 }
 
                 using GT = API::getTypes;
-                auto & sensorManager = ums::Transducers::SensorsManager::getInstance(mpLogger);
+                auto &sensorManager = ums::Transducers::SensorsManager::getInstance(mpLogger);
                 switch (getType.value()) {
-                    case (uint8_t)GT::SENSOR_VALUE_WITH_FORCE_NEW_READING:
+                    case (uint8_t) GT::SENSOR_VALUE_WITH_FORCE_NEW_READING:
                         mpLogger->verbose("MessageDecider CT::GET", "CT::SENSOR_VALUE_WITH_FORCE_NEW_READING");
                         sensorManager.clearCachedReadings();
-                    case (uint8_t)GT::SENSOR_VALUE: {
+                    case (uint8_t) GT::SENSOR_VALUE: {
                         mpLogger->verbose("MessageDecider CT::GET", "CT::SENSOR_VALUE");
                         std::optional<uint8_t> sensorId;
                         try {
@@ -335,7 +337,7 @@ namespace Comms {
 
                         try {
                             sendCommand->addParameter(API::APIParameter(uid.value()));
-                            for (const auto& param : sensorManager.getSensorReading(sensorId.value()))
+                            for (const auto &param: sensorManager.getSensorReading(sensorId.value()))
                                 sendCommand->addParameter(param);
                         } catch (std::exception &e) {
                             sendCommand.reset();
@@ -345,31 +347,47 @@ namespace Comms {
                         break;
                     }
 
-                    case (uint8_t)GT::CONFIG_VALUE: {
+                    case (uint8_t) GT::CONFIG_VALUE: {
                         mpLogger->verbose("MessageDecider CT::GET", "CT::CONFIG_VALUE");
 
                         responseWithError(sendCommand, ET::NOT_IMPLEMENTED, uid);
                         break;
                     }
 
-                    case (uint8_t)GT::SENSOR_LIST: {
+                    case (uint8_t) GT::SENSOR_LIST: {
                         mpLogger->verbose("MessageDecider CT::GET", "CT::SENSOR_LIST");
 
-                        responseWithError(sendCommand, ET::NOT_IMPLEMENTED, uid);
+                        try {
+                            sendCommand.emplace(CT::RESPONSE);
+                        } catch (std::exception &e) {
+                            mpLogger->error("MessageDecider GT::SENSOR_LIST", e.what());
+                            responseWithError(sendCommand, ET::INTERNAL_ERROR, uid);
+                            break;
+                        }
+
+                        try {
+                            sendCommand->addParameter(API::APIParameter(uid.value()));
+                            for (const auto &param: sensorManager.getSensorsIds())
+                                sendCommand->addParameter(param);
+                        } catch (std::exception &e) {
+                            sendCommand.reset();
+                            mpLogger->error("MessageDecider GT::SENSOR_LIST", e.what());
+                            responseWithError(sendCommand, ET::INTERNAL_ERROR, uid);
+                            break;
+                        }
                         break;
                     }
 
-                    case (uint8_t)GT::LOGS: {
+                    case (uint8_t) GT::LOGS: {
                         mpLogger->verbose("MessageDecider CT::GET", "CT::LOGS");
                         responseWithError(sendCommand, ET::NOT_IMPLEMENTED, uid);
                         break;
                     }
 
-                    // TESTME errors
-                    case (uint8_t)GT::BATTERY_STATE: {
+                    case (uint8_t) GT::BATTERY_STATE: {
                         constexpr uint8_t BATTERY_SENSOR_ID = 1;
                         mpLogger->verbose("MessageDecider CT::GET", "CT::BATTERY_STATE");
-                        auto & sensorManager = ums::Transducers::SensorsManager::getInstance(mpLogger);
+                        auto &sensorManager = ums::Transducers::SensorsManager::getInstance(mpLogger);
 
                         try {
                             sendCommand.emplace(CT::RESPONSE);
@@ -378,10 +396,10 @@ namespace Comms {
                             mpLogger->error("MessageDecider GT::BATTERY_STATE", e.what());
                             break;
                         }
-                        
+
                         try {
                             sendCommand->addParameter(API::APIParameter(uid.value()));
-                            for (const auto& param : sensorManager.getSensorReading(BATTERY_SENSOR_ID))
+                            for (const auto &param: sensorManager.getSensorReading(BATTERY_SENSOR_ID))
                                 sendCommand->addParameter(param);
                         } catch (std::exception &e) {
                             sendCommand.reset();
@@ -391,7 +409,7 @@ namespace Comms {
                         break;
                     }
 
-                    default:  {
+                    default: {
                         mpLogger->errorv("MessageDecider CT::GET", "Got unknown get type: ", getType.value());
                         responseWithError(sendCommand, ET::BAD_ARGUMENT, uid);
                         break;
@@ -428,7 +446,7 @@ namespace Comms {
                 mpLogger->errorv(
                     "Connection messageDecider",
                     "Received unknown command type: ",
-                    (int)receivedCommand->getCommandType()
+                    (int) receivedCommand->getCommandType()
                 );
                 responseWithError(sendCommand, ET::UNKNOWN_COMMAND, uid);
                 break;
@@ -445,7 +463,8 @@ namespace Comms {
         }
     }
 
-    void Connection::responseWithError(std::optional<API::CommandHandler> &responseCommand, API::errorTypes errorType, const std::optional<uint32_t> uid) const {
+    void Connection::responseWithError(std::optional<API::CommandHandler> &responseCommand, API::errorTypes errorType,
+                                       const std::optional<uint32_t> uid) const {
         using CT = API::commandTypes;
         if (!uid.has_value()) {
             try {
@@ -455,7 +474,7 @@ namespace Comms {
                 responseCommand.reset();
                 mpLogger->error("Connection messageDecider", e.what());
             }
-           return;
+            return;
         }
 
         try {

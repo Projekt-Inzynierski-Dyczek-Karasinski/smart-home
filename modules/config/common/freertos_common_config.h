@@ -11,6 +11,7 @@
 #define SMALL_TASK_SIZE 1024 // 1kB
 #define MEDIUM_TASK_SIZE 2048 // 2kB
 #define BIG_TASK_SIZE 4096 // 4kB
+#define HUGE_TASK_SIZE 8192 // 8kB
 // #define TESTING_TASK_SIZE 10000 // 10000B round number for easy calculations - only for testing
 
 // DebugLED
@@ -24,7 +25,7 @@
 #define COMMUNICATION_MAIN_TASK_SIZE    BIG_TASK_SIZE
 #define ENCODE_TASK_SIZE                MEDIUM_TASK_SIZE
 #define DECODE_TASK_SIZE                BIG_TASK_SIZE
-#define TERMINAL_INPUT_TASK_SIZE        BIG_TASK_SIZE
+#define TERMINAL_INPUT_TASK_SIZE        HUGE_TASK_SIZE
 
 // HC12
 #define HC12_MAIN_TASK_SIZE     MEDIUM_TASK_SIZE

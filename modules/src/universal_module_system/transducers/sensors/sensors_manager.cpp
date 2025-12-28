@@ -85,6 +85,24 @@ namespace UniversalModuleSystem::Transducers {
         xSemaphoreGive(mSensorMutex);
     }
 
+    std::vector<API::APIParameterVariant> SensorsManager::getSensorsIds() const {
+        using ET = API::errorTypes;
+
+        const auto &dataManager = DataManager::getInstance();
+        nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
+        nl::json &sensorData = jsonData[ms_ALL_SENSORS_DATA][ms_SENSORS_ARRAY];
+        if (jsonData.empty())
+            return std::vector<API::APIParameterVariant>{API::APIParameter((uint8_t) ET::INTERNAL_ERROR, true)};
+
+
+        std::vector<API::APIParameterVariant> result;
+        result.reserve(sensorData.size());
+        for (auto &jsonSensor : sensorData) {
+            result.emplace_back(API::APIParameter<uint8_t>(jsonSensor[ms_SENSOR_DATA][ms_SENSOR_ID].get<uint8_t>()));
+        }
+        return result;
+    }
+
     std::vector<API::APIParameterVariant> SensorsManager::getSensorCurrentReading(const uint8_t sensorId) {
         using ET = API::errorTypes;
         mpLogger->debug("SensorsManager", "getSensorCurrentReading");
