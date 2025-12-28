@@ -1,20 +1,23 @@
 #include "light_sensor.h"
 
 namespace UniversalModuleSystem::Transducers {
-    LightSensor::LightSensor(const std::shared_ptr<ul::Logger> &logger) : Sensor(logger) {
-    }
+    LightSensor::LightSensor(const std::shared_ptr<ul::Logger> &logger) : Sensor(logger) {}
 
-    std::vector<API::APIParameterVariant> LightSensor::getApiFormattedReading() {
+    void LightSensor::waitUntilReadingEnds() {
         xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
         xSemaphoreGive(mReadingCompleteSemaphore);
         // if reading was newer started
-        if (mLightPercentage.load() == 0) {
+        if (mLightPercentage.load() == -1) {
             startReading();
             xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
             xSemaphoreGive(mReadingCompleteSemaphore);
         }
+    }
 
-        return std::vector<API::APIParameterVariant> {API::APIParameter(mLightPercentage.load())};
+    std::vector<API::APIParameterVariant> LightSensor::getApiFormattedReading() {
+        waitUntilReadingEnds();
+
+        return std::vector<API::APIParameterVariant> {API::APIParameter((uint8_t)mLightPercentage.load())};
     }
 
     void LightSensor::startReading() {
@@ -30,7 +33,7 @@ namespace UniversalModuleSystem::Transducers {
         );
     }
 
-    uint8_t LightSensor::calculateLightPercentage(const uint16_t rawReading) {
+    int8_t LightSensor::calculateLightPercentage(const uint16_t rawReading) {
         constexpr uint16_t MAX_ANALOG_READ = 4096;
 
         // uint32_t to not exceed overflow in calculations
@@ -38,7 +41,7 @@ namespace UniversalModuleSystem::Transducers {
         result *= 100;
         result /= MAX_ANALOG_READ;
 
-        return (uint8_t) result;
+        return (int8_t) result;
     }
 
 
@@ -50,8 +53,6 @@ namespace UniversalModuleSystem::Transducers {
 
         xSemaphoreTake(ls.mSensorDataMutex, portMAX_DELAY);
 
-        ls.mpLogger->errorv("LightSensor test", "read: ", ls.mCommonSensorData.readPin);
-
         for (uint8_t i = 0; i < NUMBER_OF_READS; i++) {
             vTaskDelay(pdMS_TO_TICKS(TIME_BETWEEN_READS));
             lightReadSum += analogRead(ls.mCommonSensorData.readPin);
@@ -60,7 +61,7 @@ namespace UniversalModuleSystem::Transducers {
         ls.mLightPercentage.store(ls.calculateLightPercentage(lightReadSum / NUMBER_OF_READS));
         xSemaphoreGive(ls.mSensorDataMutex);
 
-        ls.mpLogger->verbosev("LightSensor Task", "Light (%): ", ls.mLightPercentage.load());
+        ls.mpLogger->debugv("LightSensor Task", "Light (%): ", ls.mLightPercentage.load());
         xSemaphoreGive(ls.mReadingCompleteSemaphore);
 
         vTaskDelete(nullptr);

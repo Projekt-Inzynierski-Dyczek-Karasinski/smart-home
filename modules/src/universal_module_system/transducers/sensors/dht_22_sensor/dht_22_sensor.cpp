@@ -5,7 +5,7 @@
 namespace UniversalModuleSystem::Transducers {
     Dht22Sensor::Dht22Sensor(const std::shared_ptr<ul::Logger> &logger) : Sensor(logger) {}
 
-    std::vector<API::APIParameterVariant> Dht22Sensor::getApiFormattedReading() {
+    void Dht22Sensor::waitUntilReadingEnds() {
         xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
         xSemaphoreGive(mReadingCompleteSemaphore);
 
@@ -15,9 +15,13 @@ namespace UniversalModuleSystem::Transducers {
             xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
             xSemaphoreGive(mReadingCompleteSemaphore);
         }
+    }
 
-        mpLogger->verbosev("Dht22Sensor reading", "Humidity (%): ", mHumidity.load());
-        mpLogger->verbosev("Dht22Sensor reading", "Temperature (C): ", mTemperature.load());
+    std::vector<API::APIParameterVariant> Dht22Sensor::getApiFormattedReading() {
+        waitUntilReadingEnds();
+
+        mpLogger->debugv("Dht22Sensor reading", "Humidity (%): ", mHumidity.load());
+        mpLogger->debugv("Dht22Sensor reading", "Temperature (C): ", mTemperature.load());
 
         return std::vector<API::APIParameterVariant> {
             API::APIParameter(mHumidity.load()),
@@ -50,8 +54,10 @@ namespace UniversalModuleSystem::Transducers {
 
         dht.mHumidity.store(dhtLib.readHumidity());
         dht.mTemperature.store(dhtLib.readTemperature());
-        dht.mpLogger->verbosev("Dht22Sensor Read Task", "Humidity: ", (int)(dhtLib.readHumidity()*10));
-        dht.mpLogger->verbosev("Dht22Sensor Read Task", "Temperature: ", (int)(dhtLib.readTemperature()*10));
+
+        dht.mpLogger->debugv("Dht22Sensor Read Task", "Humidity: ", (int)(dhtLib.readHumidity()*10));
+        dht.mpLogger->debugv("Dht22Sensor Read Task", "Temperature: ", (int)(dhtLib.readTemperature()*10));
+
         xSemaphoreGive(dht.mReadingCompleteSemaphore);
 
         vTaskDelete(nullptr);

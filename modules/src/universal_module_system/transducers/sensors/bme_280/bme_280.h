@@ -9,6 +9,13 @@ namespace UniversalModuleSystem::Transducers {
     public:
         explicit BME280(const std::shared_ptr<ul::Logger> &logger);
 
+        /**
+         * @brief Waits until the sensor reading completes.
+         * @details It is used when only waiting for the reading to finish is needed, but not the reading result.
+         * <code>getApiFormattedReading</code> automatically waits for the reading to finish before returning the result.
+         */
+        void waitUntilReadingEnds() override;
+
         std::vector<API::APIParameterVariant> getApiFormattedReading() override;
 
         void startReading() override;

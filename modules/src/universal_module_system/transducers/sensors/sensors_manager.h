@@ -11,6 +11,7 @@
 namespace ul = Utils::Logging;
 namespace API = Comms::API;
 
+// TODO !pr check comments
 namespace UniversalModuleSystem::Transducers {
     /**
      * @brief Singleton manager class that handles sensors.
@@ -35,13 +36,41 @@ namespace UniversalModuleSystem::Transducers {
         SensorsManager& operator = (const SensorsManager&) = delete;
 
         /**
-         * @brief Get a reading of sensor.
+         * @brief Get a reading of sensor. Automatically handles new reading if needed.
          * @param sensorId Sensor ID.
          * @return Reading of the sensor.
          */
         std::vector<API::APIParameterVariant> getSensorReading(uint8_t sensorId);
 
+        /**
+         * @brief Clears cached readings (if caching is disabled, does nothing).
+         * @note Thread-safe.
+         */
+        void clearCachedReadings();
+
     private:
+        /**
+         * @brief Get a reading of sensor.
+         * @details It is used when sensors readings caching is disabled.
+         * @param sensorId Sensor ID.
+         * @return Reading of the sensor.
+         */
+        std::vector<API::APIParameterVariant> getSensorCurrentReading(uint8_t sensorId);
+
+        /**
+         * @brief Get a reading of sensor.
+         * @details It is used when sensors readings caching is enabled.
+         * @param sensorId Sensor ID.
+         * @return Reading of the sensor.
+         */
+        std::vector<API::APIParameterVariant> getSensorCachedReading(uint8_t sensorId);
+
+        /**
+         * @brief Creates sensors instances, starts their readings and starts mSensorTimeoutTimer.
+         * @warning <b>Not thread-safe</b>. Must be protected externally with <code>mSensorMutex</code> before calling.
+         */
+        void readAllSensors();
+
         /**
          * @brief Factory method to create a sensor instance from its type name.
          * @details When adding new sensor derived class, add here case for it.
@@ -97,11 +126,28 @@ namespace UniversalModuleSystem::Transducers {
         explicit SensorsManager(const std::shared_ptr<ul::Logger> &logger);
 
         /**
-         * @brief Private destructor for singleton pattern
+         * @brief Private destructor for singleton pattern.
          */
-        ~SensorsManager() = default;
+        ~SensorsManager();
+
+        /**
+         * @brief Clears readings of sensors.
+         * @param xTimer Handle to the expired FreeRTOS timer.
+         * @note Thread-safe.
+         */
+        static void sensorTimeoutTimerCallback(TimerHandle_t xTimer);
+
+        std::vector<std::unique_ptr<Sensor>> mSensors;
 
         std::shared_ptr<ul::Logger> mpLogger;
+
+        SemaphoreHandle_t mSensorMutex = nullptr;
+        TimerHandle_t mSensorTimeoutTimer = nullptr;
+
+        uint8_t mSensorsPowerPin;
+
+        // TODO assign final value
+        static constexpr uint16_t ms_DELAY_AFTER_POWERING_ON_SENSORS = 100; // ms
 
         // JSON keys
         static constexpr char ms_SENSORS_ARRAY[] = "sensors";
@@ -110,5 +156,6 @@ namespace UniversalModuleSystem::Transducers {
         static constexpr char ms_POWER_PIN[] = "powerPin";
         static constexpr char ms_SENSOR_DATA[] = "data";
         static constexpr char ms_SENSOR_ID[] = "id";
+        static constexpr char ms_SENSORS_READINGS_TIMEOUT[] = "readingsTimeout";
     };
 }

@@ -5,7 +5,7 @@
 
 // Logger
 #ifndef TERMINAL_BAUD_RATE
-    #define TERMINAL_BAUD_RATE 9600
+    #define TERMINAL_BAUD_RATE 115200
 #endif
 
 #ifndef LOGGING_LEVEL

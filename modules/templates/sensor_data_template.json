@@ -1,6 +1,7 @@
 {
   "sensorsData": {
     "powerPin": 13,
+    "readingsTimeout": 60000,
     "sensors": [
       {
         "type": "batterySensor",

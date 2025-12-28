@@ -9,7 +9,7 @@
 namespace UniversalModuleSystem::Transducers {
     BME280::BME280(const std::shared_ptr<ul::Logger> &logger) : Sensor(logger) {}
 
-    std::vector<API::APIParameterVariant> BME280::getApiFormattedReading() {
+    void BME280::waitUntilReadingEnds() {
         xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
         xSemaphoreGive(mReadingCompleteSemaphore);
 
@@ -19,6 +19,10 @@ namespace UniversalModuleSystem::Transducers {
             xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
             xSemaphoreGive(mReadingCompleteSemaphore);
         }
+    }
+
+    std::vector<API::APIParameterVariant> BME280::getApiFormattedReading() {
+        waitUntilReadingEnds();
 
         // if sensor is not responding
         if (mHumidity.load() == FLT_MAX && mTemperature.load() == 0 && mPressure.load() == 0) {
@@ -27,9 +31,9 @@ namespace UniversalModuleSystem::Transducers {
             };
         }
 
-        mpLogger->verbosev("BME280 reading", "Humidity (%): ", mHumidity.load());
-        mpLogger->verbosev("BME280 reading", "Temperature (C): ", mTemperature.load());
-        mpLogger->verbosev("BME280 reading", "Pressure (hPa): ", mPressure.load());
+        mpLogger->debugv("BME280 reading", "Humidity (%): ", mHumidity.load());
+        mpLogger->debugv("BME280 reading", "Temperature (C): ", mTemperature.load());
+        mpLogger->debugv("BME280 reading", "Pressure (hPa): ", mPressure.load());
 
         return std::vector<API::APIParameterVariant> {
             API::APIParameter(mHumidity.load()),
@@ -69,15 +73,21 @@ namespace UniversalModuleSystem::Transducers {
             vTaskDelete(nullptr);
         }
 
-        bme.mHumidity.store(bme280.readHumidity());
-        bme.mPressure.store(bme280.readPressure() / 100.0F);
-        bme.mTemperature.store(bme280.readTemperature());
+        const float humidity = bme280.readHumidity();
+        const float pressure = bme280.readPressure() / 100.0F;
+        const float temperature = bme280.readTemperature();
+
+        bme.mHumidity.store(humidity);
+        bme.mPressure.store(pressure);
+        bme.mTemperature.store(temperature);
         xSemaphoreGive(bme.mReadingCompleteSemaphore);
 
-        bme.mpLogger->verbosev("BME280 Read Task", "Humidity:    ",bme.mHumidity.load());
-        bme.mpLogger->verbosev("BME280 Read Task", "Pressure:    ",bme.mPressure.load());
-        bme.mpLogger->verbosev("BME280 Read Task", "Temperature: ",bme.mTemperature.load());
+        bme.mpLogger->debugv("BME280 Read Task", "Humidity:    ", (int)humidity);
+        bme.mpLogger->debugv("BME280 Read Task", "Pressure:    ", (int)pressure);
+        bme.mpLogger->debugv("BME280 Read Task", "Temperature: ", (int)temperature);
+        wire.end();
 
+        vTaskDelay(pdMS_TO_TICKS(10)); // delay for logger
         vTaskDelete(nullptr);
     }
 

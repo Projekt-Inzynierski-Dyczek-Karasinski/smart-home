@@ -37,7 +37,15 @@ namespace UniversalModuleSystem::Transducers {
          */
         virtual void startReading() = 0;
 
-        // TODO !pr make pure virtual
+        /**
+         * @brief Waits until the sensor reading completes.
+         * @details It is used when only waiting for the reading to finish is needed, but not the reading result.
+         * <code>getApiFormattedReading</code> automatically waits for the reading to finish before returning the result.
+         *
+         * @note This method must be implemented by derived class.
+         */
+        virtual void waitUntilReadingEnds() = 0;
+
         /**
          * @brief Get formatted reading (APIParameterVariant).
          * @return Array of readings in API format.
@@ -60,7 +68,6 @@ namespace UniversalModuleSystem::Transducers {
          */
         bool init(const nl::json &jsonData);
 
-
     protected:
         // TODO !pr update comment (now class Sensor implement default)
         /**
@@ -73,7 +80,7 @@ namespace UniversalModuleSystem::Transducers {
          * @warning Do <b>not</b> take <code>mSensorDataMutex</code> inside this method.
          * This method is called in <code>loadData()</code>, where this mutex is already taken.
          */
-        virtual bool loadAdditionalData(const nl::json& jsonData);
+        virtual bool loadAdditionalData(const nl::json &jsonData);
 
         /**
          * @brief Load common sensor parameters from JSON.
@@ -93,7 +100,7 @@ namespace UniversalModuleSystem::Transducers {
              * @brief Construct CommonSensorData from JSON parameters.
              * @param json JSON object with sensor data.
              */
-            explicit CommonSensorData(const nl::json& json);
+            explicit CommonSensorData(const nl::json &json);
 
             CommonSensorData() = default;
 

@@ -3,16 +3,20 @@
 namespace UniversalModuleSystem::Transducers {
     BatterySensorESP32::BatterySensorESP32(const std::shared_ptr<ul::Logger> &logger) : Sensor(logger) {}
 
-    std::vector<API::APIParameterVariant> BatterySensorESP32::getApiFormattedReading() {
+    void BatterySensorESP32::waitUntilReadingEnds() {
         xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
         xSemaphoreGive(mReadingCompleteSemaphore);
         // if reading was newer started
-        if (mBatteryReadPercentage.load() == 0) {
+        if (mBatteryReadPercentage.load() == -1) {
             startReading();
             xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
             xSemaphoreGive(mReadingCompleteSemaphore);
         }
-        return std::vector<API::APIParameterVariant> {API::APIParameter(mBatteryReadPercentage.load())};;
+    }
+
+    std::vector<API::APIParameterVariant> BatterySensorESP32::getApiFormattedReading() {
+        waitUntilReadingEnds();
+        return std::vector<API::APIParameterVariant> {API::APIParameter((uint8_t)mBatteryReadPercentage.load())};;
     }
 
     void BatterySensorESP32::startReading() {
@@ -41,7 +45,7 @@ namespace UniversalModuleSystem::Transducers {
         return (uint16_t)result;
     }
 
-    uint8_t BatterySensorESP32::calculateBatteryChargePercentage(const uint16_t outputVoltage) const {
+    int8_t BatterySensorESP32::calculateBatteryChargePercentage(const uint16_t outputVoltage) const {
         if (outputVoltage <= mAdditionalData.minVoltage) return 0;
         if (outputVoltage >= mAdditionalData.maxVoltage) return 100;
 
@@ -50,7 +54,7 @@ namespace UniversalModuleSystem::Transducers {
         result *= 100;
         result /= (mAdditionalData.maxVoltage - mAdditionalData.minVoltage);
 
-        return (uint8_t)result;
+        return (int8_t)result;
     }
 
 
@@ -71,8 +75,8 @@ namespace UniversalModuleSystem::Transducers {
         bs.mBatteryReadPercentage.store(bs.calculateBatteryChargePercentage(batteryVoltage));
         xSemaphoreGive(bs.mSensorDataMutex);
 
-        bs.mpLogger->verbosev("BatterySensorESP32 Task", "Battery charge level is (mV): ", batteryVoltage);
-        bs.mpLogger->verbosev("BatterySensorESP32 Task", "Battery charge level is (%): ", bs.mBatteryReadPercentage.load());
+        bs.mpLogger->debugv("BatterySensorESP32 Task", "Battery charge level is (mV): ", batteryVoltage);
+        bs.mpLogger->debugv("BatterySensorESP32 Task", "Battery charge level is (%): ", bs.mBatteryReadPercentage.load());
         xSemaphoreGive(bs.mReadingCompleteSemaphore);
 
         vTaskDelete(nullptr);

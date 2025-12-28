@@ -247,7 +247,7 @@ namespace Utils {
             static xSemaphoreHandle smSerialMutex; ///< Static handle to FreeRTOS mutex protecting changing settings of Serial and printing.
             static bool smIsSerialEnabled; ///< Static flag ensuring that <code>Serial.begin()</code> is called only once.
 
-            std::atomic<Level> mLogLevel{Level::NONE}; ///< Currently set logging level.
+            Level mLogLevel = Level::NONE; ///< Currently set logging level.
 
             const size_t m_LOG_TYPE_LENGTH = 10;
             char mInputBuffer[MESSAGE_SIZE]{};

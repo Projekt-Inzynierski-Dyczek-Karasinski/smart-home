@@ -22,6 +22,13 @@ namespace UniversalModuleSystem::Transducers {
         explicit BatterySensorESP32(const std::shared_ptr<ul::Logger> &logger);
 
         /**
+         * @brief Waits until the sensor reading completes.
+         * @details It is used when only waiting for the reading to finish is needed, but not the reading result.
+         * <code>getApiFormattedReading</code> automatically waits for the reading to finish before returning the result.
+         */
+        void waitUntilReadingEnds() override;
+
+        /**
          * @brief Get battery percentage reading.
          * @return Battery voltage.
          *
@@ -71,7 +78,7 @@ namespace UniversalModuleSystem::Transducers {
          * @param outputVoltage Battery output voltage in mV.
          * @return The battery charge percentage.
          */
-        uint8_t calculateBatteryChargePercentage(uint16_t outputVoltage) const;
+        int8_t calculateBatteryChargePercentage(uint16_t outputVoltage) const;
 
         /**
          * @brief Structure holding specific data to BatterySensorESP32.
@@ -101,6 +108,6 @@ namespace UniversalModuleSystem::Transducers {
         };
 
         AdditionalData mAdditionalData{};
-        std::atomic<uint8_t> mBatteryReadPercentage{0};
+        std::atomic<int8_t> mBatteryReadPercentage{-1};
     };
 }

@@ -12,6 +12,13 @@ namespace UniversalModuleSystem::Transducers {
         explicit LightSensor(const std::shared_ptr<ul::Logger> &logger);
 
         /**
+         * @brief Waits until the sensor reading completes.
+         * @details It is used when only waiting for the reading to finish is needed, but not the reading result.
+         * <code>getApiFormattedReading</code> automatically waits for the reading to finish before returning the result.
+         */
+        void waitUntilReadingEnds() override;
+
+        /**
          * @brief Get the sensor reading.
          * @return Sensor reading.
          *
@@ -27,7 +34,7 @@ namespace UniversalModuleSystem::Transducers {
         void startReading() override;
 
     private:
-        uint8_t calculateLightPercentage(uint16_t rawReading);
+        int8_t calculateLightPercentage(uint16_t rawReading);
 
         /**
         * @brief FreeRTOS task function to perform photoresistor ADC readings.
@@ -39,6 +46,6 @@ namespace UniversalModuleSystem::Transducers {
         */
         static void lightReadTask(void *parameters);
 
-        std::atomic<uint8_t> mLightPercentage{0};
+        std::atomic<int8_t> mLightPercentage{-1};
     };
 }
