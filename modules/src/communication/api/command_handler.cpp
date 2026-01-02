@@ -12,7 +12,7 @@ namespace Comms::API {
             mCommandParameters.push_back(
             createAPIParameterVariant(sbp, &message[messageOffset])
             );
-            mParametersSpecialBytes.push_back(SpecialByteParameter(message[messageOffset]));
+            mParametersSpecialBytes.emplace_back(message[messageOffset]);
 
             messageOffset += sbp.getLength() + 1;
         }
@@ -54,7 +54,6 @@ namespace Comms::API {
         calculateSpecialByteCommand();
     }
 
-
     void CommandHandler::generateMessage(uint8_t *messageOutput) {
         calculateSpecialByteCommand();
         messageOutput[ms_SPECIAL_BYTE_INDEX] = mSpecialByteCommand.getSpecialByte();
@@ -69,7 +68,7 @@ namespace Comms::API {
     }
 
     APIParameterVariant CommandHandler::getParameter(const uint8_t index) const {
-        if (index >= getNumberOfParameters()) throw std::invalid_argument("Index too big.");
+        if (index >= getNumberOfParameters()) throw std::invalid_argument("Index is out of range.");
         return mCommandParameters[index];
     }
 

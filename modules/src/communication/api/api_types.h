@@ -1,9 +1,7 @@
 #pragma once
 
-#include <cstdint>
+#include <Arduino.h>
 #include <variant>
-
-// TODO !pr add comments for API
 
 namespace Comms::API {
     enum class errorTypes : uint8_t {

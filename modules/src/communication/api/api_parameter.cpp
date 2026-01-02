@@ -110,6 +110,8 @@ namespace Comms::API {
 
     template<typename T>
     APIParameter<T *>::APIParameter(const T *parameter, const size_t length) {
+        if (length > 15) throw std::length_error("length too big");
+
         mBytesRepresentation.reserve(length + 1);
         mBytesRepresentation.push_back(SpecialByteParameter(parameter, length).getSpecialByte());
 
