@@ -3,6 +3,8 @@
 #include <cstdint>
 #include <variant>
 
+// TODO !pr add comments for API
+
 namespace Comms::API {
     enum class errorTypes : uint8_t {
         UNKNOWN = 0,
@@ -63,8 +65,6 @@ namespace Comms::API {
         double,
         const char*,
         const uint8_t*
-        // const char*, // TODO !pr remove?
-        // const uint8_t*
     >;
 
     enum class ParameterVariantEnum : uint8_t {

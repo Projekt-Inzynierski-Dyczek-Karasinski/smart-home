@@ -37,11 +37,6 @@ namespace Comms {
         taskEXIT_CRITICAL(&mCriticalSectionMutex);
     }
 
-    void Communication::startPinging() const {
-        constexpr uint8_t notificationValue = START_PINGING_NOTIF;
-        xQueueSend(mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
-    }
-
     void Communication::addByteToDecode(const uint8_t data) const {
         xQueueSend(mReceiveByteQueue, &data, portMAX_DELAY);
         vTaskResume(mDecodeMessageTaskHandle);
@@ -162,25 +157,11 @@ namespace Comms {
     void Communication::receivedMessageDecider(bool *isReadingRawMessage) {
         uint8_t buffer[MESSAGE_SIZE];
 
-        // TODO consider changing if else statements to switch case
         if (xQueueReceive(mReceiveMessageQueue, buffer, 0) == pdTRUE) {
-            // if it is connection message
-            if (buffer[0] == (uint8_t)'C' && buffer[1] == (uint8_t)'O') {
-                mpConnection->messageDecider(buffer);
-            }
-            // if it is "ping", reply to ping
-            else if (uah::areArraysEqual(buffer, PING_MESSAGE)) {
-                replyToPing();
-            }
-            // if it is "reping", reply to ping
-            else if (uah::areArraysEqual(buffer, RE_PING_MESSAGE)) {
-                xTimerStop(mPingTimeoutTimer, portMAX_DELAY);
-                mpLogger->info("Communication Main", "Ping Success");
-                mpConnection->endConnection();
-            }
             // TODO !mm consider change isReadingRawMessage flag to mpAddressing->getIsAddressingInProgress()
+            // TODO !mm change/remove addressing algorithm
             // if it is addressing message
-            else if ((buffer[0] == (uint8_t)'A' && buffer[1] == (uint8_t)'D') || *isReadingRawMessage) {
+            if ((buffer[0] == (uint8_t)'A' && buffer[1] == (uint8_t)'D') || *isReadingRawMessage) {
                 *isReadingRawMessage = false;
                 mpAddressing->addMessage(buffer);
             }
@@ -191,7 +172,7 @@ namespace Comms {
                 }
             #endif
             else {
-                mpConnection->messageDecider2(buffer);
+                mpConnection->messageDecider(buffer);
             }
             *isReadingRawMessage = false;
         }
@@ -248,21 +229,6 @@ namespace Comms {
                 case SUSPEND_ENCODE_MESSAGE_TASK_NOTIF:
                     com.mpLogger->debug("Communication Main", "vTaskSuspend(com.mEncodeMessageTaskHandle);");
                     vTaskSuspend(com.mEncodeMessageTaskHandle);
-                    break;
-
-                case START_PINGING_NOTIF:
-                    com.transmitPing();
-                    xTimerStart(com.mPingTimeoutTimer, portMAX_DELAY);
-                    break;
-
-                case STOP_PINGING_NOTIF:
-                    com.mpConnection->endConnection();
-                    xTimerStop(com.mPingTimeoutTimer, portMAX_DELAY);
-                    break;
-
-                case PING_TIMEOUT_NOTIF:
-                    com.mpLogger->info("Communication Main", "Ping Timeout");
-                    com.transmitPing();
                     break;
 
                 case READ_RAW_MESSAGE_NOTIF:
@@ -568,8 +534,7 @@ namespace Comms {
                 uint8_t messageIndex = 0;
 
                 // calc messageQuantity
-                // const uint8_t messageLen = uah::calcLenOfDataInArray(messageBuffer, MESSAGE_SIZE);
-                uint8_t messageLen = MESSAGE_SIZE - 1;// TODO !pr check if it breaks something
+                uint8_t messageLen = MESSAGE_SIZE - 1;
                 while (messageBuffer[messageLen] == '\0') {
                     messageLen--;
                 }
@@ -654,13 +619,7 @@ namespace Comms {
                     com.mpLogger->infoa("Communication Input", "Input: ", buffer, MESSAGE_SIZE);
 
                     // special debug commands
-                    if (uah::areArraysEqual(buffer, "startping")) {
-                        constexpr uint8_t notificationValue = START_PINGING_NOTIF;
-                        xQueueSend(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
-                    } else if (uah::areArraysEqual(buffer, "stopping")) {
-                        constexpr uint8_t notificationValue = STOP_PINGING_NOTIF;
-                        xQueueSend(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
-                    } else if (uah::areArraysEqual(buffer, "readraw")) {
+                    if (uah::areArraysEqual(buffer, "readraw")) {
                         constexpr uint8_t notificationValue = READ_RAW_MESSAGE_NOTIF;
                         xQueueSendToFront(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
                     }
@@ -858,10 +817,6 @@ namespace Comms {
             com.mpLogger->debug("Communication Timers", "Byte timeout.");
             constexpr uint8_t notificationValue = BYTE_TIMEOUT_NOTIF;
             xQueueSend(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
-        } else if (xTimer == com.mPingTimeoutTimer) {
-            com.mpLogger->debug("Communication Timers", "Ping timeout.");
-            constexpr uint8_t notificationValue = PING_TIMEOUT_NOTIF;
-            xQueueSend(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
         }
     }
 
@@ -884,22 +839,9 @@ namespace Comms {
                 communicationTimersCallbacks
             );
         }
-        if (mPingTimeoutTimer == nullptr) {
-            mPingTimeoutTimer = xTimerCreate(
-                "Ping Timeout",
-                pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT),
-                pdTRUE,
-                this,
-                communicationTimersCallbacks
-            );
-        }
     }
 
     void Communication::deleteCommunicationTimers() {
-        if (mPingTimeoutTimer != nullptr) {
-            xTimerDelete(mPingTimeoutTimer, portMAX_DELAY);
-            mPingTimeoutTimer = nullptr;
-        }
         if (mReceiveByteTimeoutTimer != nullptr) {
             xTimerDelete(mReceiveByteTimeoutTimer, portMAX_DELAY);
             mReceiveByteTimeoutTimer = nullptr;
@@ -908,19 +850,5 @@ namespace Comms {
             xTimerDelete(mReceiveMessageTimeoutTimer, portMAX_DELAY);
             mReceiveMessageTimeoutTimer = nullptr;
         }
-    }
-
-    // ============================ Other =============================
-    // FIXME getting no reply to ping cause connection timeout and strange behaviour
-    void Communication::transmitPing() const {
-        uint8_t buffer[MESSAGE_SIZE];
-        uah::prepareBuffer(buffer, PING_MESSAGE, MESSAGE_SIZE);
-        sendMessage(buffer);
-    }
-
-    void Communication::replyToPing() const {
-        uint8_t buffer[MESSAGE_SIZE];
-        uah::prepareBuffer(buffer, RE_PING_MESSAGE, MESSAGE_SIZE);
-        sendMessage(buffer);
     }
 }

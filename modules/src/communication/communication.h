@@ -61,11 +61,6 @@ namespace Comms {
         void resetEncodeMessageTask();
 
         /**
-         * @brief Signals the main task to start pinging process.
-         */
-        void startPinging() const;
-
-        /**
          * @brief Add a single byte to the byte queue for decoding.
          *        Resumes the decode task if necessary.
          * @param data Byte to add to receive queue.
@@ -256,15 +251,6 @@ namespace Comms {
          */
         void deleteCommunicationTimers();
 
-        /**
-         * @brief Transmit a "ping" message.
-         */
-        void transmitPing() const;
-        /**
-         * @brief Transmit a "reping" message, as a reply to a received "ping" message.
-         */
-        void replyToPing() const;
-
         std::shared_ptr<ums::DebugLED> mpDebugLED; ///< Pointer to debugLED class instance.
         std::shared_ptr<ul::Logger> mpLogger;
         Connection *mpConnection; ///< Pointer to Connection class instance.
@@ -289,11 +275,6 @@ namespace Comms {
             // suspending notifications
             SUSPEND_DECODE_MESSAGE_TASK_NOTIF,
             SUSPEND_ENCODE_MESSAGE_TASK_NOTIF,
-            // SUSPEND_CONNECTION_TASK_NOTIF,
-            // ping notifications
-            START_PINGING_NOTIF,
-            STOP_PINGING_NOTIF,
-            PING_TIMEOUT_NOTIF,
             // addressing notifications
             READ_RAW_MESSAGE_NOTIF,
             STOP_ADDRESSING_ALGORITHM_NOTIF,
@@ -313,6 +294,5 @@ namespace Comms {
 
         TimerHandle_t mReceiveMessageTimeoutTimer = nullptr; ///< Handle to FreeRTOS software timer indicating timeout of the message.
         TimerHandle_t mReceiveByteTimeoutTimer = nullptr; ///< Handle to FreeRTOS software timer indicating timeout of the receiving byte for decode task.
-        TimerHandle_t mPingTimeoutTimer = nullptr; ///< Handle to FreeRTOS software timer indicating timeout of "ping" message.
     };
 }

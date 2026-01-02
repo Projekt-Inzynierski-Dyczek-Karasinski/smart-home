@@ -124,9 +124,6 @@ namespace Comms {
          */
         void messageDecider(const uint8_t receivedMessage[MESSAGE_SIZE]);
 
-        // TODO !pr add comment
-        void messageDecider2(const uint8_t receivedMessage[MESSAGE_SIZE]);
-
         /**
          * @brief Handle connection when receiving new RF message.
          * @details Establishes connection, creates and starts/restarts timeout timer, and sets protocol IP address.
