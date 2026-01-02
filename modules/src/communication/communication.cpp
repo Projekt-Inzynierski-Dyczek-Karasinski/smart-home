@@ -784,6 +784,15 @@ namespace Comms {
                         ch.generateMessage(message);
                         com.sendMessage(message);
                     }
+                    // ascii test
+                    else if (uah::areArraysEqual(buffer, "ascii")) {
+                        API::CommandHandler ch(API::commandTypes::RESPONSE);
+                        char text[] = "abcdefg";
+                        ch.addParameter(API::APIParameter(text, strlen(text)));
+                        uint8_t message[MESSAGE_SIZE] = {};
+                        ch.generateMessage(message);
+                        com.sendMessage(message);
+                    }
                     // rest
                     else {
                         // check if is HC_12 command

@@ -35,6 +35,11 @@ namespace UniversalModuleSystem {
          */
         virtual void disableAutoSleep() = 0;
 
+        /**
+         * @brief Restarts idle timer, if the idle timer is enabled.
+         */
+        virtual void restartIdleTimer() = 0;
+
     protected:
         /**
          * @brief Private constructor for singleton pattern.

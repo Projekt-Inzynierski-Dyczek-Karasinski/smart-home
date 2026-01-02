@@ -59,7 +59,7 @@ namespace UniversalModuleSystem {
         }
 
         // timer wake up
-        esp_sleep_enable_timer_wakeup(milliSeconds * US_TO_MILLISECONDS_FACTOR);
+        esp_sleep_enable_timer_wakeup((uint64_t)milliSeconds * US_TO_MILLISECONDS_FACTOR);
 
         mpLogger->infov("PowerManagerESP32", "Going to sleep for (ms): ", milliSeconds);
 
@@ -84,12 +84,22 @@ namespace UniversalModuleSystem {
         #endif
     }
 
+    void PowerManagerESP32::restartIdleTimer() {
+        if (mIdleTimer != nullptr) {
+            xTimerStart(mIdleTimer, portMAX_DELAY);
+        }
+    }
+
     PowerManagerESP32::PowerManagerESP32(const std::shared_ptr<ul::Logger> &logger) : mpLogger(logger) {
         handleWakeUpReason();
+        createIdleTimer();
     }
 
     PowerManagerESP32::~PowerManagerESP32() {
-        xTimerDelete(mAutoSleepTimer, portMAX_DELAY);
+        if (mAutoSleepTimer != nullptr)
+            xTimerDelete(mAutoSleepTimer, portMAX_DELAY);
+        if (mIdleTimer != nullptr)
+            xTimerDelete(mIdleTimer, portMAX_DELAY);
     }
 
     void PowerManagerESP32::waitAndDisableCriticalFeatures() const {
@@ -104,19 +114,19 @@ namespace UniversalModuleSystem {
     void PowerManagerESP32::handleWakeUpReason() {
         switch (esp_sleep_get_wakeup_cause()) {
             case ESP_SLEEP_WAKEUP_EXT0:
-                mpLogger->verbose("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
+                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
                 disableAutoSleep();
                 break;
             case ESP_SLEEP_WAKEUP_EXT1:
-                mpLogger->verbose("PowerManagerESP32 Class", "Module was wake up by rf module.");
+                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by rf module.");
                 enableAutoSleep();
                 break;
             case ESP_SLEEP_WAKEUP_TIMER:
-                mpLogger->verbose("PowerManagerESP32 Class", "Module was wake up by timer.");
+                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by timer.");
                 disableAutoSleep();
                 break;
             default:
-                mpLogger->verbose("PowerManagerESP32 Class", "Module had power loss.");
+                mpLogger->info("PowerManagerESP32 Class", "Module had power loss.");
                 disableAutoSleep();
                 break;
         }
@@ -133,7 +143,7 @@ namespace UniversalModuleSystem {
                     pdMS_TO_TICKS(AUTO_SLEEP_WAIT_TIME),
                     pdFALSE,
                     this,
-                    goToAutoSleep
+                    timerTriggeredSleep
                 );
                 xTimerStart(mAutoSleepTimer, portMAX_DELAY);
             }
@@ -150,7 +160,34 @@ namespace UniversalModuleSystem {
     uint32_t PowerManagerESP32::getCurrentTime() const {
         struct timeval timeStruct{};
         gettimeofday(&timeStruct, nullptr);
-        // TODO consider making this more accurate
         return timeStruct.tv_sec * 1000;
+    }
+
+    void PowerManagerESP32::createIdleTimer() {
+#ifndef CENTRAL_UNIT
+        const auto &dm = DataManager::getInstance();
+        nl::json jsonData = dm.loadJson(dm.s_BASE_CONFIG_PATH);
+        nl::json &idleTimerData = jsonData[ms_IDLE_TIMER_DATA];
+        const uint32_t sleepTime = idleTimerData[ms_IDLE_TIMER_SLEEP_TIME].get<uint32_t>();
+        const uint32_t timeout = idleTimerData[ms_IDLE_TIMER_TIMEOUT].get<uint32_t>();
+
+        if (sleepTime != 0 && timeout != 0) {
+            mIdleSleepTime.store(sleepTime);
+            mIdleTimer = xTimerCreate(
+                "Idle Timer",
+                pdMS_TO_TICKS(timeout),
+                pdFALSE,
+                this,
+                idleAutosleep
+            );
+            xTimerStart(mIdleTimer, portMAX_DELAY);
+        }
+#endif
+    }
+
+    void PowerManagerESP32::idleAutosleep(TimerHandle_t xTimer) {
+        auto &pm = *static_cast<PowerManagerESP32 *>(pvTimerGetTimerID(xTimer));
+        if (const uint32_t sleepTime = pm.mIdleSleepTime.load(); sleepTime != 0)
+            pm.enterSleep(sleepTime, true);
     }
 }

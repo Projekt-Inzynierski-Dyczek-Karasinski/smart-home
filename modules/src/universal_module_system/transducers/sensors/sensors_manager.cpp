@@ -150,7 +150,7 @@ namespace UniversalModuleSystem::Transducers {
     }
 
     void SensorsManager::readAllSensors() {
-        mpLogger->debug("SensorsManager", "readAllSensors");
+        mpLogger->verbose("SensorsManager", "New sensors reading...");
         if (!mSensors.empty()) mSensors.clear();
 
         const auto &dataManager = DataManager::getInstance();

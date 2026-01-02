@@ -31,5 +31,9 @@
   "ota": {
     "version": 1,
     "ota_pin": 3
+  },
+  "idleAutoSleep": {
+    "sleepTime": 86400000,
+    "idleTimeout": 300000
   }
 }

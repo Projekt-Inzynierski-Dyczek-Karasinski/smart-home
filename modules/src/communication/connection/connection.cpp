@@ -140,6 +140,9 @@ namespace Comms {
 
     // TODO !pr change to messageDecider
     void Connection::messageDecider2(const uint8_t receivedMessage[MESSAGE_SIZE]) {
+        auto &powerManager = ums::PowerManager::getInstance(mpLogger);
+        powerManager.restartIdleTimer();
+
         uint8_t sendBuffer[MESSAGE_SIZE] = {};
         using CT = API::commandTypes;
         using ET = API::errorTypes;
@@ -183,6 +186,13 @@ namespace Comms {
                     receivedCommand->getNumberOfParameters()
                 );
                 uah::printArrayAsInt(receivedMessage, MESSAGE_SIZE);
+
+                try {
+                    char text[16] = {};
+                    std::get<API::APIParameter<char*>>(receivedCommand->getParameter(0)).getValue(text);
+                    mpLogger->infoa("MessageDecider TEST", "get char array: ", (uint8_t*)text, strlen(text));
+                } catch (...) {
+                }
 
                 try {
                     const uint32_t resUid = receivedCommand->getParameterValue<uint32_t>(0);
@@ -387,7 +397,6 @@ namespace Comms {
                     case (uint8_t) GT::BATTERY_STATE: {
                         constexpr uint8_t BATTERY_SENSOR_ID = 1;
                         mpLogger->verbose("MessageDecider CT::GET", "CT::BATTERY_STATE");
-                        auto &sensorManager = ums::Transducers::SensorsManager::getInstance(mpLogger);
 
                         try {
                             sendCommand.emplace(CT::RESPONSE);
@@ -510,7 +519,9 @@ namespace Comms {
     }
 
     void Connection::sendingHandle(const uint8_t message[MESSAGE_SIZE]) {
-        // TODO add handling for completely failed connection
+        auto &powerManager = ums::PowerManager::getInstance(mpLogger);
+        powerManager.restartIdleTimer();
+
         if (!uah::areArraysEqual(message, ConnectionMessages::s_CONNECTION_REPEAT_MESSAGE)) {
             mpLogger->debug("Connection Method", "setLastTransmittedMessage(message)");
             setLastTransmittedMessage(message);

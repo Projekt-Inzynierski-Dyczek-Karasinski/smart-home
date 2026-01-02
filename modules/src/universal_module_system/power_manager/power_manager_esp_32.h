@@ -6,6 +6,7 @@
 
 #include "i_power_manager.h"
 
+#include <atomic>
 #include <memory>
 #include <nlohmann/json.hpp>
 
@@ -58,6 +59,11 @@ namespace UniversalModuleSystem {
          */
         void disableAutoSleep() override;
 
+        /**
+         * @brief Restarts idle timer, if the idle timer is enabled.
+         */
+        void restartIdleTimer() override;
+
     private:
         /**
          * @brief Private constructor for singleton pattern.
@@ -108,12 +114,34 @@ namespace UniversalModuleSystem {
          */
         uint32_t getCurrentTime() const;
 
+        /**
+         * @brief Creates idle timer, that automatically put ESP32 to sleep, if idle autosleep is enabled.
+         */
+        void createIdleTimer();
+
+        /**
+         * @brief Idle timer callback.
+         * @param xTimer Handle to the timer triggering auto-sleep (used for passing pointer to instance of PowerManagerESP32).
+         */
+        static void idleAutosleep(TimerHandle_t xTimer);
+
         std::shared_ptr<ul::Logger> mpLogger;
 
+        // TODO remove?
         TimerHandle_t mAutoSleepTimer = nullptr; ///< FreeRTOS timer handle for managing auto-sleep functionality.
+
+        TimerHandle_t mIdleTimer = nullptr; ///< FreeRTOS timer handle for managing idle auto-sleep functionality.
+
+        std::atomic<uint32_t> mIdleSleepTime{0};
 
         // auto sleep
         static uint32_t msSleepStart; ///< When sleep starts, variable saved in RTC memory.
         static int64_t msIntendedSleepTime; ///< How long sleep should last, variable saved in RTC memory.
+
+
+        // JSON keys
+        static constexpr char ms_IDLE_TIMER_DATA[] = "idleAutoSleep";
+        static constexpr char ms_IDLE_TIMER_TIMEOUT[] = "idleTimeout";
+        static constexpr char ms_IDLE_TIMER_SLEEP_TIME[] = "sleepTime";
     };
 }
