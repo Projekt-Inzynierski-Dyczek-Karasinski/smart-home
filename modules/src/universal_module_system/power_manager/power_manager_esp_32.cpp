@@ -113,6 +113,7 @@ namespace UniversalModuleSystem {
 
     void PowerManagerESP32::handleWakeUpReason() {
         switch (esp_sleep_get_wakeup_cause()) {
+            // TODO !pr add rf notif
             case ESP_SLEEP_WAKEUP_EXT0:
                 mpLogger->info("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
                 disableAutoSleep();

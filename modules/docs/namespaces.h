@@ -10,8 +10,22 @@
  * - derived class CentralUnitAddressing - Addressing class with central unit's features
  * - derived class ModuleAddressing - Addressing class with module's features
  * - class Connection - handling communication after addressing, when module is exchanging messages with central unit
+ * - namespace API - containing classes that handles communication API
  */
 namespace Comms {}
+
+/**
+ * @namespace Comms::API
+ * @brief Contains classes that handle communication API.
+ * @details Handles API for RF communication. Introduces features that enable easy encoding and decoding commands
+ * and parameters. Contains:
+ * - class CommandHandler - main API class, that enables converting raw message's bytes to command and vice versa.
+ * - class SpecialByteCommand - handles API special byte for commands.
+ * - class SpecialByteParameter - handles API special byte for command's parameters.
+ * - class APIParameter - handles creating and decoding parameters passed in commands.
+ * - multiple enum classes - for commands, errors, parameters, etc. types.
+ */
+namespace Comms::API {}
 
 /**
  * @namespace UniversalModuleSystem
@@ -23,7 +37,7 @@ namespace Comms {}
  * - class DataManager - class handling loading and saving data from/to flash memory
  * - class PowerManager - class responsible for rebooting, putting to sleep and reading battery
  * - class Ota - class responsible for connecting to Wi-Fi and handling OTA programming
- * - namespace Transducers - namespace for acurators and sensors used in SMART Home system.
+ * - namespace Transducers - namespace for actuators and sensors used in SMART Home system.
  *
  * @warning Class PowerManager works only with ESP32.
  */
@@ -31,7 +45,7 @@ namespace UniversalModuleSystem {}
 
 /**
  * @namespace UniversalModuleSystem::Transducers
- * @brief Contains classes for handling acurators and sensors used in SMART Home system.
+ * @brief Contains classes for handling actuators and sensors used in SMART Home system.
  *
  * @details Contains:
  * - class SensorManager - singleton handling all module's sensors

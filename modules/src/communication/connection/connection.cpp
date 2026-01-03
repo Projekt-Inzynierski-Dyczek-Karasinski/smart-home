@@ -58,47 +58,51 @@ namespace Comms {
         std::optional<uint32_t> uid;
         bool isDeepSleep = false;
 
+        // main decider switch
         switch (receivedCommand->getCommandType()) {
-            // TODO !pr move RESPONSE to group below
-            case CT::RESPONSE: {
+            // if DEBUG_MODE is not defined CT::RESPONSE will work same as cases: CT::ACKNOWLEDGE, CT::NEGATIVE, CT::REPING
+            case CT::RESPONSE:
+#ifdef DEBUG_MODE
+            {
                 mpLogger->infov(
                     "MessageDecider TEST",
                     "response with num of parameters: ",
-                    receivedCommand->getNumberOfParameters()
+                    static_cast<int>(receivedCommand->getNumberOfParameters())
                 );
                 uah::printArrayAsInt(receivedMessage, MESSAGE_SIZE);
 
                 try {
                     char text[16] = {};
-                    std::get<API::APIParameter<char*>>(receivedCommand->getParameter(0)).getValue(text);
-                    mpLogger->infoa("MessageDecider TEST", "get char array: ", (uint8_t*)text, strlen(text));
+                    std::get<API::APIParameter<char *> >(receivedCommand->getParameter(0)).getValue(text);
+                    mpLogger->infoa("MessageDecider TEST", "get char array: ", reinterpret_cast<uint8_t *>(text), strlen(text));
                 } catch (...) {
                 }
 
                 try {
-                    const uint32_t resUid = receivedCommand->getParameterValue<uint32_t>(0);
-                    mpLogger->infov("MessageDecider TEST", "uid: ", (int) resUid);
+                    const auto resUid = receivedCommand->getParameterValue<uint32_t>(0);
+                    mpLogger->infov("MessageDecider TEST", "uid: ", static_cast<int>(resUid));
                 } catch (...) {
                 }
 
                 try {
-                    const uint8_t batteryRead = receivedCommand->getParameterValue<uint8_t>(1);
+                    const auto batteryRead = receivedCommand->getParameterValue<uint8_t>(1);
                     mpLogger->infov("MessageDecider TEST", "Battery read %: ", batteryRead);
-                } catch (...) {}
+                } catch (...) {
+                }
 
                 try {
                     const auto humidity = receivedCommand->getParameterValue<float>(1);
                     const auto pressure = receivedCommand->getParameterValue<float>(2);
                     const auto temperature = receivedCommand->getParameterValue<float>(3);
-                    mpLogger->infov("MessageDecider TEST", "humidity: ", (int) (humidity));
-                    mpLogger->infov("MessageDecider TEST", "pressure: ", (int) (pressure));
-                    mpLogger->infov("MessageDecider TEST", "temperature: ", (int) (temperature));
+                    mpLogger->infov("MessageDecider TEST", "humidity: ",    static_cast<int>(humidity));
+                    mpLogger->infov("MessageDecider TEST", "pressure: ",    static_cast<int>(pressure));
+                    mpLogger->infov("MessageDecider TEST", "temperature: ", static_cast<int>(temperature));
                 } catch (...) {
                     try {
                         const auto humidity = receivedCommand->getParameterValue<float>(1);
                         const auto temperature = receivedCommand->getParameterValue<float>(2);
-                        mpLogger->infov("MessageDecider TEST", "humidity: ", (int) (humidity));
-                        mpLogger->infov("MessageDecider TEST", "temperature: ", (int) (temperature));
+                        mpLogger->infov("MessageDecider TEST", "humidity: ",    static_cast<int>(humidity));
+                        mpLogger->infov("MessageDecider TEST", "temperature: ", static_cast<int>(temperature));
                     } catch (...) {
                     }
                 }
@@ -112,7 +116,7 @@ namespace Comms {
                 }
                 break;
             }
-
+#endif
             case CT::ACKNOWLEDGE:
             case CT::NEGATIVE:
             case CT::REPING: {
