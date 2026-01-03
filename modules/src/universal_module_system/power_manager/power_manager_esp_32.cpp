@@ -8,8 +8,10 @@
 #include "../../../config/universal_module_system_config.h"
 #include "universal_module_system/data_manager.h"
 #include "communication/communication.h"
+#include "communication/api/command_handler.h"
 
 namespace nl = nlohmann;
+namespace API = Comms::API;
 
 namespace UniversalModuleSystem {
     #ifdef AUTO_SLEEP
@@ -113,23 +115,65 @@ namespace UniversalModuleSystem {
 
     void PowerManagerESP32::handleWakeUpReason() {
         switch (esp_sleep_get_wakeup_cause()) {
-            // TODO !pr add rf notif
-            case ESP_SLEEP_WAKEUP_EXT0:
-                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
-                disableAutoSleep();
-                break;
             case ESP_SLEEP_WAKEUP_EXT1:
                 mpLogger->info("PowerManagerESP32 Class", "Module was wake up by rf module.");
                 enableAutoSleep();
                 break;
+
             case ESP_SLEEP_WAKEUP_TIMER:
                 mpLogger->info("PowerManagerESP32 Class", "Module was wake up by timer.");
                 disableAutoSleep();
                 break;
+
+// macro disabling wake up rf notifications that are annoying during software development
+#ifdef DISABLE_WAKE_UP_RF_NOTIFICATION
+            case ESP_SLEEP_WAKEUP_EXT0:
+                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
+                disableAutoSleep();
+                break;
+
             default:
                 mpLogger->info("PowerManagerESP32 Class", "Module had power loss.");
                 disableAutoSleep();
                 break;
+
+#else
+            case ESP_SLEEP_WAKEUP_EXT0:
+                try {
+                    API::CommandHandler commandHandler(API::commandTypes::NOTIFY);
+                    API::APIParameter notify(static_cast<uint8_t>(API::notifyTypes::MANUAL_WAKE_UP));
+                    commandHandler.addParameter(notify);
+
+                    uint8_t message[MESSAGE_SIZE] = {};
+                    commandHandler.generateMessage(message);
+                    const auto &communication = Comms::Communication::getInstance();
+                    communication.sendMessage(message);
+                } catch (std::exception &e) {
+                    mpLogger->error("PowerManagerESP32 handleWakeUpReason", "Failed to create notification in case ESP_SLEEP_WAKEUP_EXT0.");
+                    mpLogger->error("PowerManagerESP32 handleWakeUpReason", e.what());
+                }
+                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
+                disableAutoSleep();
+                break;
+
+            default:
+                try {
+                    API::CommandHandler commandHandler(API::commandTypes::NOTIFY);
+                    API::APIParameter notify(static_cast<uint8_t>(API::notifyTypes::POWER_LOSS));
+                    commandHandler.addParameter(notify);
+
+                    uint8_t message[MESSAGE_SIZE] = {};
+                    commandHandler.generateMessage(message);
+                    const auto &communication = Comms::Communication::getInstance();
+                    communication.sendMessage(message);
+                } catch (std::exception &e) {
+                    mpLogger->error("PowerManagerESP32 handleWakeUpReason", "Failed to create notification in default case.");
+                    mpLogger->error("PowerManagerESP32 handleWakeUpReason", e.what());
+                }
+                mpLogger->info("PowerManagerESP32 Class", "Module had power loss.");
+                disableAutoSleep();
+                break;
+#endif
         }
     }
 

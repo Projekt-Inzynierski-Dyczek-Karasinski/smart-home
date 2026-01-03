@@ -333,6 +333,12 @@ namespace Comms {
                     receivedCommand.reset();
                     mpLogger->error("MessageDecider CT::NOTIFY", e.what());
                 }
+#ifdef DEBUG_MODE
+                try {
+                    auto notifType = receivedCommand->getParameterValue<uint8_t>(0);
+                    mpLogger->verbosev("MessageDecider", "CT::NOTIFY type: ", notifType);
+                } catch (...){}
+#endif
                 break;
             }
 

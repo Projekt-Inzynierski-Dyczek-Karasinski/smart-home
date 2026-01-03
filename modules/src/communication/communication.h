@@ -34,7 +34,10 @@ namespace Comms {
          * @param logger Shared pointer to the Logger instance.
          * @return Reference to the singleton Communication instance.
          */
-        static Communication& getInstance(const std::shared_ptr<ums::DebugLED> &debugLED, const std::shared_ptr<ul::Logger> &logger);
+        static Communication& getInstance(
+            const std::shared_ptr<ums::DebugLED> &debugLED = nullptr,
+            const std::shared_ptr<ul::Logger> &logger = nullptr
+        );
 
         // Delete copy constructor and assignment operator
         Communication(const Communication&) = delete;

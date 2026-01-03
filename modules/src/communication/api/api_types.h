@@ -39,6 +39,13 @@ namespace Comms::API {
         NOTIFY = 12
     };
 
+    enum class notifyTypes : uint8_t {
+        UNKNOWN = 0,
+        MANUAL_WAKE_UP = 1,
+        POWER_LOSS = 2,
+        SENSOR_ALERT = 3
+    };
+
     enum class parametersTypes : uint8_t {
         UNKNOWN = 0,
         UINT = 1,

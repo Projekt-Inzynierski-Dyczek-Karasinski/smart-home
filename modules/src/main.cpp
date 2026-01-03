@@ -23,11 +23,13 @@ void setup() {
     // ums::Ota ota(logger);
     // ota.autoEnableOta();
 
-    auto &powerManager = ums::PowerManager::getInstance(logger);
+
 
     const auto debugLed = std::make_shared<ums::DebugLED>(logger);
     auto &communication = Comms::Communication::getInstance(debugLed, logger);
     auto &pairingButton = ums::PairingButton::getInstance(debugLed, &communication, logger);
+
+    auto &powerManager = ums::PowerManager::getInstance(logger);
     auto &sensorManager = ums::Transducers::SensorsManager::getInstance(logger);
 
     logger->info("Main", "All components initialized. Deleting functions setup() and loop()...");

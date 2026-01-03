@@ -2,6 +2,7 @@
 
 #include <optional>
 
+#include "../config/logger_config.h"
 #include "utils/uint8_array_handlers.h"
 #include "universal_module_system/power_manager/power_manager.h"
 #include "universal_module_system/data_manager.h"
@@ -95,6 +96,14 @@ namespace Comms {
             #error "Not implemented"
         #endif
     {
+        if (mpLogger == nullptr) {
+            mpLogger = std::make_shared<ul::Logger>(static_cast<ul::Level>(LOGGING_LEVEL));
+            mpLogger->error("Communication Class", "Constructor of Connection class got nullptr as logger.");
+        }
+        if (mpDebugLED == nullptr) {
+            mpDebugLED = std::make_shared<ums::DebugLED>(mpLogger);
+            mpLogger->error("Communication Class", "Constructor of Connection class got nullptr as DebugLED.");
+        }
         mpConnection = &Connection::getInstance(this, mpAddressing, mpRfModule, logger);
 
         createCommunicationQueues();
@@ -732,7 +741,6 @@ namespace Comms {
                     // notif test
                     else if (uah::areArraysEqual(buffer, "notif")) {
                         API::CommandHandler ch(API::commandTypes::NOTIFY);
-                        ch.addParameter(API::APIParameter((uint8_t)1));
                         uint8_t message[MESSAGE_SIZE] = {};
                         ch.generateMessage(message);
                         com.sendMessage(message);
