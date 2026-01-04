@@ -3,9 +3,12 @@
 #include <HardwareSerial.h>
 #include <memory>
 
+#include <nlohmann/json.hpp>
+
 #include "utils/logger.h"
 
 namespace ul = Utils::Logging;
+namespace nl = nlohmann;
 
 namespace Comms {
     class Communication;
@@ -75,6 +78,25 @@ namespace Comms {
         void sleep();
 
     private:
+        /**
+         * @brief Struct handling unpacking json hc12 data.
+         */
+        struct HC12Data {
+            explicit HC12Data(const nl::json &data);
+
+            const uint8_t txPin;
+            const uint8_t rxPin;
+            const uint8_t setPin;
+            const uint32_t baudrate;
+
+        private:
+            // JSON keys
+            static constexpr char ms_TX_PIN[] = "tx";
+            static constexpr char ms_RX_PIN[] = "rx";
+            static constexpr char ms_SET_PIN[] = "set";
+            static constexpr char ms_BAUDRATE[] = "baudrate";
+        };
+
         /**
          * @brief Create a FreeRTOS Queues used in HC12 class.
          */
@@ -149,7 +171,6 @@ namespace Comms {
 
         Communication *mpCommunication; // pointer to instance of Communication class
         HardwareSerial *mpSerial; // pointer to HardwareSerial
-        unsigned long mBaudRate; // TODO remove?
 
         // Notifications for Main HC12 task
         typedef enum : uint8_t {
@@ -177,5 +198,9 @@ namespace Comms {
         TaskHandle_t mSetupHC12TaskHandle = nullptr; ///< Handle to FreeRTOS setup task.
 
         std::shared_ptr<ul::Logger> mpLogger;
+        const HC12Data m_HC12_DATA;
+
+        // JSON key
+        static constexpr char s_HC12_DATA[] = "hc12";
     };
 }

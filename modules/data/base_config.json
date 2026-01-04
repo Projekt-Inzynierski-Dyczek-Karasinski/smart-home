@@ -8,6 +8,12 @@
     "ssid": "wifi ssid",
     "password": "wifi password"
   },
+  "hc12": {
+    "rx": 25,
+    "tx": 33,
+    "set": 32,
+    "baudrate": 9600
+  },
   "sensorsData": {
     "powerPin": 13,
     "readingsTimeout": 60000,
@@ -34,6 +40,6 @@
   },
   "idleAutoSleep": {
     "sleepTime": 86400000,
-    "idleTimeout": 120000
+    "idleTimeout": 300000
   }
 }

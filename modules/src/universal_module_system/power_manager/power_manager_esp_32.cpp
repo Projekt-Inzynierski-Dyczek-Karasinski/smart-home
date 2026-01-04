@@ -127,6 +127,7 @@ namespace UniversalModuleSystem {
 
 // macro disabling wake up rf notifications that are annoying during software development
 #ifdef DISABLE_WAKE_UP_RF_NOTIFICATION
+#warning "Wake up rf notifications are disabled"
             case ESP_SLEEP_WAKEUP_EXT0:
                 mpLogger->info("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
                 disableAutoSleep();

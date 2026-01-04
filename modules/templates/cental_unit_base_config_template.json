@@ -107,5 +107,11 @@
   "wifi": {
     "ssid": "wifi ssid",
     "password": "wifi password"
+  },
+  "hc12": {
+    "rx": 6,
+    "tx": 7,
+    "set": 5,
+    "baudrate": 9600
   }
 }
