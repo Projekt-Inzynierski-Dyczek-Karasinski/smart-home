@@ -11,7 +11,6 @@
 namespace ul = Utils::Logging;
 namespace API = Comms::API;
 
-// TODO !pr check comments
 namespace UniversalModuleSystem::Transducers {
     /**
      * @brief Singleton manager class that handles sensors.
@@ -25,7 +24,7 @@ namespace UniversalModuleSystem::Transducers {
          * @brief Gets the singleton instance of SensorsManager.
          *
          * @param logger Shared pointer to the logger instance, default: nullptr.
-         * @return Reference to the SensorClientCode instance.
+         * @return Reference to the SensorsManager instance.
          *
          * @warning First call must pass a pointer to a logger.
          */
@@ -52,7 +51,7 @@ namespace UniversalModuleSystem::Transducers {
          * @brief Get sensors IDs.
          * @return Sensors IDs.
          */
-        std::vector<API::APIParameterVariant> getSensorsIds() const;
+        [[nodiscard]] std::vector<API::APIParameterVariant> getSensorsIds() const;
 
     private:
         /**
@@ -65,14 +64,14 @@ namespace UniversalModuleSystem::Transducers {
 
         /**
          * @brief Get a reading of sensor.
-         * @details It is used when sensors readings caching is enabled.
+         * @details Used when sensor reading caching is disabled.
          * @param sensorId Sensor ID.
          * @return Reading of the sensor.
          */
         std::vector<API::APIParameterVariant> getSensorCachedReading(uint8_t sensorId);
 
         /**
-         * @brief Creates sensors instances, starts their readings and starts mSensorTimeoutTimer.
+         * @brief Create sensor instances, start their readings, and start mSensorTimeoutTimer.
          * @warning <b>Not thread-safe</b>. Must be protected externally with <code>mSensorMutex</code> before calling.
          */
         void readAllSensors();

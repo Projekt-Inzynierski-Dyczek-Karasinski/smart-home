@@ -1,6 +1,6 @@
 #pragma once
 
-//TODO !pr move this config to base_config.json
+//TODO !pr remove commented config
 #ifdef HC12_MODULE
     #include "hc12_common_config.h"
 

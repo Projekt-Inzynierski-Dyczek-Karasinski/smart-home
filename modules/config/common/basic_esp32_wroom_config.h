@@ -1,5 +1,6 @@
 #pragma once
 
+//TODO !pr remove commented config
 #ifdef HC12_MODULE
     #include "hc12_common_config.h"
 

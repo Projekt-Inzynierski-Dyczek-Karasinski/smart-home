@@ -1,5 +1,6 @@
 #pragma once
 
+#include <Arduino.h>
 #include <memory>
 #include <vector>
 
@@ -33,7 +34,7 @@ namespace UniversalModuleSystem::Transducers {
         /**
          * @brief Start acquiring data from the sensor.
          *
-         * @note This method must be implemented by derived class.
+         * @note This method must be implemented by a derived class.
          */
         virtual void startReading() = 0;
 
@@ -42,14 +43,14 @@ namespace UniversalModuleSystem::Transducers {
          * @details It is used when only waiting for the reading to finish is needed, but not the reading result.
          * <code>getApiFormattedReading</code> automatically waits for the reading to finish before returning the result.
          *
-         * @note This method must be implemented by derived class.
+         * @note This method must be implemented by a derived class.
          */
         virtual void waitUntilReadingEnds() = 0;
 
         /**
          * @brief Get formatted reading (APIParameterVariant).
-         * @return Array of readings in API format.
-         * @note This method must be implemented by derived class.
+         * @return Vector of readings in API format.
+         * @note This method must be implemented by a derived class.
          */
         virtual std::vector<API::APIParameterVariant> getApiFormattedReading() = 0;
 
@@ -69,14 +70,13 @@ namespace UniversalModuleSystem::Transducers {
         bool init(const nl::json &jsonData);
 
     protected:
-        // TODO !pr update comment (now class Sensor implement default)
         /**
-         * @brief Load sensor-specific configuration from JSON.
+         * @brief Load sensor-specific configuration from JSON. By default, does nothing and returns true.
          *
          * @param jsonData JSON object containing sensor data.
          * @return True if loading succeeds, false otherwise.
          *
-         * @note This method must be implemented by derived class.
+         * @note This method must be implemented by a derived class if additional data is needed.
          * @warning Do <b>not</b> take <code>mSensorDataMutex</code> inside this method.
          * This method is called in <code>loadData()</code>, where this mutex is already taken.
          */

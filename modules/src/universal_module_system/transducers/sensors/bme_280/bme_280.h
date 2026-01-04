@@ -2,11 +2,16 @@
 
 #include "universal_module_system/transducers/sensors/sensor.h"
 
-// TODO !pr add comments
-
 namespace UniversalModuleSystem::Transducers {
+    /**
+     * @brief BME280 sensor class for measuring humidity, pressure and temperature.
+     */
     class BME280 : public Sensor {
     public:
+        /**
+        * @brief Construct the BME280 object.
+        * @param logger Shared pointer to logger.
+        */
         explicit BME280(const std::shared_ptr<ul::Logger> &logger);
 
         /**
@@ -16,8 +21,19 @@ namespace UniversalModuleSystem::Transducers {
          */
         void waitUntilReadingEnds() override;
 
+        /**
+         * @brief Get humidity, pressure and temperature reading.
+         * @return Vector with humidity, pressure and temperature reading as APIParameters.
+         *
+         * @note Thread-safe.
+         */
         std::vector<API::APIParameterVariant> getApiFormattedReading() override;
 
+        /**
+         * @brief Begin an asynchronous measurement of the BME280 Sensor.
+         * @details Creates a FreeRTOS task to perform reading values from the sensor.
+         * This task deletes itself after the measurement ends.
+         */
         void startReading() override;
 
     private:
@@ -44,6 +60,14 @@ namespace UniversalModuleSystem::Transducers {
             static constexpr char ms_I2C_ADDRESS[] = "I2CAddress";
         };
 
+        /**
+         * @brief Load additional BME280 sensor configuration from JSON.
+         *
+         * @param jsonData JSON object containing sensor parameters.
+         * @return True if additional data loaded successfully, false otherwise.
+         *
+         * @warning <b>Not</b> thread-safe. Must be protected externally with <code>mSensorDataMutex</code> before calling.
+         */
         bool loadAdditionalData(const nl::json &jsonData) override;
 
         static void bmeReadTask(void *parameters);

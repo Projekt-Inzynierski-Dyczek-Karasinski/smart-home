@@ -3,6 +3,9 @@
 #include "universal_module_system/transducers/sensors/sensor.h"
 
 namespace UniversalModuleSystem::Transducers {
+    /**
+     * @brief Light sensor class for measuring light percentage.
+     */
     class LightSensor final : public Sensor {
     public:
         /**
@@ -29,11 +32,16 @@ namespace UniversalModuleSystem::Transducers {
         /**
          * @brief Begin an asynchronous measurement of the sensor.
          * @details Creates a FreeRTOS task to perform multiple ADC samples and stores the calculated voltage.
-         * This task deletes itself after end measurement.
+         * This task deletes itself after the measurement ends.
          */
         void startReading() override;
 
     private:
+        /**
+         * @brief Calculates the light percentage, based on analog reading.
+         * @param rawReading Raw analog reading of light sensor.
+         * @return The light percentage.
+         */
         int8_t calculateLightPercentage(uint16_t rawReading);
 
         /**

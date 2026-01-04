@@ -8,7 +8,6 @@
 
 #include "universal_module_system/transducers/sensors/sensor.h"
 
-
 namespace UniversalModuleSystem::Transducers {
     /**
      * @brief Battery sensor class for measuring battery voltage on ESP32.
@@ -39,7 +38,7 @@ namespace UniversalModuleSystem::Transducers {
         /**
          * @brief Begin an asynchronous measurement of the battery voltage.
          * @details Creates a FreeRTOS task to perform multiple ADC samples and stores the calculated voltage.
-         * This task deletes itself after end measurement.
+         * This task deletes itself after the measurement ends.
          */
         void startReading() override;
 
