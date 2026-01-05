@@ -58,18 +58,19 @@ namespace Comms {
         std::optional<uint32_t> uid;
         bool isDeepSleep = false;
 
+        mpLogger->verbosev(
+            "MessageDecider",
+            "Number of command's parameters: ",
+            static_cast<int>(receivedCommand->getNumberOfParameters())
+        );
+
         // main decider switch
         switch (receivedCommand->getCommandType()) {
             // if DEBUG_MODE is not defined CT::RESPONSE will work same as cases: CT::ACKNOWLEDGE, CT::NEGATIVE, CT::REPING
             case CT::RESPONSE:
 #ifdef DEBUG_MODE
             {
-                mpLogger->infov(
-                    "MessageDecider TEST",
-                    "response with num of parameters: ",
-                    static_cast<int>(receivedCommand->getNumberOfParameters())
-                );
-                uah::printArrayAsInt(receivedMessage, MESSAGE_SIZE);
+                mpLogger->verbose("MessageDecider", "CT::RESPONSE");
 
                 try {
                     char text[16] = {};
@@ -145,19 +146,87 @@ namespace Comms {
                 mpLogger->verbose("MessageDecider", "CT::PING");
 
                 try {
+                    sendCommand.emplace(CT::REPING);
+                } catch (std::exception &e) {
+                    sendCommand.reset();
+                    mpLogger->error("MessageDecider CT::PING", e.what());
+                    break;
+                }
+
+                try {
                     uid = receivedCommand->getParameterValue<uint32_t>(0);
+                    if (uid.has_value()) sendCommand->addParameter(API::APIParameter(uid.value()));
                 } catch (std::exception &e) {
                     mpLogger->error("MessageDecider CT::PING", e.what());
                     responseWithError(sendCommand, ET::BAD_ARGUMENT, uid);
                     break;
                 }
 
-                try {
-                    sendCommand.emplace(CT::REPING);
-                    sendCommand->addParameter(API::APIParameter(uid.value()));
-                } catch (std::exception &e) {
-                    receivedCommand.reset();
-                    mpLogger->error("MessageDecider CT::REPING", e.what());
+                const size_t numberOfParameters = receivedCommand->getNumberOfParameters();
+                const auto &parametersSpecialBytes = receivedCommand->getParametersSpecialBytes();
+
+                using PT = API::parametersTypes;
+                for (size_t i = 1; i < numberOfParameters; i++) {
+                    try {
+                        constexpr uint8_t MAX_PARAMETER_ARRAY_SIZE = 16;
+
+                        char logMessage[32];
+                        sprintf(logMessage, "Parameter type: %s", API::parametersTypesToString(receivedCommand->getParameterType(i)).data());
+                        mpLogger->info("MessageDecider CT::PING", logMessage);
+
+                        switch (receivedCommand->getParameterType(i)) {
+                            case PT::INT: {
+                                const auto parameterValue = receivedCommand->getParameterValue<int64_t>(i);
+                                mpLogger->infov("MessageDecider CT::PING", "Parameter value: ", static_cast<int>(parameterValue));
+                                sendCommand->addParameter(API::APIParameter(parameterValue));
+                                break;
+                            }
+
+                            case API::parametersTypes::UINT: {
+                                const auto parameterValue = receivedCommand->getParameterValue<uint64_t>(i);
+                                mpLogger->infov("MessageDecider CT::PING", "Parameter value: ", static_cast<int>(parameterValue));
+                                sendCommand->addParameter(API::APIParameter(parameterValue));
+                                break;
+                            }
+
+                            case API::parametersTypes::FLOAT: {
+                                const auto parameterValue = receivedCommand->getParameterValue<double>(i);
+                                mpLogger->infov("MessageDecider CT::PING", "Parameter value: ", static_cast<int>(parameterValue));
+                                sendCommand->addParameter(API::APIParameter(parameterValue));
+                                break;
+                            }
+
+                            case API::parametersTypes::ASCII: {
+                                char parameterValue[MAX_PARAMETER_ARRAY_SIZE] = {};
+                                receivedCommand->getParameterValueArray<char>(parameterValue, i);
+                                mpLogger->infoa("MessageDecider CT::PING", "Parameter value: ", reinterpret_cast<uint8_t*>(parameterValue), MAX_PARAMETER_ARRAY_SIZE);
+                                sendCommand->addParameter(API::APIParameter(parameterValue, parametersSpecialBytes[i].getLength()));
+                                break;
+                            }
+
+                            case API::parametersTypes::RAW: {
+                                uint8_t parameterValue[MAX_PARAMETER_ARRAY_SIZE] = {};
+                                receivedCommand->getParameterValueArray<uint8_t>(parameterValue, i);
+                                mpLogger->infoa("MessageDecider CT::PING", "Parameter value: ", parameterValue, MAX_PARAMETER_ARRAY_SIZE, false);
+                                sendCommand->addParameter(API::APIParameter(parameterValue, parametersSpecialBytes[i].getLength()));
+                                break;
+                            }
+
+                            case API::parametersTypes::ERROR: {
+                                const auto parameterValue = receivedCommand->getParameterValue<uint8_t>(i);
+                                mpLogger->infov("MessageDecider CT::PING", "Parameter value: ", static_cast<int>(parameterValue));
+                                sendCommand->addParameter(API::APIParameter(parameterValue, true));
+                                break;
+                            }
+
+                            default:
+                                throw std::invalid_argument("Unknown argument type.");
+                        }
+                    } catch (std::exception &e) {
+                        mpLogger->error("MessageDecider CT::PING", e.what());
+                        responseWithError(sendCommand, ET::BAD_ARGUMENT, uid);
+                        break;
+                    }
                 }
                 break;
             }

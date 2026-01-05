@@ -747,8 +747,17 @@ namespace Comms {
                     } else if (uah::areArraysEqual(buffer, "ping")) {
                         API::CommandHandler ch(API::commandTypes::PING);
                         ch.addParameter(API::APIParameter((uint8_t)12));
+                        ch.addParameter(API::APIParameter((uint8_t)128));
+                        ch.addParameter(API::APIParameter(3.4f));
+                        ch.addParameter(API::APIParameter(-456));
+                        char charArray[] = "abcdef";
+                        ch.addParameter(API::APIParameter(charArray, strlen(charArray)));
+                        uint8_t rawArray[] = {1,2,3,4,5};
+                        ch.addParameter(API::APIParameter(rawArray, sizeof(rawArray)));
+
                         uint8_t message[MESSAGE_SIZE] = {};
                         ch.generateMessage(message);
+
                         com.sendMessage(message);
                     }
                     // ascii test

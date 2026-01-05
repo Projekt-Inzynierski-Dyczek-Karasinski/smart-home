@@ -2,6 +2,7 @@
 
 #include <Arduino.h>
 #include <variant>
+#include <string_view>
 
 namespace Comms::API {
     enum class errorTypes : uint8_t {
@@ -55,6 +56,18 @@ namespace Comms::API {
         RAW = 5,
         ERROR = 6
     };
+
+    inline std::string_view parametersTypesToString(const parametersTypes parameterType) {
+        switch (parameterType) {
+            case parametersTypes::INT:   return "INT";
+            case parametersTypes::UINT:  return "UINT";
+            case parametersTypes::FLOAT: return "FLOAT";
+            case parametersTypes::ASCII: return "ASCII";
+            case parametersTypes::RAW:   return "RAW";
+            case parametersTypes::ERROR: return "ERROR";
+            default:                     return "UNKNOWN";
+        }
+    }
 
     using parameterVariant = std::variant<
         std::monostate,

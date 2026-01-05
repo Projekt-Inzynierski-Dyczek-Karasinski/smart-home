@@ -49,7 +49,7 @@ namespace Comms::API {
         return mCommandParameters.size();
     }
 
-    void CommandHandler::addParameter(const APIParameterVariant APIParameter) {
+    void CommandHandler::addParameter(const APIParameterVariant &APIParameter) {
         mCommandParameters.push_back(APIParameter);
         calculateSpecialByteCommand();
     }
@@ -58,8 +58,9 @@ namespace Comms::API {
         calculateSpecialByteCommand();
         messageOutput[ms_SPECIAL_BYTE_INDEX] = mSpecialByteCommand.getSpecialByte();
         uint8_t messageOffset = 1;
+        const uint8_t numberOfParameters = getNumberOfParameters();
 
-        for (uint8_t i = 0; i < getNumberOfParameters(); i++) {
+        for (uint8_t i = 0; i < numberOfParameters; i++) {
             std::visit([&messageOutput, &messageOffset](auto&& param) {
                 param.getBytesRepresentation(&messageOutput[messageOffset]);
                 messageOffset += param.getBytesRepresentationLength();
@@ -72,6 +73,14 @@ namespace Comms::API {
         return mCommandParameters[index];
     }
 
+    const std::vector<SpecialByteParameter>& CommandHandler::getParametersSpecialBytes() const {
+        return mParametersSpecialBytes;
+    }
+
+    parametersTypes CommandHandler::getParameterType(const uint8_t index) const {
+        if (index >= getNumberOfParameters()) throw std::invalid_argument("Index is out of range.");
+        return static_cast<parametersTypes>(mParametersSpecialBytes[index].getType());
+    }
 
     void CommandHandler::calculateSpecialByteCommand() {
         const SpecialByteCommand newSpecialByteCommand(mSpecialByteCommand.getCommandType(), getNumberOfParameters());
@@ -187,6 +196,24 @@ namespace Comms::API {
         }
     }
 
+    template<typename T>
+    void CommandHandler::getParameterValueArray(T *outputArray, const uint8_t index) {
+        if (index >= getNumberOfParameters()) throw std::invalid_argument("Index too big.");
+
+        using PT = parametersTypes;
+        switch (static_cast<PT>(mParametersSpecialBytes[index].getType())) {
+            case PT::ASCII:
+                std::get<APIParameter<char*>>(mCommandParameters[index]).getValue((char*)outputArray);
+                break;
+
+            case PT::RAW:
+                std::get<APIParameter<uint8_t*>>(mCommandParameters[index]).getValue((uint8_t*)outputArray);
+                break;
+
+            default: throw std::invalid_argument("Unsupported parameter type");
+        }
+    }
+
     template uint8_t CommandHandler::getParameterValue<uint8_t>(uint8_t);
     template uint16_t CommandHandler::getParameterValue<uint16_t>(uint8_t);
     template uint32_t CommandHandler::getParameterValue<uint32_t>(uint8_t);
@@ -197,4 +224,7 @@ namespace Comms::API {
     template int64_t CommandHandler::getParameterValue<int64_t>(uint8_t);
     template float CommandHandler::getParameterValue<float>(uint8_t);
     template double CommandHandler::getParameterValue<double>(uint8_t);
+
+    template void CommandHandler::getParameterValueArray<char>(char *outputArray, uint8_t);
+    template void CommandHandler::getParameterValueArray<uint8_t>(uint8_t *outputArray, uint8_t);
 }

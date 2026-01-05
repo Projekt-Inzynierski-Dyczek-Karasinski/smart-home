@@ -39,22 +39,21 @@ namespace Comms::API {
          *
          * @return Command type enum value.
          */
-        commandTypes getCommandType() const;
-
+        [[nodiscard]] commandTypes getCommandType() const;
 
         /**
          * @brief Get a human-readable string representation of the command type.
          *
          * @return Arduino String containing the command name.
          */
-        String getCommandTypeString() const;
+        [[nodiscard]] String getCommandTypeString() const;
 
         /**
         * @brief Get the number of parameters currently stored in this command.
         *
         * @return Number of stored parameters.
         */
-        size_t getNumberOfParameters() const;
+        [[nodiscard]] size_t getNumberOfParameters() const;
 
         /**
          * @brief Append a parameter to the command.
@@ -63,7 +62,7 @@ namespace Comms::API {
          *
          * @param APIParameter Parameter variant to add.
          */
-        void addParameter(APIParameterVariant APIParameter);
+        void addParameter(const APIParameterVariant &APIParameter);
 
         /**
          * @brief Serialize the command and its parameters into an output byte buffer.
@@ -80,7 +79,24 @@ namespace Comms::API {
          *
          * @throws std::invalid_argument If index is out of range.
          */
-        APIParameterVariant getParameter(uint8_t index) const;
+        [[nodiscard]] APIParameterVariant getParameter(uint8_t index) const;
+
+        /**
+         * @brief Get command parameters special bytes.
+         *
+         * @return Const reference of command's special bytes.
+         */
+        [[nodiscard]] const std::vector<SpecialByteParameter> &getParametersSpecialBytes() const;
+
+        /**
+         * @brief Get a parameter type by index.
+         *
+         * @param index Parameter index.
+         * @return The parameter type stored at index.
+         *
+         * @throws std::invalid_argument If index is out of range.
+         */
+        [[nodiscard]] parametersTypes getParameterType(uint8_t index) const;
 
         /**
          * @brief Get the typed value of a parameter by index. The method checks the parameter metadata
@@ -96,6 +112,20 @@ namespace Comms::API {
          */
         template<typename T>
         T getParameterValue(uint8_t index);
+
+        static constexpr uint8_t s_MAX_LENGTH_OF_ARRAY_PARAMETER = 16;
+
+        /**
+         * @brief Get the typed value of a parameter by index.
+         *
+         * @tparam T Array type.
+         * @param outputArray Array to save parameter value.
+         * @param index Parameter index.
+         *
+         * @throws std::invalid_argument If index is out of range or parameter type is unsupported.
+         */
+        template<typename T>
+        void getParameterValueArray(T *outputArray, uint8_t index);
 
     private:
         /**

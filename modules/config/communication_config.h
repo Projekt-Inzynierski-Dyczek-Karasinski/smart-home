@@ -20,17 +20,12 @@
 // TODO assign final value
 #define RECEIVE_BYTE_QUEUE_LEN 128
 #define BLANK_CHARACTER 0
-// TODO assign final value
 #define SUSPEND_TASK_TIME_SHORT 200 // 0.2s
-// TODO assign final value
 #define SUSPEND_TASK_TIME_LONG 2000 // 2s
 #define RECEIVE_BYTE_TIMEOUT 100 // 0.1s
-#define RECEIVE_MESSAGE_TIMEOUT 1000 // 1s
-// TODO assign final value
+#define RECEIVE_MESSAGE_TIMEOUT 2000 // 2s
 #define REPEAT_LAST_MESSAGE_MAX_ATTEMPTS 5
-// TODO assign final value
 #define PING_MAX_ATTEMPTS 3
-// TODO assign final value
 #define DELAY_BETWEEN_MESSAGES 80
 
 #define CONNECTION_SEMAPHORE_TIMEOUT 100 // 0.1s

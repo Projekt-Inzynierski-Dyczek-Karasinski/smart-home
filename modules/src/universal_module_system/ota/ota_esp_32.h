@@ -1,5 +1,5 @@
-#pragma once
-
+// #pragma once
+//
 // #ifndef ESP32_BOARD
 // #error "OtaESP32 class is exclusively for ESP32"
 // #endif
