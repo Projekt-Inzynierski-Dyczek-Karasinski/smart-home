@@ -58,6 +58,7 @@ namespace SmartHomeMediator {
     }
 
     ba::awaitable<void> RfClient::run(std::function<void(const std::string &message)> handleMessage) {
+        mpLogger->debug("[RF_CLIENT] [RUN] called");
         auto &mediator = Mediator::Instance();
         mMessageHandler = std::move(handleMessage);
 
@@ -65,6 +66,7 @@ namespace SmartHomeMediator {
         startSending();
         boost::asio::steady_timer timer(co_await boost::asio::this_coro::executor);
 
+        mpLogger->info("[RF_CLIENT] Started RfClient");
         while (!mIsShuttingDown) {
             if (mSessionQueue.empty()) {
                 // Wait before next pooling
@@ -81,7 +83,7 @@ namespace SmartHomeMediator {
                 mSessionQueue.pop();
             }
 
-            mCurrentSession = std::make_unique<Session>(meta, mpDriver, shared_from_this());
+            mCurrentSession = std::make_unique<Session>(meta, mpDriver, shared_from_this(), mpLogger);
 
             auto result = co_await mCurrentSession->execute();
 
@@ -98,6 +100,7 @@ namespace SmartHomeMediator {
     }
 
     void RfClient::addSession(RfTypes::SessionMetadata &&metadata) {
+        mpLogger->debug("[RF_CLIENT] Adding session");
         std::scoped_lock lock(mSessionQueueMutex);
         mSessionQueue.push(std::move(metadata));
     }
@@ -105,6 +108,11 @@ namespace SmartHomeMediator {
     void RfClient::addMessageToSend(std::vector<uint8_t> &&message) {
         std::scoped_lock lock(mSessionQueueMutex);
         mSendQueue.push(std::move(message));
+    }
+
+    bool RfClient::isSendQueueEmpty(){
+        std::scoped_lock lock(mSendQueueMutex);
+        return mSendQueue.empty();
     }
 
     uint8_t RfClient::getDefaultChannel() {
@@ -118,7 +126,7 @@ namespace SmartHomeMediator {
     void RfClient::startReceiving() {
         bool expected = false;
         constexpr bool desired = true;
-        if (mIsReceiving.compare_exchange_strong(expected, desired)) {
+        if (!mIsReceiving.compare_exchange_strong(expected, desired)) {
             mpLogger->warning("[RF_CLIENT] Already receiving");
             return;
         }
@@ -130,7 +138,7 @@ namespace SmartHomeMediator {
     void RfClient::startSending() {
         bool expected = false;
         constexpr bool desired = true;
-        if (mIsSending.compare_exchange_strong(expected, desired)) {
+        if (!mIsSending.compare_exchange_strong(expected, desired)) {
             mpLogger->warning("[RF_CLIENT] Already sending");
             return;
         }
@@ -152,7 +160,7 @@ namespace SmartHomeMediator {
                 data = co_await mpDriver->read();
                 ++packetReceived;
             } catch (const std::exception &e) {
-                mpLogger->errorf("[RF_CLIENT] Receive error: %s", e.what());
+                mpLogger->debugf("[RF_CLIENT] Receive error: %s", e.what());
             }
 
             if (data.empty()) {
@@ -161,7 +169,15 @@ namespace SmartHomeMediator {
                 continue;
             }
 
-            const auto packet = RfTypes::Packet::from_vector(data);
+            RfTypes::Packet packet;
+            try {
+                packet = RfTypes::Packet::from_vector(data);
+            }
+            catch (const std::exception &e) {
+                mpLogger->debugf("[RF_CLIENT] invalid packet: %s", e.what());
+                ++packetInvalid;
+                continue;
+            }
 
             if (!packet.isValid()) {
                 mpLogger->debug("[RF_CLIENT] Received invalid packet");
@@ -172,6 +188,7 @@ namespace SmartHomeMediator {
             if (mCurrentSession) {
                 mCurrentSession->addReceivedPacket(packet);
             } else {
+                mpLogger->debug("[RF_CLIENT] Creating new session"); //TODO !pr test
                 auto meta = RfTypes::SessionMetadata{
                     .sessionType = RfTypes::SessionType::FROM_MODULE,
                     .rfChannel = mDefaultChannel,
@@ -200,7 +217,7 @@ namespace SmartHomeMediator {
                 [this, &packetReceived, &packetInvalid, &packetEmpty](const bs::error_code &ec) {
                     if (!ec && packetReceived > 0) {
                         mpLogger->infof(
-                            "[RF_CLIENT] Received %d packets, %2.2f\\% packet loss (%d invalid, %d dropped)",
+                            "[RF_CLIENT] Received %d packets, %2.2f%% packet loss (%d invalid, %d dropped)",
                             packetReceived.load(),
                             (packetInvalid + packetEmpty) / static_cast<double>(packetReceived),
                             packetInvalid.load(),
@@ -220,7 +237,7 @@ namespace SmartHomeMediator {
         boost::asio::steady_timer timer(co_await boost::asio::this_coro::executor);
 
         while (mIsSending) {
-            if (mSessionQueue.empty()) {
+            if (mSendQueue.empty()) {
                 // Wait before next pooling
                 timer.expires_after(msPOOLING_DELAY);
                 co_await timer.async_wait(ba::use_awaitable);

@@ -106,7 +106,7 @@ namespace SmartHomeMediator {
         static constexpr size_t ms_BUFFER_CAPACITY = 1024;
         static constexpr size_t ms_READ_CHUNK_SIZE = 512;
 
-        static constexpr auto ms_READ_ASYNC_WAIT_TIMEOUT = 100ns;
+        static constexpr auto ms_READ_ASYNC_WAIT_TIMEOUT = 5ms;
 
         ba::serial_port mPort;
         ba::io_context &mIoContext;
@@ -115,7 +115,7 @@ namespace SmartHomeMediator {
         ba::streambuf mBuffer;
 
         /// Flag to pause readLoop during sync operations
-        bool mSyncModeActive = false;
+        bool mIsSyncModeActive = false;
 
         /// For shutdown handling
         bool mIsShuttingDown = false;

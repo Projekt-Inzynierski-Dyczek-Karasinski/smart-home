@@ -79,10 +79,11 @@ int main(int argc, char *argv[]) {
 
     if (!mediator.initialize(config, logger)) {
         logger->critical("[MAIN] Failed to initalize");
+        return EXIT_FAILURE;
     }
 
     mediator.run();
 
     logger->info("[MAIN] Exit");
-    return 0;
+    return EXIT_SUCCESS;
 }

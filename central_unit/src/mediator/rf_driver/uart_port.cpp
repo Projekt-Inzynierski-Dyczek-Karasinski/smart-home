@@ -28,7 +28,7 @@ namespace SmartHomeMediator {
     }
 
     ba::awaitable<std::vector<uint8_t>> UartPort::readUntil(const std::chrono::milliseconds timeoutDuration) {
-        mSyncModeActive = true; // Stop read loop
+        mIsSyncModeActive = true; // Stop read loop
 
         cancel(); // Interrupt readLoop
 
@@ -57,7 +57,7 @@ namespace SmartHomeMediator {
             timer.cancel();
 
             //  Restart read loop
-            mSyncModeActive = false;
+            mIsSyncModeActive = false;
             ba::post(mIoContext, [this] {
                 if (!mIsShuttingDown) {
                     startReadLoop();
@@ -82,7 +82,7 @@ namespace SmartHomeMediator {
             timer.cancel();
 
             // Restart read loop
-            mSyncModeActive = false;
+            mIsSyncModeActive = false;
             ba::post(mIoContext, [this] {
                 if (!mIsShuttingDown) {
                     startReadLoop();
@@ -103,7 +103,6 @@ namespace SmartHomeMediator {
         ba::steady_timer timer(mIoContext);
 
         while (true) {
-            // Save current buffer size
             const size_t currentSize = mBuffer.size();
 
             // Set timer for inactivity timeout
@@ -124,7 +123,7 @@ namespace SmartHomeMediator {
             size_t newSize = mBuffer.size();
 
             if (newSize == currentSize) {
-                // No new data arrived for ms_READ_ASYNC_WAIT_TIMEOUT ms
+                // No new data arrived for ms_READ_ASYNC_WAIT_TIMEOUT
 
                 if (newSize == 0) {
                     // Continue until read any data
@@ -142,7 +141,7 @@ namespace SmartHomeMediator {
     }
 
     void UartPort::startReadLoop() {
-        if (mIsShuttingDown || mSyncModeActive) {
+        if (mIsShuttingDown || mIsSyncModeActive) {
             return;
         }
 
@@ -159,7 +158,7 @@ namespace SmartHomeMediator {
 
         mPort.set_option(ba::serial_port::baud_rate(baudRate));
 
-        if (!mSyncModeActive && !mIsShuttingDown) {
+        if (!mIsSyncModeActive && !mIsShuttingDown) {
             ba::post(mIoContext, [this] {
                 startReadLoop();
             });
@@ -177,7 +176,7 @@ namespace SmartHomeMediator {
         mBuffer.commit(bytesTransferred);
 
         // Chain next read
-        if (!mSyncModeActive && !mIsShuttingDown) {
+        if (!mIsSyncModeActive && !mIsShuttingDown) {
             startReadLoop();
         }
     }

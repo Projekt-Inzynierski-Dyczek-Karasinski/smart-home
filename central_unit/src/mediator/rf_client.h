@@ -56,6 +56,8 @@ namespace SmartHomeMediator {
 
         void addMessageToSend(std::vector<uint8_t> &&message);
 
+        bool isSendQueueEmpty();
+
         uint8_t getDefaultChannel();
 
         std::array<uint8_t, 6> getDefaultMacAddress();

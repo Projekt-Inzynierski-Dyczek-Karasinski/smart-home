@@ -65,6 +65,14 @@ namespace SmartHomeMediator {
 
         ba::awaitable<std::string> getAllOptions() override;
 
+        /**
+         * @brief Get required delay between write operations.
+         *
+         * @details Returns 2000ms for FU2/FU4 modes, 40ms for FU1/FU3.
+         * @return Delay duration.
+         */
+        std::chrono::milliseconds getRequiredWriteDelay() const;
+
     private:
         /**
          * @brief Enter AT command mode.
@@ -124,14 +132,6 @@ namespace SmartHomeMediator {
          * @return Extracted value.
          */
         static std::vector<uint8_t> parseResponse(const std::vector<uint8_t> &response);
-
-        /**
-         * @brief Get required delay between write operations.
-         *
-         * @details Returns 2000ms for FU2/FU4 modes, 40ms for FU1/FU3.
-         * @return Delay duration.
-         */
-        std::chrono::milliseconds getRequiredWriteDelay() const;
 
         /**
          * @brief Map power level (1-8) to dBm string.

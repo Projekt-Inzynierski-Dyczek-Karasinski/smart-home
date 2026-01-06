@@ -10,21 +10,21 @@
 #include <utility>
 
 
-
 namespace SmartHomeMediator {
-
     Session::Session(RfTypes::SessionMetadata metadata,
-                     const std::shared_ptr<HC12Driver> &rfDriver,
-                     const std::shared_ptr<RfClient> &rfClient)
+                     const std::shared_ptr<HC12Driver> &pRfDriver,
+                     const std::shared_ptr<RfClient> &pRfClient,
+                     const std::shared_ptr<su::Logger> &pLogger)
         : mMetadata(std::move(metadata)),
-          mpRfDriver(rfDriver),
-          mpRfClient(rfClient) {
+          mpRfDriver(pRfDriver),
+          mpRfClient(pRfClient),
+          mpLogger(pLogger) {
     }
 
     ba::awaitable<std::string> Session::execute() {
+        mpLogger->debug("[SESSION] [EXECUTE] called");
         std::vector<uint8_t> receivedMessage;
         RfTypes::RfCommand commandResponse;
-
 
         auto timer = ba::steady_timer(co_await ba::this_coro::executor); //TODO !pr add t/o
 
@@ -98,13 +98,16 @@ namespace SmartHomeMediator {
                 case State::AWAIT_RESPONSE:
                     receivedMessage = co_await receive();
                     if (receivedMessage.empty()) {
+                        mpLogger->debug("[SESSION] [EXECUTE] [AWAIT_RESPONSE] empty response");
                         changeState(State::RESEND_LAST_MESSAGE);
                         break;
                     }
 
                     try {
                         commandResponse = RfTypes::RfCommand(receivedMessage);
-                    } catch (...) {
+                    } catch (const std::exception &e) {
+                        mpLogger->debugf("[SESSION] [EXECUTE] [AWAIT_RESPONSE] parse to rf command failed: %s",
+                                         e.what());
                         changeState(State::SEND_REPEAT_LAST_MESSAGE);
                         break;
                     }
@@ -115,20 +118,23 @@ namespace SmartHomeMediator {
                             changeState(State::NEXT_COMMAND);
                             break;
                         }
+                        mpLogger->debug("[SESSION] [EXECUTE] [AWAIT_RESPONSE] invalid response for notification");
                         changeState(State::SEND_REPEAT_LAST_MESSAGE);
                         break;
                     }
 
                     if (commandResponse.commandType != RfTypes::CommandTypes::RESPONSE &&
                         commandResponse.commandType != RfTypes::CommandTypes::PING) {
+                        mpLogger->debug("[SESSION] [EXECUTE] [AWAIT_RESPONSE] invalid response type");
                         changeState(State::SEND_REPEAT_LAST_MESSAGE);
                         break;
                     }
 
                     try {
                         resultVector.push_back(RfApi::toApiString(commandResponse));
-                    }catch (...) {
-                        // Invalid response, request repeat
+                    } catch (const std::exception &e) {
+                        mpLogger->debugf("[SESSION] [EXECUTE] [AWAIT_RESPONSE] parse to api response failed: %s",
+                                         e.what());
                         changeState(State::SEND_REPEAT_LAST_MESSAGE);
                         break;
                     }
@@ -138,7 +144,7 @@ namespace SmartHomeMediator {
 
 
                 case State::RESEND_LAST_MESSAGE:
-                    if (retries++ >= msMAX_REATTEMPTS) {
+                    if (++retries > msMAX_REATTEMPTS) {
                         error.code = sa::ErrorCodes::MEDIATOR_COMMUNICATION_ERROR;
                         error.message = SmartHome::API::errorCodeToString(error.code);
                         error.data = "No response from module";
@@ -157,7 +163,7 @@ namespace SmartHomeMediator {
 
 
                 case State::SEND_REPEAT_LAST_MESSAGE: {
-                    if (retries++ >= msMAX_REATTEMPTS) {
+                    if (++retries > msMAX_REATTEMPTS) {
                         error.code = sa::ErrorCodes::MEDIATOR_COMMUNICATION_ERROR;
                         error.message = SmartHome::API::errorCodeToString(error.code);
                         error.data = "Module sent invalid response";
@@ -226,11 +232,28 @@ namespace SmartHomeMediator {
             }
         }
 
+        boost::asio::steady_timer awaitSendTimer(co_await boost::asio::this_coro::executor);
+
+        // Wait until all messages are send
+        while (!mpRfClient->isSendQueueEmpty()) {
+            awaitSendTimer.expires_after(msPOOLING_DELAY);
+            co_await awaitSendTimer.async_wait(ba::use_awaitable);
+        }
+
+        awaitSendTimer.expires_after(mpRfDriver->getRequiredWriteDelay() + msPOOLING_DELAY);
+        co_await awaitSendTimer.async_wait(ba::use_awaitable);
+
         // Return to default channel, ignore errors
         co_await changeChannel(mpRfClient->getDefaultChannel());
 
         auto resultJsonArray = nlohmann::json::array();
-        resultJsonArray = resultVector;
+        for (const auto &result: resultVector) {
+            try {
+                resultJsonArray.push_back(nlohmann::json::parse(result));
+            } catch (const std::exception &e) {
+                mpLogger->errorf("[SESSION] [EXECUTE] Failed to parse result: %s", e.what());
+            }
+        }
         co_return to_string(resultJsonArray);
     }
 
@@ -278,8 +301,9 @@ namespace SmartHomeMediator {
 
         std::atomic_bool timeout = false;
 
-        auto timeoutCallback = [&timeout](const bs::error_code &ec) {
+        auto timeoutCallback = [&timeout, this](const bs::error_code &ec) {
             if (!ec) {
+                mpLogger->debug("[SESSION] [RECEIVE] timeout");
                 timeout = true;
             }
         };
@@ -289,6 +313,7 @@ namespace SmartHomeMediator {
 
         while (!mIsReceivedBufferReady) {
             if (timeout) {
+                mpLogger->debug("[SESSION] [RECEIVE] receive loop timed out");
                 std::scoped_lock lock(mReceiveMutex);
                 mIsReceivedBufferReady = false;
                 mReceivedBuffer.clear();
@@ -297,15 +322,24 @@ namespace SmartHomeMediator {
             poolingTimer.expires_after(msPOOLING_DELAY);
             co_await poolingTimer.async_wait(ba::use_awaitable);
         }
+        timeoutTimer.cancel();
 
         std::scoped_lock lock(mReceiveMutex);
         std::vector<uint8_t> result = mReceivedBuffer;
         mReceivedBuffer.clear();
         mIsReceivedBufferReady = false;
+        std::string tmp;
+
+        for (const auto &e: result) {
+            tmp += std::to_string(e) + ",";
+        }
+        tmp.pop_back();
+        mpLogger->debugf("[SESSION] [RECEIVE] Received packet: [%s]", tmp.c_str());
         co_return result;
     }
 
     ba::awaitable<bool> Session::changeChannel(const uint8_t channel) const {
+        mpLogger->debug("[SESSION] [CHANGE_CHANNEL] called");
         auto retryTimer = ba::steady_timer(co_await ba::this_coro::executor);
         bool isSuccessful = false;
         for (int i = 0; i < 3; i++) {

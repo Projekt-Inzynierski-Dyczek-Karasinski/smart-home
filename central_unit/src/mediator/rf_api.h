@@ -30,7 +30,7 @@ namespace SmartHomeMediator {
          * @note Message must be in JSON RPC format with `params` field formated as follows:
          *       \code{.json}
          *       {
-         *         "target": "mediator",
+         *         "target": "module_mediator",
          *         "module_info": {
          *           "logic_address": <uint>,
          *           "rf_channel": <uint>

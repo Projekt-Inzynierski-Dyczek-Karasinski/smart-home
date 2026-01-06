@@ -28,7 +28,7 @@ namespace SmartHomeMediator {
     }
 
     bool ApiClient::connectToServer(const std::string_view ipAddress, const int port) {
-        mConnection.emplace(*mpIoContext, si::SocketConnection::Type::UDS, mpLogger);
+        mConnection.emplace(*mpIoContext, si::SocketConnection::Type::TCP, mpLogger);
         const auto endpoint = bai::tcp::endpoint(bai::make_address(ipAddress), port);
 
         if (!mConnection->connect(endpoint)) {

@@ -106,6 +106,7 @@ namespace SmartHomeMediator {
             }
             isRfClientInitialized = isSuccessful;
         });
+        std::this_thread::sleep_for(1s);
         if (!isRfClientInitialized) return false;
 
         mIsInitialized.store(true, std::memory_order_release);
@@ -125,7 +126,7 @@ namespace SmartHomeMediator {
         }
 
         mIsRunning.store(true, std::memory_order_release);
-        mpLogger->info("[MEDIATOR] Mediator running");
+        mpLogger->info("[MEDIATOR] Mediator starting");
 
         mpService->onStart();
 
@@ -139,23 +140,23 @@ namespace SmartHomeMediator {
             signalHandler(ec, sig);
         });
 
-        static constexpr int nullConnection = 0;
+        static constexpr int nullConnection = 0; // Connection ID is not needed when communicating only with IPC server
         mpRfApi = std::make_unique<RfApi>(mpRfClient);
         mpRfApi->initialize([this](const std::string &message) {
             mpApiClient->handleOutgoing(nullConnection, message.data());
         });
 
-        mMediatorIoContext.post([this] {
+        mApiClientIoContext.post([this] {
             mpApiClient->initialize([this](const std::string &message) {
                 mpRfApi->handleIncoming(nullConnection, message.data());
             });
         });
 
-        mMediatorIoContext.post([this] {
-            mpRfClient->run([this](const std::string &message) {
-                mpRfApi->handleOutgoing(nullConnection, message.data());
-            });
-        });
+        ba::co_spawn(mRfClientIoContext, mpRfClient->run([this](const std::string &message) {
+            mpRfApi->handleOutgoing(nullConnection, message.data());
+        }), ba::detached);
+
+        mpLogger->info("[MEDIATOR] Mediator running");
 
         // Main thread loop
         mMediatorThread->join();

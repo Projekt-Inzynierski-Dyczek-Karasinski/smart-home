@@ -92,7 +92,7 @@ namespace SmartHomeMediator::RfTypes {
     };
 
     // Target string
-    inline constexpr std::string_view MEDIATOR_STRING = "mediator";
+    inline constexpr std::string_view MEDIATOR_STRING = "module_mediator";
 
     // Commands strings
     inline constexpr std::string_view GET_STRING = "get";

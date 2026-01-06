@@ -3,7 +3,6 @@
 #include <boost/algorithm/string/case_conv.hpp>
 
 namespace SmartHomeMediator::RfTypes {
-
     namespace sj = SmartHome::JsonRpcStrings;
 
 
@@ -13,8 +12,7 @@ namespace SmartHomeMediator::RfTypes {
         }
 
         Packet packet{};
-        packet = std::bit_cast<Packet>(data); // TODO !pr test
-        // std::memcpy(&packet, data.data(), data.size());
+        std::memcpy(&packet, data.data(), data.size());
         return packet;
     }
 
@@ -225,6 +223,12 @@ namespace SmartHomeMediator::RfTypes {
             }
         };
 
+        // Helper lambda to adjust value of param length read from special byte.
+        // Actual parameter length is equal to value contained in second half of special byte + 1
+        const auto adjustParamLength = [](unsigned char &value) {
+            value = value + 1;
+        };
+
         // Parse command
         requireBytes(1);
         const auto [command, numOfParameters] = readSpecialByte(rawData[rawDataOffset++]);
@@ -246,10 +250,11 @@ namespace SmartHomeMediator::RfTypes {
         // Parse UID or Notification type
         if (commandType == CommandTypes::REPING || commandType == CommandTypes::RESPONSE) {
             requireBytes(1);
-            const auto [uidParameterRawType, uidParameterLength] = readSpecialByte(rawData[rawDataOffset++]);
+            auto [uidParameterRawType, uidParameterLength] = readSpecialByte(rawData[rawDataOffset++]);
             if (static_cast<ParameterTypes>(uidParameterRawType) != ParameterTypes::UINT) {
                 throw std::runtime_error("unexpected parameter type for UID");
             }
+            adjustParamLength(uidParameterLength);
             requireBytes(uidParameterLength);
 
 
@@ -267,7 +272,7 @@ namespace SmartHomeMediator::RfTypes {
             rawDataOffset += uidParameterLength;
         } else if (commandType == CommandTypes::NOTIFY) {
             requireBytes(1);
-            const auto [notifTypeParameterRawType, notifTypeParameterLength] =
+            auto [notifTypeParameterRawType, notifTypeParameterLength] =
                     readSpecialByte(rawData[rawDataOffset++]);
 
             if (static_cast<ParameterTypes>(notifTypeParameterRawType) != ParameterTypes::UINT) {
@@ -276,16 +281,18 @@ namespace SmartHomeMediator::RfTypes {
             if (notifTypeParameterLength != sizeof(uint8_t)) {
                 throw std::runtime_error("unexpected parameter length for Notification Type");
             }
+            adjustParamLength(notifTypeParameterLength);
             requireBytes(notifTypeParameterLength);
 
             requestType.emplace(std::bit_cast<NotificationTypes>(rawData[rawDataOffset]));
             rawDataOffset += notifTypeParameterLength;
         }
 
-        for (uint8_t i = paramIndexOffset; i < numOfParameters; ++i) {
+        for (uint8_t i = paramIndexOffset; i < numOfParameters; i++) {
             requireBytes(1);
-            const auto [parameterRawType, parameterLength] = readSpecialByte(rawData[rawDataOffset++]);
+            auto [parameterRawType, parameterLength] = readSpecialByte(rawData[rawDataOffset++]);
             const auto parameterType = static_cast<ParameterTypes>(parameterRawType);
+            adjustParamLength(parameterLength);
             requireBytes(parameterLength);
 
             Parameter parameter;
@@ -312,7 +319,9 @@ namespace SmartHomeMediator::RfTypes {
                     copyRawDataToParameter<RfErrorCodes>(parameter, parameterData);
                     break;
                 default:
-                    throw std::runtime_error("unsupported parameter type");
+                    char buffer[64];
+                    sprintf(buffer, "unexpected parameter type %d", parameterRawType);
+                    throw std::runtime_error(buffer);
             }
 
             parameters.push_back(parameter);
@@ -320,16 +329,18 @@ namespace SmartHomeMediator::RfTypes {
     }
 
     std::vector<uint8_t> RfCommand::to_vector() const {
-        std::vector<uint8_t> buffer;
-        const uint8_t specialByte = getSpecialByte(static_cast<uint8_t>(commandType),
-                                                   static_cast<uint8_t>(parameters.size()));
-        buffer.push_back(specialByte);
-
-
         std::vector<uint8_t> requestIdVector;
         if (requestId.has_value()) {
             requestIdVector = Parameter(static_cast<uint64_t>(requestId.value())).to_vector();;
         }
+
+
+        std::vector<uint8_t> buffer;
+        const uint8_t specialByte = getSpecialByte(static_cast<uint8_t>(commandType),
+                                                   static_cast<uint8_t>(parameters.size()) +
+                                                   (requestId.has_value() ? 1 : 0));
+        buffer.push_back(specialByte);
+
 
         std::vector<uint8_t> typeVector;
 
@@ -447,5 +458,4 @@ namespace SmartHomeMediator::RfTypes {
         result.first = specialByte >> 4;
         return result;
     }
-
 }

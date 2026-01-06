@@ -25,9 +25,11 @@ namespace SmartHomeMediator {
          */
         struct Config {
             /// Default TCP config from socket server
-            si::SocketServer::Config::Tcp tcp;
+            si::SocketServer::Config::Tcp tcp{
+                .isEnabled = true, .endpointAddress = "192.168.100.32", .endpointPort = 43321
+            };
             /// Default UDS config from socket server
-            si::SocketServer::Config::Uds uds;
+            si::SocketServer::Config::Uds uds{.isEnabled = false, .endpointPath = ""};
         };
 
 
