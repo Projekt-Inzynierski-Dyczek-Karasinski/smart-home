@@ -257,9 +257,9 @@ namespace SmartHome::API {
          */
         explicit ApiRequest(std::string_view value);
 
-        nlohmann::json to_json();
+        nlohmann::json to_json() const;
 
-        std::string to_string();
+        std::string to_string() const;
 
         /// Update request from JSON object.
         ApiRequest operator()(const nlohmann::json &value);
@@ -294,6 +294,11 @@ namespace SmartHome::API {
         std::optional<std::string> result; ///< Result string or JSON object stored as string
         std::optional<ApiError> error; ///< Error object if request failed
         ApiId id; ///< Response identifier matching request
+
+
+        explicit ApiResponse() = default;
+
+        explicit ApiResponse(const nlohmann::json &json);
 
         /**
          * @brief Convert response to JSON object.
