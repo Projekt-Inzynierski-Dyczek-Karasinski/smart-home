@@ -3,8 +3,7 @@
 #include <boost/algorithm/string/case_conv.hpp>
 
 namespace SmartHome {
-    ba::awaitable<API::ApiResponse> CoreActions::coreEchoHandler(
-        const std::shared_ptr<Actions::CommandMetadata> &commandMetadata) {
+    ba::awaitable<API::ApiResponse> CoreActions::coreEchoHandler(const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[CORE_ACTIONS] [ECHO] called");
         const auto &command = commandMetadata->command;
         API::ApiResponse commandResult;
@@ -22,8 +21,7 @@ namespace SmartHome {
         co_return commandResult;
     }
 
-    ba::awaitable<API::ApiResponse> CoreActions::coreGetHandler(
-        const std::shared_ptr<Actions::CommandMetadata> &commandMetadata) {
+    ba::awaitable<API::ApiResponse> CoreActions::coreGetHandler(const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[CORE_ACTIONS] [GET] called");
         const auto &command = commandMetadata->command;
         API::ApiResponse commandResult;
@@ -106,7 +104,7 @@ namespace SmartHome {
         co_return commandResult;
     }
 
-    ba::awaitable<API::ApiResponse> CoreActions::coreSetHandler(const std::shared_ptr<Actions::CommandMetadata> &commandMetadata) {
+    ba::awaitable<API::ApiResponse> CoreActions::coreSetHandler(const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[CORE_ACTIONS] [SET] called");
         const auto &command = commandMetadata->command;
         API::ApiResponse commandResult;
@@ -180,17 +178,16 @@ namespace SmartHome {
         return (iter != setKeyMap.end()) ? iter->second : SetKeys::UNDEFINED;
     }
 
-    bool CoreActions::setConnectionType(const std::shared_ptr<Actions::CommandMetadata> &pMetadata,
+    bool CoreActions::setConnectionType(const cmdMetaPtr &pMetadata,
                                         std::string_view connectionTypeString) {
         clearStaleConnectionTypes();
 
         connectionId_t connectionId;
         // Get Connection ID
-        try{
+        try {
             std::scoped_lock lock(Actions::msActiveRequestsLock);
             connectionId = Actions::msActiveRequests.at(pMetadata->requestId).request.connectionId;
-        }
-        catch (...) {
+        } catch (...) {
             return false;
         }
 
@@ -227,7 +224,6 @@ namespace SmartHome {
                 continue;
             }
             Actions::msConnectionTypeMap[connectionType] = intersectionResult;
-
         }
     }
 }

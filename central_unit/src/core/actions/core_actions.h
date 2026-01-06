@@ -15,6 +15,8 @@ namespace SmartHome {
     }
 
     class CoreActions {
+        using cmdMetaPtr = std::shared_ptr<Actions::CommandMetadata>;
+
     public:
         enum class SetKeys {
             UNDEFINED = 0,
@@ -29,8 +31,7 @@ namespace SmartHome {
        * @param commandMetadata Command execution metadata.
        * @return API response with echoed parameters.
        */
-        static ba::awaitable<API::ApiResponse> coreEchoHandler(
-            const std::shared_ptr<Actions::CommandMetadata> &commandMetadata);
+        static ba::awaitable<API::ApiResponse> coreEchoHandler(const cmdMetaPtr &commandMetadata);
 
         // TODO change docstring after adding proper implementation
         /**
@@ -41,11 +42,9 @@ namespace SmartHome {
          *
          * @note Proper implementation will be added later.
          */
-        static ba::awaitable<API::ApiResponse> coreGetHandler(
-            const std::shared_ptr<Actions::CommandMetadata> &commandMetadata);
+        static ba::awaitable<API::ApiResponse> coreGetHandler(const cmdMetaPtr &commandMetadata);
 
-        static ba::awaitable<API::ApiResponse> coreSetHandler(
-            const std::shared_ptr<Actions::CommandMetadata> &commandMetadata);
+        static ba::awaitable<API::ApiResponse> coreSetHandler(const cmdMetaPtr &commandMetadata);
 
         static constexpr std::string_view msCONNECTION_TYPE_STRING = "connection_type";
 
@@ -53,7 +52,7 @@ namespace SmartHome {
 
         static SetKeys stringToSetKey(std::string_view setKey);
 
-        static bool setConnectionType(const std::shared_ptr<Actions::CommandMetadata> &pMetadata,
+        static bool setConnectionType(const cmdMetaPtr &pMetadata,
                                       std::string_view connectionTypeString);
 
         static void clearStaleConnectionTypes();

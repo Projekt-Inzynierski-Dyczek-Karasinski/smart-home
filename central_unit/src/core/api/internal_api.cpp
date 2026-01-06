@@ -146,33 +146,62 @@ namespace SmartHome::API {
                                   const ApiId id,
                                   const Method method,
                                   const Target target)
-        : params(std::move(params)), commandId(id), method(method), target(target) {
+        : params(params), commandId(id), method(method), target(target) {
     }
 
     void InternalApi::handleIncoming(const apiId_t connectionId, std::string &&message) {
         boost::algorithm::trim(message);
         std::string_view messageView(message);
 
+        const auto logger = Core::Instance().mpLogger;
+        logger->debug("[INTERNAL_API] handleIncoming");
 
-        // TODO !pr check if response is incoming: if not continue with request parsing
-        // TODO !pr handle incoming response
+        bool isMessageJson = false;
+
+        nlohmann::json jsonMessage;
+
+        if (nlohmann::json::accept(messageView)) {
+            isMessageJson = true;
+            jsonMessage = nlohmann::json::parse(messageView);
+
+            // Check for incoming responses
+            if (jsonMessage.is_array()) {
+                // Handle responses from JSON batch, leave potential requests in jsonMessage
+                for (int i = jsonMessage.size() - 1; i >= 0; --i) {
+                    try {
+                        ApiResponse response(jsonMessage[i]);
+                        ba::post(Core::Instance().getCoreIoContext(), [connectionId, response] {
+                            Actions::handleIncomingResponse(connectionId, response);
+                        });
+                        jsonMessage.erase(jsonMessage.begin() + i);
+                    } catch (...) {
+                    }
+                }
+                if (jsonMessage.empty()) return;
+            } else {
+                try {
+                    auto response = ApiResponse(jsonMessage);
+                    ba::post(Core::Instance().getCoreIoContext(), [connectionId, response] {
+                        Actions::handleIncomingResponse(connectionId, response);
+                    });
+                    return;
+                } catch (...) {
+                }
+            }
+        }
 
         Request requestStruct = {
             .connectionId = connectionId,
         };
 
-        const auto logger = Core::Instance().mpLogger;
-        logger->debug("[INTERNAL_API] handleIncoming");
-
         ApiError e;
-        if (nlohmann::json::accept(messageView)) {
-            //Setting structured result when trimmedRequest contains json object
+        if (isMessageJson) {
+            //Setting structured result when trimmedRequest contains JSON object
             requestStruct.isResultStructured = true;
-            nlohmann::json requestJson = nlohmann::json::parse(messageView);
 
-            if (requestJson.is_array()) {
+            if (jsonMessage.is_array()) {
                 // Parse JSON-RPC batch request by filling Request struct commands vector with parsed ApiRequest structs
-                for (const auto &unpackedRequest: requestJson) {
+                for (const auto &unpackedRequest: jsonMessage) {
                     try {
                         requestStruct.commands.emplace_back(ApiRequest(unpackedRequest));
                     } catch (const std::exception &exception) {
@@ -196,7 +225,7 @@ namespace SmartHome::API {
             } else {
                 // Parse singular JSON-RPC request
                 try {
-                    requestStruct.commands.emplace_back(ApiRequest(requestJson));
+                    requestStruct.commands.emplace_back(ApiRequest(jsonMessage));
                 } catch (const std::exception &exception) {
                     e.code = ErrorCodes::PARSE_ERROR;
                     e.data = exception.what();

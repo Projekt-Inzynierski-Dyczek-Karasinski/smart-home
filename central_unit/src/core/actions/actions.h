@@ -14,7 +14,10 @@ using sai = SmartHome::API::InternalApi;
 namespace SmartHome {
     using namespace std::chrono_literals;
 
+    //TODO !pr check if needed
     class CoreActions;
+    class MediatorActions;
+
     /**
      * @brief Actions handler for processing internal API commands.
      *
@@ -23,6 +26,7 @@ namespace SmartHome {
      */
     class Actions {
         friend class CoreActions;
+        friend class MediatorActions;
 
     public:
         /**
@@ -38,6 +42,8 @@ namespace SmartHome {
                 CANCELLED = 2,
                 TIMED_OUT = 3
             };
+
+
 
             /// Command data
             API::InternalApi::Command command;
@@ -74,6 +80,20 @@ namespace SmartHome {
             bool isPending() const;
         };
 
+        struct OutgoingRequestMetadata {
+            std::mutex metadataMutex;
+            /// Outgoing requests
+            std::vector<API::ApiRequest> requestsToSend;
+            /// ApiRequest response promise map {ApiRequest.id: shared_ptr<promise<ApiResponse>>}
+            std::unordered_map<apiId_t, std::shared_ptr<std::promise<API::ApiResponse> > > requestsPromises;
+            /// For aggregating request to send in batch
+            std::shared_ptr<ba::steady_timer> sendTimer = std::make_shared<ba::steady_timer>(
+                Core::Instance().getCoreIoContext());
+            /// Request-level timeout timer
+            std::shared_ptr<ba::steady_timer> timeoutTimer = std::make_shared<ba::steady_timer>(
+                Core::Instance().getCoreIoContext());
+        };
+
         /// Callback type for request completion notification
         using RequestCallback = std::function<void(connectionId_t connectionId, std::string &&response)>;
 
@@ -96,7 +116,7 @@ namespace SmartHome {
         static void handleOutgoingResponse(apiId_t responseId);
 
 
-        static void handleIncomingResponse(const API::InternalApi::Response &response);
+        static void handleIncomingResponse(connectionId_t connectionId, const API::ApiResponse &response);
 
         static void handleOutgoingRequest(connectionId_t connectionId, API::ApiRequest &&apiRequest,
                                           const std::shared_ptr<std::promise<API::ApiResponse> > &pResponsePromise);
@@ -157,7 +177,7 @@ namespace SmartHome {
         };
 
 
-        using CommandMetadataPtr = std::shared_ptr<CommandMetadata>;
+        using cmdMetaPtr = std::shared_ptr<CommandMetadata>;
 
         /**
          * @brief Request metadata containing all commands and state.
@@ -166,7 +186,7 @@ namespace SmartHome {
             /// Original request data
             API::InternalApi::Request request;
             /// Command metadata pointers
-            std::vector<CommandMetadataPtr> commands;
+            std::vector<cmdMetaPtr> commands;
             /// Request-level timeout timer
             std::atomic<std::shared_ptr<ba::steady_timer> > requestTimeoutTimer;
             /// Count of incomplete commands
@@ -194,19 +214,7 @@ namespace SmartHome {
             void cancel();
         };
 
-        struct OutgoingRequestMetadata {
-            std::mutex metadataMutex;
-            /// Outgoing requests
-            std::vector<API::ApiRequest> requestsToSend;
-            /// ApiRequest response promise map {ApiRequest.id: shared_ptr<promise<ApiResponse>>}
-            std::unordered_map<apiId_t, std::shared_ptr<std::promise<API::ApiResponse> > > requestsPromises;
-            /// For aggregating request to send in batch
-            std::shared_ptr<ba::steady_timer> sendTimer = std::make_shared<ba::steady_timer>(
-                Core::Instance().getCoreIoContext());
-            /// Request-level timeout timer
-            std::shared_ptr<ba::steady_timer> timeoutTimer = std::make_shared<ba::steady_timer>(
-                Core::Instance().getCoreIoContext());
-        };
+
 
         /**
          * @brief Generate unique request ID.
@@ -221,7 +229,7 @@ namespace SmartHome {
          *
          * @details Handlers receive command metadata and return API response asynchronously.
          */
-        using CommandHandler = std::function<ba::awaitable<API::ApiResponse>(const std::shared_ptr<CommandMetadata> &)>;
+        using CommandHandler = std::function<ba::awaitable<API::ApiResponse>(const cmdMetaPtr &)>;
 
         /**
          * @brief Lookup command handler from registry.
@@ -241,8 +249,8 @@ namespace SmartHome {
          * @param newCommand Command to execute.
          * @param requestId Parent request identifier.
          */
-        static void executeCommandAsync(CommandHandler handler,
-                                        API::InternalApi::Command newCommand,
+        static void executeCommandAsync(const CommandHandler& handler,
+                                        const API::InternalApi::Command& newCommand,
                                         apiId_t requestId);
 
         /**
@@ -252,7 +260,7 @@ namespace SmartHome {
          * @param handler Command handler function.
          * @return Awaitable void result.
          */
-        static ba::awaitable<void> processCommand(std::shared_ptr<CommandMetadata> commandMetadata,
+        static ba::awaitable<void> processCommand(cmdMetaPtr commandMetadata,
                                                   CommandHandler handler);
 
 
@@ -262,7 +270,7 @@ namespace SmartHome {
          * @param commandMetadata Command that completed.
          * @param commandResult Result from command handler.
          */
-        static void handleCommandResult(const std::shared_ptr<CommandMetadata> &commandMetadata,
+        static void handleCommandResult(const cmdMetaPtr &commandMetadata,
                                         API::ApiResponse &&commandResult);
 
         /**
@@ -270,7 +278,7 @@ namespace SmartHome {
          *
          * @param commandMetadata Timed-out command metadata.
          */
-        static void handleCommandTimeout(const std::shared_ptr<CommandMetadata> &commandMetadata);
+        static void handleCommandTimeout(const cmdMetaPtr &commandMetadata);
 
         /**
          * @brief Add command result to response collection.
@@ -278,7 +286,7 @@ namespace SmartHome {
          * @param commandMetadata Command metadata with request ID.
          * @param apiResponse Response to add.
          */
-        static void addCommandResultToResponse(const std::shared_ptr<CommandMetadata> &commandMetadata,
+        static void addCommandResultToResponse(const cmdMetaPtr &commandMetadata,
                                                API::ApiResponse &&apiResponse);
 
         /**
@@ -344,6 +352,6 @@ namespace SmartHome {
          * @return API response with result or error.
          */
         static ba::awaitable<API::ApiResponse> placeholderHandler(
-            const std::shared_ptr<CommandMetadata> &commandMetadata);
+            const cmdMetaPtr &commandMetadata);
     };
 }
