@@ -9,6 +9,7 @@ namespace SmartHomeMediator {
     RfTypes::RfCommand RfApi::toRfCommand(const SmartHome::API::ApiRequest &apiRequest) {
         RfTypes::RfCommand rfCommand;
         char buffer[1024];
+        int paramOffset = 1; // default offset to skip request type
 
         if (!apiRequest.params.has_value()) {
             throw std::invalid_argument("No parameters specified");
@@ -35,12 +36,12 @@ namespace SmartHomeMediator {
                 // Read set type from first index
                 try {
                     rfCommand.requestType.emplace(
-                        RfTypes::setTypeFromString(methodParams.get()->front().get<std::string>()));
+                        RfTypes::setTypeFromString(methodParams->front().get<std::string>()));
                 } catch (const std::exception &e) {
                     sprintf(buffer,
                             "Missing or invalid action type inside method_params for set: %s,\ncurrent method_params: %s",
                             e.what(),
-                            methodParams.get()->dump().c_str());
+                            methodParams->dump().c_str());
                     throw std::invalid_argument(buffer);
                 }
             } else if (method == RfTypes::GET_STRING && methodParams != nullptr && methodParams->is_array() &&
@@ -49,24 +50,24 @@ namespace SmartHomeMediator {
                 // Read get type from first index
                 try {
                     rfCommand.requestType.emplace(
-                        RfTypes::getTypeFromString(methodParams.get()->front().get<std::string>()));
+                        RfTypes::getTypeFromString(methodParams->front().get<std::string>()));
                 } catch (const std::exception &e) {
                     sprintf(buffer,
                             "Missing or invalid action type inside method_params for get: %s,\ncurrent method_params: %s",
                             e.what(),
-                            methodParams.get()->dump().c_str());
+                            methodParams->dump().c_str());
                     throw std::invalid_argument(buffer);
                 }
             } else if (method == RfTypes::EXECUTE_STRING && methodParams != nullptr && methodParams->is_array() &&
                        !methodParams->empty()) {
                 std::string action;
                 try {
-                    action = methodParams.get()->front().get<std::string>();
+                    action = methodParams->front().get<std::string>();
                 } catch (const std::exception &e) {
                     sprintf(buffer,
                             "Missing or invalid action type inside method_params for execute: %s,\ncurrent method_params: %s",
                             e.what(),
-                            methodParams.get()->dump().c_str());
+                            methodParams->dump().c_str());
                     throw std::invalid_argument(buffer);
                 }
 
@@ -78,13 +79,14 @@ namespace SmartHomeMediator {
                 }
             } else if (method == RfTypes::PING_STRING) {
                 rfCommand.commandType = RfTypes::CommandTypes::PING;
+                paramOffset = 0; // ping does not have a type as first param
             } else {
                 throw std::invalid_argument("Invalid method specified");
             }
 
             // Pass remaining method params to rfCommand parameter vector
-            for (auto i = 1; i < methodParams->size(); i++) {
-                rfCommand.parameters.push_back(RfTypes::Parameter::parameterFromJson(methodParams.get()->at(i)));
+            for (auto i = paramOffset; i < methodParams->size(); i++) {
+                rfCommand.parameters.push_back(RfTypes::Parameter::parameterFromJson(methodParams->at(i)));
             }
 
             rfCommand.requestId = apiRequest.id.value();
@@ -94,12 +96,12 @@ namespace SmartHomeMediator {
                 // Read get notify from first index
                 try {
                     rfCommand.requestType.emplace(
-                        RfTypes::notificationTypeFromString(methodParams.get()->front().get<std::string>()));
+                        RfTypes::notificationTypeFromString(methodParams->front().get<std::string>()));
                 } catch (const std::exception &e) {
                     sprintf(buffer,
                             "Missing or invalid action type inside method_params for notify: %s,\ncurrent method_params: %s",
                             e.what(),
-                            methodParams.get()->dump().c_str());
+                            methodParams->dump().c_str());
                     throw std::invalid_argument(buffer);
                 }
             } else {
