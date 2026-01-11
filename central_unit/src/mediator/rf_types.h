@@ -179,6 +179,8 @@ namespace SmartHomeMediator::RfTypes {
 
         explicit Parameter(double newValue);
 
+        explicit Parameter(float newValue);
+
         explicit Parameter(std::string_view newValue);
 
         explicit Parameter(const std::vector<uint8_t> &newValue);
@@ -290,6 +292,7 @@ namespace SmartHomeMediator::RfTypes {
         return value;
     }
 
+    // TODO !pr move to .tpp
     template<typename T>
     void copyRawDataToParameter(RfTypes::Parameter &param, const std::span<uint8_t> &rawData) {
         if (rawData.size() > sizeof(T)) throw std::runtime_error("rawData too long for type");

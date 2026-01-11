@@ -189,6 +189,7 @@ namespace SmartHomeMediator {
                 mCurrentSession->addReceivedPacket(packet);
             } else {
                 mpLogger->debug("[RF_CLIENT] Creating new session"); //TODO !pr test
+                // TODO !pr fix session form module notif
                 auto meta = RfTypes::SessionMetadata{
                     .sessionType = RfTypes::SessionType::FROM_MODULE,
                     .rfChannel = mDefaultChannel,

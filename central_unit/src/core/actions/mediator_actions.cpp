@@ -252,7 +252,7 @@ namespace SmartHome {
 
         const auto &params = command.params.value();
         const auto paramsSize = params.size();
-        if (!(params.is_array() && paramsSize <= numOfExpectedParams)) {
+        if (!params.is_array() && paramsSize >= numOfExpectedParams) {
             error.data = "Expected at least " + std::to_string(numOfExpectedParams) + " parameters, " +
                          std::to_string(numOfExpectedParams) + " received. ";
             return false;

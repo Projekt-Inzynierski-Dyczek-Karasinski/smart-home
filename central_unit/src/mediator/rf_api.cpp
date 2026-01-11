@@ -113,7 +113,8 @@ namespace SmartHomeMediator {
     }
 
     std::string RfApi::toApiString(RfTypes::RfCommand rfCommand) {
-        if (rfCommand.commandType == RfTypes::CommandTypes::RESPONSE) {
+        if (rfCommand.commandType == RfTypes::CommandTypes::RESPONSE || rfCommand.commandType ==
+            RfTypes::CommandTypes::REPING) {
             SmartHome::API::ApiError error;
             SmartHome::API::ApiResponse response;
             if (rfCommand.requestId.has_value()) {
@@ -142,13 +143,15 @@ namespace SmartHomeMediator {
                     }
                     response.result = paramJsonArray.dump();
                 }
-            } else {
+            } else if (rfCommand.commandType == RfTypes::CommandTypes::RESPONSE) {
                 // Return MEDIATOR_COMMUNICATION_ERROR if response has no parameters
                 error.code = SmartHome::API::ErrorCodes::MEDIATOR_COMMUNICATION_ERROR;
                 error.message = SmartHome::API::errorCodeToString(error.code);
                 error.data = "Module response without values";
 
                 response.error = error;
+            } else {
+                response.result.emplace(); // REPING without values is a valid response
             }
             // Return response
             return response.to_string();
@@ -276,7 +279,7 @@ namespace SmartHomeMediator {
 
         try {
             rfCommand = toRfCommand(apiRequest);
-        } catch (const std::exception  &e) {
+        } catch (const std::exception &e) {
             pLogger->errorf("[RF_API] [TO_METADATA] Failed to parse request message to RfCommand: %s", e.what());
             return std::nullopt;
         }
@@ -285,7 +288,7 @@ namespace SmartHomeMediator {
             metadata.rfChannel = moduleInfo.at(sj::ModuleInfoKeys::RF_CHANNEL).get<uint8_t>();
             metadata.targetLogicAddress = moduleInfo.at(sj::ModuleInfoKeys::LOGIC_ADDRESS).get<uint8_t>();
             metadata.commands.push_back(rfCommand);
-        } catch (const std::exception  &e) {
+        } catch (const std::exception &e) {
             pLogger->errorf("[RF_API] [TO_METADATA] Failed to parse request: %s", e.what());
             return std::nullopt;
         }

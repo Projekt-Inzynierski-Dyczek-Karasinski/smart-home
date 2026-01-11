@@ -107,11 +107,17 @@ namespace SmartHomeMediator::RfTypes {
     Parameter::Parameter(const double newValue) {
         type = ParameterTypes::FLOAT;
 
-        if (newValue <= std::numeric_limits<float>::max()) {
-            assignSwappedEndian(value, static_cast<float>(newValue));
-        } else {
-            assignSwappedEndian(value, newValue);
-        }
+        // TODO !pr test
+
+        assignSwappedEndian(value, newValue);
+    }
+
+    Parameter::Parameter(const float newValue) {
+        type = ParameterTypes::FLOAT;
+
+        // TODO !pr test
+
+        assignSwappedEndian(value, newValue);
     }
 
     Parameter::Parameter(const std::string_view newValue) {
@@ -302,12 +308,34 @@ namespace SmartHomeMediator::RfTypes {
             switch (parameterType) {
                 case ParameterTypes::UINT:
                     copyRawDataToParameter<uint64_t>(parameter, parameterData);
+
+                    printf("UINT parameter parsed:\n");
+                    printf("  Raw bytes from payload: ");
+                    for (auto b: parameterData) printf("%d ", b);
+                    printf("\n");
+                    printf("  Parameter.value after parsing: ");
+                    for (auto b: parameter.value) printf("%d ", b);
+                    printf("\n");
+
                     break;
                 case ParameterTypes::INT:
                     copyRawDataToParameter<int64_t>(parameter, parameterData);
                     break;
                 case ParameterTypes::FLOAT:
-                    copyRawDataToParameter<double>(parameter, parameterData);
+                    if (parameterLength == sizeof(float)) {
+                        copyRawDataToParameter<float>(parameter, parameterData);
+                    } else {
+                        copyRawDataToParameter<double>(parameter, parameterData);
+                    }
+
+                    printf("FLOAT parameter parsed:\n");
+                    printf("  Raw bytes from payload: ");
+                    for (auto b: parameterData) printf("%d ", b);
+                    printf("\n");
+                    printf("  Parameter.value after parsing: ");
+                    for (auto b: parameter.value) printf("%d ", b);
+                    printf("\n");
+
                     break;
                 case ParameterTypes::ASCII:
                     assignRawDataToParameter<std::string>(parameter, parameterData);

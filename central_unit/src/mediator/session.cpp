@@ -71,6 +71,8 @@ namespace SmartHomeMediator {
         }
 
 
+        //TODO !pr send wakeup notif as first/before main session
+
         auto previousState = State::NEXT_COMMAND;
         auto state = State::NEXT_COMMAND;
 
@@ -124,7 +126,7 @@ namespace SmartHomeMediator {
                     }
 
                     if (commandResponse.commandType != RfTypes::CommandTypes::RESPONSE &&
-                        commandResponse.commandType != RfTypes::CommandTypes::PING) {
+                        commandResponse.commandType != RfTypes::CommandTypes::REPING) {
                         mpLogger->debug("[SESSION] [EXECUTE] [AWAIT_RESPONSE] invalid response type");
                         changeState(State::SEND_REPEAT_LAST_MESSAGE);
                         break;
@@ -334,7 +336,7 @@ namespace SmartHomeMediator {
             tmp += std::to_string(e) + ",";
         }
         tmp.pop_back();
-        mpLogger->debugf("[SESSION] [RECEIVE] Received packet: [%s]", tmp.c_str());
+        mpLogger->debugf("[SESSION] [RECEIVE] Received message: [%s]", tmp.c_str());
         co_return result;
     }
 
