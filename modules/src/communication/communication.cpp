@@ -741,6 +741,8 @@ namespace Comms {
                     // notif test
                     else if (uah::areArraysEqual(buffer, "notif")) {
                         API::CommandHandler ch(API::commandTypes::NOTIFY);
+                        ch.addParameter(API::APIParameter(static_cast<uint8_t>(API::notifyTypes::SENSOR_ALERT)));
+
                         uint8_t message[MESSAGE_SIZE] = {};
                         ch.generateMessage(message);
                         com.sendMessage(message);

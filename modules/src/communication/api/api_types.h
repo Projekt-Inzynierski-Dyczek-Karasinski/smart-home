@@ -4,6 +4,8 @@
 #include <variant>
 #include <string_view>
 
+
+// TODO !pr add one line commets for enums
 namespace Comms::API {
     enum class errorTypes : uint8_t {
         UNKNOWN = 0,

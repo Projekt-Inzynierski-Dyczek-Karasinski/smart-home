@@ -482,6 +482,8 @@ namespace Comms {
         auto &powerManager = ums::PowerManager::getInstance(mpLogger);
         powerManager.restartIdleTimer();
 
+
+        // TODO !pr change to CommandHandler and remove ConnectionMessages
         if (!uah::areArraysEqual(message, ConnectionMessages::s_CONNECTION_REPEAT_MESSAGE)) {
             mpLogger->debug("Connection Method", "setLastTransmittedMessage(message)");
             setLastTransmittedMessage(message);
