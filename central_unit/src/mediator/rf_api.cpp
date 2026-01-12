@@ -162,8 +162,8 @@ namespace SmartHomeMediator {
             if (!rfCommand.requestType.has_value()) {
                 throw std::invalid_argument("RfCommand of notify type does not have NotificationType set");
             }
-
             SmartHome::API::ApiRequest notify;
+            notify.params.emplace();
             auto &params = notify.params.value();
 
             notify.method = "notify";

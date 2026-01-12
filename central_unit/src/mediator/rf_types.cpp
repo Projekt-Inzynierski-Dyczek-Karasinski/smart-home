@@ -286,13 +286,14 @@ namespace SmartHomeMediator::RfTypes {
             if (static_cast<ParameterTypes>(notifTypeParameterRawType) != ParameterTypes::UINT) {
                 throw std::runtime_error("unexpected parameter type for Notification Type");
             }
+            adjustParamLength(notifTypeParameterLength);
             if (notifTypeParameterLength != sizeof(uint8_t)) {
                 throw std::runtime_error("unexpected parameter length for Notification Type");
             }
-            adjustParamLength(notifTypeParameterLength);
             requireBytes(notifTypeParameterLength);
 
-            requestType.emplace(std::bit_cast<NotificationTypes>(rawData[rawDataOffset]));
+            requestType = static_cast<NotificationTypes>(rawData[rawDataOffset]);
+
             rawDataOffset += notifTypeParameterLength;
         }
 

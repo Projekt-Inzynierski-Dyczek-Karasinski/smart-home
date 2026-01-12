@@ -47,7 +47,8 @@ namespace SmartHomeMediator {
             state = newState;
         };
 
-        auto timer = ba::steady_timer(co_await ba::this_coro::executor); //TODO !pr add t/o
+        auto timeoutTimer = ba::steady_timer(co_await ba::this_coro::executor); //TODO !pr add t/o
+        auto delayTimer = ba::steady_timer(co_await ba::this_coro::executor); //TODO !pr add t/o
 
 
         // Change channel to target's channel
@@ -210,6 +211,8 @@ namespace SmartHomeMediator {
                     lowLevelCommand.commandType = RfTypes::CommandTypes::NEGATIVE;
                     co_await send(lowLevelCommand.to_vector());
                     changeState(State::NEXT_COMMAND);
+                    delayTimer.expires_after(msPOOLING_DELAY);
+                    co_await delayTimer.async_wait( ba::use_awaitable);
                     break;
                 }
 
@@ -284,16 +287,14 @@ namespace SmartHomeMediator {
             }
         }
 
-        boost::asio::steady_timer awaitSendTimer(co_await boost::asio::this_coro::executor);
-
         // Wait until all messages are send
         while (!mpRfClient->isSendQueueEmpty()) {
-            awaitSendTimer.expires_after(msPOOLING_DELAY);
-            co_await awaitSendTimer.async_wait(ba::use_awaitable);
+            delayTimer.expires_after(msPOOLING_DELAY);
+            co_await delayTimer.async_wait(ba::use_awaitable);
         }
 
-        awaitSendTimer.expires_after(mpRfDriver->getRequiredWriteDelay() + msPOOLING_DELAY);
-        co_await awaitSendTimer.async_wait(ba::use_awaitable);
+        delayTimer.expires_after(mpRfDriver->getRequiredWriteDelay() + msPOOLING_DELAY);
+        co_await delayTimer.async_wait(ba::use_awaitable);
 
         // Return to default channel, ignore errors
         if (!isInitializedFromModule) {
