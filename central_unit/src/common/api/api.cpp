@@ -244,7 +244,7 @@ namespace SmartHome::API {
         } else if (error.has_value()) {
             json[JsonRpcStrings::ResponseKeys::ERROR] = error.value().to_json();
         } else {
-            throw std::invalid_argument("Invalid JSON-RPC response");
+            throw std::invalid_argument("Invalid JSON-RPC response: response must have result or error");
         }
 
         if (!id.isUndefined()) json.update(id.toJson());

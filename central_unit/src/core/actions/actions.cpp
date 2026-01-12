@@ -125,7 +125,7 @@ namespace SmartHome {
         pendingRequest->requestsPromises.at(responseId)->set_value(response);
         pendingRequest->requestsPromises.erase(responseId);
 
-        if (pendingRequest->requestsPromises.size() == 0) {
+        if (pendingRequest->requestsPromises.empty()) {
             pendingRequest->timeoutTimer->cancel();
         }
     }
@@ -581,13 +581,32 @@ namespace SmartHome {
 
         if (isStructured) {
             nlohmann::json json;
+            API::ApiResponse errorResponse;
+            errorResponse.id  = nullptr;
+
+            API::ApiError error;
+            error.code = API::ErrorCodes::INTERNAL_ERROR;
+            error.message = API::errorCodeToString(error.code);
+
             if (responsesVector.size() > 1) {
                 json = nlohmann::json::array();
                 for (auto &response: responsesVector) {
-                    json.push_back(response.to_json());
+                    try {
+                        json.push_back(response.to_json());
+                    } catch (std::exception &e) {
+                        error.data = e.what();
+                        errorResponse.error = error;
+                        json.push_back(errorResponse.to_json());
+                    }
                 }
             } else {
-                json = responsesVector[0].to_json();
+                try {
+                    json = responsesVector[0].to_json();
+                } catch (std::exception &e) {
+                    error.data = e.what();
+                    errorResponse.error = error;
+                    json= errorResponse.to_json();
+                }
             }
             responseString = json.dump();
         } else {
