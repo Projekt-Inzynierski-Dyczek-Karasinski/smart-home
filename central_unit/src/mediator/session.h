@@ -54,6 +54,8 @@ namespace SmartHomeMediator {
 
         ba::awaitable<bool> changeChannel(uint8_t channel) const;
 
+        ba::awaitable<bool> acquireConnection();
+
         static constexpr uint msMAX_REATTEMPTS = 3;
         static constexpr auto msSESSION_TIMEOUT = 10s;
         static constexpr auto msRECEIVE_MESSAGE_TIMEOUT = 2s;

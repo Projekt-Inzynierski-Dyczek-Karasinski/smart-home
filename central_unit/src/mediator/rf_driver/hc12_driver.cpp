@@ -44,6 +44,13 @@ namespace SmartHomeMediator {
     }
 
     ba::awaitable<void> HC12Driver::write(std::vector<uint8_t> data) {
+        std::string tmp;
+        for (const auto e : data) {
+            tmp += std::to_string(e) + ",";
+        }
+        tmp.pop_back();
+        mpLogger->debugf("[HC12_DRIVER] Write data: [%s]", tmp.data());
+
         // Calculate required delay based on FU mode
         const auto now = std::chrono::steady_clock::now();
         const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - mLastWriteTime);

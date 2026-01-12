@@ -52,6 +52,14 @@ namespace SmartHomeMediator {
 
         // Change channel to target's channel
         if (!isInitializedFromModule) {
+            // Prepare error response id if possible
+            if (!mMetadata.commands.empty() && mMetadata.commands.front().requestType.has_value()) {
+                response.id = mMetadata.commands.front().requestId.value();
+            } else {
+                response.id = nullptr;
+            }
+
+
             bool isChannelChangeSuccessful = co_await changeChannel(mMetadata.rfChannel);
             if (!isChannelChangeSuccessful) {
                 error.code = SmartHome::API::ErrorCodes::MEDIATOR_RUNTIME_ERROR;
@@ -59,12 +67,21 @@ namespace SmartHomeMediator {
                 error.data = "Mediator failed to change rf channel";
 
                 response.error = error;
-                response.id = nullptr;
+
+                // TODO !pr get id from all commands prepare batch error response
 
                 co_return response.to_string();
             }
 
-            //TODO !pr send wakeup notif as first/before main session
+            error.code = SmartHome::API::ErrorCodes::MEDIATOR_COMMUNICATION_ERROR;
+            error.message = SmartHome::API::errorCodeToString(error.code);
+            error.data = "Mediator failed to acquire connection, module may be offline";
+
+            response.error = error;
+
+            // TODO !pr get id from all commands prepare batch error response
+            if (!co_await acquireConnection()) co_return response.to_string();
+            // End session if connection can not be acquired
         }
 
 
@@ -394,5 +411,33 @@ namespace SmartHomeMediator {
         }
 
         co_return isSuccessful;
+    }
+
+    ba::awaitable<bool> Session::acquireConnection() {
+        RfTypes::RfCommand commandResponse;
+        RfTypes::RfCommand command;
+        command.commandType = RfTypes::CommandTypes::NOTIFY;
+        command.requestType.emplace(RfTypes::NotificationTypes::WAKE);
+
+        auto retries = 0;
+
+        while (++retries < msMAX_REATTEMPTS) {
+            co_await send(command.to_vector());
+            std::vector<uint8_t> receivedMessage = co_await receive();
+
+            if (receivedMessage.empty()) continue;
+
+            try {
+                commandResponse = RfTypes::RfCommand(receivedMessage);
+            } catch (...) {
+                continue;
+            }
+
+            if (commandResponse.commandType == RfTypes::CommandTypes::ACKNOWLEDGE) {
+                co_return true;
+            }
+        }
+        mpLogger->debugf("[SESSION] [ACQUIRE_CONNECTION] Failed to acquire connection");
+        co_return false;
     }
 }
