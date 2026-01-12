@@ -16,6 +16,7 @@ namespace SmartHome {
 
         constexpr uint minNumOfParams = 2;
 
+        // TODO !pr modify set and get to make module_id optional -> set/get values for RF transceiver options
         if (!areParamsValid(error, command, minNumOfParams)) {
             error.data += "Mediator get command expects params of following format: "
                     "{{'module_id': <uint>}, target_value_key<string>, (optional)optional_arguments<any>}";
@@ -63,6 +64,7 @@ namespace SmartHome {
 
         constexpr uint minNumOfParams = 3;
 
+        // TODO !pr modify set and get to make module_id optional -> set/get values for RF transceiver options
         if (!areParamsValid(error, command, minNumOfParams)) {
             error.data += "Mediator set command expects params of following format: "
                     "{{'module_id': <uint>}, target_value_key<string>, target_new_value<any>}";
@@ -232,7 +234,11 @@ namespace SmartHome {
 
         try {
             API::ApiResponse response(future.get());
-            requestResult.result = response.result;
+            if (response.result.has_value()) requestResult.result = std::move(response.result);
+            else if (response.error.has_value()) requestResult.error = std::move(response.error);
+            else {
+                throw std::runtime_error("Received an invalid response: no result or error");
+            }
         } catch (const std::exception &e) {
             requestResult.error = API::ApiError(
                 API::ErrorCodes::INTERNAL_ERROR,

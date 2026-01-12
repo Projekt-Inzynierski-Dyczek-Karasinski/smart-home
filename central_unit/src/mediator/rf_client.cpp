@@ -89,10 +89,14 @@ namespace SmartHomeMediator {
 
             mCurrentSession.reset();
 
-            mediator.getIoContext().post([this, result] {
-                mMessageHandler(result);
+            // Ignore session without result
+            if (!result.empty()) {
+                mpLogger->debugf("[RF_CLIENT] result: %s", result.c_str());
+                mediator.getIoContext().post([this, result] {
+                   mMessageHandler(result);
 
-            });
+               });
+            }
         }
         mpLogger->info("[RF_CLIENT] Stopping RfClient");
         mIsReceiving = false;

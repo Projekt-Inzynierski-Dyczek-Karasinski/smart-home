@@ -126,6 +126,10 @@ namespace SmartHomeMediator {
     }
 
     void ApiClient::send(const std::string_view message) {
+        if (message.empty()) {
+            mpLogger->error("[API_CLIENT] Error while sending: empty message");
+            return;
+        }
         if (mConnection && mConnection->isOpen()) {
             mConnection->writeAsync(message.data());
         } else {

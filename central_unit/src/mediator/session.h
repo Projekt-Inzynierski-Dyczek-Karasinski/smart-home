@@ -36,11 +36,14 @@ namespace SmartHomeMediator {
     private:
         enum class State : uint8_t {
             NEXT_COMMAND,
-            SEND_MESSAGE,
-            AWAIT_RESPONSE,
-            RESEND_LAST_MESSAGE,
-            SEND_REPEAT_LAST_MESSAGE,
             SEND_END_COMMAND,
+            SEND_ACK_COMMAND,
+            SEND_NEG_COMMAND,
+            SEND_MESSAGE,
+            SEND_REPEAT_LAST_MESSAGE,
+            RESEND_LAST_MESSAGE,
+            AWAIT_RESPONSE,
+            AWAIT_NOTIFICATION,
             FINISHED
         };
 

@@ -14,7 +14,9 @@ namespace SmartHomeMediator::RfTypes {
     enum class RfErrorCodes: uint8_t {
         UNKNOWN = 0,
         BAD_COMMAND,
+        UNKNOWN_COMMAND,
         BAD_ARGUMENT,
+        NOT_IMPLEMENTED,
         INTERNAL_ERROR
     };
 
@@ -57,7 +59,8 @@ namespace SmartHomeMediator::RfTypes {
         SENSOR_LIST,
         // Debug/Status values
         LOGS,
-        BATTERY_LEVEL
+        BATTERY_LEVEL,
+        FORCE_READ_SENSOR_VALUE,
     };
 
     enum class SetTypes: uint8_t {
@@ -109,6 +112,7 @@ namespace SmartHomeMediator::RfTypes {
     inline constexpr std::string_view SENSOR_LIST_STRING = "sensor_list";
     inline constexpr std::string_view LOGS_STRING = "logs";
     inline constexpr std::string_view BATTERY_LEVEL_STRING = "battery_level";
+    inline constexpr std::string_view FORCE_READ_SENSOR_VALUE_STRING = "force_read_sensor_value";
     inline constexpr std::string_view MANUAL_TRIGGER_STRING = "manual_trigger";
     inline constexpr std::string_view POWER_LOSS_STRING = "power_loss";
     inline constexpr std::string_view ALERT_STRING = "alert";
@@ -178,8 +182,6 @@ namespace SmartHomeMediator::RfTypes {
         explicit Parameter(int64_t newValue);
 
         explicit Parameter(double newValue);
-
-        explicit Parameter(float newValue);
 
         explicit Parameter(std::string_view newValue);
 
@@ -294,20 +296,20 @@ namespace SmartHomeMediator::RfTypes {
 
     // TODO !pr move to .tpp
     template<typename T>
-    void copyRawDataToParameter(RfTypes::Parameter &param, const std::span<uint8_t> &rawData) {
+    void copyRawDataToParameter(Parameter &param, const std::span<uint8_t> &rawData) {
         if (rawData.size() > sizeof(T)) throw std::runtime_error("rawData too long for type");
 
         std::array<uint8_t, sizeof(T)> buffer{};
         std::copy_n(rawData.begin(), rawData.size(), buffer.end() - rawData.size());
         T value = std::bit_cast<T>(buffer);
 
-        param = RfTypes::Parameter(value);
+        param = Parameter(value);
     }
 
     template<typename T>
-    void assignRawDataToParameter(RfTypes::Parameter &param, const std::span<uint8_t> &rawData) {
+    void assignRawDataToParameter(Parameter &param, const std::span<uint8_t> &rawData) {
         T value{};
         value.assign(rawData.begin(), rawData.end());
-        param = RfTypes::Parameter(value);
+        param = Parameter(value);
     }
 }

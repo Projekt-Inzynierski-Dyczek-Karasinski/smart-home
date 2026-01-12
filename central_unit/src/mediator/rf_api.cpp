@@ -9,7 +9,6 @@ namespace SmartHomeMediator {
     RfTypes::RfCommand RfApi::toRfCommand(const SmartHome::API::ApiRequest &apiRequest) {
         RfTypes::RfCommand rfCommand;
         char buffer[1024];
-        int paramOffset = 1; // default offset to skip request type
 
         if (!apiRequest.params.has_value()) {
             throw std::invalid_argument("No parameters specified");
@@ -30,6 +29,7 @@ namespace SmartHomeMediator {
         const auto method = boost::algorithm::to_lower_copy(apiRequest.method);
 
         if (apiRequest.id.hasValue()) {
+            int paramOffset = 1;
             if (method == RfTypes::SET_STRING && methodParams != nullptr && methodParams->is_array() &&
                 methodParams->size() > 1) {
                 rfCommand.commandType = RfTypes::CommandTypes::SET;
@@ -192,10 +192,15 @@ namespace SmartHomeMediator {
 
         nlohmann::json jsonRpcRequest;
 
+        if (!nlohmann::json::accept(message)) {
+            pLogger->error("[RF_API] [HANDLE_INCOMING] Failed to accept incoming message: invalid JSON format");
+            return;
+        }
+
         try {
             jsonRpcRequest = nlohmann::json::parse(message);
         } catch (const std::exception &e) {
-            pLogger->errorf("[RF_API] [HANDLE_INCOMING] Failed to parse request message from json: %s", e.what());
+            pLogger->errorf("[RF_API] [HANDLE_INCOMING] Failed to parse request message from JSON: %s", e.what());
             return;
         }
 

@@ -107,15 +107,17 @@ namespace SmartHomeMediator::RfTypes {
     Parameter::Parameter(const double newValue) {
         type = ParameterTypes::FLOAT;
 
-        // TODO !pr test
+        if (std::abs(newValue) <= std::numeric_limits<float>::max()) {
+            // Check precision loss
+            const double tolerance = 2.0 * std::numeric_limits<float>::epsilon() * std::abs(newValue);
+            const auto floatValue = static_cast<float>(newValue);
+            const auto doubleValue = static_cast<double>(floatValue);
 
-        assignSwappedEndian(value, newValue);
-    }
-
-    Parameter::Parameter(const float newValue) {
-        type = ParameterTypes::FLOAT;
-
-        // TODO !pr test
+            if (std::abs(doubleValue - newValue) <= tolerance) {
+                assignSwappedEndian(value, floatValue);
+                return;
+            }
+        }
 
         assignSwappedEndian(value, newValue);
     }
@@ -308,15 +310,6 @@ namespace SmartHomeMediator::RfTypes {
             switch (parameterType) {
                 case ParameterTypes::UINT:
                     copyRawDataToParameter<uint64_t>(parameter, parameterData);
-
-                    printf("UINT parameter parsed:\n");
-                    printf("  Raw bytes from payload: ");
-                    for (auto b: parameterData) printf("%d ", b);
-                    printf("\n");
-                    printf("  Parameter.value after parsing: ");
-                    for (auto b: parameter.value) printf("%d ", b);
-                    printf("\n");
-
                     break;
                 case ParameterTypes::INT:
                     copyRawDataToParameter<int64_t>(parameter, parameterData);
@@ -327,15 +320,6 @@ namespace SmartHomeMediator::RfTypes {
                     } else {
                         copyRawDataToParameter<double>(parameter, parameterData);
                     }
-
-                    printf("FLOAT parameter parsed:\n");
-                    printf("  Raw bytes from payload: ");
-                    for (auto b: parameterData) printf("%d ", b);
-                    printf("\n");
-                    printf("  Parameter.value after parsing: ");
-                    for (auto b: parameter.value) printf("%d ", b);
-                    printf("\n");
-
                     break;
                 case ParameterTypes::ASCII:
                     assignRawDataToParameter<std::string>(parameter, parameterData);
@@ -366,7 +350,8 @@ namespace SmartHomeMediator::RfTypes {
         std::vector<uint8_t> buffer;
         const uint8_t specialByte = getSpecialByte(static_cast<uint8_t>(commandType),
                                                    static_cast<uint8_t>(parameters.size()) +
-                                                   (requestId.has_value() ? 1 : 0));
+                                                   (requestId.has_value() ? 1 : 0) +
+                                                   (requestType.has_value() ? 1 : 0));
         buffer.push_back(specialByte);
 
 
@@ -413,8 +398,12 @@ namespace SmartHomeMediator::RfTypes {
                 return "Unknown error";
             case RfErrorCodes::BAD_COMMAND:
                 return "Bad command";
+            case RfErrorCodes::UNKNOWN_COMMAND:
+                return "Unknown command";
             case RfErrorCodes::BAD_ARGUMENT:
                 return "Bad argument";
+            case RfErrorCodes::NOT_IMPLEMENTED:
+                return "Not implemented";
             case RfErrorCodes::INTERNAL_ERROR:
                 return "Internal error";
             default:
@@ -428,7 +417,8 @@ namespace SmartHomeMediator::RfTypes {
             {CONFIG_OPTION_STRING, GetTypes::CONFIG_OPTION},
             {SENSOR_LIST_STRING, GetTypes::SENSOR_LIST},
             {LOGS_STRING, GetTypes::LOGS},
-            {BATTERY_LEVEL_STRING, GetTypes::BATTERY_LEVEL}
+            {BATTERY_LEVEL_STRING, GetTypes::BATTERY_LEVEL},
+            {FORCE_READ_SENSOR_VALUE_STRING, GetTypes::FORCE_READ_SENSOR_VALUE}
         };
 
         const auto iter = strToGetMap.find(boost::algorithm::to_lower_copy(std::string(value)));
