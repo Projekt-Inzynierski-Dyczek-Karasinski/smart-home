@@ -29,10 +29,12 @@ namespace SmartHomeMediator {
 
         std::vector<uint8_t> receivedMessage;
         std::vector<uint8_t> lastSendMessage;
-        std::vector<std::string> resultVector;
+        std::vector<std::string> resultsVector;
 
         SmartHome::API::ApiResponse response;
         SmartHome::API::ApiError error;
+
+        auto resultJsonArray = nlohmann::json::array();
 
         size_t commandsVectorIndex = 0;
         uint retries = 0;
@@ -42,14 +44,38 @@ namespace SmartHomeMediator {
         auto previousState = State::NEXT_COMMAND;
         auto state = isInitializedFromModule ? State::AWAIT_NOTIFICATION : State::NEXT_COMMAND;
 
+        // Lambda for changing session states
         auto changeState = [&previousState, &state](const State newState) {
             previousState = state;
             state = newState;
         };
 
-        auto timeoutTimer = ba::steady_timer(co_await ba::this_coro::executor); //TODO !pr add t/o
-        auto delayTimer = ba::steady_timer(co_await ba::this_coro::executor); //TODO !pr add t/o
+        // Lambda for generating error responses for all commands
+        auto generateErrorResponses = [this, &error, &response, &resultJsonArray] {
+            for (const auto &command: mMetadata.commands) {
+                if (command.requestId.has_value()) response.id = command.requestId.value();
+                else response.id = nullptr;
 
+                response.error = error;
+
+                try {
+                    resultJsonArray.push_back(response.to_json());
+                } catch (...) {
+                }
+            }
+            return resultJsonArray;
+        };
+
+        bool isSessionCanceled = false;
+        auto timeoutTimer = ba::steady_timer(co_await ba::this_coro::executor);
+        auto delayTimer = ba::steady_timer(co_await ba::this_coro::executor);
+
+        timeoutTimer.expires_after(msSESSION_TIMEOUT);
+        timeoutTimer.async_wait([&isSessionCanceled](const boost::system::error_code &ec) {
+            if (!ec) {
+                isSessionCanceled = true;
+            }
+        });
 
         // Change channel to target's channel
         if (!isInitializedFromModule) {
@@ -60,33 +86,27 @@ namespace SmartHomeMediator {
                 response.id = nullptr;
             }
 
-
             bool isChannelChangeSuccessful = co_await changeChannel(mMetadata.rfChannel);
             if (!isChannelChangeSuccessful) {
                 error.code = SmartHome::API::ErrorCodes::MEDIATOR_RUNTIME_ERROR;
                 error.message = SmartHome::API::errorCodeToString(error.code);
                 error.data = "Mediator failed to change rf channel";
 
-                response.error = error;
-
-                // TODO !pr get id from all commands prepare batch error response
-
-                co_return response.to_string();
+                co_return to_string(generateErrorResponses());
             }
 
             error.code = SmartHome::API::ErrorCodes::MEDIATOR_COMMUNICATION_ERROR;
             error.message = SmartHome::API::errorCodeToString(error.code);
             error.data = "Mediator failed to acquire connection, module may be offline";
 
-            response.error = error;
-
-            // TODO !pr get id from all commands prepare batch error response
-            if (!co_await acquireConnection()) co_return response.to_string();
             // End session if connection can not be acquired
+            if (!co_await acquireConnection()) {
+                co_return to_string(generateErrorResponses());;
+            }
         }
 
 
-        while (state != State::FINISHED) {
+        while (state != State::FINISHED && !isSessionCanceled) {
             switch (state) {
                 case State::SEND_MESSAGE:
                     lastSendMessage = currentCommand.to_vector();
@@ -131,7 +151,7 @@ namespace SmartHomeMediator {
                     }
 
                     try {
-                        resultVector.push_back(RfApi::toApiString(commandResponse));
+                        resultsVector.push_back(RfApi::toApiString(commandResponse));
                     } catch (const std::exception &e) {
                         mpLogger->debugf("[SESSION] [EXECUTE] [AWAIT_RESPONSE] parse to api response failed: %s",
                                          e.what());
@@ -152,7 +172,7 @@ namespace SmartHomeMediator {
                         response.error = error;
                         response.id = currentCommand.requestId.value();
 
-                        resultVector.push_back(response.to_string());
+                        resultsVector.push_back(response.to_string());
 
                         changeState(State::NEXT_COMMAND);
                         break;
@@ -180,7 +200,7 @@ namespace SmartHomeMediator {
                         else
                             response.id = nullptr;
 
-                        resultVector.push_back(response.to_string());
+                        resultsVector.push_back(response.to_string());
 
                         changeState(State::NEXT_COMMAND);
                         break;
@@ -212,7 +232,7 @@ namespace SmartHomeMediator {
                     co_await send(lowLevelCommand.to_vector());
                     changeState(State::NEXT_COMMAND);
                     delayTimer.expires_after(msPOOLING_DELAY);
-                    co_await delayTimer.async_wait( ba::use_awaitable);
+                    co_await delayTimer.async_wait(ba::use_awaitable);
                     break;
                 }
 
@@ -241,7 +261,7 @@ namespace SmartHomeMediator {
                     }
 
                     try {
-                        resultVector.push_back(RfApi::toApiString(commandResponse));
+                        resultsVector.push_back(RfApi::toApiString(commandResponse));
                     } catch (const std::exception &e) {
                         mpLogger->debugf("[SESSION] [EXECUTE] [AWAIT_NOTIFICATION] parse to api response failed: %s",
                                          e.what());
@@ -273,7 +293,7 @@ namespace SmartHomeMediator {
                             response.error = error;
                             response.id = currentCommand.requestId.value();
 
-                            resultVector.push_back(response.to_string());
+                            resultsVector.push_back(response.to_string());
                             break;
                         }
 
@@ -301,8 +321,9 @@ namespace SmartHomeMediator {
             co_await changeChannel(mpRfClient->getDefaultChannel());
         }
 
-        auto resultJsonArray = nlohmann::json::array();
-        for (const auto &result: resultVector) {
+        if (resultsVector.empty()) co_return "";
+
+        for (const auto &result: resultsVector) {
             try {
                 resultJsonArray.push_back(nlohmann::json::parse(result));
             } catch (const std::exception &e) {
