@@ -47,6 +47,43 @@ namespace SmartHomeMediator {
             FINISHED
         };
 
+        struct ExecutionContext {
+            State state;
+            State previousState;
+
+            RfTypes::RfCommand commandResponse;
+            RfTypes::RfCommand lowLevelCommand;
+            RfTypes::RfCommand currentCommand;
+            std::vector<uint8_t> receivedMessage;
+            std::vector<uint8_t> lastSendMessage;
+
+            std::vector<std::string> resultsVector;
+            SmartHome::API::ApiResponse response;
+            SmartHome::API::ApiError error;
+
+            size_t commandsVectorIndex = 0;
+            uint retries = 0;
+            bool isInitializedFromModule;
+
+            ba::steady_timer* delayTimer;
+
+            std::function<void(State)> changeState;
+
+            ExecutionContext(const bool initFromModule, ba::steady_timer* timer)
+                : isInitializedFromModule(initFromModule)
+                , delayTimer(timer) {
+
+                previousState = State::NEXT_COMMAND;
+                state = isInitializedFromModule ? State::AWAIT_NOTIFICATION : State::NEXT_COMMAND;
+
+                changeState = [this](const State newState) {
+                    previousState = state;
+                    state = newState;
+                };
+            }
+        };
+
+        ba::awaitable<void> processState(ExecutionContext& ctx);
 
         ba::awaitable<void> send(const std::vector<uint8_t> &message) const;
 
@@ -66,12 +103,9 @@ namespace SmartHomeMediator {
         std::shared_ptr<RfClient> mpRfClient;
         std::shared_ptr<su::Logger> mpLogger;
 
-        State mSessionCurrentState{};
-
         std::vector<uint8_t> mReceivedBuffer;
         std::mutex mReceiveMutex;
         std::atomic_bool mIsReceivedBufferReady{false};
 
-        uint mFailedAttempts = 0;
     };
 }

@@ -23,35 +23,20 @@ namespace SmartHomeMediator {
 
     ba::awaitable<std::string> Session::execute() {
         mpLogger->debug("[SESSION] [EXECUTE] called");
-        RfTypes::RfCommand commandResponse;
-        RfTypes::RfCommand lowLevelCommand;
-        RfTypes::RfCommand currentCommand;
-
-        std::vector<uint8_t> receivedMessage;
-        std::vector<uint8_t> lastSendMessage;
-        std::vector<std::string> resultsVector;
-
-        SmartHome::API::ApiResponse response;
-        SmartHome::API::ApiError error;
 
         auto resultJsonArray = nlohmann::json::array();
 
-        size_t commandsVectorIndex = 0;
-        uint retries = 0;
-
         const bool isInitializedFromModule = mMetadata.sessionType == RfTypes::SessionType::FROM_MODULE;
+        bool isSessionCanceled = false;
 
-        auto previousState = State::NEXT_COMMAND;
-        auto state = isInitializedFromModule ? State::AWAIT_NOTIFICATION : State::NEXT_COMMAND;
+        auto timeoutTimer = ba::steady_timer(co_await ba::this_coro::executor);
+        auto delayTimer = ba::steady_timer(co_await ba::this_coro::executor);
 
-        // Lambda for changing session states
-        auto changeState = [&previousState, &state](const State newState) {
-            previousState = state;
-            state = newState;
-        };
+        ExecutionContext ctx(isInitializedFromModule, &delayTimer);
 
         // Lambda for generating error responses for all commands
-        auto generateErrorResponses = [this, &error, &response, &resultJsonArray] {
+        auto generateErrorResponses = [this, &resultJsonArray](SmartHome::API::ApiError &error) {
+            SmartHome::API::ApiResponse response;
             for (const auto &command: mMetadata.commands) {
                 if (command.requestId.has_value()) response.id = command.requestId.value();
                 else response.id = nullptr;
@@ -66,245 +51,33 @@ namespace SmartHomeMediator {
             return resultJsonArray;
         };
 
-        bool isSessionCanceled = false;
-        auto timeoutTimer = ba::steady_timer(co_await ba::this_coro::executor);
-        auto delayTimer = ba::steady_timer(co_await ba::this_coro::executor);
-
         timeoutTimer.expires_after(msSESSION_TIMEOUT);
         timeoutTimer.async_wait([&isSessionCanceled](const boost::system::error_code &ec) {
-            if (!ec) {
-                isSessionCanceled = true;
-            }
+            if (!ec) isSessionCanceled = true;
         });
+
 
         // Change channel to target's channel
         if (!isInitializedFromModule) {
-            // Prepare error response id if possible
-            if (!mMetadata.commands.empty() && mMetadata.commands.front().requestType.has_value()) {
-                response.id = mMetadata.commands.front().requestId.value();
-            } else {
-                response.id = nullptr;
+            if (!co_await changeChannel(mMetadata.rfChannel)) {
+                ctx.error.code = SmartHome::API::ErrorCodes::MEDIATOR_RUNTIME_ERROR;
+                ctx.error.message = SmartHome::API::errorCodeToString(ctx.error.code);
+                ctx.error.data = "Mediator failed to change rf channel";
+
+                co_return to_string(generateErrorResponses(ctx.error));
             }
 
-            bool isChannelChangeSuccessful = co_await changeChannel(mMetadata.rfChannel);
-            if (!isChannelChangeSuccessful) {
-                error.code = SmartHome::API::ErrorCodes::MEDIATOR_RUNTIME_ERROR;
-                error.message = SmartHome::API::errorCodeToString(error.code);
-                error.data = "Mediator failed to change rf channel";
-
-                co_return to_string(generateErrorResponses());
-            }
-
-            error.code = SmartHome::API::ErrorCodes::MEDIATOR_COMMUNICATION_ERROR;
-            error.message = SmartHome::API::errorCodeToString(error.code);
-            error.data = "Mediator failed to acquire connection, module may be offline";
+            ctx.error.code = SmartHome::API::ErrorCodes::MEDIATOR_COMMUNICATION_ERROR;
+            ctx.error.message = SmartHome::API::errorCodeToString(ctx.error.code);
+            ctx.error.data = "Mediator failed to acquire connection, module may be offline";
 
             // End session if connection can not be acquired
-            if (!co_await acquireConnection()) {
-                co_return to_string(generateErrorResponses());;
-            }
+            if (!co_await acquireConnection()) co_return to_string(generateErrorResponses(ctx.error));
         }
 
-
-        while (state != State::FINISHED && !isSessionCanceled) {
-            switch (state) {
-                case State::SEND_MESSAGE:
-                    lastSendMessage = currentCommand.to_vector();
-                    co_await send(lastSendMessage);
-                    changeState(State::AWAIT_RESPONSE);
-                    break;
-
-
-                case State::AWAIT_RESPONSE:
-                    receivedMessage = co_await receive();
-                    if (receivedMessage.empty()) {
-                        mpLogger->debug("[SESSION] [EXECUTE] [AWAIT_RESPONSE] empty message");
-                        changeState(State::RESEND_LAST_MESSAGE);
-                        break;
-                    }
-
-                    try {
-                        commandResponse = RfTypes::RfCommand(receivedMessage);
-                    } catch (const std::exception &e) {
-                        mpLogger->debugf("[SESSION] [EXECUTE] [AWAIT_RESPONSE] parse to rf command failed: %s",
-                                         e.what());
-                        changeState(State::SEND_REPEAT_LAST_MESSAGE);
-                        break;
-                    }
-
-                    // Check if received acknowledge as response to notify
-                    if (currentCommand.commandType == RfTypes::CommandTypes::NOTIFY) {
-                        if (commandResponse.commandType == RfTypes::CommandTypes::ACKNOWLEDGE) {
-                            changeState(State::NEXT_COMMAND);
-                            break;
-                        }
-                        mpLogger->debug("[SESSION] [EXECUTE] [AWAIT_RESPONSE] invalid response for notification");
-                        changeState(State::SEND_REPEAT_LAST_MESSAGE);
-                        break;
-                    }
-
-                    if (commandResponse.commandType != RfTypes::CommandTypes::RESPONSE &&
-                        commandResponse.commandType != RfTypes::CommandTypes::REPING) {
-                        mpLogger->debug("[SESSION] [EXECUTE] [AWAIT_RESPONSE] invalid response type");
-                        changeState(State::SEND_REPEAT_LAST_MESSAGE);
-                        break;
-                    }
-
-                    try {
-                        resultsVector.push_back(RfApi::toApiString(commandResponse));
-                    } catch (const std::exception &e) {
-                        mpLogger->debugf("[SESSION] [EXECUTE] [AWAIT_RESPONSE] parse to api response failed: %s",
-                                         e.what());
-                        changeState(State::SEND_REPEAT_LAST_MESSAGE);
-                        break;
-                    }
-
-                    changeState(State::NEXT_COMMAND);
-                    break;
-
-
-                case State::RESEND_LAST_MESSAGE:
-                    if (++retries > msMAX_REATTEMPTS) {
-                        error.code = sa::ErrorCodes::MEDIATOR_COMMUNICATION_ERROR;
-                        error.message = SmartHome::API::errorCodeToString(error.code);
-                        error.data = "No response from module";
-
-                        response.error = error;
-                        response.id = currentCommand.requestId.value();
-
-                        resultsVector.push_back(response.to_string());
-
-                        changeState(State::NEXT_COMMAND);
-                        break;
-                    }
-                    co_await send(lastSendMessage);
-                    changeState(previousState);
-                    break;
-
-
-                case State::SEND_REPEAT_LAST_MESSAGE: {
-                    if (++retries > msMAX_REATTEMPTS) {
-                        if (isInitializedFromModule) {
-                            changeState(State::SEND_NEG_COMMAND);
-                            break;
-                        }
-
-                        error.code = sa::ErrorCodes::MEDIATOR_COMMUNICATION_ERROR;
-                        error.message = SmartHome::API::errorCodeToString(error.code);
-                        error.data = "Module sent invalid response";
-
-                        response.error = error;
-
-                        if (currentCommand.requestId.has_value())
-                            response.id = currentCommand.requestId.value();
-                        else
-                            response.id = nullptr;
-
-                        resultsVector.push_back(response.to_string());
-
-                        changeState(State::NEXT_COMMAND);
-                        break;
-                    }
-                    lowLevelCommand.commandType = RfTypes::CommandTypes::REPEAT;
-                    co_await send(lowLevelCommand.to_vector());
-
-                    changeState(previousState);
-                    break;
-                }
-
-
-                case State::SEND_END_COMMAND: {
-                    lowLevelCommand.commandType = RfTypes::CommandTypes::END;
-                    co_await send(lowLevelCommand.to_vector());
-                    changeState(State::FINISHED);
-                    break;
-                }
-
-                case State::SEND_ACK_COMMAND: {
-                    lowLevelCommand.commandType = RfTypes::CommandTypes::ACKNOWLEDGE;
-                    co_await send(lowLevelCommand.to_vector());
-                    changeState(State::NEXT_COMMAND);
-                    break;
-                }
-
-                case State::SEND_NEG_COMMAND: {
-                    lowLevelCommand.commandType = RfTypes::CommandTypes::NEGATIVE;
-                    co_await send(lowLevelCommand.to_vector());
-                    changeState(State::NEXT_COMMAND);
-                    delayTimer.expires_after(msPOOLING_DELAY);
-                    co_await delayTimer.async_wait(ba::use_awaitable);
-                    break;
-                }
-
-                case State::AWAIT_NOTIFICATION:
-                    receivedMessage = co_await receive();
-                    if (receivedMessage.empty()) {
-                        mpLogger->debug("[SESSION] [EXECUTE] [AWAIT_NOTIFICATION] empty message");
-                        changeState(State::SEND_REPEAT_LAST_MESSAGE);
-                        break;
-                    }
-
-                    try {
-                        commandResponse = RfTypes::RfCommand(receivedMessage);
-                    } catch (const std::exception &e) {
-                        mpLogger->debugf("[SESSION] [EXECUTE] [AWAIT_NOTIFICATION] parse to rf command failed: %s",
-                                         e.what());
-                        changeState(State::SEND_REPEAT_LAST_MESSAGE);
-                        break;
-                    }
-
-                    // Check if received notify
-                    if (commandResponse.commandType != RfTypes::CommandTypes::NOTIFY) {
-                        mpLogger->debug("[SESSION] [EXECUTE] [AWAIT_NOTIFICATION] invalid message");
-                        changeState(State::SEND_REPEAT_LAST_MESSAGE);
-                        break;
-                    }
-
-                    try {
-                        resultsVector.push_back(RfApi::toApiString(commandResponse));
-                    } catch (const std::exception &e) {
-                        mpLogger->debugf("[SESSION] [EXECUTE] [AWAIT_NOTIFICATION] parse to api response failed: %s",
-                                         e.what());
-                        changeState(State::SEND_REPEAT_LAST_MESSAGE);
-                        break;
-                    }
-
-                    changeState(State::SEND_ACK_COMMAND);
-                    break;
-
-
-                case State::FINISHED: break;
-                case State::NEXT_COMMAND:
-                default: {
-                    retries = 0;
-                    if (mMetadata.commands.empty()) {
-                        changeState(State::SEND_END_COMMAND);
-                        break;
-                    }
-
-                    if (commandsVectorIndex < mMetadata.commands.size()) {
-                        currentCommand = mMetadata.commands[commandsVectorIndex++];
-
-                        if (currentCommand.commandType == RfTypes::CommandTypes::UNDEFINED) {
-                            error.code = sa::ErrorCodes::MEDIATOR_COMMUNICATION_ERROR;
-                            error.message = SmartHome::API::errorCodeToString(error.code);
-                            error.data = "Failed to parse RfCommand";
-
-                            response.error = error;
-                            response.id = currentCommand.requestId.value();
-
-                            resultsVector.push_back(response.to_string());
-                            break;
-                        }
-
-                        changeState(State::SEND_MESSAGE);
-                        break;
-                    }
-
-                    changeState(State::SEND_END_COMMAND);
-                    break;
-                }
-            }
+        // Run state machine
+        while (ctx.state != State::FINISHED && !isSessionCanceled) {
+            co_await processState(ctx);
         }
 
         // Wait until all messages are send
@@ -317,13 +90,12 @@ namespace SmartHomeMediator {
         co_await delayTimer.async_wait(ba::use_awaitable);
 
         // Return to default channel, ignore errors
-        if (!isInitializedFromModule) {
-            co_await changeChannel(mpRfClient->getDefaultChannel());
-        }
+        if (!isInitializedFromModule) co_await changeChannel(mpRfClient->getDefaultChannel());
 
-        if (resultsVector.empty()) co_return "";
 
-        for (const auto &result: resultsVector) {
+        if (ctx.resultsVector.empty()) co_return "";
+
+        for (const auto &result: ctx.resultsVector) {
             try {
                 resultJsonArray.push_back(nlohmann::json::parse(result));
             } catch (const std::exception &e) {
@@ -342,6 +114,208 @@ namespace SmartHomeMediator {
         std::scoped_lock lock(mReceiveMutex);
         mReceivedBuffer.insert(mReceivedBuffer.end(), packet.payload.begin(), packet.payload.end());
         if (packet.isLastPacket()) mIsReceivedBufferReady = true;
+    }
+
+    ba::awaitable<void> Session::processState(ExecutionContext &ctx) {
+        switch (ctx.state) {
+            case State::SEND_MESSAGE:
+                ctx.lastSendMessage = ctx.currentCommand.to_vector();
+                co_await send(ctx.lastSendMessage);
+                ctx.changeState(State::AWAIT_RESPONSE);
+                break;
+
+
+            case State::AWAIT_RESPONSE:
+                ctx.receivedMessage = co_await receive();
+                if (ctx.receivedMessage.empty()) {
+                    mpLogger->debug("[SESSION] [EXECUTE] [AWAIT_RESPONSE] empty message");
+                    ctx.changeState(State::RESEND_LAST_MESSAGE);
+                    break;
+                }
+
+                try {
+                    ctx.commandResponse = RfTypes::RfCommand(ctx.receivedMessage);
+                } catch (const std::exception &e) {
+                    mpLogger->debugf("[SESSION] [EXECUTE] [AWAIT_RESPONSE] parse to rf command failed: %s",
+                                     e.what());
+                    ctx.changeState(State::SEND_REPEAT_LAST_MESSAGE);
+                    break;
+                }
+
+                // Check if received acknowledge as response to notify
+                if (ctx.currentCommand.commandType == RfTypes::CommandTypes::NOTIFY) {
+                    if (ctx.commandResponse.commandType == RfTypes::CommandTypes::ACKNOWLEDGE) {
+                        ctx.changeState(State::NEXT_COMMAND);
+                        break;
+                    }
+                    mpLogger->debug("[SESSION] [EXECUTE] [AWAIT_RESPONSE] invalid response for notification");
+                    ctx.changeState(State::SEND_REPEAT_LAST_MESSAGE);
+                    break;
+                }
+
+                if (ctx.commandResponse.commandType != RfTypes::CommandTypes::RESPONSE &&
+                    ctx.commandResponse.commandType != RfTypes::CommandTypes::REPING) {
+                    mpLogger->debug("[SESSION] [EXECUTE] [AWAIT_RESPONSE] invalid response type");
+                    ctx.changeState(State::SEND_REPEAT_LAST_MESSAGE);
+                    break;
+                }
+
+                try {
+                    ctx.resultsVector.push_back(RfApi::toApiString(ctx.commandResponse));
+                } catch (const std::exception &e) {
+                    mpLogger->debugf("[SESSION] [EXECUTE] [AWAIT_RESPONSE] parse to api response failed: %s",
+                                     e.what());
+                    ctx.changeState(State::SEND_REPEAT_LAST_MESSAGE);
+                    break;
+                }
+
+                ctx.changeState(State::NEXT_COMMAND);
+                break;
+
+
+            case State::RESEND_LAST_MESSAGE:
+                if (++ctx.retries > msMAX_REATTEMPTS) {
+                    ctx.error.code = sa::ErrorCodes::MEDIATOR_COMMUNICATION_ERROR;
+                    ctx.error.message = SmartHome::API::errorCodeToString(ctx.error.code);
+                    ctx.error.data = "No response from module";
+
+                    ctx.response.error = ctx.error;
+                    ctx.response.id = ctx.currentCommand.requestId.value();
+
+                    ctx.resultsVector.push_back(ctx.response.to_string());
+
+                    ctx.changeState(State::NEXT_COMMAND);
+                    break;
+                }
+                co_await send(ctx.lastSendMessage);
+                ctx.changeState(ctx.previousState);
+                break;
+
+
+            case State::SEND_REPEAT_LAST_MESSAGE: {
+                if (++ctx.retries > msMAX_REATTEMPTS) {
+                    if (ctx.isInitializedFromModule) {
+                        ctx.changeState(State::SEND_NEG_COMMAND);
+                        break;
+                    }
+
+                    ctx.error.code = sa::ErrorCodes::MEDIATOR_COMMUNICATION_ERROR;
+                    ctx.error.message = SmartHome::API::errorCodeToString(ctx.error.code);
+                    ctx.error.data = "Module sent invalid response";
+
+                    ctx.response.error = ctx.error;
+
+                    if (ctx.currentCommand.requestId.has_value())
+                        ctx.response.id = ctx.currentCommand.requestId.value();
+                    else
+                        ctx.response.id = nullptr;
+
+                    ctx.resultsVector.push_back(ctx.response.to_string());
+
+                    ctx.changeState(State::NEXT_COMMAND);
+                    break;
+                }
+                ctx.lowLevelCommand.commandType = RfTypes::CommandTypes::REPEAT;
+                co_await send(ctx.lowLevelCommand.to_vector());
+
+                ctx.changeState(ctx.previousState);
+                break;
+            }
+
+
+            case State::SEND_END_COMMAND: {
+                ctx.lowLevelCommand.commandType = RfTypes::CommandTypes::END;
+                co_await send(ctx.lowLevelCommand.to_vector());
+                ctx.changeState(State::FINISHED);
+                break;
+            }
+
+            case State::SEND_ACK_COMMAND: {
+                ctx.lowLevelCommand.commandType = RfTypes::CommandTypes::ACKNOWLEDGE;
+                co_await send(ctx.lowLevelCommand.to_vector());
+                ctx.changeState(State::NEXT_COMMAND);
+                break;
+            }
+
+            case State::SEND_NEG_COMMAND: {
+                ctx.lowLevelCommand.commandType = RfTypes::CommandTypes::NEGATIVE;
+                co_await send(ctx.lowLevelCommand.to_vector());
+                ctx.changeState(State::NEXT_COMMAND);
+                ctx.delayTimer->expires_after(msPOOLING_DELAY);
+                co_await ctx.delayTimer->async_wait(ba::use_awaitable);
+                break;
+            }
+
+            case State::AWAIT_NOTIFICATION:
+                ctx.receivedMessage = co_await receive();
+                if (ctx.receivedMessage.empty()) {
+                    mpLogger->debug("[SESSION] [EXECUTE] [AWAIT_NOTIFICATION] empty message");
+                    ctx.changeState(State::SEND_REPEAT_LAST_MESSAGE);
+                    break;
+                }
+
+                try {
+                    ctx.commandResponse = RfTypes::RfCommand(ctx.receivedMessage);
+                } catch (const std::exception &e) {
+                    mpLogger->debugf("[SESSION] [EXECUTE] [AWAIT_NOTIFICATION] parse to rf command failed: %s",
+                                     e.what());
+                    ctx.changeState(State::SEND_REPEAT_LAST_MESSAGE);
+                    break;
+                }
+
+                // Check if received notify
+                if (ctx.commandResponse.commandType != RfTypes::CommandTypes::NOTIFY) {
+                    mpLogger->debug("[SESSION] [EXECUTE] [AWAIT_NOTIFICATION] invalid message");
+                    ctx.changeState(State::SEND_REPEAT_LAST_MESSAGE);
+                    break;
+                }
+
+                try {
+                    ctx.resultsVector.push_back(RfApi::toApiString(ctx.commandResponse));
+                } catch (const std::exception &e) {
+                    mpLogger->debugf("[SESSION] [EXECUTE] [AWAIT_NOTIFICATION] parse to api response failed: %s",
+                                     e.what());
+                    ctx.changeState(State::SEND_REPEAT_LAST_MESSAGE);
+                    break;
+                }
+
+                ctx.changeState(State::SEND_ACK_COMMAND);
+                break;
+
+
+            case State::FINISHED: break;
+            case State::NEXT_COMMAND:
+            default: {
+                ctx.retries = 0;
+                if (mMetadata.commands.empty()) {
+                    ctx.changeState(State::SEND_END_COMMAND);
+                    break;
+                }
+
+                if (ctx.commandsVectorIndex < mMetadata.commands.size()) {
+                    ctx.currentCommand = mMetadata.commands[ctx.commandsVectorIndex++];
+
+                    // Add error to result on undefined command
+                    if (ctx.currentCommand.commandType == RfTypes::CommandTypes::UNDEFINED) {
+                        ctx.error.code = sa::ErrorCodes::MEDIATOR_COMMUNICATION_ERROR;
+                        ctx.error.message = SmartHome::API::errorCodeToString(ctx.error.code);
+                        ctx.error.data = "Failed to parse RfCommand";
+
+                        ctx.response.error = ctx.error;
+                        ctx.response.id = ctx.currentCommand.requestId.value();
+
+                        ctx.resultsVector.push_back(ctx.response.to_string());
+                        break;
+                    }
+
+                    ctx.changeState(State::SEND_MESSAGE);
+                    break;
+                }
+
+                ctx.changeState(State::SEND_END_COMMAND);
+                break;
+            }
+        }
     }
 
     ba::awaitable<void> Session::send(const std::vector<uint8_t> &message) const {
