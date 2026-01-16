@@ -298,6 +298,13 @@ namespace SmartHome::API {
 
         explicit ApiResponse() = default;
 
+        /**
+         * @brief Construct ApiResponse object.
+         *
+         * @param json nlohmann::json object to be parsed into ApiResponse.
+         *
+         * @throws std::invalid_argument Throws invalid argument when passed JSON object is not in JSON-RPC 2.0 format.
+         */
         explicit ApiResponse(const nlohmann::json &json);
 
         /**
