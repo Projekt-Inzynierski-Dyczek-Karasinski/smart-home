@@ -34,8 +34,7 @@ namespace SmartHomeMediator {
         mpLogger = logger;
 
         // Start service
-        const std::string serviceName = "smarthome-radiod";
-        mpService = su::ServiceManager::create(logger, serviceName, su::ServiceType::AUTO);
+        mpService = su::ServiceManager::create(logger, msServiceName, su::ServiceType::AUTO);
         mpService->setIoContext(mMediatorIoContext);
         if (!mpService->onInitialize()) {
             logger->error("[MEDIATOR] Failed to initialize service");

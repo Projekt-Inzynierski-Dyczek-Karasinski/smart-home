@@ -35,8 +35,7 @@ namespace SmartHome {
         // Initialize AsyncLogger, using Logger for further initialization
         mpLogger = std::make_shared<Utils::AsyncLogger>(logger, mCoreUtilityIoContext);
 
-        const std::string serviceName = "smarthome"; //TODO !pr move variable to header?
-        mpService = Utils::ServiceManager::create(logger, serviceName, Utils::ServiceType::AUTO);
+        mpService = Utils::ServiceManager::create(logger, msServiceName, Utils::ServiceType::AUTO);
         mpService->setIoContext(mCoreIoContext);
 
         if (!mpService->onInitialize()) {

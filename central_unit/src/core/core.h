@@ -182,6 +182,8 @@ namespace SmartHome {
          */
         static uint getThreadCount(int threadCountConfigValue);
 
+        static constexpr std::string_view msServiceName = "smarthomed";
+
         // Configuration
         Config mConfig;
 

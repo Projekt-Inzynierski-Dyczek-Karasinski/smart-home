@@ -99,6 +99,8 @@ namespace SmartHomeMediator {
 
         void signalHandler(const boost::system::error_code &ec, int signal);
 
+        static constexpr std::string_view msServiceName = "smarthome-radiod";
+
         Config mConfig;
 
         std::unique_ptr<su::ServiceManager> mpService;
