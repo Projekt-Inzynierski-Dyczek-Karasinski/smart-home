@@ -6,26 +6,25 @@
 namespace SmartHomeMediator {
     HC12Driver::HC12Driver(ba::io_context &ioContext,
                            const std::shared_ptr<su::Logger> &logger,
-                           const std::string_view uartPortName,
-                           const uint uartBaudRate)
+                           Config config)
         : mpLogger(logger),
           mIoContext(ioContext),
-          mOriginalBaudRate(uartBaudRate),
+          mOriginalBaudRate(config.uartBaudrate),
           mLastWriteTime(std::chrono::steady_clock::now()) {
         try {
-            mpUart = std::make_unique<UartPort>(mIoContext, uartPortName, uartBaudRate);
+            mpUart = std::make_unique<UartPort>(mIoContext, config.uartPortPath, config.uartBaudrate);
 
             constexpr bool initialPinStateHigh = true;
             constexpr bool setPinToOutput = true;
-            mpSetPin = std::make_unique<GpioHandler>(ms_SET_PIN,
+            mpSetPin = std::make_unique<GpioHandler>(config.setPin,
                                                      initialPinStateHigh,
                                                      setPinToOutput,
-                                                     mUART_DEVICE_PATH.data());
+                                                     config.chipPath);
 
             mpUart->startReadLoop();
 
             mpLogger->infof("[HC12_DRIVER] Driver initialized on %s at %u baud",
-                            uartPortName.data(), uartBaudRate);
+                            config.uartPortPath.c_str(), config.uartBaudrate);
         } catch (const std::exception &e) {
             mpLogger->errorf("[HC12_DRIVER] Failed to initialize: %s", e.what());
             throw;
@@ -43,13 +42,15 @@ namespace SmartHomeMediator {
         mpLogger->info("[HC12_DRIVER] Driver shutdown");
     }
 
-    ba::awaitable<void> HC12Driver::write(std::vector<uint8_t> data) {
-        std::string tmp;
-        for (const auto e : data) {
-            tmp += std::to_string(e) + ",";
+    ba::awaitable<void> HC12Driver::write(const std::vector<uint8_t> data) {
+        if (mpLogger->getLevel() == SmartHome::Utils::LogLevels::Level::DEBUG) {
+            std::string tmp;
+            for (const auto e: data) {
+                tmp += std::to_string(e) + ",";
+            }
+            tmp.pop_back();
+            mpLogger->debugf("[HC12_DRIVER] Write data: [%s]", tmp.data());
         }
-        tmp.pop_back();
-        mpLogger->debugf("[HC12_DRIVER] Write data: [%s]", tmp.data());
 
         // Calculate required delay based on FU mode
         const auto now = std::chrono::steady_clock::now();
@@ -58,33 +59,18 @@ namespace SmartHomeMediator {
 
         // Wait if necessary
         if (elapsed < required) {
-            try {
-                const auto executor = co_await ba::this_coro::executor;
-                ba::steady_timer timer(executor, required - elapsed);
-                co_await timer.async_wait(ba::use_awaitable);
-            } catch (const std::exception &e) {
-                mpLogger->errorf("[HC12_DRIVER] Write delay error: %s", e.what());
-                throw;
-            }
+            const auto executor = co_await ba::this_coro::executor;
+            ba::steady_timer timer(executor, required - elapsed);
+            co_await timer.async_wait(ba::use_awaitable);
         }
 
         // Write
-        try {
-            co_await mpUart->writeAsync(data);
-            mLastWriteTime = std::chrono::steady_clock::now();
-        } catch (const std::exception &e) {
-            mpLogger->errorf("[HC12_DRIVER] Write error: %s", e.what());
-            throw;
-        }
+        co_await mpUart->writeAsync(data);
+        mLastWriteTime = std::chrono::steady_clock::now();
     }
 
     ba::awaitable<std::vector<uint8_t> > HC12Driver::read() {
-        try {
-            co_return  co_await mpUart->readAsync();;
-        } catch (const std::exception &e) {
-            mpLogger->errorf("[HC12_DRIVER] Read error: %s", e.what());
-            throw;
-        }
+            co_return co_await mpUart->readAsync();;
     }
 
     ba::awaitable<bool> HC12Driver::setOption(std::string option,
@@ -110,10 +96,12 @@ namespace SmartHomeMediator {
         try {
             const auto command = buildSetCommand(parsedOption, value);
             const auto response = co_await sendAtCommand(command, msCONFIG_TIMEOUT);
+            const auto responseValue = parseResponse(response);
 
+            const std::string responseValueStr = {responseValue.begin(), responseValue.end()}; // TODO !pr test
             const std::string responseStr = {response.begin(), response.end()};
-            // TODO !pr add value comparison
-            if (responseStr.starts_with("OK")) {
+
+            if (responseStr.starts_with("OK") && value == responseValueStr) {
                 success = true;
                 mpLogger->debugf("[HC12_DRIVER] setOption success: %s=%s",
                                  option.data(), value.data());
@@ -140,7 +128,7 @@ namespace SmartHomeMediator {
         co_return success;
     }
 
-    ba::awaitable<bool> HC12Driver::setOption(const Hc12Option option, const std::string& value) {
+    ba::awaitable<bool> HC12Driver::setOption(const Hc12Option option, const std::string &value) {
         const auto optionStr = optionToString(option);
         return setOption(optionStr, value);
     }
@@ -204,14 +192,14 @@ namespace SmartHomeMediator {
     ba::awaitable<std::string> HC12Driver::getAllOptions() {
         std::string formatted;
 
-        //TODO !pr implement
+        const auto options = {Hc12Option::CHANNEL, Hc12Option::BAUDRATE, Hc12Option::FU_MODE, Hc12Option::POWER};
 
-        // const auto options = {Hc12Option::CHANNEL, Hc12Option::BAUDRATE, Hc12Option::FU_MODE, Hc12Option::POWER};
-        //
-        // for (auto option: options) {
-        // }
-        //
-        // getOption();
+        for (const auto &option: options) {
+            const auto response = co_await getOption(optionToString(option));
+            formatted.append(response.begin(), response.end());
+            formatted.append(",");
+        }
+        formatted.pop_back();
 
         co_return formatted;
     }
@@ -262,7 +250,7 @@ namespace SmartHomeMediator {
         co_return response;
     }
 
-    auto HC12Driver::stringToOption(const std::string_view option) -> HC12Driver::Hc12Option {
+    auto HC12Driver::stringToOption(const std::string_view option) -> Hc12Option {
         if (option == "channel") return Hc12Option::CHANNEL;
         if (option == "baudrate") return Hc12Option::BAUDRATE;
         if (option == "fu_mode") return Hc12Option::FU_MODE;
@@ -388,12 +376,11 @@ namespace SmartHomeMediator {
         if (iter != mOptionsCache.end()) {
             const std::string &mode = iter->second;
             if (mode == "2" || mode == "4") {
-                return 2000ms; // Value from HC12 user manual
+                return msHIGH_WRITE_DELAY;
             }
         }
 
-        // Default for FU1, FU3, or unknown
-        return 80ms; // Most reliable value (lower values caused data loss)
+        return msLOW_WRITE_DELAY;
     }
 
     std::string_view HC12Driver::powerLevelToDbm(const std::string_view level) {

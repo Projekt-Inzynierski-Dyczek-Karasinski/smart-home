@@ -32,18 +32,23 @@ namespace SmartHomeMediator {
             POWER // AT+P (1-8)
         };
 
+        struct Config {
+            std::string uartPortPath = "/dev/serial0";
+            std::string chipPath = "/dev/gpiochip0";
+            uint uartBaudrate = 9600;
+            uint setPin = 18;
+        };
+
         /**
          * @brief Construct HC12 driver.
          *
          * @param ioContext Single-threaded IO context for RF operations.
          * @param logger Logger instance.
-         * @param uartPortName UART device path.
-         * @param uartBaudRate UART baud rate for RF mode.
+         * @param config Struct with HC-12 basic config.
          */
         HC12Driver(ba::io_context &ioContext,
                    const std::shared_ptr<su::Logger> &logger,
-                   std::string_view uartPortName,
-                   uint uartBaudRate);
+                   Config config);
 
         ~HC12Driver() override;
 
@@ -59,7 +64,7 @@ namespace SmartHomeMediator {
 
         ba::awaitable<bool> setOption(std::string option, std::string value) override;
 
-        ba::awaitable<bool> setOption(Hc12Option option, const std::string& value);
+        ba::awaitable<bool> setOption(Hc12Option option, const std::string &value);
 
         ba::awaitable<std::vector<uint8_t> > getOption(std::string option) override;
 
@@ -157,10 +162,14 @@ namespace SmartHomeMediator {
         bool mIsInConfigMode = false;
         std::chrono::steady_clock::time_point mLastWriteTime;
 
+        // Power level to db array, with value from HC-12 user spreadsheet.
         static constexpr std::array<std::string_view, 8> mDbmArray = {"1", "2", "5", "8", "11", "14", "17", "20"};
 
+        // Default for FU1, FU3, or unknown. 80ms is the most reliable value (lower values caused data loss)
+        static constexpr auto msLOW_WRITE_DELAY = 80ms;
+        // Default for FU2, FU4. 2000ms is value recommended by HC-12 user spreadsheet.
+        static constexpr auto msHIGH_WRITE_DELAY = 2000ms;
+
         static constexpr auto msCONFIG_TIMEOUT = 400ms;
-        static constexpr std::string_view mUART_DEVICE_PATH = "/dev/gpiochip0";
-        static constexpr int ms_SET_PIN = 18; ///< GPIO pin number for SET control (BCM numbering).
     };
 }
