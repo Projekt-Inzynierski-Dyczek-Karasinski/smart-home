@@ -48,7 +48,7 @@ namespace SmartHomeMediator {
      *          Existing values in structs are overwritten with values from the YAML file if present.
      *
      * @param configManager Configuration manager instance for YAML file handling.
-     * @param mediatorConfig Mediator launch configuration struct to be updated. //TODO
+     * @param mediatorConfig Mediator launch configuration struct to be updated. //TODO !pr
      */
     void loadYamlConfigs(su::ConfigManager &configManager,
                          Mediator::Config &mediatorConfig);

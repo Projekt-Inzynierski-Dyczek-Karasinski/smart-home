@@ -87,6 +87,8 @@ namespace SmartHomeMediator {
          */
         void setBaudRate(uint baudRate);
 
+        uint getBaudRate() const;
+
         /**
          * @brief Cancel all pending operations on port.
          */
@@ -106,7 +108,9 @@ namespace SmartHomeMediator {
         static constexpr size_t ms_BUFFER_CAPACITY = 1024;
         static constexpr size_t ms_READ_CHUNK_SIZE = 512;
 
-        static constexpr auto ms_READ_ASYNC_WAIT_TIMEOUT = 5ms;
+        static constexpr auto ms_READ_ASYNC_WAIT_MIN_TIMEOUT = 1ms;
+        static constexpr auto ms_TIME_PER_BYTE_MULTIPLIER = 3;
+        static constexpr auto ms_BITS_PER_BYTE = 10; // 8N1
 
         ba::serial_port mPort;
         ba::io_context &mIoContext;

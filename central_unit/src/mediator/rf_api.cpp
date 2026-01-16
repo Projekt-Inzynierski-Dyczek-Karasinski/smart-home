@@ -204,8 +204,8 @@ namespace SmartHomeMediator {
             return;
         }
 
-        //TODO add api commands for mediator remote control
-        //TODO send error responses
+        //TODO !pr add api commands for mediator remote control
+        //TODO !pr send error responses
 
         if (jsonRpcRequest.is_array()) {
             // Handle batch request

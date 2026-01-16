@@ -27,7 +27,7 @@ namespace SmartHomeMediator {
         );
     }
 
-    ba::awaitable<std::vector<uint8_t>> UartPort::readUntil(const std::chrono::milliseconds timeoutDuration) {
+    ba::awaitable<std::vector<uint8_t> > UartPort::readUntil(const std::chrono::milliseconds timeoutDuration) {
         mIsSyncModeActive = true; // Stop read loop
 
         cancel(); // Interrupt readLoop
@@ -99,14 +99,16 @@ namespace SmartHomeMediator {
         }
     }
 
-    ba::awaitable<std::vector<uint8_t>> UartPort::readAsync() {
+    ba::awaitable<std::vector<uint8_t> > UartPort::readAsync() {
         ba::steady_timer timer(mIoContext);
 
         while (true) {
             const size_t currentSize = mBuffer.size();
 
             // Set timer for inactivity timeout
-            timer.expires_after(ms_READ_ASYNC_WAIT_TIMEOUT); //TODO calculate from baud rate
+            auto timePerByte = static_cast<uint>(static_cast<double>(ms_BITS_PER_BYTE) / getBaudRate());
+            auto timePerByteMs = std::chrono::milliseconds(timePerByte);
+            timer.expires_after(timePerByteMs * ms_TIME_PER_BYTE_MULTIPLIER + ms_READ_ASYNC_WAIT_MIN_TIMEOUT);
 
             // Wait for timeout
             try {
@@ -163,6 +165,13 @@ namespace SmartHomeMediator {
                 startReadLoop();
             });
         }
+    }
+
+    uint UartPort::getBaudRate() const {
+        ba::serial_port::baud_rate baudRate;
+        mPort.get_option(baudRate);
+        const int currentBaudRate = baudRate.value();
+        return currentBaudRate;
     }
 
     void UartPort::cancel() {

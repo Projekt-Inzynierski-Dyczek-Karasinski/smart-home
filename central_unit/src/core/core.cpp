@@ -35,7 +35,7 @@ namespace SmartHome {
         // Initialize AsyncLogger, using Logger for further initialization
         mpLogger = std::make_shared<Utils::AsyncLogger>(logger, mCoreUtilityIoContext);
 
-        mpService = Utils::ServiceManager::create(logger, msServiceName, Utils::ServiceType::AUTO);
+        mpService = Utils::ServiceManager::create(logger, ms_ServiceName, Utils::ServiceType::AUTO);
         mpService->setIoContext(mCoreIoContext);
 
         if (!mpService->onInitialize()) {

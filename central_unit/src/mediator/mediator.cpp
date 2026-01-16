@@ -34,7 +34,7 @@ namespace SmartHomeMediator {
         mpLogger = logger;
 
         // Start service
-        mpService = su::ServiceManager::create(logger, msServiceName, su::ServiceType::AUTO);
+        mpService = su::ServiceManager::create(logger, ms_ServiceName, su::ServiceType::AUTO);
         mpService->setIoContext(mMediatorIoContext);
         if (!mpService->onInitialize()) {
             logger->error("[MEDIATOR] Failed to initialize service");
