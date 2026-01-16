@@ -23,18 +23,23 @@ namespace SmartHomeMediator {
      */
     class RfClient : public std::enable_shared_from_this<RfClient> {
     public:
+        struct Config {
+            HC12Driver::Config rfDriverConfig{};
+            std::array<uint8_t, 6> defaultMac = {1,1,1,1,1,1}; //Default 1:1:1:1:1:1 for testing
+            uint8_t defaultChannel = 1;
+        };
+
+
         /**
          * @brief Construct RF client.
          *
          * @param ioContext Single-threaded IO context for RF operations.
          * @param logger Logger instance.
-         * @param uartPortName UART device path.
-         * @param uartBaudRate UART baud rate for RF mode.
+         * @param config Struct with RfClient config.
          */
         RfClient(ba::io_context &ioContext,
                  const std::shared_ptr<su::Logger> &logger,
-                 std::string_view uartPortName,
-                 uint uartBaudRate);
+                 const Config &config);
 
         ~RfClient();
 
@@ -58,9 +63,9 @@ namespace SmartHomeMediator {
 
         bool isSendQueueEmpty();
 
-        uint8_t getDefaultChannel();
+        uint8_t getDefaultChannel() const;
 
-        std::array<uint8_t, 6> getDefaultMacAddress();
+        std::array<uint8_t, 6> getDefaultMacAddress() const;
 
     private:
         /**

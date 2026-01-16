@@ -1,18 +1,17 @@
 #include "rf_client.h"
+#include "rf_client.h"
 #include "mediator.h"
 
 namespace SmartHomeMediator {
     RfClient::RfClient(ba::io_context &ioContext,
                        const std::shared_ptr<su::Logger> &logger,
-                       const std::string_view uartPortName,
-                       const uint uartBaudRate)
+                       const Config &config)
         : mIoContext(ioContext), mpLogger(logger) {
         try {
             mpDriver = std::make_shared<HC12Driver>(
                 mIoContext,
                 mpLogger,
-                uartPortName,
-                uartBaudRate
+                config.rfDriverConfig
             );
 
             mpLogger->info("[RF_CLIENT] RF client created");
@@ -21,8 +20,8 @@ namespace SmartHomeMediator {
             throw;
         }
 
-        mDefaultChannel = 1; //TODO !pr read from conf
-        mDefaultMac = {1, 1, 1, 1, 1, 1}; //TODO !pr read from conf
+        mDefaultChannel = config.defaultChannel;
+        mDefaultMac = config.defaultMac;
     }
 
     RfClient::~RfClient() {
@@ -119,11 +118,11 @@ namespace SmartHomeMediator {
         return mSendQueue.empty();
     }
 
-    uint8_t RfClient::getDefaultChannel() {
+    uint8_t RfClient::getDefaultChannel() const {
         return mDefaultChannel;
     }
 
-    std::array<uint8_t, 6> RfClient::getDefaultMacAddress() {
+    std::array<uint8_t, 6> RfClient::getDefaultMacAddress() const {
         return mDefaultMac;
     }
 
@@ -256,8 +255,12 @@ namespace SmartHomeMediator {
                 data = std::move(mSendQueue.front());
                 mSendQueue.pop();
             }
-
-            co_await mpDriver->write(data);
+            try {
+                co_await mpDriver->write(data);
+            }
+            catch (const std::exception &e) {
+                mpLogger->errorf("[RF_CLIENT] write error: %s", e.what());
+            }
         }
         mpLogger->info("[RF_CLIENT] Send loop stopped");
         co_return;

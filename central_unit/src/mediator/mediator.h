@@ -26,10 +26,12 @@ namespace SmartHomeMediator {
         struct Config {
             /// Default TCP config from socket server
             si::SocketServer::Config::Tcp tcp{
-                .isEnabled = true, .endpointAddress = "192.168.100.32", .endpointPort = 43321
+                .isEnabled = true, .endpointAddress = "127.0.0.1", .endpointPort = 43321
             };
             /// Default UDS config from socket server
-            si::SocketServer::Config::Uds uds{.isEnabled = false, .endpointPath = ""};
+            si::SocketServer::Config::Uds uds{.isEnabled = true, .endpointPath = "/var/run/smarthomed.sock"};
+
+            RfClient::Config rfClient{};
         };
 
 
@@ -44,7 +46,7 @@ namespace SmartHomeMediator {
         static Mediator &Instance();
 
         // Prevent copying
-        Mediator(const Mediator &);
+        Mediator(const Mediator &) = delete;
 
         // Prevent assignment
         Mediator &operator=(const Mediator &) = delete;
@@ -105,12 +107,12 @@ namespace SmartHomeMediator {
         std::shared_ptr<RfClient> mpRfClient;
 
         // IPC API client resources
-        ba::io_context mApiClientIoContext; //TODO make strand
+        ba::io_context mApiClientIoContext;
         std::optional<std::thread> mApiClientThread;
         std::optional<ba::executor_work_guard<ba::io_context::executor_type> > mApiClientGuard;
 
         // RF client resources
-        ba::io_context mRfClientIoContext; //TODO make strand
+        ba::io_context mRfClientIoContext;
         std::optional<std::thread> mRfClientThread;
         std::optional<ba::executor_work_guard<ba::io_context::executor_type> > mRfClientGuard;
 

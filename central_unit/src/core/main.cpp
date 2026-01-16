@@ -194,18 +194,38 @@ int main(int argc, char *argv[]) {
             case Utils::ServiceType::STANDALONE:
                 if (std::filesystem::exists(mediatorConfig.execPath)) {
                     logger->info("[MAIN] Starting Mediator in STANDALONE mode");
-                    mediator = bp::child(mediatorConfig.execPath);
+                    mediator = bp::child(mediatorConfig.execPath, "--config", mediatorConfig.execPath);
                 } else {
                     logger->error("[MAIN] Could not find mediator executable");
                 }
                 break;
             case Utils::ServiceType::SYSTEMD:
-                logger->info("[MAIN] Starting Mediator in SYSTEMD mode");
-                //TODO implement
-                break;
+                logger->info("[MAIN] Mediator in SYSTEMD mode - waiting for service to be ready"); {
+                    bool isRunning = false;
+
+                    for (int attempt = 1; attempt <= s_MAX_RETRIES; ++attempt) {
+                        int ret = std::system("systemctl is-active --quiet smarthome-mediator.service");
+                        if (ret == 0) {
+                            logger->info("[MAIN] Mediator service is running");
+                            isRunning = true;
+                            break;
+                        }
+
+                        if (attempt < s_MAX_RETRIES) {
+                            logger->debugf("[MAIN] Mediator not ready yet, retry %d/%d", attempt, s_MAX_RETRIES);
+                            std::this_thread::sleep_for(s_RETRY_DELAY);
+                        }
+                    }
+
+                    if (!isRunning) {
+                        logger->warning("[MAIN] Mediator service did not start within timeout");
+                        logger->warning("[MAIN] RF features will be unavailable");
+                        logger->info("[MAIN] Check status: sudo systemctl status smarthome-mediator.service");
+                    }
+                    break;
+                }
         }
     }
-
 
     // Run core main loop
     logger->debug("[MAIN] Running Core...");
@@ -223,7 +243,7 @@ int main(int argc, char *argv[]) {
                 mediator.wait();
             }
         } else if (mediatorConfig.serviceType == Utils::ServiceType::SYSTEMD) {
-            //TODO implement
+            logger->debug("[MAIN] Mediator in SYSTEMD mode - not stopping (managed by systemd)");
         }
     }
 

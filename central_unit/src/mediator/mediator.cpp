@@ -47,7 +47,7 @@ namespace SmartHomeMediator {
 
         mConfig = configStruct;
 
-        // Attempt establishing connection with SmatHome daemon
+        // Attempt establishing connection with SmartHome daemon
         mpApiClient = std::make_unique<ApiClient>(&mApiClientIoContext, mpLogger);
         bool isConnectionEstablished = false;
         if (mConfig.uds.isEnabled) {
@@ -83,15 +83,13 @@ namespace SmartHomeMediator {
             mMediatorIoContext.run();
         });
 
-        //TODO !pr
         try {
             mpRfClient = std::make_unique<RfClient>(
                 mRfClientIoContext,
                 mpLogger,
-                "/dev/serial0",
-                9600
+                mConfig.rfClient
             );
-            mpLogger->infof("[MEDIATOR] RF client created");
+            mpLogger->debug("[MEDIATOR] RF client created");
         } catch (const std::exception &e) {
             mpLogger->errorf("[MEDIATOR] Failed to create RF client: %s", e.what());
             return false;
@@ -100,7 +98,7 @@ namespace SmartHomeMediator {
         bool isRfClientInitialized = false;
         mpRfClient->initialize([this, &isRfClientInitialized](const bool isSuccessful) {
             if (isSuccessful) {
-                mpLogger->infof("[MEDIATOR] RF initialized");
+                mpLogger->debug("[MEDIATOR] RF initialized");
             } else {
                 mpLogger->errorf("[MEDIATOR] RF initialization failed");
             }
@@ -110,7 +108,7 @@ namespace SmartHomeMediator {
         if (!isRfClientInitialized) return false;
 
         mIsInitialized.store(true, std::memory_order_release);
-        logger->debug("[MEDIATOR] Mediator successfully initialized");
+        logger->info("[MEDIATOR] Mediator successfully initialized");
 
         return true;
     }
@@ -162,18 +160,12 @@ namespace SmartHomeMediator {
         mMediatorThread->join();
         mMediatorThread.reset();
 
-        mpLogger->debug("[TEST] mediator joined");
-
         // Join threads
         mApiClientThread->join();
         mApiClientThread.reset();
 
-        mpLogger->debug("[TEST] api joined");
-
         mRfClientThread->join(); // TODO !pr RF client hangs on something during shutdown
         mRfClientThread.reset();
-
-        mpLogger->debug("[TEST] rf joined");
 
         // Stop utilities
         mMediatorUtilityGuard.reset();
@@ -190,8 +182,8 @@ namespace SmartHomeMediator {
         }
 
         // Start shutdown timeout timer
-        auto shutdownTimeout = std::make_shared<ba::steady_timer>(mMediatorUtilityIoContext, ms_SHUTDOWN_TIMEOUT);
-        shutdownTimeout->async_wait([this, shutdownTimeout](const bs::error_code &ec) {
+        std::weak_ptr shutdownTimeout = std::make_shared<ba::steady_timer>(mMediatorUtilityIoContext, ms_SHUTDOWN_TIMEOUT);
+        shutdownTimeout.lock()->async_wait([this, shutdownTimeout](const bs::error_code &ec) {
             if (!ec) {
                 mMediatorIoContext.stop();
                 mApiClientIoContext.stop();
@@ -218,7 +210,7 @@ namespace SmartHomeMediator {
             mSignals.reset();
         }
 
-        mpLogger->debug("[MEDIATOR] Shutdown complete");
+        mpLogger->info("[MEDIATOR] Shutdown");
     }
 
     bool Mediator::isRunning() const {
