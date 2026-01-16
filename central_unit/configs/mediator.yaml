@@ -1,7 +1,34 @@
-log_level: "debug" #TODO implement verbose levels
+preset_values:
+  log_levels:
+    none: &none 0
+    critical: &critical 1
+    error: &error 2
+    warning: &warning 3
+    info: &info 4
+    debug: &debug 5
 
-connection:
-  - type: "tcp"
-    enabled: true
-    address: "127.0.0.1"
-    port: 43321
+mediator:
+  rf_client:
+    default_mac_address: ~ #SmartHome network uid in MAC address format, defaults to device MAC
+    default_rf_channel: 1
+    rf_driver:
+      uart_port_path: "/dev/serial0"
+      uart_baud_rate: 9600
+      gpio_chip_path: "/dev/gpiochip0"
+      set_pin_number: 18
+  logging:
+    log_level: *info
+    enable_console_log_output: true
+    log_file:
+      enabled: true
+      create_new: true
+      archive_old: true
+      path: "/var/log/smarthome/mediator.log"
+  ipc:
+    tcp:
+      enabled: true
+      address: "127.0.0.1"
+      port: 43321
+    uds:
+      enabled: true
+      socket_path: "/var/run/mediator.sock"

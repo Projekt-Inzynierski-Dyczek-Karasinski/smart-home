@@ -1,4 +1,7 @@
 preset_values:
+  service_modes:
+    standalone_daemon: &standalone_daemon "STANDALONE"
+    systemd_daemon: &systemd_daemon "SYSTEMD"
   core_modes:
     headless: &headless 0
     gui: &gui 1
@@ -47,7 +50,7 @@ core:
 services:
   mediator:
     enabled: false
-    service_type: "Standalone" # TODO implement systemd service along proper mediator implementation
+    service_type: *standalone_daemon
     exec_path: ~ #Option for standalone mode - Default: /usr/local/bin/
     config_path: "/etc/smarthome/mediator.yaml"
 
