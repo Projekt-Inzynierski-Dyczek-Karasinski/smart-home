@@ -6,8 +6,12 @@
 namespace sj = SmartHome::JsonRpcStrings;
 
 namespace SmartHomeMediator {
-    RfTypes::RfCommand RfApi::toRfCommand(const SmartHome::API::ApiRequest &apiRequest) {
-        RfTypes::RfCommand rfCommand;
+    using namespace std::string_literals;
+
+    std::unique_ptr<RfTypes::Command> RfApi::toRfCommand(
+        const SmartHome::API::ApiRequest &apiRequest,
+        const bool isConfigCommand) {
+        auto pRfCommand = std::make_unique<RfTypes::RfCommand>();
         char buffer[1024];
 
         if (!apiRequest.params.has_value()) {
@@ -19,89 +23,91 @@ namespace SmartHomeMediator {
             throw std::invalid_argument("Missing or invalid target parameter");
         }
 
-        std::unique_ptr<nlohmann::json> methodParams;
+        std::unique_ptr<nlohmann::json> pMethodParams;
         if (params.contains(sj::ParamsKeys::METHOD_PARAMS)) {
-            methodParams = make_unique<nlohmann::json>(params[sj::ParamsKeys::METHOD_PARAMS]);
+            pMethodParams = make_unique<nlohmann::json>(params[sj::ParamsKeys::METHOD_PARAMS]);
         } else {
             throw std::invalid_argument("Missing method params");
         }
 
         const auto method = boost::algorithm::to_lower_copy(apiRequest.method);
 
+        if (isConfigCommand) return toConfigCommand(apiRequest, method, pMethodParams);
+
         if (apiRequest.id.hasValue()) {
             int paramOffset = 1;
-            if (method == RfTypes::SET_STRING && methodParams != nullptr && methodParams->is_array() &&
-                methodParams->size() > 1) {
-                rfCommand.commandType = RfTypes::CommandTypes::SET;
+            if (method == RfTypes::SET_STRING && pMethodParams != nullptr && pMethodParams->is_array() &&
+                pMethodParams->size() > 1) {
+                pRfCommand->rfCommandType = RfTypes::RfCommandType::SET;
                 // Read set type from first index
                 try {
-                    rfCommand.requestType.emplace(
-                        RfTypes::setTypeFromString(methodParams->front().get<std::string>()));
+                    pRfCommand->requestType.emplace(
+                        RfTypes::setTypeFromString(pMethodParams->front().get<std::string>()));
                 } catch (const std::exception &e) {
                     sprintf(buffer,
                             "Missing or invalid action type inside method_params for set: %s,\ncurrent method_params: %s",
                             e.what(),
-                            methodParams->dump().c_str());
+                            pMethodParams->dump().c_str());
                     throw std::invalid_argument(buffer);
                 }
-            } else if (method == RfTypes::GET_STRING && methodParams != nullptr && methodParams->is_array() &&
-                       !methodParams->empty()) {
-                rfCommand.commandType = RfTypes::CommandTypes::GET;
+            } else if (method == RfTypes::GET_STRING && pMethodParams != nullptr && pMethodParams->is_array() &&
+                       !pMethodParams->empty()) {
+                pRfCommand->rfCommandType = RfTypes::RfCommandType::GET;
                 // Read get type from first index
                 try {
-                    rfCommand.requestType.emplace(
-                        RfTypes::getTypeFromString(methodParams->front().get<std::string>()));
+                    pRfCommand->requestType.emplace(
+                        RfTypes::getTypeFromString(pMethodParams->front().get<std::string>()));
                 } catch (const std::exception &e) {
                     sprintf(buffer,
                             "Missing or invalid action type inside method_params for get: %s,\ncurrent method_params: %s",
                             e.what(),
-                            methodParams->dump().c_str());
+                            pMethodParams->dump().c_str());
                     throw std::invalid_argument(buffer);
                 }
-            } else if (method == RfTypes::EXECUTE_STRING && methodParams != nullptr && methodParams->is_array() &&
-                       !methodParams->empty()) {
+            } else if (method == RfTypes::EXECUTE_STRING && pMethodParams != nullptr && pMethodParams->is_array() &&
+                       !pMethodParams->empty()) {
                 std::string action;
                 try {
-                    action = methodParams->front().get<std::string>();
+                    action = pMethodParams->front().get<std::string>();
                 } catch (const std::exception &e) {
                     sprintf(buffer,
                             "Missing or invalid action type inside method_params for execute: %s,\ncurrent method_params: %s",
                             e.what(),
-                            methodParams->dump().c_str());
+                            pMethodParams->dump().c_str());
                     throw std::invalid_argument(buffer);
                 }
 
-                if (action == RfTypes::SLEEP_STRING) rfCommand.commandType = RfTypes::CommandTypes::SLEEP;
+                if (action == RfTypes::SLEEP_STRING) pRfCommand->rfCommandType = RfTypes::RfCommandType::SLEEP;
                 else if (action == RfTypes::DEEP_SLEEP_STRING)
-                    rfCommand.commandType = RfTypes::CommandTypes::DEEP_SLEEP;
+                    pRfCommand->rfCommandType = RfTypes::RfCommandType::DEEP_SLEEP;
                 else {
                     throw std::invalid_argument("Invalid action parameter specified");
                 }
             } else if (method == RfTypes::PING_STRING) {
-                rfCommand.commandType = RfTypes::CommandTypes::PING;
+                pRfCommand->rfCommandType = RfTypes::RfCommandType::PING;
                 paramOffset = 0; // ping does not have a type as first param
             } else {
                 throw std::invalid_argument("Invalid method specified");
             }
 
             // Pass remaining method params to rfCommand parameter vector
-            for (auto i = paramOffset; i < methodParams->size(); i++) {
-                rfCommand.parameters.push_back(RfTypes::Parameter::parameterFromJson(methodParams->at(i)));
+            for (auto i = paramOffset; i < pMethodParams->size(); i++) {
+                pRfCommand->parameters.push_back(RfTypes::Parameter::parameterFromJson(pMethodParams->at(i)));
             }
 
-            rfCommand.requestId = apiRequest.id.value();
+            pRfCommand->requestId = apiRequest.id.value();
         } else if (apiRequest.id.isUndefined()) {
             if (method == RfTypes::NOTIFY_STRING) {
-                rfCommand.commandType = RfTypes::CommandTypes::NOTIFY;
+                pRfCommand->rfCommandType = RfTypes::RfCommandType::NOTIFY;
                 // Read get notify from first index
                 try {
-                    rfCommand.requestType.emplace(
-                        RfTypes::notificationTypeFromString(methodParams->front().get<std::string>()));
+                    pRfCommand->requestType.emplace(
+                        RfTypes::notificationTypeFromString(pMethodParams->front().get<std::string>()));
                 } catch (const std::exception &e) {
                     sprintf(buffer,
                             "Missing or invalid action type inside method_params for notify: %s,\ncurrent method_params: %s",
                             e.what(),
-                            methodParams->dump().c_str());
+                            pMethodParams->dump().c_str());
                     throw std::invalid_argument(buffer);
                 }
             } else {
@@ -111,12 +117,60 @@ namespace SmartHomeMediator {
             throw std::invalid_argument("Unexpected request format: received request with null ID");
         }
 
-        return rfCommand;
+        return pRfCommand;
+    }
+
+    std::unique_ptr<RfTypes::MediatorConfigCommand> RfApi::toConfigCommand(
+        const SmartHome::API::ApiRequest &apiRequest, const std::string_view method,
+        const std::unique_ptr<nlohmann::json>
+        &pMethodParams) {
+        if (!pMethodParams || pMethodParams->empty()) {
+            throw std::invalid_argument(
+                "Missing method params: method params are required for mediator config command");
+        }
+
+        char buffer[1024];
+        auto pConfigCommand = std::make_unique<RfTypes::MediatorConfigCommand>();
+
+        if (apiRequest.id.hasValue()) {
+            pConfigCommand->requestId = apiRequest.id.value();
+        }
+
+        size_t requiredSize;
+
+        if (method == RfTypes::GET_STRING) {
+            pConfigCommand->configCommandType = RfTypes::MediatorConfigCommandType::GET;
+            requiredSize = 1;
+        } else if (method == RfTypes::SET_STRING) {
+            pConfigCommand->configCommandType = RfTypes::MediatorConfigCommandType::SET;
+            requiredSize = 2;
+        } else if (method == RfTypes::EXECUTE_STRING) {
+            pConfigCommand->configCommandType = RfTypes::MediatorConfigCommandType::EXECUTE;
+            requiredSize = 2;
+        } else {
+            throw std::invalid_argument("Invalid method for mediator config command: "s + method.data());
+        }
+
+        if (pMethodParams->size() != requiredSize) {
+            sprintf(buffer,
+                    "Invalid method params size: received %lu, required %lu",
+                    pMethodParams->size(),
+                    requiredSize);
+            throw std::invalid_argument(buffer);
+        }
+
+        pConfigCommand->commandKey = pMethodParams->front().get<std::string>();
+
+        if (requiredSize == 2) {
+            pConfigCommand->commandValue = pMethodParams->at(1).get<std::string>();
+        }
+
+        return pConfigCommand;
     }
 
     std::string RfApi::toApiString(RfTypes::RfCommand rfCommand) {
-        if (rfCommand.commandType == RfTypes::CommandTypes::RESPONSE || rfCommand.commandType ==
-            RfTypes::CommandTypes::REPING) {
+        if (rfCommand.rfCommandType == RfTypes::RfCommandType::RESPONSE || rfCommand.rfCommandType ==
+            RfTypes::RfCommandType::REPING) {
             SmartHome::API::ApiError error;
             SmartHome::API::ApiResponse response;
             if (rfCommand.requestId.has_value()) {
@@ -128,12 +182,12 @@ namespace SmartHomeMediator {
 
             if (!rfCommand.parameters.empty()) {
                 // Check for error
-                if (rfCommand.parameters[0].type == RfTypes::ParameterTypes::ERROR) {
+                if (rfCommand.parameters[0].type == RfTypes::ParameterType::ERROR) {
                     // Return MODULE_RUNTIME_ERROR if error occurred on module side
                     error.code = SmartHome::API::ErrorCodes::MODULE_RUNTIME_ERROR;
                     error.message = SmartHome::API::errorCodeToString(error.code);
 
-                    RfTypes::RfErrorCodes rfErrorCode;
+                    RfTypes::RfErrorCode rfErrorCode;
                     memcpy(&rfErrorCode, rfCommand.parameters[0].value.data(), rfCommand.parameters[0].value.size());
                     error.data = RfTypes::getStringFromRfErrorCode(rfErrorCode);
                     response.error = error;
@@ -145,7 +199,7 @@ namespace SmartHomeMediator {
                     }
                     response.result = paramJsonArray.dump();
                 }
-            } else if (rfCommand.commandType == RfTypes::CommandTypes::RESPONSE) {
+            } else if (rfCommand.rfCommandType == RfTypes::RfCommandType::RESPONSE) {
                 // Return MEDIATOR_COMMUNICATION_ERROR if response has no parameters
                 error.code = SmartHome::API::ErrorCodes::MEDIATOR_COMMUNICATION_ERROR;
                 error.message = SmartHome::API::errorCodeToString(error.code);
@@ -158,7 +212,7 @@ namespace SmartHomeMediator {
             // Return response
             return response.to_string();
         }
-        if (rfCommand.commandType == RfTypes::CommandTypes::NOTIFY) {
+        if (rfCommand.rfCommandType == RfTypes::RfCommandType::NOTIFY) {
             if (!rfCommand.requestType.has_value()) {
                 throw std::invalid_argument("RfCommand of notify type does not have NotificationType set");
             }
@@ -166,12 +220,14 @@ namespace SmartHomeMediator {
             notify.params.emplace();
             auto &params = notify.params.value();
 
-            notify.method = "notify";
+            notify.method = RfTypes::NOTIFY_STRING;
 
-            params[sj::ParamsKeys::TARGET] = "core";
+            params[sj::ParamsKeys::TARGET] = RfTypes::CORE_STRING;
 
-            auto notificationType = std::get<RfTypes::NotificationTypes>(rfCommand.requestType.value());
-            params[sj::ParamsKeys::METHOD_PARAMS] = notificationTypeToString(notificationType);
+            auto notificationType = std::get<RfTypes::NotificationType>(rfCommand.requestType.value());
+            auto methodParams = nlohmann::json::array();
+            methodParams.push_back(notificationTypeToString(notificationType));
+            params[sj::ParamsKeys::METHOD_PARAMS] = methodParams;
 
             return notify.to_string();
         }
@@ -187,10 +243,18 @@ namespace SmartHomeMediator {
     }
 
     void RfApi::handleIncoming(SmartHome::connectionId_t connectionId, std::string &&message) {
+        constexpr auto nullConnectionId = 0;
         const auto &pLogger = Mediator::Instance().mpLogger;
         pLogger->debugf("[RF_API] [HANDLE_INCOMING] Incoming message: %s]", message.c_str());
 
         nlohmann::json jsonRpcRequest;
+        RfTypes::SessionMetadata metadata;
+        SmartHome::API::ApiResponse response;
+        SmartHome::API::ApiError error;
+        response.id = nullptr;
+
+        error.code = SmartHome::API::ErrorCodes::PARSE_ERROR;
+        error.message = SmartHome::API::errorCodeToString(error.code);
 
         if (!nlohmann::json::accept(message)) {
             pLogger->error("[RF_API] [HANDLE_INCOMING] Failed to accept incoming message: invalid JSON format");
@@ -204,9 +268,6 @@ namespace SmartHomeMediator {
             return;
         }
 
-        //TODO !pr add api commands for mediator remote control
-        //TODO !pr send error responses
-
         if (jsonRpcRequest.is_array()) {
             // Handle batch request
             std::map<uint8_t, RfTypes::SessionMetadata> metadataMap; //{targetLogicAddress: RfTypes::SessionMetadata}
@@ -216,25 +277,38 @@ namespace SmartHomeMediator {
 
                 try {
                     apiRequest(request);
+                    response.id = apiRequest.id;
                 } catch (const std::exception &e) {
                     pLogger->errorf("[RF_API] [HANDLE_INCOMING] Failed to parse request message to ApiRequest: %s",
                                     e.what());
+
+                    error.data = "Failed to parse request message to ApiRequest: "s + e.what();
+                    response.error = error;
+
+                    handleOutgoing(nullConnectionId, response.to_string());
                     continue;
                 }
 
-                auto metadata = toMetadata(apiRequest);
-                if (!metadata.has_value()) continue;
-                const auto &metadataValue = metadata.value();
+                try {
+                    metadata = toMetadata(apiRequest);
+                } catch (const std::exception &e) {
+                    error.data = "Failed to parse request into mediator session: "s + e.what();
+                    response.error = error;
 
-                if (metadataMap.contains(metadataValue.targetLogicAddress)) {
-                    metadataMap.at(metadataValue.targetLogicAddress).commands.push_back(metadataValue.commands.front());
+                    handleOutgoing(nullConnectionId, response.to_string());
+                    continue;
+                }
+
+                if (metadataMap.contains(metadata.targetLogicAddress)) {
+                    metadataMap.at(metadata.targetLogicAddress).commands.
+                            push_back(std::move(metadata.commands.front()));
                 } else {
-                    metadataMap[metadataValue.targetLogicAddress] = metadataValue;
+                    metadataMap[metadata.targetLogicAddress] = metadata;
                 }
             }
 
-            for (auto &metadata: metadataMap | std::views::values) {
-                mpRfClient->addSession(std::move(metadata));
+            for (auto &m: metadataMap | std::views::values) {
+                mpRfClient->addSession(std::move(m));
             }
         } else {
             SmartHome::API::ApiRequest apiRequest;
@@ -244,13 +318,24 @@ namespace SmartHomeMediator {
             } catch (const std::exception &e) {
                 pLogger->errorf("[RF_API] [HANDLE_INCOMING] Failed to parse request message to ApiRequest: %s",
                                 e.what());
+                error.data = "Failed to parse request message to ApiRequest: "s + e.what();
+                response.error = error;
+
+                handleOutgoing(nullConnectionId, response.to_string());
                 return;
             }
 
-            auto metadata = toMetadata(apiRequest);
-            if (!metadata.has_value()) return;;
+            try {
+                metadata = toMetadata(apiRequest);
+            } catch (const std::exception &e) {
+                error.data = "Failed to parse request into mediator session: "s + e.what();
+                response.error = error;
 
-            mpRfClient->addSession(std::move(metadata.value()));
+                handleOutgoing(nullConnectionId, response.to_string());
+                return;
+            }
+
+            mpRfClient->addSession(std::move(metadata));
         }
     }
 
@@ -258,22 +343,34 @@ namespace SmartHomeMediator {
         mMessageHandler(message);
     }
 
-    std::optional<RfTypes::SessionMetadata> RfApi::toMetadata(const SmartHome::API::ApiRequest &apiRequest) {
+    RfTypes::SessionMetadata RfApi::toMetadata(const SmartHome::API::ApiRequest &apiRequest) {
         const auto &pLogger = Mediator::Instance().mpLogger;
 
         RfTypes::SessionMetadata metadata;
-        RfTypes::RfCommand rfCommand;
+        std::unique_ptr<RfTypes::Command> pCommand;
 
         if (!apiRequest.params.has_value()) {
             pLogger->error("[RF_API] [TO_METADATA] Failed to parse incoming message: invalid format");
-            return std::nullopt;
+            throw std::invalid_argument("Invalid format");
         }
 
         const auto &params = apiRequest.params.value();
 
         if (!params.contains(sj::ParamsKeys::MODULE_INFO)) {
-            pLogger->error("[RF_API] [TO_METADATA] Received request without module info");
-            return std::nullopt;
+            pLogger->debug("[RF_API] [TO_METADATA] Received request targeted at module mediator");
+            metadata.sessionType = RfTypes::SessionType::MEDIATOR_CONFIG;
+            metadata.targetLogicAddress = 0;
+
+            try {
+                constexpr bool isConfigCommand = true;
+                pCommand = toRfCommand(apiRequest, isConfigCommand);
+            } catch (const std::exception &e) {
+                pLogger->errorf("[RF_API] [TO_METADATA] Failed to parse request message to RfCommand: %s", e.what());
+                throw;
+            }
+            metadata.commands.push_back(std::move(pCommand));
+
+            return metadata;
         }
 
         const auto &moduleInfo = params.at(sj::ParamsKeys::MODULE_INFO);
@@ -281,23 +378,30 @@ namespace SmartHomeMediator {
         if (!(moduleInfo.contains(sj::ModuleInfoKeys::LOGIC_ADDRESS) &&
               moduleInfo.contains(sj::ModuleInfoKeys::RF_CHANNEL))) {
             pLogger->error("[RF_API] [TO_METADATA] Received request with invalid module info");
-            return std::nullopt;
+            throw std::invalid_argument("Invalid module info object");
         }
 
         try {
-            rfCommand = toRfCommand(apiRequest);
+            pCommand = toRfCommand(apiRequest);
         } catch (const std::exception &e) {
             pLogger->errorf("[RF_API] [TO_METADATA] Failed to parse request message to RfCommand: %s", e.what());
-            return std::nullopt;
+            throw;
         }
 
         try {
+            const auto moduleLogicAddress = moduleInfo.at(sj::ModuleInfoKeys::LOGIC_ADDRESS).get<uint8_t>();
+
+            if (moduleLogicAddress == 0) {
+                pLogger->error("[RF_API] [TO_METADATA] Module with invalid logic address");
+                throw std::invalid_argument("Invalid module info object: module cannot have logic address 0");
+            }
+
             metadata.rfChannel = moduleInfo.at(sj::ModuleInfoKeys::RF_CHANNEL).get<uint8_t>();
-            metadata.targetLogicAddress = moduleInfo.at(sj::ModuleInfoKeys::LOGIC_ADDRESS).get<uint8_t>();
-            metadata.commands.push_back(rfCommand);
+            metadata.targetLogicAddress = moduleLogicAddress;
+            metadata.commands.push_back(std::move(pCommand));
         } catch (const std::exception &e) {
             pLogger->errorf("[RF_API] [TO_METADATA] Failed to parse request: %s", e.what());
-            return std::nullopt;
+            throw;
         }
         return metadata;
     }

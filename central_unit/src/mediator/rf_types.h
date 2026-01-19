@@ -9,9 +9,9 @@
 
 
 namespace SmartHomeMediator::RfTypes {
-    class RfCommand;
+    class Command;
 
-    enum class RfErrorCodes: uint8_t {
+    enum class RfErrorCode: uint8_t {
         UNKNOWN = 0,
         BAD_COMMAND,
         UNKNOWN_COMMAND,
@@ -20,7 +20,7 @@ namespace SmartHomeMediator::RfTypes {
         INTERNAL_ERROR
     };
 
-    enum class ParameterTypes: uint8_t {
+    enum class ParameterType: uint8_t {
         UNDEFINED = 0,
         // Regular types
         UINT,
@@ -32,7 +32,7 @@ namespace SmartHomeMediator::RfTypes {
         ERROR
     };
 
-    enum class CommandTypes: uint8_t {
+    enum class RfCommandType: uint8_t {
         UNDEFINED = 0,
         // Low level (Used in rf protocol)
         ACKNOWLEDGE,
@@ -50,7 +50,7 @@ namespace SmartHomeMediator::RfTypes {
         NOTIFY
     };
 
-    enum class GetTypes: uint8_t {
+    enum class GetType: uint8_t {
         UNDEFINED = 0,
         // Sensor values
         SENSOR_VALUE,
@@ -63,7 +63,7 @@ namespace SmartHomeMediator::RfTypes {
         FORCE_READ_SENSOR_VALUE,
     };
 
-    enum class SetTypes: uint8_t {
+    enum class SetType: uint8_t {
         UNDEFINED = 0,
         // Config values
         CONFIG_OPTION,
@@ -72,7 +72,7 @@ namespace SmartHomeMediator::RfTypes {
         SET_ACTUATOR_VALUE
     };
 
-    enum class NotificationTypes: uint8_t {
+    enum class NotificationType: uint8_t {
         UNDEFINED = 0,
         // Received from modules
         MANUAL_TRIGGER,
@@ -84,18 +84,35 @@ namespace SmartHomeMediator::RfTypes {
 
     enum class SessionType : uint8_t {
         FROM_CENTRAL_UNIT,
-        FROM_MODULE
+        FROM_MODULE,
+        MEDIATOR_CONFIG
     };
+
+    enum class MediatorConfigCommandType : uint8_t {
+        UNDEFINED = 0,
+        SET,
+        GET,
+        EXECUTE
+    };
+
+    enum class CommandType : uint8_t {
+        RF = 0,
+        CONFIG
+    };
+
 
     struct SessionMetadata {
         SessionType sessionType = SessionType::FROM_CENTRAL_UNIT;
-        uint8_t rfChannel{};
-        uint8_t targetLogicAddress{};
-        std::vector<RfCommand> commands{};
+        uint8_t rfChannel = 0;
+        // Logic address for module must be more than 0, default value of 0 is reserved for mediator
+        uint8_t targetLogicAddress = 0;
+        std::vector<std::unique_ptr<Command> > commands{};
     };
 
     // Target string
     inline constexpr std::string_view MEDIATOR_STRING = "module_mediator";
+    inline constexpr std::string_view CORE_STRING = "core";
+
 
     // Commands strings
     inline constexpr std::string_view GET_STRING = "get";
@@ -122,6 +139,7 @@ namespace SmartHomeMediator::RfTypes {
     inline constexpr std::string_view SLEEP_STRING = "sleep";
     inline constexpr std::string_view DEEP_SLEEP_STRING = "deep_sleep";
 
+    inline constexpr std::string_view GET_ALL_OPTIONS_STRING = "get_all_options";
 
     inline constexpr std::string_view UNDEFINED_STRING = "undefined";
 
@@ -172,7 +190,7 @@ namespace SmartHomeMediator::RfTypes {
 
 
     struct Parameter {
-        ParameterTypes type{};
+        ParameterType type{};
         std::vector<uint8_t> value{};
 
         Parameter() = default;
@@ -187,7 +205,7 @@ namespace SmartHomeMediator::RfTypes {
 
         explicit Parameter(const std::vector<uint8_t> &newValue);
 
-        explicit Parameter(RfErrorCodes newValue);
+        explicit Parameter(RfErrorCode newValue);
 
         static Parameter parameterFromJson(const nlohmann::json &json);
 
@@ -196,33 +214,57 @@ namespace SmartHomeMediator::RfTypes {
         std::vector<uint8_t> to_vector() const;
     };
 
-    class RfCommand {
+    class Command {
+    protected:
+        const CommandType mType;
+
     public:
-        RfCommand() = default;
+        explicit Command(const CommandType type) : mType(type) {
+        };
+
+        CommandType getType() const;
+
+        std::optional<SmartHome::apiId_t> requestId;
+    };
+
+    class RfCommand : public Command {
+    public:
+        RfCommand() : Command(CommandType::RF) {
+        };
 
         explicit RfCommand(std::vector<uint8_t> rawData);
 
-        CommandTypes commandType = CommandTypes::UNDEFINED;
+        RfCommandType rfCommandType = RfCommandType::UNDEFINED;
 
-        // TODO !pr move optionals into parameters
-        std::optional<std::variant<GetTypes, SetTypes, NotificationTypes> > requestType;
-
-        std::optional<SmartHome::apiId_t> requestId;
+        std::optional<std::variant<GetType, SetType, NotificationType> > requestType;
 
         std::vector<Parameter> parameters;
 
         std::vector<uint8_t> to_vector() const;
     };
 
-    std::string_view getStringFromRfErrorCode(RfErrorCodes code);
+    class MediatorConfigCommand : public Command {
+    public:
+        MediatorConfigCommand() : Command(CommandType::CONFIG) {
+        }
 
-    GetTypes getTypeFromString(std::string_view value);
+        MediatorConfigCommandType configCommandType = MediatorConfigCommandType::UNDEFINED;
 
-    SetTypes setTypeFromString(std::string_view value);
+        std::string commandKey;
 
-    NotificationTypes notificationTypeFromString(std::string_view value);
+        std::string commandValue;
 
-    std::string_view notificationTypeToString(NotificationTypes value);
+    };
+
+    std::string_view getStringFromRfErrorCode(RfErrorCode code);
+
+    GetType getTypeFromString(std::string_view value);
+
+    SetType setTypeFromString(std::string_view value);
+
+    NotificationType notificationTypeFromString(std::string_view value);
+
+    std::string_view notificationTypeToString(NotificationType value);
 
     uint8_t getSpecialByte(uint8_t firstHalf, uint8_t secondHalf);
 

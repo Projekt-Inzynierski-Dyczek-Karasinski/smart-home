@@ -77,7 +77,7 @@ namespace SmartHomeMediator::RfTypes {
     }
 
     Parameter::Parameter(const uint64_t newValue) {
-        type = ParameterTypes::UINT;
+        type = ParameterType::UINT;
 
         if (newValue <= std::numeric_limits<uint8_t>::max()) {
             assignSwappedEndian(value, static_cast<uint8_t>(newValue));
@@ -91,7 +91,7 @@ namespace SmartHomeMediator::RfTypes {
     }
 
     Parameter::Parameter(const int64_t newValue) {
-        type = ParameterTypes::INT;
+        type = ParameterType::INT;
 
         if (newValue >= std::numeric_limits<int8_t>::min() && newValue <= std::numeric_limits<int8_t>::max()) {
             assignSwappedEndian(value, static_cast<int8_t>(newValue));
@@ -105,7 +105,7 @@ namespace SmartHomeMediator::RfTypes {
     }
 
     Parameter::Parameter(const double newValue) {
-        type = ParameterTypes::FLOAT;
+        type = ParameterType::FLOAT;
 
         if (std::abs(newValue) <= std::numeric_limits<float>::max()) {
             // Check precision loss
@@ -123,19 +123,19 @@ namespace SmartHomeMediator::RfTypes {
     }
 
     Parameter::Parameter(const std::string_view newValue) {
-        type = ParameterTypes::ASCII;
+        type = ParameterType::ASCII;
 
         value.assign(newValue.begin(), newValue.end());
     }
 
     Parameter::Parameter(const std::vector<uint8_t> &newValue) {
-        type = ParameterTypes::RAW;
+        type = ParameterType::RAW;
 
         value = newValue;
     }
 
-    Parameter::Parameter(const RfErrorCodes newValue) {
-        type = ParameterTypes::ERROR;
+    Parameter::Parameter(const RfErrorCode newValue) {
+        type = ParameterType::ERROR;
 
         assignSwappedEndian(value, static_cast<uint8_t>(newValue));
     }
@@ -152,37 +152,37 @@ namespace SmartHomeMediator::RfTypes {
     nlohmann::json Parameter::parameterToJson() const {
         const size_t size = value.size();
         switch (type) {
-            case ParameterTypes::UINT:
+            case ParameterType::UINT:
                 if (size == sizeof(uint8_t)) return getValueFromRawData<uint8_t>(value);
                 if (size == sizeof(uint16_t)) return getValueFromRawData<uint16_t>(value);
                 if (size == sizeof(uint32_t)) return getValueFromRawData<uint32_t>(value);
                 return getValueFromRawData<uint64_t>(value);
-            case ParameterTypes::INT:
+            case ParameterType::INT:
                 if (size == sizeof(int8_t)) return getValueFromRawData<int8_t>(value);
                 if (size == sizeof(int16_t)) return getValueFromRawData<int16_t>(value);
                 if (size == sizeof(int32_t)) return getValueFromRawData<int32_t>(value);
                 return getValueFromRawData<int64_t>(value);
-            case ParameterTypes::FLOAT:
+            case ParameterType::FLOAT:
                 if (size == sizeof(float)) return getValueFromRawData<float>(value);
                 return getValueFromRawData<double>(value);
-            case ParameterTypes::ASCII: {
+            case ParameterType::ASCII: {
                 std::string str;
                 std::ranges::copy(value, std::back_inserter(str));
                 return str;
             }
-            case ParameterTypes::RAW: {
+            case ParameterType::RAW: {
                 auto array = nlohmann::json::array();
                 for (const auto &element: value) {
                     array.push_back(element);
                 }
                 return array;
             }
-            case ParameterTypes::ERROR: {
-                RfErrorCodes errorCode;
+            case ParameterType::ERROR: {
+                RfErrorCode errorCode;
                 memcpy(&errorCode, value.data(), sizeof(errorCode));
                 return getStringFromRfErrorCode(errorCode);
             }
-            case ParameterTypes::UNDEFINED:
+            case ParameterType::UNDEFINED:
             default:
                 throw std::runtime_error("unsupported parameter type");
         }
@@ -197,7 +197,7 @@ namespace SmartHomeMediator::RfTypes {
             return buffer;
         }
 
-        if (type == ParameterTypes::ASCII || type == ParameterTypes::RAW) {
+        if (type == ParameterType::ASCII || type == ParameterType::RAW) {
             buffer.reserve(value.size() + ((value.size() / 16) + 1));
 
             for (size_t offset = 0; offset < value.size(); offset += 16) {
@@ -220,7 +220,11 @@ namespace SmartHomeMediator::RfTypes {
         return buffer;
     }
 
-    RfCommand::RfCommand(std::vector<uint8_t> rawData) {
+    CommandType Command::getType() const {
+        return mType;
+    }
+
+    RfCommand::RfCommand(std::vector<uint8_t> rawData) : Command(CommandType::RF) {
         constexpr uint8_t paramIndexOffset = 1; // Param with index 0 is reserved for UID / Notification type
         size_t rawDataOffset = 0;
 
@@ -240,7 +244,7 @@ namespace SmartHomeMediator::RfTypes {
         // Parse command
         requireBytes(1);
         const auto [command, numOfParameters] = readSpecialByte(rawData[rawDataOffset++]);
-        commandType = static_cast<CommandTypes>(command);
+        rfCommandType = static_cast<RfCommandType>(command);
 
         // Return if command is not expecting params
         if (numOfParameters == 0) return;
@@ -248,18 +252,18 @@ namespace SmartHomeMediator::RfTypes {
         // Check first param for error
         requireBytes(1);
         const auto [firstParamRawType,_] = readSpecialByte(rawData[rawDataOffset]);
-        if (static_cast<ParameterTypes>(firstParamRawType) == ParameterTypes::ERROR) {
+        if (static_cast<ParameterType>(firstParamRawType) == ParameterType::ERROR) {
             requireBytes(2);
-            const auto errorCode = static_cast<RfErrorCodes>(rawData[rawDataOffset + 2]);
+            const auto errorCode = static_cast<RfErrorCode>(rawData[rawDataOffset + 2]);
             parameters.emplace_back(errorCode);
             return;
         }
 
         // Parse UID or Notification type
-        if (commandType == CommandTypes::REPING || commandType == CommandTypes::RESPONSE) {
+        if (rfCommandType == RfCommandType::REPING || rfCommandType == RfCommandType::RESPONSE) {
             requireBytes(1);
             auto [uidParameterRawType, uidParameterLength] = readSpecialByte(rawData[rawDataOffset++]);
-            if (static_cast<ParameterTypes>(uidParameterRawType) != ParameterTypes::UINT) {
+            if (static_cast<ParameterType>(uidParameterRawType) != ParameterType::UINT) {
                 throw std::runtime_error("unexpected parameter type for UID");
             }
             adjustParamLength(uidParameterLength);
@@ -278,12 +282,12 @@ namespace SmartHomeMediator::RfTypes {
 
             requestId.emplace(uid);
             rawDataOffset += uidParameterLength;
-        } else if (commandType == CommandTypes::NOTIFY) {
+        } else if (rfCommandType == RfCommandType::NOTIFY) {
             requireBytes(1);
             auto [notifTypeParameterRawType, notifTypeParameterLength] =
                     readSpecialByte(rawData[rawDataOffset++]);
 
-            if (static_cast<ParameterTypes>(notifTypeParameterRawType) != ParameterTypes::UINT) {
+            if (static_cast<ParameterType>(notifTypeParameterRawType) != ParameterType::UINT) {
                 throw std::runtime_error("unexpected parameter type for Notification Type");
             }
             adjustParamLength(notifTypeParameterLength);
@@ -292,7 +296,7 @@ namespace SmartHomeMediator::RfTypes {
             }
             requireBytes(notifTypeParameterLength);
 
-            requestType = static_cast<NotificationTypes>(rawData[rawDataOffset]);
+            requestType = static_cast<NotificationType>(rawData[rawDataOffset]);
 
             rawDataOffset += notifTypeParameterLength;
         }
@@ -300,7 +304,7 @@ namespace SmartHomeMediator::RfTypes {
         for (uint8_t i = paramIndexOffset; i < numOfParameters; i++) {
             requireBytes(1);
             auto [parameterRawType, parameterLength] = readSpecialByte(rawData[rawDataOffset++]);
-            const auto parameterType = static_cast<ParameterTypes>(parameterRawType);
+            const auto parameterType = static_cast<ParameterType>(parameterRawType);
             adjustParamLength(parameterLength);
             requireBytes(parameterLength);
 
@@ -309,27 +313,27 @@ namespace SmartHomeMediator::RfTypes {
             rawDataOffset += parameterLength;
 
             switch (parameterType) {
-                case ParameterTypes::UINT:
+                case ParameterType::UINT:
                     copyRawDataToParameter<uint64_t>(parameter, parameterData);
                     break;
-                case ParameterTypes::INT:
+                case ParameterType::INT:
                     copyRawDataToParameter<int64_t>(parameter, parameterData);
                     break;
-                case ParameterTypes::FLOAT:
+                case ParameterType::FLOAT:
                     if (parameterLength == sizeof(float)) {
                         copyRawDataToParameter<float>(parameter, parameterData);
                     } else {
                         copyRawDataToParameter<double>(parameter, parameterData);
                     }
                     break;
-                case ParameterTypes::ASCII:
+                case ParameterType::ASCII:
                     assignRawDataToParameter<std::string>(parameter, parameterData);
                     break;
-                case ParameterTypes::RAW:
+                case ParameterType::RAW:
                     assignRawDataToParameter<std::vector<uint8_t> >(parameter, parameterData);
                     break;
-                case ParameterTypes::ERROR:
-                    copyRawDataToParameter<RfErrorCodes>(parameter, parameterData);
+                case ParameterType::ERROR:
+                    copyRawDataToParameter<RfErrorCode>(parameter, parameterData);
                     break;
                 default:
                     char buffer[64];
@@ -349,7 +353,7 @@ namespace SmartHomeMediator::RfTypes {
 
 
         std::vector<uint8_t> buffer;
-        const uint8_t specialByte = getSpecialByte(static_cast<uint8_t>(commandType),
+        const uint8_t specialByte = getSpecialByte(static_cast<uint8_t>(rfCommandType),
                                                    static_cast<uint8_t>(parameters.size()) +
                                                    (requestId.has_value() ? 1 : 0) +
                                                    (requestType.has_value() ? 1 : 0));
@@ -361,15 +365,15 @@ namespace SmartHomeMediator::RfTypes {
         if (requestType.has_value()) {
             uint8_t type = 0;
 
-            switch (commandType) {
-                case CommandTypes::GET:
-                    type = static_cast<uint8_t>(std::get<GetTypes>(requestType.value()));
+            switch (rfCommandType) {
+                case RfCommandType::GET:
+                    type = static_cast<uint8_t>(std::get<GetType>(requestType.value()));
                     break;
-                case CommandTypes::SET:
-                    type = static_cast<uint8_t>(std::get<SetTypes>(requestType.value()));
+                case RfCommandType::SET:
+                    type = static_cast<uint8_t>(std::get<SetType>(requestType.value()));
                     break;
-                case CommandTypes::NOTIFY:
-                    type = static_cast<uint8_t>(std::get<NotificationTypes>(requestType.value()));
+                case RfCommandType::NOTIFY:
+                    type = static_cast<uint8_t>(std::get<NotificationType>(requestType.value()));
                     break;
                 default: break;
             }
@@ -393,71 +397,71 @@ namespace SmartHomeMediator::RfTypes {
         return buffer;
     }
 
-    std::string_view getStringFromRfErrorCode(const RfErrorCodes code) {
+    std::string_view getStringFromRfErrorCode(const RfErrorCode code) {
         switch (code) {
-            case RfErrorCodes::UNKNOWN:
+            case RfErrorCode::UNKNOWN:
                 return "Unknown error";
-            case RfErrorCodes::BAD_COMMAND:
+            case RfErrorCode::BAD_COMMAND:
                 return "Bad command";
-            case RfErrorCodes::UNKNOWN_COMMAND:
+            case RfErrorCode::UNKNOWN_COMMAND:
                 return "Unknown command";
-            case RfErrorCodes::BAD_ARGUMENT:
+            case RfErrorCode::BAD_ARGUMENT:
                 return "Bad argument";
-            case RfErrorCodes::NOT_IMPLEMENTED:
+            case RfErrorCode::NOT_IMPLEMENTED:
                 return "Not implemented";
-            case RfErrorCodes::INTERNAL_ERROR:
+            case RfErrorCode::INTERNAL_ERROR:
                 return "Internal error";
             default:
                 return "Undefined error";
         }
     }
 
-    GetTypes getTypeFromString(const std::string_view value) {
-        static const std::unordered_map<std::string_view, GetTypes> strToGetMap{
-            {SENSOR_VALUE_STRING, GetTypes::SENSOR_VALUE},
-            {CONFIG_OPTION_STRING, GetTypes::CONFIG_OPTION},
-            {SENSOR_LIST_STRING, GetTypes::SENSOR_LIST},
-            {LOGS_STRING, GetTypes::LOGS},
-            {BATTERY_LEVEL_STRING, GetTypes::BATTERY_LEVEL},
-            {FORCE_READ_SENSOR_VALUE_STRING, GetTypes::FORCE_READ_SENSOR_VALUE}
+    GetType getTypeFromString(const std::string_view value) {
+        static const std::unordered_map<std::string_view, GetType> strToGetMap{
+            {SENSOR_VALUE_STRING, GetType::SENSOR_VALUE},
+            {CONFIG_OPTION_STRING, GetType::CONFIG_OPTION},
+            {SENSOR_LIST_STRING, GetType::SENSOR_LIST},
+            {LOGS_STRING, GetType::LOGS},
+            {BATTERY_LEVEL_STRING, GetType::BATTERY_LEVEL},
+            {FORCE_READ_SENSOR_VALUE_STRING, GetType::FORCE_READ_SENSOR_VALUE}
         };
 
         const auto iter = strToGetMap.find(boost::algorithm::to_lower_copy(std::string(value)));
-        return (iter != strToGetMap.end()) ? iter->second : GetTypes::UNDEFINED;
+        return (iter != strToGetMap.end()) ? iter->second : GetType::UNDEFINED;
     }
 
-    SetTypes setTypeFromString(const std::string_view value) {
-        static const std::unordered_map<std::string_view, SetTypes> strToSetMap{
-            {CONFIG_OPTION_STRING, SetTypes::CONFIG_OPTION},
-            {TOGGLE_ACTUATOR_STRING, SetTypes::TOGGLE_ACTUATOR},
-            {SET_ACTUATOR_VALUE_STRING, SetTypes::SET_ACTUATOR_VALUE}
+    SetType setTypeFromString(const std::string_view value) {
+        static const std::unordered_map<std::string_view, SetType> strToSetMap{
+            {CONFIG_OPTION_STRING, SetType::CONFIG_OPTION},
+            {TOGGLE_ACTUATOR_STRING, SetType::TOGGLE_ACTUATOR},
+            {SET_ACTUATOR_VALUE_STRING, SetType::SET_ACTUATOR_VALUE}
         };
 
         const auto iter = strToSetMap.find(boost::algorithm::to_lower_copy(std::string(value)));
-        return (iter != strToSetMap.end()) ? iter->second : SetTypes::UNDEFINED;
+        return (iter != strToSetMap.end()) ? iter->second : SetType::UNDEFINED;
     }
 
-    NotificationTypes notificationTypeFromString(const std::string_view value) {
-        static const std::unordered_map<std::string_view, NotificationTypes> strToNotifMap{
-            {MANUAL_TRIGGER_STRING, NotificationTypes::MANUAL_TRIGGER},
-            {POWER_LOSS_STRING, NotificationTypes::POWER_LOSS},
-            {ALERT_STRING, NotificationTypes::ALERT},
-            {WAKE_STRING, NotificationTypes::WAKE}
+    NotificationType notificationTypeFromString(const std::string_view value) {
+        static const std::unordered_map<std::string_view, NotificationType> strToNotifMap{
+            {MANUAL_TRIGGER_STRING, NotificationType::MANUAL_TRIGGER},
+            {POWER_LOSS_STRING, NotificationType::POWER_LOSS},
+            {ALERT_STRING, NotificationType::ALERT},
+            {WAKE_STRING, NotificationType::WAKE}
         };
 
         const auto iter = strToNotifMap.find(boost::algorithm::to_lower_copy(std::string(value)));
-        return (iter != strToNotifMap.end()) ? iter->second : NotificationTypes::UNDEFINED;
+        return (iter != strToNotifMap.end()) ? iter->second : NotificationType::UNDEFINED;
     }
 
-    std::string_view notificationTypeToString(const NotificationTypes value) {
+    std::string_view notificationTypeToString(const NotificationType value) {
         switch (value) {
-            case NotificationTypes::MANUAL_TRIGGER:
+            case NotificationType::MANUAL_TRIGGER:
                 return MANUAL_TRIGGER_STRING;
-            case NotificationTypes::POWER_LOSS:
+            case NotificationType::POWER_LOSS:
                 return POWER_LOSS_STRING;
-            case NotificationTypes::ALERT:
+            case NotificationType::ALERT:
                 return ALERT_STRING;
-            case NotificationTypes::WAKE:
+            case NotificationType::WAKE:
                 return WAKE_STRING;
             default:
                 return UNDEFINED_STRING;

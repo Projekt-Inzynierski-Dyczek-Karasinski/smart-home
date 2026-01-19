@@ -51,9 +51,9 @@ namespace SmartHomeMediator {
             State state;
             State previousState;
 
-            RfTypes::RfCommand commandResponse;
+            std::unique_ptr<RfTypes::RfCommand> pCommandResponse;
+            std::unique_ptr<RfTypes::RfCommand>  pCurrentCommand;
             RfTypes::RfCommand lowLevelCommand;
-            RfTypes::RfCommand currentCommand;
             std::vector<uint8_t> receivedMessage;
             std::vector<uint8_t> lastSendMessage;
 
@@ -83,6 +83,8 @@ namespace SmartHomeMediator {
             }
         };
 
+        ba::awaitable<std::string> handleMediatorConfigSession() const;
+
         ba::awaitable<void> processState(ExecutionContext& ctx);
 
         ba::awaitable<void> send(const std::vector<uint8_t> &message) const;
@@ -98,7 +100,7 @@ namespace SmartHomeMediator {
         static constexpr auto msRECEIVE_MESSAGE_TIMEOUT = 2s;
         static constexpr auto msPOOLING_DELAY = 10ms;
 
-        const RfTypes::SessionMetadata mMetadata;
+        RfTypes::SessionMetadata mMetadata;
         std::shared_ptr<HC12Driver> mpRfDriver;
         std::shared_ptr<RfClient> mpRfClient;
         std::shared_ptr<su::Logger> mpLogger;

@@ -39,10 +39,11 @@ namespace SmartHomeMediator {
         } catch (...) {
             // Ignore exceptions in destructor
         }
-        mpLogger->info("[HC12_DRIVER] Driver shutdown");
+        mpLogger->debug("[HC12_DRIVER] Driver shutdown");
     }
 
     ba::awaitable<void> HC12Driver::write(const std::vector<uint8_t> data) {
+        // TODO !pr remove?
         if (mpLogger->getLevel() == SmartHome::Utils::LogLevels::Level::DEBUG) {
             std::string tmp;
             for (const auto e: data) {
@@ -70,7 +71,7 @@ namespace SmartHomeMediator {
     }
 
     ba::awaitable<std::vector<uint8_t> > HC12Driver::read() {
-            co_return co_await mpUart->readAsync();;
+        co_return co_await mpUart->readAsync();;
     }
 
     ba::awaitable<bool> HC12Driver::setOption(std::string option,
@@ -78,8 +79,7 @@ namespace SmartHomeMediator {
         // Convert to enum for validation
         const Hc12Option parsedOption = stringToOption(option);
         if (parsedOption == Hc12Option::UNDEFINED) {
-            mpLogger->errorf("[HC12_DRIVER] Unknown option: %s", option.data());
-            co_return false;
+            throw std::invalid_argument("setOption error: unknown option");
         }
 
         bool success = false;
@@ -88,8 +88,8 @@ namespace SmartHomeMediator {
         try {
             co_await enterConfigMode();
         } catch (const std::exception &e) {
-            mpLogger->errorf("[HC12_DRIVER] setOption - enterConfig error: %s", e.what());
-            co_return false;
+            mpLogger->errorf("[HC12_DRIVER] [SET_OPTION] enterConfig error: %s", e.what());
+            throw;
         }
 
         // Build and send command
@@ -103,21 +103,23 @@ namespace SmartHomeMediator {
 
             if (responseStr.starts_with("OK") && value == responseValueStr) {
                 success = true;
-                mpLogger->debugf("[HC12_DRIVER] setOption success: %s=%s",
+                mpLogger->debugf("[HC12_DRIVER] [SET_OPTION] success: %s=%s",
                                  option.data(), value.data());
             } else {
-                mpLogger->warningf("[HC12_DRIVER] setOption failed: %s (response: %s)",
+                mpLogger->warningf("[HC12_DRIVER] [SET_OPTION] failed: %s (response: %s)",
                                    option.data(), responseStr.c_str());
             }
         } catch (const std::exception &e) {
-            mpLogger->errorf("[HC12_DRIVER] setOption - sendCommand error: %s", e.what());
+            mpLogger->errorf("[HC12_DRIVER] [SET_OPTION] sendCommand error: %s", e.what());
+            throw;
         }
 
         // Exit config mode
         try {
             co_await exitConfigMode();
         } catch (const std::exception &e) {
-            mpLogger->errorf("[HC12_DRIVER] setOption - exitConfig error: %s", e.what());
+            mpLogger->errorf("[HC12_DRIVER] [SET_OPTION] exitConfig error: %s", e.what());
+            throw;
         }
 
         // Update cache on success
@@ -137,7 +139,7 @@ namespace SmartHomeMediator {
         // Try cache first
         const auto iter = mOptionsCache.find(std::string(option));
         if (iter != mOptionsCache.end()) {
-            mpLogger->debugf("[HC12_DRIVER] getOption cache found: %s=%s",
+            mpLogger->debugf("[HC12_DRIVER] [GET_OPTION] cache found: %s=%s",
                              option.data(), iter->second.c_str());
             std::vector<uint8_t> result = {iter->second.begin(), iter->second.end()};
             co_return result;
@@ -146,8 +148,7 @@ namespace SmartHomeMediator {
         // Convert to enum for validation
         const Hc12Option opt = stringToOption(option);
         if (opt == Hc12Option::UNDEFINED) {
-            mpLogger->errorf("[HC12_DRIVER] getOption - unknown option: %s", option.data());
-            co_return std::vector<uint8_t>();
+            throw std::invalid_argument("getOption error: unknown option");
         }
 
         std::vector<uint8_t> value;
@@ -156,8 +157,8 @@ namespace SmartHomeMediator {
         try {
             co_await enterConfigMode();
         } catch (const std::exception &e) {
-            mpLogger->errorf("[HC12_DRIVER] getOption - enterConfig error: %s", e.what());
-            co_return std::vector<uint8_t>();
+            mpLogger->errorf("[HC12_DRIVER] [GET_OPTION] enterConfig error: %s", e.what());
+            throw;
         }
 
         // Query HC-12
@@ -167,18 +168,20 @@ namespace SmartHomeMediator {
             value = parseResponse(response);
 
             if (!value.empty()) {
-                mpLogger->debugf("[HC12_DRIVER] getOption cached: %s=%s",
+                mpLogger->debugf("[HC12_DRIVER] [GET_OPTION] cached: %s=%s",
                                  option.data(), value.data());
             }
         } catch (const std::exception &e) {
-            mpLogger->errorf("[HC12_DRIVER] getOption - sendCommand error: %s", e.what());
+            mpLogger->errorf("[HC12_DRIVER] [GET_OPTION] sendCommand error: %s", e.what());
+            throw;
         }
 
         // Exit config mode
         try {
             co_await exitConfigMode();
         } catch (const std::exception &e) {
-            mpLogger->errorf("[HC12_DRIVER] getOption - exitConfig error: %s", e.what());
+            mpLogger->errorf("[HC12_DRIVER] [GET_OPTION] exitConfig error: %s", e.what());
+            throw;
         }
 
         // Update cache on successful query
@@ -195,9 +198,18 @@ namespace SmartHomeMediator {
         const auto options = {Hc12Option::CHANNEL, Hc12Option::BAUDRATE, Hc12Option::FU_MODE, Hc12Option::POWER};
 
         for (const auto &option: options) {
-            const auto response = co_await getOption(optionToString(option));
-            formatted.append(response.begin(), response.end());
-            formatted.append(",");
+            const auto optionStr = optionToString(option);
+            formatted += optionStr + ':';
+            try {
+                const auto response = co_await getOption(optionStr);
+                formatted.append(response.begin(), response.end());
+            } catch (const std::exception &e) {
+                mpLogger->errorf("[HC12_DRIVER] [GET_ALL_OPTIONS] getOption (%s) error: %s",
+                                 optionStr.c_str(),
+                                 e.what());
+                formatted += "error_value";
+            }
+            formatted += ',';
         }
         formatted.pop_back();
 

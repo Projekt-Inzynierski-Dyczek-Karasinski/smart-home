@@ -16,10 +16,9 @@ namespace SmartHome {
 
         constexpr uint minNumOfParams = 2;
 
-        // TODO !pr modify set and get to make module_id optional -> set/get values for RF transceiver options
         if (!areParamsValid(error, command, minNumOfParams)) {
             error.data += "Mediator get command expects params of following format: "
-                    "{{'module_id': <uint>}, target_value_key<string>, (optional)optional_arguments<any>}";
+                    "{(optional){'module_id': <uint>}, target_value_key<string>, (optional)optional_arguments<any>}";
             commandResult.error = error;
             co_return commandResult;
         }
@@ -28,7 +27,6 @@ namespace SmartHome {
 
         API::ApiRequest requestToMediator;
         auto &rtmParams = prepareRequestToMediator(requestToMediator, command);
-
 
 
         if (params[0].is_object() && params[0].contains("module_id")) {
@@ -40,8 +38,8 @@ namespace SmartHome {
             rtmParams[JsonRpcStrings::ParamsKeys::METHOD_PARAMS] = nlohmann::json::array_t(
                 params.begin() + 1, params.end());
         } else {
-            error.data = "Mediator get command requires first parameter with object containing module id."
-                    "Expected format: {{'module_id': <uint>}, target_value_key<string>, (optional)optional_arguments<any>}";
+            rtmParams[JsonRpcStrings::ParamsKeys::METHOD_PARAMS] =
+                    nlohmann::json::array_t(params.begin(), params.end());
         }
 
         // TODO Check short term memory for cached result
@@ -64,10 +62,9 @@ namespace SmartHome {
 
         constexpr uint minNumOfParams = 3;
 
-        // TODO !pr modify set and get to make module_id optional -> set/get values for RF transceiver options
         if (!areParamsValid(error, command, minNumOfParams)) {
             error.data += "Mediator set command expects params of following format: "
-                    "{{'module_id': <uint>}, target_value_key<string>, target_new_value<any>}";
+                    "{(optional){'module_id': <uint>}, target_value_key<string>, target_new_value<any>}";
             commandResult.error = error;
             co_return commandResult;
         }
@@ -86,8 +83,8 @@ namespace SmartHome {
             rtmParams[JsonRpcStrings::ParamsKeys::METHOD_PARAMS] = nlohmann::json::array_t(
                 params.begin() + 1, params.end());
         } else {
-            error.data = "Mediator set command requires first parameter with object containing module id."
-                    "Expected format: {{'module_id': <uint>}, target_value_key<string>, target_new_value<any>}";
+            rtmParams[JsonRpcStrings::ParamsKeys::METHOD_PARAMS] =
+                    nlohmann::json::array_t(params.begin(), params.end());
         }
 
         // TODO consider if set values should be stored in short/long term memory
@@ -271,7 +268,8 @@ namespace SmartHome {
         request.id = command.commandId;
         request.method = command.method.to_string();
         request.params.emplace(nlohmann::json());
-        request.params.value()[JsonRpcStrings::ParamsKeys::TARGET] = ai::Target(ai::TargetTypes::MODULE_MEDIATOR).to_string();
+        request.params.value()[JsonRpcStrings::ParamsKeys::TARGET] = ai::Target(ai::TargetTypes::MODULE_MEDIATOR).
+                to_string();
 
         return request.params.value();
     }

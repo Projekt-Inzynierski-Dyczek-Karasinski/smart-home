@@ -14,7 +14,13 @@ namespace SmartHomeMediator {
 
     class RfApi final : public sa::Api {
     public:
-        static RfTypes::RfCommand toRfCommand(const SmartHome::API::ApiRequest &apiRequest);
+        static std::unique_ptr<RfTypes::Command> toRfCommand(
+            const SmartHome::API::ApiRequest &apiRequest,
+            bool isConfigCommand = false);
+
+        static std::unique_ptr<RfTypes::MediatorConfigCommand> toConfigCommand(
+            const SmartHome::API::ApiRequest &apiRequest, std::string_view method,
+            const std::unique_ptr<nlohmann::json> &pMethodParams);
 
         static std::string toApiString(RfTypes::RfCommand rfCommand);
 
@@ -50,6 +56,6 @@ namespace SmartHomeMediator {
         static constexpr auto msMAX_PARAMETERS = 16;
         static constexpr auto msMAX_COMMANDS = msMAX_PARAMETERS;
 
-        static std::optional<RfTypes::SessionMetadata> toMetadata(const SmartHome::API::ApiRequest &apiRequest);
+        static RfTypes::SessionMetadata toMetadata(const SmartHome::API::ApiRequest &apiRequest);
     };
 }
