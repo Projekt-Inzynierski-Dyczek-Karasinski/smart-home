@@ -139,6 +139,7 @@ namespace SmartHome::API {
             params = value.params.value()[JsonRpcStrings::ParamsKeys::METHOD_PARAMS].get<nlohmann::json>();
 
         commandId = value.id;
+        isNotification = !value.id.hasValue();
         method(value.method);
     }
 
@@ -147,6 +148,7 @@ namespace SmartHome::API {
                                   const Method method,
                                   const Target target)
         : params(params), commandId(id), method(method), target(target) {
+        isNotification = !id.hasValue();
     }
 
     void InternalApi::handleIncoming(const apiId_t connectionId, std::string &&message) {

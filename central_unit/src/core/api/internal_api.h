@@ -170,6 +170,7 @@ namespace SmartHome::API {
             ApiId commandId;   ///< Command identifier used for result response.
             Method method;  ///< Command method to execute
             Target target;  ///< Target component for command
+            bool isNotification = false; ///< Helper flag signaling notification command
 
             /**
              * @brief Construct command from API request.

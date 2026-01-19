@@ -1,9 +1,9 @@
 #include "actions.h"
+#include "core_actions.h"
+#include "mediator_actions.h"
 
 #include <memory>
 
-#include "core_actions.h"
-#include "mediator_actions.h"
 
 namespace SmartHome {
     void Actions::handleIncomingRequest(const API::InternalApi::Request &request, const RequestCallback &callback) {
@@ -45,7 +45,8 @@ namespace SmartHome {
             );
 
             if (!inserted) {
-                logger->error("[ACTIONS] [HANDLE_INCOMING_REQUEST]  Handling new request failed: Failed to create response object");
+                logger->error(
+                    "[ACTIONS] [HANDLE_INCOMING_REQUEST]  Handling new request failed: Failed to create response object");
                 msActiveRequests.erase(requestId);
                 error.code = API::ErrorCodes::INTERNAL_ERROR;
                 error.data = "Failed to create response object for request";
@@ -54,7 +55,9 @@ namespace SmartHome {
             try {
                 msResponses[requestId].apiResponses.reserve(request.commands.size());
             } catch (const std::exception &e) {
-                logger->errorf("[ACTIONS] [HANDLE_INCOMING_REQUEST] Handling new request failed on reserving responses space: %s", e.what());
+                logger->errorf(
+                    "[ACTIONS] [HANDLE_INCOMING_REQUEST] Handling new request failed on reserving responses space: %s",
+                    e.what());
                 std::scoped_lock lockAR(msActiveRequestsLock);
                 msActiveRequests.erase(requestId);
                 error.code = API::ErrorCodes::INTERNAL_ERROR;
@@ -275,6 +278,7 @@ namespace SmartHome {
         : command(std::move(command)),
           commandTimeoutTimer(std::move(commandTimeoutTimer)),
           requestId(requestId) {
+        isNotification = this->command.isNotification;
     }
 
     bool Actions::CommandMetadata::cancel() {
@@ -388,7 +392,8 @@ namespace SmartHome {
 
     ba::awaitable<void> Actions::processCommand(const cmdMetaPtr commandMetadata,
                                                 const CommandHandler handler) {
-        API::ApiResponse response;
+        if (!commandMetadata->isPending()) co_return; // Skip handling stale commands
+        std::optional<API::ApiResponse> response;
 
         try {
             response = co_await handler(commandMetadata);
@@ -398,16 +403,27 @@ namespace SmartHome {
             error.message = API::errorCodeToString(error.code);
             error.data = exception.what();
 
-            response.error = error;
-            response.id = commandMetadata->command.commandId;
+            response.emplace(API::ApiResponse());
+            response->error = error;
+            response->id = commandMetadata->command.commandId;
         }
 
         if (auto timer = commandMetadata->commandTimeoutTimer.exchange(nullptr)) timer->cancel();
-        handleCommandResult(commandMetadata, std::move(response));
+
+        if (!commandMetadata->isPending()) co_return;
+
+        if (response.has_value()) handleCommandResult(commandMetadata, std::move(response.value()));
+
+        else updateRequestStatus(commandMetadata->requestId, true);
         co_return;
     }
 
     void Actions::startCommandTimeoutTimer(const cmdMetaPtr &commandMetadata) {
+        // Notifications do not require timeout
+        if (commandMetadata->isNotification) {
+            return;
+        }
+
         if (auto timer = commandMetadata->commandTimeoutTimer.load()) {
             timer->expires_after(ms_COMMAND_TIMEOUT);
             timer->async_wait([commandMetadata](const bs::error_code &ec) {
@@ -430,9 +446,8 @@ namespace SmartHome {
             return;
         }
 
-        // Add response only if command has an ID
         // As defined in JSON-RPC docs request w/o ID is a notification — response must not be sent in return
-        if (!commandMetadata->command.commandId.isUndefined()) {
+        if (!commandMetadata->command.isNotification) {
             addCommandResultToResponse(commandMetadata, std::move(commandResult));
         }
         updateRequestStatus(commandMetadata->requestId);
@@ -460,11 +475,12 @@ namespace SmartHome {
         updateRequestStatus(commandMetadata->requestId);
 
 
-        Core::Instance().mpLogger->errorf("[ACTIONS] [HANDLE_COMMAND_TIMEOUT] Command timeout - request ID: %d command ID: %s",
-                                          commandMetadata->requestId,
-                                          commandMetadata->command.commandId.hasValue()
-                                              ? std::to_string(commandMetadata->command.commandId.value()).c_str()
-                                              : "null");
+        Core::Instance().mpLogger->errorf(
+            "[ACTIONS] [HANDLE_COMMAND_TIMEOUT] Command timeout - request ID: %d command ID: %s",
+            commandMetadata->requestId,
+            commandMetadata->command.commandId.hasValue()
+                ? std::to_string(commandMetadata->command.commandId.value()).c_str()
+                : "null");
     }
 
     void Actions::addCommandResultToResponse(const cmdMetaPtr &commandMetadata,
@@ -492,7 +508,8 @@ namespace SmartHome {
     }
 
     void Actions::handleRequestTimeout(const apiId_t requestId) {
-        Core::Instance().mpLogger->errorf("[ACTIONS] [HANDLE_REQUEST_TIMEOUT] Request timeout - request ID: %d", requestId);
+        Core::Instance().mpLogger->errorf("[ACTIONS] [HANDLE_REQUEST_TIMEOUT] Request timeout - request ID: %d",
+                                          requestId);
 
         std::vector<cmdMetaPtr> commandsMD;
 
@@ -540,6 +557,7 @@ namespace SmartHome {
 
         msActiveRequests.erase(requestId);
         msResponses.erase(requestId);
+        Core::Instance().mpLogger->debugf("[ACTIONS] [CLEANUP_REQUEST] Request deleted - request ID: %d", requestId);
     }
 
     void Actions::handleOutgoingResponse(const apiId_t responseId) {
@@ -556,7 +574,8 @@ namespace SmartHome {
             std::scoped_lock lock(msResponsesLock);
             const auto iter = msResponses.find(responseId);
             if (iter == msResponses.end()) {
-                logger->errorf("[ACTIONS] [HANDLE_OUTGOING_RESPONSE] response for request [ID:%d] not found", responseId);
+                logger->errorf("[ACTIONS] [HANDLE_OUTGOING_RESPONSE] response for request [ID:%d] not found",
+                               responseId);
                 return;
             }
             const auto &internalResponse = iter->second;
@@ -582,7 +601,7 @@ namespace SmartHome {
         if (isStructured) {
             nlohmann::json json;
             API::ApiResponse errorResponse;
-            errorResponse.id  = nullptr;
+            errorResponse.id = nullptr;
 
             API::ApiError error;
             error.code = API::ErrorCodes::INTERNAL_ERROR;
@@ -605,7 +624,7 @@ namespace SmartHome {
                 } catch (std::exception &e) {
                     error.data = e.what();
                     errorResponse.error = error;
-                    json= errorResponse.to_json();
+                    json = errorResponse.to_json();
                 }
             }
             responseString = json.dump();
@@ -638,6 +657,7 @@ namespace SmartHome {
         {{sai::TargetTypes::CORE, sai::MethodTypes::GET}, CoreActions::coreGetHandler},
         {{sai::TargetTypes::CORE, sai::MethodTypes::SET}, CoreActions::coreSetHandler},
         {{sai::TargetTypes::CORE, sai::MethodTypes::EXECUTE}, placeholderHandler},
+        {{sai::TargetTypes::CORE, sai::MethodTypes::NOTIFY}, CoreActions::coreNotifyHandler},
         {{sai::TargetTypes::CORE, sai::MethodTypes::ECHO_REQUEST}, CoreActions::coreEchoHandler},
         {{sai::TargetTypes::CORE, sai::MethodTypes::PING_REQUEST}, placeholderHandler},
         //Mediator
@@ -686,7 +706,7 @@ namespace SmartHome {
     // ======================================== CommandHandler functions ========================================
 
     // THIS PLACEHOLDER IS AN EXAMPLE AND IT SHOULD BE USED AS A TEMPLATE FOR OTHER COMMAND HANDLERS.
-    ba::awaitable<API::ApiResponse> Actions::placeholderHandler(
+    ba::awaitable<std::optional<API::ApiResponse> > Actions::placeholderHandler(
         const cmdMetaPtr &commandMetadata) {
         // Optional debug log
         Core::Instance().mpLogger->debug("[ACTIONS] [PLACEHOLDER_HANDLER] called");

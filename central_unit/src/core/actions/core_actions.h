@@ -31,7 +31,7 @@ namespace SmartHome {
        * @param commandMetadata Command execution metadata.
        * @return API response with echoed parameters.
        */
-        static ba::awaitable<API::ApiResponse> coreEchoHandler(const cmdMetaPtr &commandMetadata);
+        static ba::awaitable<std::optional<API::ApiResponse>> coreEchoHandler(const cmdMetaPtr &commandMetadata);
 
         // TODO change docstring after adding proper implementation
         /**
@@ -42,9 +42,12 @@ namespace SmartHome {
          *
          * @note Proper implementation will be added later.
          */
-        static ba::awaitable<API::ApiResponse> coreGetHandler(const cmdMetaPtr &commandMetadata);
+        static ba::awaitable<std::optional<API::ApiResponse>> coreGetHandler(const cmdMetaPtr &commandMetadata);
 
-        static ba::awaitable<API::ApiResponse> coreSetHandler(const cmdMetaPtr &commandMetadata);
+        static ba::awaitable<std::optional<API::ApiResponse>> coreSetHandler(const cmdMetaPtr &commandMetadata);
+
+        static ba::awaitable<std::optional<API::ApiResponse>> coreNotifyHandler(const cmdMetaPtr &commandMetadata);
+
 
         static constexpr std::string_view msCONNECTION_TYPE_STRING = "connection_type";
 

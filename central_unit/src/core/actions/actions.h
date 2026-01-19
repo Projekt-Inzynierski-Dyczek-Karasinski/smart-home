@@ -14,10 +14,6 @@ using sai = SmartHome::API::InternalApi;
 namespace SmartHome {
     using namespace std::chrono_literals;
 
-    //TODO !pr check if needed
-    class CoreActions;
-    class MediatorActions;
-
     /**
      * @brief Actions handler for processing internal API commands.
      *
@@ -44,7 +40,6 @@ namespace SmartHome {
             };
 
 
-
             /// Command data
             API::InternalApi::Command command;
             /// Command-specific timeout timer
@@ -53,6 +48,8 @@ namespace SmartHome {
             apiId_t requestId;
             /// Current command state
             std::atomic<State> state{State::PENDING};
+            /// Helper flag signaling notification command
+            bool isNotification = false;
 
             /**
              * @brief Construct command metadata.
@@ -215,7 +212,6 @@ namespace SmartHome {
         };
 
 
-
         /**
          * @brief Generate unique request ID.
          *
@@ -229,7 +225,7 @@ namespace SmartHome {
          *
          * @details Handlers receive command metadata and return API response asynchronously.
          */
-        using CommandHandler = std::function<ba::awaitable<API::ApiResponse>(const cmdMetaPtr &)>;
+        using CommandHandler = std::function<ba::awaitable<std::optional<API::ApiResponse> >(const cmdMetaPtr &)>;
 
         /**
          * @brief Lookup command handler from registry.
@@ -249,8 +245,8 @@ namespace SmartHome {
          * @param newCommand Command to execute.
          * @param requestId Parent request identifier.
          */
-        static void executeCommandAsync(const CommandHandler& handler,
-                                        const API::InternalApi::Command& newCommand,
+        static void executeCommandAsync(const CommandHandler &handler,
+                                        const API::InternalApi::Command &newCommand,
                                         apiId_t requestId);
 
         /**
@@ -322,7 +318,7 @@ namespace SmartHome {
         /// Mutex for active requests map access
         static std::mutex msActiveRequestsLock;
 
-        static std::unordered_map<connectionId_t, std::shared_ptr<OutgoingRequestMetadata>> msOutgoingRequests;
+        static std::unordered_map<connectionId_t, std::shared_ptr<OutgoingRequestMetadata> > msOutgoingRequests;
         static std::mutex msOutgoingRequestsLock;
 
         /// Response collection map
@@ -351,7 +347,7 @@ namespace SmartHome {
          * @param commandMetadata Command execution metadata.
          * @return API response with result or error.
          */
-        static ba::awaitable<API::ApiResponse> placeholderHandler(
+        static ba::awaitable<std::optional<API::ApiResponse> > placeholderHandler(
             const cmdMetaPtr &commandMetadata);
     };
 }

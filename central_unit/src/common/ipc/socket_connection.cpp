@@ -117,6 +117,8 @@ namespace SmartHome::IPC {
         };
 
         std::visit(socketVisitor, mSocket);
+
+        // TODO consider implementing on close callback
     }
 
     void SocketConnection::shutdownSocket(ba::socket_base::shutdown_type mode) {

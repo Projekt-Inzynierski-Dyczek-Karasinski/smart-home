@@ -11,9 +11,9 @@ namespace SmartHome {
         using cmdMetaPtr = std::shared_ptr<Actions::CommandMetadata>;
 
     public:
-        static ba::awaitable<API::ApiResponse> mediatorGetHandler(const cmdMetaPtr &commandMetadata);
+        static ba::awaitable<std::optional<API::ApiResponse>> mediatorGetHandler(const cmdMetaPtr &commandMetadata);
 
-        static ba::awaitable<API::ApiResponse> mediatorSetHandler(const cmdMetaPtr &commandMetadata);
+        static ba::awaitable<std::optional<API::ApiResponse>> mediatorSetHandler(const cmdMetaPtr &commandMetadata);
 
         /**
          * @brief
@@ -31,9 +31,9 @@ namespace SmartHome {
          *       }
          *       \endcode
          */
-        static ba::awaitable<API::ApiResponse> mediatorExecuteHandler(const cmdMetaPtr &commandMetadata);
+        static ba::awaitable<std::optional<API::ApiResponse>> mediatorExecuteHandler(const cmdMetaPtr &commandMetadata);
 
-        static ba::awaitable<API::ApiResponse> mediatorPingHandler(const cmdMetaPtr &commandMetadata);
+        static ba::awaitable<std::optional<API::ApiResponse>> mediatorPingHandler(const cmdMetaPtr &commandMetadata);
 
         static ba::awaitable<API::ApiResponse> sendRequestToMediator(API::ApiRequest &&request,
                                                                      cmdMetaPtr commandMetadata);
