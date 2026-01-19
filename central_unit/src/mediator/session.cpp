@@ -48,7 +48,11 @@ namespace SmartHomeMediator {
                     mpLogger->error("[SESSION] [EXECUTE] Received invalid command type ");
                     continue;
                 }
-                const auto pRfCommand = static_cast<RfTypes::RfCommand *>(pCommand.get());
+                const auto* pRfCommand = dynamic_cast<RfTypes::RfCommand*>(pCommand.get());
+                if (!pRfCommand) {
+                    mpLogger->error("[SESSION] [EXECUTE] Failed command class cast ");
+                    continue;
+                }
 
                 if (pRfCommand->requestId.has_value()) response.id = pRfCommand->requestId.value();
                 else response.id = nullptr;
@@ -158,11 +162,16 @@ namespace SmartHomeMediator {
                 continue;
             }
 
-            const auto &configCommand = *static_cast<RfTypes::MediatorConfigCommand *>(pCommand.get());
-            std::string_view key = configCommand.commandKey;
-            std::string_view value = configCommand.commandValue;
+            auto pConfigCommand = dynamic_cast<RfTypes::MediatorConfigCommand*>(pCommand.get());
+            if (!pConfigCommand) {
+                mpLogger->error("[SESSION] [CONFIG_SESSION] Failed command class cast ");
+                continue;
+            }
 
-            switch (configCommand.configCommandType) {
+            std::string_view key = pConfigCommand->commandKey;
+            std::string_view value = pConfigCommand->commandValue;
+
+            switch (pConfigCommand->configCommandType) {
                 case RfTypes::MediatorConfigCommandType::EXECUTE:
                     //TODO implement mediator remote action execution (shutdown, restart...)
                     mpLogger->warning("[SESSION] [CONFIG_SESSION] Execute not implemented");
@@ -420,12 +429,12 @@ namespace SmartHomeMediator {
                         break;
                     }
 
-                    ctx.pCurrentCommand = std::unique_ptr<RfTypes::RfCommand>(
-                        static_cast<RfTypes::RfCommand *>(command.release())
-                    );
+
+                    const auto pCommand =  dynamic_cast<RfTypes::RfCommand *>(command.release());
+                    ctx.pCurrentCommand = std::unique_ptr<RfTypes::RfCommand>(pCommand);
 
                     // Add error to result on undefined command
-                    if (ctx.pCurrentCommand->rfCommandType == RfTypes::RfCommandType::UNDEFINED) {
+                    if (!pCommand || ctx.pCurrentCommand->rfCommandType == RfTypes::RfCommandType::UNDEFINED) {
                         ctx.error.data = "Failed to parse RfCommand";
 
                         ctx.response.error = ctx.error;

@@ -238,6 +238,8 @@ namespace SmartHomeMediator::RfTypes {
         explicit Command(const CommandType type) : mType(type) {
         };
 
+        virtual ~Command() = default;
+
         CommandType getType() const;
 
         std::optional<SmartHome::apiId_t> requestId;
