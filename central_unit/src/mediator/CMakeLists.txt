@@ -12,11 +12,11 @@ pkg_check_modules(GPIOD REQUIRED IMPORTED_TARGET libgpiodcxx)
 add_executable(smarthome-mediator
         main.cpp
         mediator.cpp
-        api_client.cpp
-        rf_client.cpp
         session.cpp
-        rf_api.cpp
+        rf_client.cpp
         rf_types.cpp
+        api/rf_api.cpp
+        api/api_client.cpp
         rf_driver/hc12_driver.cpp
         rf_driver/uart_port.cpp
         rf_driver/gpio_handler.cpp

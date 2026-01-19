@@ -3,9 +3,9 @@
 #include "async_logger.h"
 #include "socket_server.h"
 #include "service_manager/service_manager.h"
-#include "api_client.h"
 #include "rf_client.h"
-#include "rf_api.h"
+#include "api/api_client.h"
+#include "api/rf_api.h"
 
 #include <memory>
 
