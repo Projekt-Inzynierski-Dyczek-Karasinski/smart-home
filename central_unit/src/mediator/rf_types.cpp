@@ -8,7 +8,9 @@ namespace SmartHomeMediator::RfTypes {
 
     Packet Packet::from_bytes(const std::span<const uint8_t> data) {
         if (data.size() != sizeof(Packet)) {
-            throw std::invalid_argument("Invalid size");
+            char buffer[256];
+            sprintf(buffer, "Invalid size: received %lu, expected %d ", data.size(), msPACKET_SIZE);
+            throw std::invalid_argument(buffer);
         }
 
         Packet packet{};
@@ -51,6 +53,10 @@ namespace SmartHomeMediator::RfTypes {
 
     uint8_t Packet::getFillSymbol() {
         return msFILL_SYMBOL;
+    }
+
+    uint8_t Packet::getPacketSize() {
+        return msPACKET_SIZE;
     }
 
     void Packet::insertChecksum() {

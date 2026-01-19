@@ -159,10 +159,14 @@ namespace SmartHomeMediator {
             throw std::invalid_argument(buffer);
         }
 
-        pConfigCommand->commandKey = pMethodParams->front().get<std::string>();
+        pConfigCommand->commandKey = pMethodParams->front().is_string()
+            ? pMethodParams->front().get<std::string>()
+            : to_string(pMethodParams->front());
 
         if (requiredSize == 2) {
-            pConfigCommand->commandValue = pMethodParams->at(1).get<std::string>();
+            pConfigCommand->commandValue = pMethodParams->at(1).is_string()
+            ? pMethodParams->at(1).get<std::string>()
+            : to_string(pMethodParams->at(1));
         }
 
         return pConfigCommand;
@@ -303,7 +307,7 @@ namespace SmartHomeMediator {
                     metadataMap.at(metadata.targetLogicAddress).commands.
                             push_back(std::move(metadata.commands.front()));
                 } else {
-                    metadataMap[metadata.targetLogicAddress] = metadata;
+                    metadataMap[metadata.targetLogicAddress] = std::move(metadata);
                 }
             }
 

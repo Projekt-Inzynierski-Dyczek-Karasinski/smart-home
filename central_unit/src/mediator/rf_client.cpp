@@ -1,5 +1,4 @@
 #include "rf_client.h"
-#include "rf_client.h"
 #include "mediator.h"
 
 namespace SmartHomeMediator {
@@ -26,18 +25,38 @@ namespace SmartHomeMediator {
 
     RfClient::~RfClient() {
         mIsShuttingDown = true;
+        mIsReceiving = false;
+        mIsSending = false;
+
+        mCurrentSession.reset();
+
+        // Clear queue
+        {
+            std::scoped_lock lock(mSessionQueueMutex);
+            while (!mSessionQueue.empty()) {
+                mSessionQueue.pop();
+            }
+        }
+
+
         mpLogger->info("[RF_CLIENT] RF client destroyed");
     }
 
     void RfClient::initialize(const std::function<void(bool)> &onComplete) const {
-        mpLogger->info("[RF_CLIENT] Initializing - setting channel to default");
+        mpLogger->info("[RF_CLIENT] Initializing");
+
+        if (!mpDriver->isMultiChannel()) {
+            mpLogger->info("[RF_CLIENT] Initialized in single channel mode");
+            onComplete(true);
+            return;
+        }
 
         ba::co_spawn(mIoContext, [this, onComplete]() -> ba::awaitable<void> {
             bool success = false;
 
             // Set channel to default
             try {
-                success = co_await mpDriver->setOption(HC12Driver::Hc12Option::CHANNEL,
+                success = co_await mpDriver->setOption(RfDriver::msCHANNEL_OPTION_STRING.data(),
                                                        std::to_string(mDefaultChannel));
             } catch (const std::exception &e) {
                 mpLogger->errorf("[RF_CLIENT] Initialization error: %s", e.what());
@@ -46,9 +65,10 @@ namespace SmartHomeMediator {
             }
 
             if (success) {
-                mpLogger->info("[RF_CLIENT] Initialization complete - channel set to default");
+                mpLogger->info("[RF_CLIENT] Initialized in multi channel mode: channel set to default");
             } else {
-                mpLogger->error("[RF_CLIENT] Initialization failed - could not set channel");
+                mpLogger->error(
+                    "[RF_CLIENT] Failed initialization in multi channel mode: could not set default channel");
             }
 
             onComplete(success);
@@ -78,11 +98,11 @@ namespace SmartHomeMediator {
             // Get next session metadata
             {
                 std::scoped_lock lock(mSessionQueueMutex);
-                meta = mSessionQueue.front();
+                meta = std::move(mSessionQueue.front());
                 mSessionQueue.pop();
             }
 
-            mCurrentSession = std::make_unique<Session>(meta, mpDriver, shared_from_this(), mpLogger);
+            mCurrentSession = std::make_unique<Session>(std::move(meta), mpDriver, shared_from_this(), mpLogger);
 
             auto result = co_await mCurrentSession->execute();
 
@@ -92,9 +112,8 @@ namespace SmartHomeMediator {
             if (!result.empty()) {
                 mpLogger->debugf("[RF_CLIENT] result: %s", result.c_str());
                 mediator.getIoContext().post([this, result] {
-                   mMessageHandler(result);
-
-               });
+                    mMessageHandler(result);
+                });
             }
         }
         mpLogger->info("[RF_CLIENT] Stopping RfClient");
@@ -113,7 +132,7 @@ namespace SmartHomeMediator {
         mSendQueue.push(std::move(message));
     }
 
-    bool RfClient::isSendQueueEmpty(){
+    bool RfClient::isSendQueueEmpty() {
         std::scoped_lock lock(mSendQueueMutex);
         return mSendQueue.empty();
     }
@@ -174,9 +193,11 @@ namespace SmartHomeMediator {
 
             RfTypes::Packet packet;
             try {
+                if (data.size() > RfTypes::Packet::getPacketSize()) {
+                    data.resize(RfTypes::Packet::getPacketSize());
+                }
                 packet = RfTypes::Packet::from_vector(data);
-            }
-            catch (const std::exception &e) {
+            } catch (const std::exception &e) {
                 mpLogger->debugf("[RF_CLIENT] invalid packet: %s", e.what());
                 ++packetInvalid;
                 continue;
@@ -193,11 +214,10 @@ namespace SmartHomeMediator {
             } else {
                 mpLogger->debug("[RF_CLIENT] Creating new session"); //TODO !pr test
                 // TODO !pr fix session form module notif
-                auto meta = RfTypes::SessionMetadata{
-                    .sessionType = RfTypes::SessionType::FROM_MODULE,
-                    .rfChannel = mDefaultChannel,
-                    .targetLogicAddress = packet.logicAddress
-                };
+                RfTypes::SessionMetadata meta;
+                meta.sessionType = RfTypes::SessionType::FROM_MODULE;
+                meta.rfChannel = getDefaultChannel();
+                meta.targetLogicAddress = packet.logicAddress;
 
                 std::queue<RfTypes::SessionMetadata> tmpQueue;
                 tmpQueue.emplace(std::move(meta));
@@ -207,7 +227,7 @@ namespace SmartHomeMediator {
                     std::scoped_lock lock(mSessionQueueMutex);
 
                     while (!mSessionQueue.empty()) {
-                        tmpQueue.push(mSessionQueue.front());
+                        tmpQueue.push(std::move(mSessionQueue.front()));
                         mSessionQueue.pop();
                     }
                     mSessionQueue = std::move(tmpQueue);
@@ -257,8 +277,7 @@ namespace SmartHomeMediator {
             }
             try {
                 co_await mpDriver->write(data);
-            }
-            catch (const std::exception &e) {
+            } catch (const std::exception &e) {
                 mpLogger->errorf("[RF_CLIENT] write error: %s", e.what());
             }
         }

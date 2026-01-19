@@ -11,6 +11,13 @@ namespace SmartHomeMediator {
         mPort.set_option(ba::serial_port::parity(ba::serial_port::parity::none));
         mPort.set_option(ba::serial_port::stop_bits(ba::serial_port::stop_bits::one));
         mPort.set_option(ba::serial_port::flow_control(ba::serial_port::flow_control::none));
+
+#ifdef __linux__
+        const auto fd = mPort.native_handle();
+        if (fd >= 0) {
+            ::tcflush(fd, TCIOFLUSH);
+        }
+#endif
     }
 
     UartPort::~UartPort() {
@@ -106,10 +113,10 @@ namespace SmartHomeMediator {
             const size_t currentSize = mBuffer.size();
 
             // Set timer for inactivity timeout
-            auto timePerByte = static_cast<uint>(static_cast<double>(ms_BITS_PER_BYTE) / getBaudRate());
-            auto timePerByteMs = std::chrono::milliseconds(timePerByte);
-            timer.expires_after(timePerByteMs * ms_TIME_PER_BYTE_MULTIPLIER + ms_READ_ASYNC_WAIT_MIN_TIMEOUT);
-
+            auto timePerByte = static_cast<uint64_t>(
+                static_cast<double>(ms_BITS_PER_BYTE) / getBaudRate() * ms_NANOSECONDS_PER_SECOND);
+            auto timePerByteNs = std::chrono::nanoseconds(timePerByte);
+            timer.expires_after(timePerByteNs * ms_TIME_PER_BYTE_MULTIPLIER + ms_READ_ASYNC_WAIT_MIN_TIMEOUT);
             // Wait for timeout
             try {
                 co_await timer.async_wait(ba::use_awaitable);

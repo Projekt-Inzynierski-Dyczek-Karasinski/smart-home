@@ -59,7 +59,7 @@ namespace SmartHomeMediator {
          *
          * @throws bs::system_error when awaitable operations throws error.
          */
-        ba::awaitable<std::vector<uint8_t>> readUntil(std::chrono::milliseconds timeoutDuration);
+        ba::awaitable<std::vector<uint8_t> > readUntil(std::chrono::milliseconds timeoutDuration);
 
         /**
          * @brief Read with grouping timeout.
@@ -71,7 +71,7 @@ namespace SmartHomeMediator {
          *
          * @throws bs::system_error when awaitable operations throws error.
          */
-        ba::awaitable<std::vector<uint8_t>> readAsync();
+        ba::awaitable<std::vector<uint8_t> > readAsync();
 
         /**
          * @brief Start background read loop.
@@ -108,8 +108,9 @@ namespace SmartHomeMediator {
         static constexpr size_t ms_BUFFER_CAPACITY = 1024;
         static constexpr size_t ms_READ_CHUNK_SIZE = 512;
 
-        static constexpr auto ms_READ_ASYNC_WAIT_MIN_TIMEOUT = 1ms;
-        static constexpr auto ms_TIME_PER_BYTE_MULTIPLIER = 3;
+        static constexpr auto ms_NANOSECONDS_PER_SECOND = 1'000'000'000;
+        static constexpr auto ms_READ_ASYNC_WAIT_MIN_TIMEOUT = 5ms; // TODO test with lower values
+        static constexpr auto ms_TIME_PER_BYTE_MULTIPLIER = 10; // TODO test with lower values
         static constexpr auto ms_BITS_PER_BYTE = 10; // 8N1
 
         ba::serial_port mPort;

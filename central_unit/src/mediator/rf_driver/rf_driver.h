@@ -65,6 +65,17 @@ namespace SmartHomeMediator {
          */
         virtual ba::awaitable<std::string> getAllOptions() = 0;
 
+        /**
+         * @brief Get required delay between write operations.
+         *
+         * @return required delay in ms.
+         */
+        virtual std::chrono::milliseconds getRequiredWriteDelay() = 0;
+
+        virtual bool isMultiChannel() = 0;
+
+        static constexpr std::string_view msCHANNEL_OPTION_STRING = "channel";
+
     protected:
         std::shared_ptr<su::Logger> mpLogger;
     };

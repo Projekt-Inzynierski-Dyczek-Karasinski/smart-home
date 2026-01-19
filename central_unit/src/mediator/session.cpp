@@ -13,7 +13,7 @@
 namespace SmartHomeMediator {
     using namespace std::string_literals;
 
-    Session::Session(RfTypes::SessionMetadata metadata,
+    Session::Session(RfTypes::SessionMetadata &&metadata,
                      const std::shared_ptr<HC12Driver> &pRfDriver,
                      const std::shared_ptr<RfClient> &pRfClient,
                      const std::shared_ptr<su::Logger> &pLogger)
@@ -92,8 +92,11 @@ namespace SmartHomeMediator {
             co_await processState(ctx);
         }
 
+        const auto pRfClient = mpRfClient.lock();
+        if (!pRfClient) co_return"";
+
         // Wait until all messages are send
-        while (!mpRfClient->isSendQueueEmpty()) {
+        while (!pRfClient->isSendQueueEmpty()) {
             delayTimer.expires_after(msPOOLING_DELAY);
             co_await delayTimer.async_wait(ba::use_awaitable);
         }
@@ -102,7 +105,7 @@ namespace SmartHomeMediator {
         co_await delayTimer.async_wait(ba::use_awaitable);
 
         // Return to default channel, ignore errors
-        if (!isInitializedFromModule) co_await changeChannel(mpRfClient->getDefaultChannel());
+        if (!isInitializedFromModule) co_await changeChannel(pRfClient->getDefaultChannel());
 
 
         if (ctx.resultsVector.empty()) co_return "";
@@ -118,8 +121,11 @@ namespace SmartHomeMediator {
     }
 
     void Session::addReceivedPacket(RfTypes::Packet packet) {
+        const auto pRfClient = mpRfClient.lock();
+        if (!pRfClient) return;
+
         if (!packet.isValid() ||
-            packet.macAddress != mpRfClient->getDefaultMacAddress() ||
+            packet.macAddress != pRfClient->getDefaultMacAddress() ||
             packet.logicAddress != mMetadata.targetLogicAddress)
             return;
 
@@ -167,7 +173,7 @@ namespace SmartHomeMediator {
                     apiResponse.error = apiError;
                     break;
                 case RfTypes::MediatorConfigCommandType::GET:
-                    if (key == RfTypes::GET_ALL_OPTIONS_STRING) {
+                    if (key == RfTypes::ALL_OPTIONS_STRING) {
                         try {
                             apiResponse.result = co_await mpRfDriver->getAllOptions();
                         } catch (const std::exception &e) {
@@ -197,8 +203,9 @@ namespace SmartHomeMediator {
                     break;
                 case RfTypes::MediatorConfigCommandType::SET:
                     try {
-                        co_await mpRfDriver->setOption(key.data(), value.data());
-                        apiResponse.result = key.data() + ":"s + value.data();
+                         co_await mpRfDriver->setOption(key.data(), value.data());
+
+                            apiResponse.result = key.data() + ":"s + value.data();
                     } catch (const std::exception &e) {
                         mpLogger->errorf("[SESSION] [CONFIG_SESSION] Failed to set (%s) option: %s",
                                          key.data(),
@@ -450,8 +457,11 @@ namespace SmartHomeMediator {
         for (auto offset = 0; offset < messageSize; offset += maxPayloadSize) {
             const size_t payloadSize = std::min(static_cast<size_t>(maxPayloadSize), messageSize - offset);
 
+            const auto pRfClient = mpRfClient.lock();
+            if (!pRfClient) co_return;
+
             RfTypes::Packet packet{
-                .macAddress = mpRfClient->getDefaultMacAddress(),
+                .macAddress = pRfClient->getDefaultMacAddress(),
                 .logicAddress = mMetadata.targetLogicAddress,
                 .packetsLeft = --numOfPackets,
             };
@@ -461,7 +471,7 @@ namespace SmartHomeMediator {
 
             packet.insertEndMarker();
             packet.insertChecksum();
-            mpRfClient->addMessageToSend(packet.to_vector());
+            pRfClient->addMessageToSend(packet.to_vector());
         }
     }
 
@@ -516,12 +526,16 @@ namespace SmartHomeMediator {
 
     ba::awaitable<bool> Session::changeChannel(const uint8_t channel) const {
         mpLogger->debug("[SESSION] [CHANGE_CHANNEL] called");
+        if (!mpRfDriver->isMultiChannel()) {
+            mpLogger->debug("[SESSION] [CHANGE_CHANNEL] isMultiChannel is set to false: skipping change channel");
+            co_return true;
+        }
         auto retryTimer = ba::steady_timer(co_await ba::this_coro::executor);
         bool isSuccessful = false;
         constexpr int retries = 3;
         for (int i = 0; i < retries; i++) {
             try {
-                isSuccessful = co_await mpRfDriver->setOption(HC12Driver::Hc12Option::CHANNEL,
+                isSuccessful = co_await mpRfDriver->setOption(RfDriver::msCHANNEL_OPTION_STRING.data(),
                                                               std::to_string(channel));
             } catch (const std::exception &e) {
                 mpLogger->errorf("[SESSION] [CHANGE_CHANNEL] Failed to change RF channel. Attempt %d/%d. Cause: %s",

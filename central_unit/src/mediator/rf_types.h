@@ -107,6 +107,18 @@ namespace SmartHomeMediator::RfTypes {
         // Logic address for module must be more than 0, default value of 0 is reserved for mediator
         uint8_t targetLogicAddress = 0;
         std::vector<std::unique_ptr<Command> > commands{};
+
+        // Delete copy
+        SessionMetadata(const SessionMetadata &) = delete;
+
+        SessionMetadata &operator=(const SessionMetadata &) = delete;
+
+        // Allow move
+        SessionMetadata(SessionMetadata &&) = default;
+
+        SessionMetadata &operator=(SessionMetadata &&) = default;
+
+        SessionMetadata() = default;
     };
 
     // Target string
@@ -139,8 +151,9 @@ namespace SmartHomeMediator::RfTypes {
     inline constexpr std::string_view SLEEP_STRING = "sleep";
     inline constexpr std::string_view DEEP_SLEEP_STRING = "deep_sleep";
 
-    inline constexpr std::string_view GET_ALL_OPTIONS_STRING = "get_all_options";
-
+    // Special strings
+    inline constexpr std::string_view ALL_OPTIONS_STRING = "all_options";
+    inline constexpr std::string_view DEFAULT_STRING = "DEFAULT";
     inline constexpr std::string_view UNDEFINED_STRING = "undefined";
 
     struct Packet {
@@ -149,6 +162,7 @@ namespace SmartHomeMediator::RfTypes {
         static constexpr uint16_t msCHECKSUM_MODULO = 256;
         static constexpr uint8_t msEND_MARKER = 0;
         static constexpr uint8_t msFILL_SYMBOL = 0;
+        static constexpr uint8_t msPACKET_SIZE = 16;
 
     public:
         std::array<uint8_t, 6> macAddress{};
@@ -177,6 +191,8 @@ namespace SmartHomeMediator::RfTypes {
         static uint8_t getEndMarker();
 
         static uint8_t getFillSymbol();
+
+        static uint8_t getPacketSize();
 
         void insertChecksum();
 
@@ -253,7 +269,6 @@ namespace SmartHomeMediator::RfTypes {
         std::string commandKey;
 
         std::string commandValue;
-
     };
 
     std::string_view getStringFromRfErrorCode(RfErrorCode code);

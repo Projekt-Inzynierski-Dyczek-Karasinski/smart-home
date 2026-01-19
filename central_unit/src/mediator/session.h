@@ -24,7 +24,7 @@ namespace SmartHomeMediator {
 
     class Session {
     public:
-        Session(RfTypes::SessionMetadata metadata,
+        Session(RfTypes::SessionMetadata &&metadata,
             const std::shared_ptr<HC12Driver> &pRfDriver,
             const std::shared_ptr<RfClient> &pRfClient,
             const std::shared_ptr<su::Logger> &pLogger);
@@ -101,8 +101,8 @@ namespace SmartHomeMediator {
         static constexpr auto msPOOLING_DELAY = 10ms;
 
         RfTypes::SessionMetadata mMetadata;
-        std::shared_ptr<HC12Driver> mpRfDriver;
-        std::shared_ptr<RfClient> mpRfClient;
+        std::shared_ptr<RfDriver> mpRfDriver;
+        std::weak_ptr<RfClient> mpRfClient;
         std::shared_ptr<su::Logger> mpLogger;
 
         std::vector<uint8_t> mReceivedBuffer;

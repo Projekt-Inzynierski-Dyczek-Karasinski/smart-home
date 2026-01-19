@@ -11,6 +11,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <set>
 
 
 namespace ba = boost::asio;
@@ -28,8 +29,9 @@ namespace SmartHomeMediator {
             UNDEFINED = 0,
             CHANNEL, // AT+C (001-127)
             BAUDRATE, // AT+B (1200/2400/.../115200)
-            FU_MODE, // AT+FU (1/2/3/4)
-            POWER // AT+P (1-8)
+            FU_MODE, // AT+FU (1-4)
+            POWER, // AT+P (1-8)
+            DEFAULT // Reset to default
         };
 
         struct Config {
@@ -61,10 +63,7 @@ namespace SmartHomeMediator {
 
         ba::awaitable<std::vector<uint8_t> > read() override;
 
-
         ba::awaitable<bool> setOption(std::string option, std::string value) override;
-
-        ba::awaitable<bool> setOption(Hc12Option option, const std::string &value);
 
         ba::awaitable<std::vector<uint8_t> > getOption(std::string option) override;
 
@@ -76,7 +75,9 @@ namespace SmartHomeMediator {
          * @details Returns 2000ms for FU2/FU4 modes, 40ms for FU1/FU3.
          * @return Delay duration.
          */
-        std::chrono::milliseconds getRequiredWriteDelay() const;
+        std::chrono::milliseconds getRequiredWriteDelay() override;
+
+        bool isMultiChannel() override;
 
     private:
         /**
@@ -148,6 +149,8 @@ namespace SmartHomeMediator {
          */
         static std::vector<uint8_t> dbmToPowerLevel(std::string_view dbm);
 
+        static bool isChannelValid(int channel);
+
         // Hardware components
         std::unique_ptr<UartPort> mpUart;
         std::unique_ptr<GpioHandler> mpSetPin;
@@ -163,7 +166,13 @@ namespace SmartHomeMediator {
         std::chrono::steady_clock::time_point mLastWriteTime;
 
         // Power level to db array, with value from HC-12 user spreadsheet.
-        static constexpr std::array<std::string_view, 8> mDbmArray = {"1", "2", "5", "8", "11", "14", "17", "20"};
+        static constexpr std::array<std::string_view, 8> msDBM_ARRAY = {"1", "2", "5", "8", "11", "14", "17", "20"};
+
+        static inline const std::set msVALID_BAUDRATE = {1200, 2400, 4800, 9600, 19200, 38400,  57600, 115200};
+        static constexpr auto msMIN_CHANNEL = 1;
+        static constexpr auto msMAX_CHANNEL = 127;
+        static inline const std::set msVALID_FU_MODE = {1,2,3,4};
+        static inline const std::set ms_VALID_POWER = {1,2,3,4,5,6,7,8};
 
         // Default for FU1, FU3, or unknown. 80ms is the most reliable value (lower values caused data loss)
         static constexpr auto msLOW_WRITE_DELAY = 80ms;
@@ -171,5 +180,7 @@ namespace SmartHomeMediator {
         static constexpr auto msHIGH_WRITE_DELAY = 2000ms;
 
         static constexpr auto msCONFIG_TIMEOUT = 400ms;
+
+        static constexpr bool msIsMultiChannel = true;
     };
 }
