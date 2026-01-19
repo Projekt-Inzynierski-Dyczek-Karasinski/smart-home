@@ -15,7 +15,7 @@ namespace SmartHome::IPC {
         try {
             std::get<bal::stream_protocol::socket>(mSocket).connect(udsEndpoint);
         } catch (std::exception &e) {
-            mpLogger->errorf("[SOCKET_CONNECTION] IPC UDS connection attempt failed: %s", e.what());
+            mpLogger->debugf("[SOCKET_CONNECTION] IPC UDS connection attempt failed: %s", e.what());
             return false;
         }
         return true;
@@ -25,7 +25,7 @@ namespace SmartHome::IPC {
         try {
             std::get<bai::tcp::socket>(mSocket).connect(tcpEndpoint);
         } catch (std::exception &e) {
-            mpLogger->errorf("[SOCKET_CONNECTION] IPC TCP connection attempt failed: %s", e.what());
+            mpLogger->debugf("[SOCKET_CONNECTION] IPC TCP connection attempt failed: %s", e.what());
             return false;
         }
         return true;
@@ -110,7 +110,7 @@ namespace SmartHome::IPC {
                 socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
                 socket.close(ec);
                 if (ec) {
-                    mpLogger->errorf("[SOCKET_CONNECTION] IPC connection close failed: %s ", ec.message().c_str());
+                    mpLogger->debugf("[SOCKET_CONNECTION] IPC connection close failed: %s ", ec.message().c_str());
                 }
                 mpLogger->debug("[SOCKET_CONNECTION] IPC connection closed");
             }
@@ -147,10 +147,10 @@ namespace SmartHome::IPC {
     void SocketConnection::handleError(const bs::error_code &ec) {
         switch (ec.value()) {
             case ba::error::operation_aborted:
-                mpLogger->info("[SOCKET_CONNECTION] IPC operation aborted");
+                mpLogger->debug("[SOCKET_CONNECTION] IPC operation aborted");
                 break;
             case ba::error::eof:
-                mpLogger->info("[SOCKET_CONNECTION] IPC connection read EOF");
+                mpLogger->debug("[SOCKET_CONNECTION] IPC connection read EOF");
                 close();
                 break;
             case ba::error::connection_reset:
@@ -160,7 +160,7 @@ namespace SmartHome::IPC {
                 break;
             default:
                 if (ec) {
-                    mpLogger->errorf("[SOCKET_CONNECTION] IPC connection failed: %s ", ec.message().c_str());
+                    mpLogger->debugf("[SOCKET_CONNECTION] IPC connection failed: %s ", ec.message().c_str());
                     close();
                 }
         }
