@@ -42,10 +42,10 @@ namespace SmartHome::API {
         const auto iter = json.find(JsonRpcStrings::Keys::ID);
         if (iter == json.end()) {
             mState = State::UNDEFINED;
-        } else if (iter.value().is_number()) {
+        } else if (iter->is_number() && iter.value() != nullptr) {
             mValue = json[JsonRpcStrings::Keys::ID];
             mState = State::HAS_VALUE;
-        } else if (iter.value().is_string() && iter.value() == JsonRpcStrings::Constants::NULL_VALUE) {
+        } else if (iter->is_string() && iter.value() == JsonRpcStrings::Constants::NULL_VALUE || iter.value() == nullptr) {
             mState = State::NULL_VALUE;
         } else {
             throw std::runtime_error("Cannot cast json to ApiId - Invalid ID value");
@@ -247,7 +247,11 @@ namespace SmartHome::API {
             throw std::invalid_argument("Invalid JSON-RPC response: response must have result or error");
         }
 
-        if (!id.isUndefined()) json.update(id.toJson());
+        if (id.hasValue()) {
+            json[JsonRpcStrings::Keys::ID] = id.value();
+        } else if (id.isNull()) {
+            json[JsonRpcStrings::Keys::ID] = nullptr;
+        }
 
         return json;
     }
@@ -269,19 +273,25 @@ namespace SmartHome::API {
             throw std::invalid_argument("Invalid JSON-RPC request: response must contain id");
         }
 
-        if (json.contains(JsonRpcStrings::ResponseKeys::RESULT) && !json.contains(JsonRpcStrings::ResponseKeys::ERROR)) {
+        if (json.contains(JsonRpcStrings::ResponseKeys::RESULT) && !json.
+            contains(JsonRpcStrings::ResponseKeys::ERROR)) {
             auto &jsonResult = json[JsonRpcStrings::ResponseKeys::RESULT];
             if (jsonResult.is_string()) result = jsonResult.get<std::string>();
             else result = jsonResult.dump();
-        }
-        else if (json.contains(JsonRpcStrings::ResponseKeys::ERROR) && !json.contains(
-                     JsonRpcStrings::ResponseKeys::RESULT))
+        } else if (json.contains(JsonRpcStrings::ResponseKeys::ERROR) && !json.contains(
+                       JsonRpcStrings::ResponseKeys::RESULT))
             error.emplace(
                 json[JsonRpcStrings::ResponseKeys::ERROR]);
         else throw std::invalid_argument("Invalid JSON-RPC request: response must contain either result or error");
 
         jsonrpc = json[JsonRpcStrings::Keys::JSONRPC];
-        id = json[JsonRpcStrings::Keys::ID];
+        auto & idJson = json[JsonRpcStrings::Keys::ID];
+        if (idJson.is_number()) {
+            id = idJson.get<int>();
+        }
+        else if (idJson == nullptr || idJson.is_null()) {
+            id = nullptr;
+        }
     }
 
     std::string_view errorCodeToString(const ErrorCodes errorCode) {

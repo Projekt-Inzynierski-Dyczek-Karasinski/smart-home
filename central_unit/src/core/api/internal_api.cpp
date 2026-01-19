@@ -153,8 +153,8 @@ namespace SmartHome::API {
         boost::algorithm::trim(message);
         std::string_view messageView(message);
 
-        const auto logger = Core::Instance().mpLogger;
-        logger->debug("[INTERNAL_API] handleIncoming");
+        const auto pLogger = Core::Instance().mpLogger;
+        pLogger->debug("[INTERNAL_API] handleIncoming called");
 
         bool isMessageJson = false;
 
@@ -174,7 +174,8 @@ namespace SmartHome::API {
                             Actions::handleIncomingResponse(connectionId, response);
                         });
                         jsonMessage.erase(jsonMessage.begin() + i);
-                    } catch (...) {
+                    } catch (const std::exception &e) {
+                        pLogger->debugf("[INTERNAL_API] [HANDLE_INCOMING] Parse to response failed: %s" , e.what());
                     }
                 }
                 if (jsonMessage.empty()) return;
@@ -185,7 +186,8 @@ namespace SmartHome::API {
                         Actions::handleIncomingResponse(connectionId, response);
                     });
                     return;
-                } catch (...) {
+                } catch (const std::exception &e) {
+                    pLogger->debugf("[INTERNAL_API] [HANDLE_INCOMING] Parse to response failed: %s" , e.what());
                 }
             }
         }
@@ -217,8 +219,8 @@ namespace SmartHome::API {
                             Method(MethodTypes::UNKNOWN),
                             Target(TargetTypes::UNKNOWN));
 
-                        logger->error(
-                            "[INTERNAL_API] [HANDLE_REQUEST] JSON-RPC batch request parse error: " +
+                        pLogger->error(
+                            "[INTERNAL_API] [HANDLE_INCOMING] JSON-RPC batch request parse error: " +
                             std::string(exception.what()));
                     }
                 }
@@ -229,8 +231,8 @@ namespace SmartHome::API {
                 } catch (const std::exception &exception) {
                     e.code = ErrorCodes::PARSE_ERROR;
                     e.data = exception.what();
-                    logger->error(
-                        "[INTERNAL_API] [HANDLE_REQUEST] JSON-RPC request parse error: " +
+                    pLogger->error(
+                        "[INTERNAL_API] [HANDLE_INCOMING] JSON-RPC request parse error: " +
                         std::string(exception.what()));
                 }
             }
@@ -241,8 +243,8 @@ namespace SmartHome::API {
             } catch (const std::exception &exception) {
                 e.code = ErrorCodes::PARSE_ERROR;
                 e.data = exception.what();
-                logger->error(
-                    "[INTERNAL_API] [HANDLE_REQUEST] unstructured request parse error: " +
+                pLogger->error(
+                    "[INTERNAL_API] [HANDLE_INCOMING] unstructured request parse error: " +
                     std::string(exception.what()));
             }
         }
@@ -263,7 +265,7 @@ namespace SmartHome::API {
             return;
         }
 
-        logger->debug("[INTERNAL_API] handler call");
+        pLogger->debug("[INTERNAL_API] handler call");
         Actions::handleIncomingRequest(requestStruct, [this](const connectionId_t id, std::string &&response) {
             handleOutgoing(id, std::move(response));
         });
