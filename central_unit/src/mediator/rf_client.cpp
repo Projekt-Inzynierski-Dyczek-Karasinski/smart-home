@@ -1,6 +1,9 @@
 #include "rf_client.h"
 #include "mediator.h"
 
+#include <boost/format.hpp>
+#include <boost/algorithm/string/join.hpp>
+
 namespace SmartHomeMediator {
     RfClient::RfClient(ba::io_context &ioContext,
                        const std::shared_ptr<su::Logger> &logger,
@@ -19,8 +22,18 @@ namespace SmartHomeMediator {
             throw;
         }
 
-        mDefaultChannel = config.defaultChannel;
-        mDefaultMac = config.defaultMac;
+        mRfMainChannel = config.defaultChannel;
+        mUniqueNetworkId = config.defaultMac;
+
+        std::vector<std::string> hexBytes;
+        hexBytes.reserve(mUniqueNetworkId.size());
+
+        for (const auto &byte : mUniqueNetworkId) {
+            hexBytes.push_back((boost::format("%02X") % static_cast<int>(byte)).str());
+        }
+        const std::string macStr = boost::algorithm::join(hexBytes, ":");
+
+        mpLogger->infof("[RF_CLIENT] RF client unique network id (MAC): %s", macStr.c_str());
     }
 
     RfClient::~RfClient() {
@@ -57,7 +70,7 @@ namespace SmartHomeMediator {
             // Set channel to default
             try {
                 success = co_await mpDriver->setOption(RfDriver::msCHANNEL_OPTION_STRING.data(),
-                                                       std::to_string(mDefaultChannel));
+                                                       std::to_string(mRfMainChannel));
             } catch (const std::exception &e) {
                 mpLogger->errorf("[RF_CLIENT] Initialization error: %s", e.what());
                 onComplete(false);
@@ -137,12 +150,12 @@ namespace SmartHomeMediator {
         return mSendQueue.empty();
     }
 
-    uint8_t RfClient::getDefaultChannel() const {
-        return mDefaultChannel;
+    uint8_t RfClient::getRfMainChannel() const {
+        return mRfMainChannel;
     }
 
-    std::array<uint8_t, 6> RfClient::getDefaultMacAddress() const {
-        return mDefaultMac;
+    std::array<uint8_t, 6> RfClient::getUniqueNetworkId() const {
+        return mUniqueNetworkId;
     }
 
     void RfClient::startReceiving() {
@@ -211,12 +224,12 @@ namespace SmartHomeMediator {
 
             if (mCurrentSession) {
                 mCurrentSession->addReceivedPacket(packet);
-            } else {
+            } else if (packet.macAddress == mUniqueNetworkId) {
                 mpLogger->debug("[RF_CLIENT] Creating new session"); //TODO !pr test
                 // TODO !pr fix session form module notif
                 RfTypes::SessionMetadata meta;
                 meta.sessionType = RfTypes::SessionType::FROM_MODULE;
-                meta.rfChannel = getDefaultChannel();
+                meta.rfChannel = getRfMainChannel();
                 meta.targetLogicAddress = packet.logicAddress;
 
                 std::queue<RfTypes::SessionMetadata> tmpQueue;

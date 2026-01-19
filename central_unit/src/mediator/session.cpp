@@ -48,7 +48,7 @@ namespace SmartHomeMediator {
                     mpLogger->error("[SESSION] [EXECUTE] Received invalid command type ");
                     continue;
                 }
-                const auto* pRfCommand = dynamic_cast<RfTypes::RfCommand*>(pCommand.get());
+                const auto *pRfCommand = dynamic_cast<RfTypes::RfCommand *>(pCommand.get());
                 if (!pRfCommand) {
                     mpLogger->error("[SESSION] [EXECUTE] Failed command class cast ");
                     continue;
@@ -88,7 +88,10 @@ namespace SmartHomeMediator {
             ctx.error.data = "Mediator failed to acquire connection, module may be offline";
 
             // End session if connection can not be acquired
-            if (!co_await acquireConnection()) co_return to_string(generateErrorResponses(ctx.error));
+            if (!co_await acquireConnection()) {
+                if (const auto pRfClient = mpRfClient.lock()) co_await changeChannel(pRfClient->getRfMainChannel());
+                co_return to_string(generateErrorResponses(ctx.error));
+            }
         }
 
         // Run state machine
@@ -109,7 +112,7 @@ namespace SmartHomeMediator {
         co_await delayTimer.async_wait(ba::use_awaitable);
 
         // Return to default channel, ignore errors
-        if (!isInitializedFromModule) co_await changeChannel(pRfClient->getDefaultChannel());
+        if (!isInitializedFromModule) co_await changeChannel(pRfClient->getRfMainChannel());
 
 
         if (ctx.resultsVector.empty()) co_return "";
@@ -129,7 +132,7 @@ namespace SmartHomeMediator {
         if (!pRfClient) return;
 
         if (!packet.isValid() ||
-            packet.macAddress != pRfClient->getDefaultMacAddress() ||
+            packet.macAddress != pRfClient->getUniqueNetworkId() ||
             packet.logicAddress != mMetadata.targetLogicAddress)
             return;
 
@@ -162,7 +165,7 @@ namespace SmartHomeMediator {
                 continue;
             }
 
-            auto pConfigCommand = dynamic_cast<RfTypes::MediatorConfigCommand*>(pCommand.get());
+            auto pConfigCommand = dynamic_cast<RfTypes::MediatorConfigCommand *>(pCommand.get());
             if (!pConfigCommand) {
                 mpLogger->error("[SESSION] [CONFIG_SESSION] Failed command class cast ");
                 continue;
@@ -212,9 +215,9 @@ namespace SmartHomeMediator {
                     break;
                 case RfTypes::MediatorConfigCommandType::SET:
                     try {
-                         co_await mpRfDriver->setOption(key.data(), value.data());
+                        co_await mpRfDriver->setOption(key.data(), value.data());
 
-                            apiResponse.result = key.data() + ":"s + value.data();
+                        apiResponse.result = key.data() + ":"s + value.data();
                     } catch (const std::exception &e) {
                         mpLogger->errorf("[SESSION] [CONFIG_SESSION] Failed to set (%s) option: %s",
                                          key.data(),
@@ -430,7 +433,7 @@ namespace SmartHomeMediator {
                     }
 
 
-                    const auto pCommand =  dynamic_cast<RfTypes::RfCommand *>(command.release());
+                    const auto pCommand = dynamic_cast<RfTypes::RfCommand *>(command.release());
                     ctx.pCurrentCommand = std::unique_ptr<RfTypes::RfCommand>(pCommand);
 
                     // Add error to result on undefined command
@@ -470,7 +473,7 @@ namespace SmartHomeMediator {
             if (!pRfClient) co_return;
 
             RfTypes::Packet packet{
-                .macAddress = pRfClient->getDefaultMacAddress(),
+                .macAddress = pRfClient->getUniqueNetworkId(),
                 .logicAddress = mMetadata.targetLogicAddress,
                 .packetsLeft = --numOfPackets,
             };
@@ -568,7 +571,7 @@ namespace SmartHomeMediator {
 
         auto retries = 0;
 
-        while (++retries < msMAX_REATTEMPTS) {
+        while (++retries <= msMAX_REATTEMPTS) {
             co_await send(command.to_vector());
             std::vector<uint8_t> receivedMessage = co_await receive();
 

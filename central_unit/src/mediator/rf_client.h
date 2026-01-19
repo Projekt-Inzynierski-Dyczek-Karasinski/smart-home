@@ -63,9 +63,9 @@ namespace SmartHomeMediator {
 
         bool isSendQueueEmpty();
 
-        uint8_t getDefaultChannel() const;
+        uint8_t getRfMainChannel() const;
 
-        std::array<uint8_t, 6> getDefaultMacAddress() const;
+        std::array<uint8_t, 6> getUniqueNetworkId() const;
 
     private:
         /**
@@ -90,8 +90,8 @@ namespace SmartHomeMediator {
         static constexpr auto msAGGREGATE_RECEIVED_PACKET_INFO_TIMEOUT = 1s;
         static constexpr auto msPOOLING_DELAY = 10ms;
 
-        uint8_t mDefaultChannel;
-        std::array<uint8_t,6> mDefaultMac;
+        uint8_t mRfMainChannel;
+        std::array<uint8_t,6> mUniqueNetworkId{}; // Defaults to device MAC address
 
         std::shared_ptr<HC12Driver> mpDriver;
         ba::io_context &mIoContext;
