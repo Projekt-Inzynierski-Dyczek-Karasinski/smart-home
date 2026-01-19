@@ -156,6 +156,7 @@ namespace SmartHome::API {
         MODULE_RUNTIME_ERROR = -32001,
         MEDIATOR_COMMUNICATION_ERROR = -32002,
         MEDIATOR_RUNTIME_ERROR = -32003,
+        NOT_IMPLEMENTED = -32004,
     };
 
     /**

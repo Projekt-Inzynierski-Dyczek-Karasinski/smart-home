@@ -304,6 +304,8 @@ namespace SmartHome::API {
                 return "Mediator communication error";
             case ErrorCodes::MEDIATOR_RUNTIME_ERROR:
                 return "Mediator runtime error";
+            case ErrorCodes::NOT_IMPLEMENTED:
+                return "Not implemented";
             case ErrorCodes::UNKNOWN_ERROR:
                 return "Unknown error";
             default:
