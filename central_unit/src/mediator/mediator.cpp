@@ -51,10 +51,14 @@ namespace SmartHomeMediator {
         bool isConnectionEstablished = false;
         if (mConfig.uds.isEnabled) {
             isConnectionEstablished = mpApiClient->connectToServer(mConfig.uds.endpointPath);
+            if (isConnectionEstablished)
+                mpLogger->info("[MEDIATOR] Connection established via UDS");
         }
         if (!isConnectionEstablished && mConfig.tcp.isEnabled) {
             isConnectionEstablished = mpApiClient->connectToServer(mConfig.tcp.endpointAddress,
                                                                    mConfig.tcp.endpointPort);
+            if (isConnectionEstablished)
+                mpLogger->info("[MEDIATOR] Connection established via TCP");
         }
         if (!isConnectionEstablished) {
             logger->error("[MEDIATOR] Failed to connect with SmartHome daemon");
@@ -155,24 +159,41 @@ namespace SmartHomeMediator {
 
         mpLogger->info("[MEDIATOR] Mediator running");
 
-        // Main thread loop
-        mMediatorThread->join();
-        mMediatorThread.reset();
 
-        // Join threads
-        mApiClientThread->join();
-        mApiClientThread.reset();
+        if (mMediatorThread && mMediatorThread->joinable()) {
+            mMediatorThread->join();
+            mMediatorThread.reset();
+        }
 
-        mRfClientThread->join(); // TODO !pr RF client hangs on something during shutdown
-        mRfClientThread.reset();
+        mpLogger->debug("[MEDIATOR] Main thread finished");
 
-        // Stop utilities
-        mMediatorUtilityGuard.reset();
-        mMediatorUtilityThread->join();
-        mMediatorUtilityThread.reset();
+        // Join other threads
+        if (mRfClientThread && mRfClientThread->joinable()) {
+            mRfClientThread->join();
+            mRfClientThread.reset();
+        }
+
+        if (mApiClientThread && mApiClientThread->joinable()) {
+            mApiClientThread->join();
+            mApiClientThread.reset();
+        }
+
+        if (mMediatorUtilityIoContext.stopped()) {
+            mMediatorUtilityIoContext.stop();
+        }
+
+        // Join utilities thread last
+        if (mMediatorUtilityThread && mMediatorUtilityThread->joinable()) {
+            mMediatorUtilityThread->join();
+            mMediatorUtilityThread.reset();
+        }
+
+        mpLogger->info("[MEDIATOR] Mediator finished running");
     }
 
     void Mediator::shutdown() {
+        mpLogger->info("[MEDIATOR] Shutdown requested");
+
         bool expected = true;
         constexpr bool desired = false;
         if (!mIsRunning.compare_exchange_strong(expected, desired)) {
@@ -180,36 +201,48 @@ namespace SmartHomeMediator {
             return;
         }
 
-        // Start shutdown timeout timer
-        std::weak_ptr shutdownTimeout = std::make_shared<ba::steady_timer>(mMediatorUtilityIoContext, ms_SHUTDOWN_TIMEOUT);
-        shutdownTimeout.lock()->async_wait([this, shutdownTimeout](const bs::error_code &ec) {
-            if (!ec) {
-                mMediatorIoContext.stop();
-                mApiClientIoContext.stop();
-                mRfClientIoContext.stop();
-            }
-        });
-
-        mpRfClient.reset();
-
-        // Delete thread guards
         mMediatorGuard.reset();
         mApiClientGuard.reset();
         mRfClientGuard.reset();
 
-        // Stops API client
-        mpApiClient.reset();
 
-        mpService->onStop();
-        mpService.reset();
-
-        // Stop handling signals
         if (mSignals.has_value()) {
             mSignals->cancel();
             mSignals.reset();
         }
 
-        mpLogger->info("[MEDIATOR] Shutdown");
+        if (mpService) {
+            mpService->onStop();
+        }
+
+        // Start shutdown timeout timer
+        const auto timeoutTimer = std::make_shared<ba::steady_timer>(mMediatorUtilityIoContext, ms_SHUTDOWN_TIMEOUT);
+        timeoutTimer->async_wait([this](const bs::error_code& ec) {
+            if (!ec) {
+                mpLogger->warning("[MEDIATOR] Shutdown timeout - force stopping IO contexts");
+
+                if (!mRfClientIoContext.stopped()) {
+                    mRfClientIoContext.stop();
+                }
+                if (!mApiClientIoContext.stopped()) {
+                    mApiClientIoContext.stop();
+                }
+                if (!mMediatorIoContext.stopped()) {
+                    mMediatorIoContext.stop();
+                }
+            }
+        });
+
+        // Reset objects
+        mpRfApi.reset();
+        mpRfClient.reset();
+        mpApiClient.reset();
+        mpService.reset();
+
+        // Reset utility guard
+        mMediatorUtilityGuard.reset();
+
+        mpLogger->debug("[MEDIATOR] Shutdown complete - waiting for threads to join in run()");
     }
 
     bool Mediator::isRunning() const {
