@@ -130,9 +130,14 @@ namespace SmartHome::IPC {
 
 
         /**
-         * TODO !pr
+         * @brief Get set of all active connection IDs.
          *
-         * @return
+         * @details Creates snapshot of currently active connection IDs.
+         *          Thread-safe via mutex.
+         *
+         * @return Unordered set containing IDs of all active connections.
+         *
+         * @note Returned set is a snapshot - connections may close after this call returns.
          */
         std::unordered_set<connectionId_t> getActiveConnections();
 

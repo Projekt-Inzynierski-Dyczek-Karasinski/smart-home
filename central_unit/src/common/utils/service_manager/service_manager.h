@@ -55,7 +55,7 @@ namespace SmartHome::Utils {
          *
          * @details Called after successful initialization. Performs platform-specific service functions.
          *
-         * @pre onInitialize() must return ture.
+         * @pre onInitialize() must return true.
          */
         virtual void onStart() = 0;
 
@@ -66,7 +66,14 @@ namespace SmartHome::Utils {
          */
         virtual void onStop() = 0;
 
-        //TODO !pr doc
+        /**
+         * @brief Set IO context for async operations.
+         *
+         * @param io_context IO context reference for watchdog timers and async operations.
+         *
+         * @note Required for SystemdService watchdog functionality.
+         *       Should be called  before onInitialize() for services that need watchdog support.
+         */
         void setIoContext(ba::io_context &io_context);
 
     protected:

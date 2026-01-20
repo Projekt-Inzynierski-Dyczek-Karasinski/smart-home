@@ -11,36 +11,112 @@ namespace SmartHome {
         using cmdMetaPtr = std::shared_ptr<Actions::CommandMetadata>;
 
     public:
-        static ba::awaitable<std::optional<API::ApiResponse>> mediatorGetHandler(const cmdMetaPtr &commandMetadata);
+        /**
+         * @brief Handle GET command for mediator/module.
+         *
+         * @details Routes GET requests to mediator or specific module based on parameters.
+         *          If first parameter contains module_id object, fetches module info and
+         *          forwards request with RF addressing. Otherwise sends directly to mediator.
+         *
+         * @param commandMetadata Command execution metadata.
+         *
+         * @return API response with requested value or error.
+         *
+         * @note Expected params format: [(optional){module_id: uint}, target_value_key<string>, optional_arguments<any>...]
+         */
+        static ba::awaitable<std::optional<API::ApiResponse> > mediatorGetHandler(const cmdMetaPtr &commandMetadata);
 
-        static ba::awaitable<std::optional<API::ApiResponse>> mediatorSetHandler(const cmdMetaPtr &commandMetadata);
 
         /**
-         * @brief
+         * @brief Handle SET command for mediator/module.
          *
-         * @note Message must be in JSON RPC format with `params` field formated as follows:
-         *       \code{.json}
-         *       {
-         *         "target": "mediator",
-         *         "method_params": [
-         *           {"module_id": <uint>}, // Object with a module id, signalizes that command's target is a module.
-         *                                  // TODO implement execute command for mediator process.
-         *           <string>,              // String representing an action to execute.
-         *           <optional>             // Optional argument of type depending on what is expected by action.
-         *         ]
-         *       }
-         *       \endcode
+         * @details Routes SET requests to mediator or specific module based on parameters.
+         *          If first parameter contains module_id object, fetches module info and
+         *          forwards request with RF addressing. Otherwise sends directly to mediator.
+         *
+         * @param commandMetadata Command execution metadata.
+         *
+         * @return API response with confirmation or error.
+         *
+         * @note Expected params format: [(optional){module_id: uint}, target_value_key<string>, target_new_value<any>]
          */
-        static ba::awaitable<std::optional<API::ApiResponse>> mediatorExecuteHandler(const cmdMetaPtr &commandMetadata);
+        static ba::awaitable<std::optional<API::ApiResponse> > mediatorSetHandler(const cmdMetaPtr &commandMetadata);
 
-        static ba::awaitable<std::optional<API::ApiResponse>> mediatorPingHandler(const cmdMetaPtr &commandMetadata);
+        /**
+         * @brief Handle EXECUTE command for mediator/module.
+         *
+         * @details Routes EXECUTE requests to mediator or specific module based on parameters.
+         *          If first parameter contains module_id object, fetches module info and
+         *          forwards request with RF addressing. Otherwise sends directly to mediator.
+         *
+         * @param commandMetadata Command execution metadata.
+         *
+         * @return API response with execution result or error.
+         *
+         * @note Expected params format: [(optional){module_id: uint}, action<string>, (optional)action_argument<any>]
+         */
 
+        static ba::awaitable<std::optional<API::ApiResponse> >
+        mediatorExecuteHandler(const cmdMetaPtr &commandMetadata);
+
+        /**
+         * @brief Handle PING command for module connectivity check.
+         *
+         * @details Sends PING to specified module and measures round-trip time.
+         *          Requires module_id in parameters to identify target module.
+         *
+         * @param commandMetadata Command execution metadata.
+         *
+         * @return API response with round-trip time in milliseconds or error.
+         *
+         * @note Expected params format: [{module_id: uint}]
+         */
+        static ba::awaitable<std::optional<API::ApiResponse> > mediatorPingHandler(const cmdMetaPtr &commandMetadata);
+
+        /**
+         * @brief Send request to mediator and await response.
+         *
+         * @details Finds mediator connection, posts request to core worker context,
+         *          starts timeout timer, and waits for response asynchronously.
+         *          Polls future status while command remains pending.
+         *
+         * @param request API request to send to mediator.
+         * @param commandMetadata Command execution metadata.
+         *
+         * @return API response from mediator or error.
+         *
+         * @note Blocks asynchronously until response received or timeout.
+         */
         static ba::awaitable<API::ApiResponse> sendRequestToMediator(API::ApiRequest &&request,
                                                                      cmdMetaPtr commandMetadata);
 
-        static bool areParamsValid(API::ApiError &error, const API::InternalApi::Command &command,
+        /**
+         * @brief Validate command parameters count and type.
+         *
+         * @details Checks if params exist, are array type, and meet minimum count requirement.
+         *          Updates error object with descriptive message on validation failure.
+         *
+         * @param error Error object to populate on validation failure.
+         * @param command Command to validate parameters for.
+         * @param numOfExpectedParams Minimum required parameter count.
+         *
+         * @return true if parameters valid, false otherwise.
+         */
+        static bool areParamsValid(API::ApiError &error,
+                                   const API::InternalApi::Command &command,
                                    uint numOfExpectedParams);
 
+        /**
+         * @brief Prepare API request structure for mediator.
+         *
+         * @details Initializes request with command ID and method, creates params object,
+         *          and sets target to module_mediator.
+         *
+         * @param request API request structure to populate.
+         * @param command Source command with ID and method.
+         *
+         * @return Reference to params JSON object for further population.
+         */
         static nlohmann::json &prepareRequestToMediator(API::ApiRequest &request,
                                                         const API::InternalApi::Command &command);
     };
