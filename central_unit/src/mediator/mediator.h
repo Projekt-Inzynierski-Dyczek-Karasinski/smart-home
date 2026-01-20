@@ -1,9 +1,9 @@
 #pragma once
 
+#include "rf_client.h"
 #include "async_logger.h"
 #include "socket_server.h"
 #include "service_manager/service_manager.h"
-#include "rf_client.h"
 #include "api/api_client.h"
 #include "api/rf_api.h"
 
@@ -18,6 +18,13 @@ namespace bs = boost::system;
 namespace SmartHomeMediator {
     using namespace std::chrono_literals;
 
+    /**
+     * @brief Central mediator singleton managing RF communication system.
+     *
+     * @details Coordinates RF client, API client, service lifecycle, and signal handling.
+     *          Runs multiple IO contexts on separate threads for RF operations, API communication, and system utilities.
+     *          Implements graceful shutdown with configurable timeout.
+     */
     class Mediator {
     public:
         /**
@@ -54,8 +61,13 @@ namespace SmartHomeMediator {
         /**
          * @brief Initialize Mediator with provided configuration.
          *
-         * @details TODO !pr Sets up thread pools, IO contexts and IPC based on config.
-         *              Must be called before run().! Can only be initialized once.
+         * @details Creates and initializes all subsystems:
+         *          - AsyncLogger with file output
+         *          - Service manager
+         *          - API client connection (UDS or TCP)
+         *          - Worker threads for each IO context
+         *          - RF client with hardware driver
+         *          Validates all components before marking initialized.
          *
          * @param configStruct Configuration parameters.
          * @param logger Shared pointer instance reference of configured logger.
@@ -66,8 +78,9 @@ namespace SmartHomeMediator {
         /**
          * @brief Starts Mediator and runs main loop.
          *
-         * @details TODO !pr Begins signal handling, starts IPC and enters main loop.
-         *          Must be called after initialize(). Block until shutdown() is called.
+         * @details Spawns signal handlers, initializes API routing between RfApi and ApiClient,
+         *          starts RF client execution loop. Blocks on main thread until shutdown requested,
+         *          then joins all worker threads in proper order.
          *
          * @pre initialize() must be successfully called first.
          */
@@ -76,7 +89,9 @@ namespace SmartHomeMediator {
         /**
          * @brief Request graceful shutdown.
          *
-         * @details TODO !pr Stops main loop, signal handlers, IPC and waits for running threads to finish.
+         * @details Requests graceful shutdown of all subsystems with timeout protection.
+         *          Resets work guards to allow IO contexts to finish, cancels signals, stops service,
+         *          and destroys objects in dependency order. Forces IO context stop if timeout expires.
          */
         void shutdown();
 
@@ -87,6 +102,11 @@ namespace SmartHomeMediator {
          */
         bool isRunning() const;
 
+        /**
+         * @brief Main IO context getter.
+         *
+         * @return IO context reference.
+         */
         ba::io_context &getIoContext();
 
         std::shared_ptr<su::Logger> mpLogger;
@@ -97,9 +117,22 @@ namespace SmartHomeMediator {
 
         ~Mediator();
 
+        /**
+         * @brief Handle POSIX signals (SIGINT, SIGTERM, SIGHUP).
+         *
+         * @param ec Error code from signal wait.
+         * @param signal Signal number received.
+         *
+         * @note Re-arms signal handler for next signal unless shutting down.
+         */
         void signalHandler(const boost::system::error_code &ec, int signal);
 
-        static constexpr std::string_view ms_ServiceName = "smarthome-radiod";
+        /// Signals handled by mediator
+        static constexpr std::array msSIGNALS_TO_HANDLE = {SIGINT, SIGTERM, SIGHUP};
+        /// Maximum time to wait for graceful shutdown
+        static constexpr auto msSHUTDOWN_TIMEOUT = 2500ms;
+        /// Service name
+        static constexpr std::string_view msSERVICE_NAME = "smarthome-radiod";
 
         Config mConfig;
 
@@ -125,9 +158,6 @@ namespace SmartHomeMediator {
         std::optional<std::thread> mMediatorUtilityThread;
         std::optional<ba::executor_work_guard<ba::io_context::executor_type> > mMediatorUtilityGuard;
         std::optional<ba::signal_set> mSignals;
-        /// Signals defined to handle in signalHandler
-        static constexpr std::array ms_SIGNALS_TO_HANDLE = {SIGINT, SIGTERM, SIGHUP};
-        static constexpr auto ms_SHUTDOWN_TIMEOUT = 5000ms;
 
         // Mediator main loop
         /// Main event loop used for internal logic

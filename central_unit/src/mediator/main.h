@@ -1,11 +1,10 @@
 #pragma once
 #include "logger.h"
+#include "mediator.h"
 #include "config_manager/config_manager.h"
 
 #include <boost/asio.hpp>
 #include <boost/program_options.hpp>
-
-#include "mediator.h"
 
 
 namespace bpo = boost::program_options;
@@ -24,16 +23,42 @@ namespace SmartHomeMediator {
         uint8_t verboseLevel = static_cast<uint8_t>(su::LogLevels::defaultLevel);
     };
 
+    /**
+     * @brief Parse MAC address string to byte array.
+     *
+     * @param macStr MAC address in format "XX:XX:XX:XX:XX:XX".
+     *
+     * @return 6-byte MAC address array, or std::nullopt on invalid format.
+     *
+     * @note Whitespace is ignored. String must be exactly 17 characters after stripping whitespace.
+     */
     std::optional<std::array<uint8_t, 6>> parseMacAddress(const std::string& macStr);
 
+    /**
+     * @brief Read MAC address for network interface from sysfs.
+     *
+     * @param interface Network interface name (e.g., "eth0", "wlan0").
+     *
+     * @return 6-byte MAC address array, or std::nullopt if interface not found or read fails.
+     *
+     * @note Reads from /sys/class/net/[interface]/address.
+     */
     std::optional<std::array<uint8_t, 6>> getMacAddressForInterface(const std::string& interface);
 
+    /**
+     * @brief Get MAC address of first available network interface.
+     *
+     * @details Iterates through /sys/class/net, skipping loopback interface,
+     *          and returns MAC address of first valid interface found.
+     *
+     * @return 6-byte MAC address array, or std::nullopt if no valid interface found.
+     */
     std::optional<std::array<uint8_t, 6>> getDefaultMacAddress();
 
     /**
      * @brief Loads logger configuration values from YAML file.
      *
-     * @details Reads SmartHome logger configuration from YAML file and updates provided config struct.
+     * @details Reads Mediator logger configuration from YAML file and updates provided config struct.
      *          Existing values in struct are overwritten with values from the YAML file if present.
      *
      * @param configManager Configuration manager instance for YAML file handling.
@@ -44,11 +69,11 @@ namespace SmartHomeMediator {
     /**
      * @brief Loads configuration values from YAML file.
      *
-     * @details Reads SmartHome configuration from YAML file and updates provided config structs.
+     * @details Reads Mediator configuration from YAML file and updates provided config structs.
      *          Existing values in structs are overwritten with values from the YAML file if present.
      *
      * @param configManager Configuration manager instance for YAML file handling.
-     * @param mediatorConfig Mediator launch configuration struct to be updated. //TODO !pr
+     * @param mediatorConfig Mediator launch configuration struct to be updated.
      */
     void loadYamlConfigs(su::ConfigManager &configManager,
                          Mediator::Config &mediatorConfig);
@@ -61,7 +86,7 @@ namespace SmartHomeMediator {
      *
      * @param vm Variables map containing parsed command-line options.
      * @param logTmpOpt Temporary logger options from initial parsing.
-     * @param mediatorConfig Core configuration to update.
+     * @param mediatorConfig Mediator configuration to update.
      * @param loggerConfig Logger configuration to update.
      */
     void overwriteConfigsWithProgramOptions(const bpo::variables_map &vm,
@@ -92,7 +117,7 @@ namespace SmartHomeMediator {
 
 
     /// Default path for smarthome YAML config
-    static constexpr std::string_view s_DEFAULT_CONFIG_PATH = "/etc/smarthome/mediator.yaml";
-    static constexpr std::string_view s_DEFAULT_LOGFILE_PATH = "/var/log/smarthome/mediator.log";
+    static constexpr std::string_view sDEFAULT_CONFIG_PATH = "/etc/smarthome/mediator.yaml";
+    static constexpr std::string_view sDEFAULT_LOGFILE_PATH = "/var/log/smarthome/mediator.log";
 
 }

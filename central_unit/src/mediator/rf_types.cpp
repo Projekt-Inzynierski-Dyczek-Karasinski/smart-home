@@ -39,10 +39,6 @@ namespace SmartHomeMediator::RfTypes {
         return packetsLeft == 0;
     }
 
-    // std::vector<uint8_t> Packet::getPayload() const {
-    //     return {payload.begin(), payload.end()};
-    // }
-
     uint8_t Packet::getPayloadMaxSize() {
         return msPAYLOAD_MAX_SIZE;
     }
@@ -63,7 +59,7 @@ namespace SmartHomeMediator::RfTypes {
         checksum = 0;
         const auto tmpChecksum = calculateChecksum(*this);
 
-        checksum = (msCHECKSUM_MODULO - (tmpChecksum % msCHECKSUM_MODULO)) % msCHECKSUM_MODULO;
+        checksum = (msCHECKSUM_MODULO - tmpChecksum % msCHECKSUM_MODULO) % msCHECKSUM_MODULO;
     }
 
     void Packet::insertEndMarker() {
@@ -199,12 +195,12 @@ namespace SmartHomeMediator::RfTypes {
         std::vector<uint8_t> buffer;
         uint8_t specialByte = 0;
 
-        if (value.size() == 0) {
+        if (value.empty()) {
             return buffer;
         }
 
         if (type == ParameterType::ASCII || type == ParameterType::RAW) {
-            buffer.reserve(value.size() + ((value.size() / 16) + 1));
+            buffer.reserve(value.size() + (value.size() / 16 + 1));
 
             for (size_t offset = 0; offset < value.size(); offset += 16) {
                 const size_t chunkSize = std::min<size_t>(16, value.size() - offset);
@@ -354,7 +350,7 @@ namespace SmartHomeMediator::RfTypes {
     std::vector<uint8_t> RfCommand::to_vector() const {
         std::vector<uint8_t> requestIdVector;
         if (requestId.has_value()) {
-            requestIdVector = Parameter(static_cast<uint64_t>(requestId.value())).to_vector();;
+            requestIdVector = Parameter(static_cast<uint64_t>(requestId.value())).to_vector();
         }
 
 
@@ -433,7 +429,7 @@ namespace SmartHomeMediator::RfTypes {
         };
 
         const auto iter = strToGetMap.find(boost::algorithm::to_lower_copy(std::string(value)));
-        return (iter != strToGetMap.end()) ? iter->second : GetType::UNDEFINED;
+        return iter != strToGetMap.end() ? iter->second : GetType::UNDEFINED;
     }
 
     SetType setTypeFromString(const std::string_view value) {
@@ -444,7 +440,7 @@ namespace SmartHomeMediator::RfTypes {
         };
 
         const auto iter = strToSetMap.find(boost::algorithm::to_lower_copy(std::string(value)));
-        return (iter != strToSetMap.end()) ? iter->second : SetType::UNDEFINED;
+        return iter != strToSetMap.end() ? iter->second : SetType::UNDEFINED;
     }
 
     NotificationType notificationTypeFromString(const std::string_view value) {
@@ -456,7 +452,7 @@ namespace SmartHomeMediator::RfTypes {
         };
 
         const auto iter = strToNotifMap.find(boost::algorithm::to_lower_copy(std::string(value)));
-        return (iter != strToNotifMap.end()) ? iter->second : NotificationType::UNDEFINED;
+        return iter != strToNotifMap.end() ? iter->second : NotificationType::UNDEFINED;
     }
 
     std::string_view notificationTypeToString(const NotificationType value) {

@@ -22,8 +22,8 @@ namespace SmartHomeMediator {
             throw;
         }
 
-        mRfMainChannel = config.defaultChannel;
-        mUniqueNetworkId = config.defaultMac;
+        mRfMainChannel = config.mainRfChannel;
+        mUniqueNetworkId = config.uniqueNetworkId;
 
         std::vector<std::string> hexBytes;
         hexBytes.reserve(mUniqueNetworkId.size());
@@ -224,9 +224,9 @@ namespace SmartHomeMediator {
 
             if (mCurrentSession) {
                 mCurrentSession->addReceivedPacket(packet);
-            } else if (packet.macAddress == mUniqueNetworkId) {
-                mpLogger->debug("[RF_CLIENT] Creating new session"); //TODO !pr test
-                // TODO !pr fix session form module notif
+            } else if (packet.macAddress == mUniqueNetworkId) {\
+                // TODO consider adding anti-spam protection (Cooldown on starting new session after ending few with NEG)
+                mpLogger->debug("[RF_CLIENT] Creating new session");
                 RfTypes::SessionMetadata meta;
                 meta.sessionType = RfTypes::SessionType::FROM_MODULE;
                 meta.rfChannel = getRfMainChannel();
@@ -245,7 +245,7 @@ namespace SmartHomeMediator {
                     }
                     mSessionQueue = std::move(tmpQueue);
                 }
-            };
+            }
 
             // Aggregate packet info for logging
             loggerAggregateTimer.cancel();

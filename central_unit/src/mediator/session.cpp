@@ -3,10 +3,7 @@
 #include "rf_driver/hc12_driver.h"
 #include "api/rf_api.h"
 
-#include <charconv>
 #include <cmath>
-#include <cstring>
-#include <stdexcept>
 #include <utility>
 
 
@@ -62,6 +59,7 @@ namespace SmartHomeMediator {
                 try {
                     resultJsonArray.push_back(response.to_json());
                 } catch (...) {
+                    // Ignore exception
                 }
             }
             return resultJsonArray;
@@ -95,7 +93,7 @@ namespace SmartHomeMediator {
         }
 
         // Run state machine
-        while (ctx.state != State::FINISHED && !isSessionCanceled) {
+        while (ctx.currentState != State::FINISHED && !isSessionCanceled) {
             co_await processState(ctx);
         }
 
@@ -138,7 +136,18 @@ namespace SmartHomeMediator {
 
         std::scoped_lock lock(mReceiveMutex);
         mReceivedBuffer.insert(mReceivedBuffer.end(), packet.payload.begin(), packet.payload.end());
-        if (packet.isLastPacket()) mIsReceivedBufferReady = true;
+        if (packet.isLastPacket()) mIsReceivedBufferReady.store(true, std::memory_order::release);
+    }
+
+    Session::ExecutionContext::ExecutionContext(const bool initFromModule, ba::steady_timer *timer)
+        : isInitializedFromModule(initFromModule), delayTimer(timer) {
+        previousState = State::NEXT_COMMAND;
+        currentState = isInitializedFromModule ? State::AWAIT_NOTIFICATION : State::NEXT_COMMAND;
+
+        changeState = [this](const State newState) {
+            previousState = currentState;
+            currentState = newState;
+        };
     }
 
     ba::awaitable<std::string> Session::handleMediatorConfigSession() const {
@@ -147,6 +156,8 @@ namespace SmartHomeMediator {
         for (const auto &pCommand: mMetadata.commands) {
             SmartHome::API::ApiResponse apiResponse;
             SmartHome::API::ApiError apiError;
+            apiError.code = SmartHome::API::ErrorCodes::MEDIATOR_RUNTIME_ERROR;
+            apiError.message = SmartHome::API::errorCodeToString(apiError.code);
 
             if (pCommand->requestId.has_value()) {
                 apiResponse.id = pCommand->requestId.value();
@@ -156,8 +167,6 @@ namespace SmartHomeMediator {
 
             if (pCommand->getType() != RfTypes::CommandType::CONFIG) {
                 mpLogger->error("[SESSION] [CONFIG_SESSION] Config session received command with invalid type");
-                apiError.code = SmartHome::API::ErrorCodes::MEDIATOR_RUNTIME_ERROR;
-                apiError.message = SmartHome::API::errorCodeToString(apiError.code);
                 apiError.data = "Config session received command with invalid type.";
 
                 apiResponse.error = apiError;
@@ -167,7 +176,11 @@ namespace SmartHomeMediator {
 
             auto pConfigCommand = dynamic_cast<RfTypes::MediatorConfigCommand *>(pCommand.get());
             if (!pConfigCommand) {
-                mpLogger->error("[SESSION] [CONFIG_SESSION] Failed command class cast ");
+                mpLogger->error("[SESSION] [CONFIG_SESSION] Failed command class cast");
+                apiError.data = "Config session failed cast to command class.";
+
+                apiResponse.error = apiError;
+                jsonResponse.push_back(apiResponse.to_json());
                 continue;
             }
 
@@ -176,29 +189,27 @@ namespace SmartHomeMediator {
 
             switch (pConfigCommand->configCommandType) {
                 case RfTypes::MediatorConfigCommandType::EXECUTE:
+                    // Execute action - return NOT IMPLEMENTED
                     //TODO implement mediator remote action execution (shutdown, restart...)
+
                     mpLogger->warning("[SESSION] [CONFIG_SESSION] Execute not implemented");
                     apiError.code = SmartHome::API::ErrorCodes::NOT_IMPLEMENTED;
                     apiError.message = SmartHome::API::errorCodeToString(apiError.code);
                     apiError.data = "Mediator execute not implemented";
-
-                    apiResponse.error = apiError;
                     break;
                 case RfTypes::MediatorConfigCommandType::GET:
+                    // Get all options
                     if (key == RfTypes::ALL_OPTIONS_STRING) {
                         try {
                             apiResponse.result = co_await mpRfDriver->getAllOptions();
                         } catch (const std::exception &e) {
                             mpLogger->errorf("[SESSION] [CONFIG_SESSION] Failed to get all options: %s", e.what());
-                            apiError.code = SmartHome::API::ErrorCodes::MEDIATOR_RUNTIME_ERROR;
-                            apiError.message = SmartHome::API::errorCodeToString(apiError.code);
                             apiError.data = e.what();
-
-                            apiResponse.error = apiError;
                         }
                         break;
                     }
 
+                    // Get singular option
                     try {
                         auto result = co_await mpRfDriver->getOption(key.data());
                         apiResponse.result = {result.begin(), result.end()};
@@ -206,14 +217,11 @@ namespace SmartHomeMediator {
                         mpLogger->errorf("[SESSION] [CONFIG_SESSION] Failed to get (%s) option: %s",
                                          key.data(),
                                          e.what());
-                        apiError.code = SmartHome::API::ErrorCodes::MEDIATOR_RUNTIME_ERROR;
-                        apiError.message = SmartHome::API::errorCodeToString(apiError.code);
                         apiError.data = e.what();
-
-                        apiResponse.error = apiError;
                     }
                     break;
                 case RfTypes::MediatorConfigCommandType::SET:
+                    // Set option
                     try {
                         co_await mpRfDriver->setOption(key.data(), value.data());
 
@@ -222,28 +230,26 @@ namespace SmartHomeMediator {
                         mpLogger->errorf("[SESSION] [CONFIG_SESSION] Failed to set (%s) option: %s",
                                          key.data(),
                                          e.what());
-                        apiError.code = SmartHome::API::ErrorCodes::MEDIATOR_RUNTIME_ERROR;
-                        apiError.message = SmartHome::API::errorCodeToString(apiError.code);
                         apiError.data = e.what();
-
-                        apiResponse.error = apiError;
                     }
                     break;
                 default:
+                    // Default return error
                     mpLogger->error("[SESSION] [CONFIG_SESSION] Invalid command type");
-                    apiError.code = SmartHome::API::ErrorCodes::MEDIATOR_RUNTIME_ERROR;
-                    apiError.message = SmartHome::API::errorCodeToString(apiError.code);
                     apiError.data = "Invalid config session command type";
 
                     apiResponse.error = apiError;
             }
+            // Error data was set, prepare error response
+            if (!apiError.data.empty()) apiResponse.error = apiError;
+
             jsonResponse.push_back(apiResponse.to_json());
         }
         co_return jsonResponse.empty() ? "" : to_string(jsonResponse);
     }
 
     ba::awaitable<void> Session::processState(ExecutionContext &ctx) {
-        switch (ctx.state) {
+        switch (ctx.currentState) {
             case State::SEND_MESSAGE:
                 ctx.lastSendMessage = ctx.pCurrentCommand->to_vector();
                 co_await send(ctx.lastSendMessage);
@@ -252,6 +258,7 @@ namespace SmartHomeMediator {
 
 
             case State::AWAIT_RESPONSE:
+                // Await response
                 ctx.receivedMessage = co_await receive();
                 if (ctx.receivedMessage.empty()) {
                     mpLogger->debug("[SESSION] [EXECUTE] [AWAIT_RESPONSE] empty message");
@@ -259,6 +266,7 @@ namespace SmartHomeMediator {
                     break;
                 }
 
+                // Try to parse response
                 try {
                     ctx.pCommandResponse = std::make_unique<RfTypes::RfCommand>(ctx.receivedMessage);
                 } catch (const std::exception &e) {
@@ -279,6 +287,7 @@ namespace SmartHomeMediator {
                     break;
                 }
 
+                // Check if response is in response/reping format
                 if (ctx.pCommandResponse->rfCommandType != RfTypes::RfCommandType::RESPONSE &&
                     ctx.pCommandResponse->rfCommandType != RfTypes::RfCommandType::REPING) {
                     mpLogger->debug("[SESSION] [EXECUTE] [AWAIT_RESPONSE] invalid response type");
@@ -286,6 +295,7 @@ namespace SmartHomeMediator {
                     break;
                 }
 
+                // Parse RF response to SmartHome::API format
                 try {
                     ctx.resultsVector.push_back(RfApi::toApiString(*ctx.pCommandResponse));
                 } catch (const std::exception &e) {
@@ -331,10 +341,12 @@ namespace SmartHomeMediator {
 
                     ctx.response.error = ctx.error;
 
-                    if (ctx.pCurrentCommand->requestId.has_value())
+                    // Emplace request id in error response if defined
+                    if (ctx.pCurrentCommand->requestId.has_value()) {
                         ctx.response.id = ctx.pCurrentCommand->requestId.value();
-                    else
+                    } else {
                         ctx.response.id = nullptr;
+                    }
 
                     ctx.resultsVector.push_back(ctx.response.to_string());
 
@@ -367,12 +379,14 @@ namespace SmartHomeMediator {
                 ctx.lowLevelCommand.rfCommandType = RfTypes::RfCommandType::NEGATIVE;
                 co_await send(ctx.lowLevelCommand.to_vector());
                 ctx.changeState(State::NEXT_COMMAND);
-                ctx.delayTimer->expires_after(msPOOLING_DELAY);
+                // Wait after sending NEG_COMMAND
+                ctx.delayTimer->expires_after(msPOOLING_DELAY * 2);
                 co_await ctx.delayTimer->async_wait(ba::use_awaitable);
                 break;
             }
 
             case State::AWAIT_NOTIFICATION:
+                // Await notif
                 ctx.receivedMessage = co_await receive();
                 if (ctx.receivedMessage.empty()) {
                     mpLogger->debug("[SESSION] [EXECUTE] [AWAIT_NOTIFICATION] empty message");
@@ -380,6 +394,7 @@ namespace SmartHomeMediator {
                     break;
                 }
 
+                // Try parsing response
                 try {
                     ctx.pCommandResponse = std::make_unique<RfTypes::RfCommand>(ctx.receivedMessage);
                 } catch (const std::exception &e) {
@@ -396,6 +411,7 @@ namespace SmartHomeMediator {
                     break;
                 }
 
+                // Try parsing to SmartHome::API format
                 try {
                     ctx.resultsVector.push_back(RfApi::toApiString(*ctx.pCommandResponse));
                 } catch (const std::exception &e) {
@@ -423,6 +439,7 @@ namespace SmartHomeMediator {
                     ctx.error.message = SmartHome::API::errorCodeToString(ctx.error.code);
 
                     auto &command = mMetadata.commands[ctx.commandsVectorIndex++];
+                    // Add error on invalid command type
                     if (command->getType() != RfTypes::CommandType::RF) {
                         ctx.error.data = "Invalid command type in RF session";
                         ctx.response.error = ctx.error;
@@ -503,7 +520,8 @@ namespace SmartHomeMediator {
         timeoutTimer.expires_after(msRECEIVE_MESSAGE_TIMEOUT);
         timeoutTimer.async_wait(timeoutCallback);
 
-        while (!mIsReceivedBufferReady) {
+        // Wait until buffer is ready or timeout happens
+        while (!mIsReceivedBufferReady.load(std::memory_order::relaxed)) {
             if (timeout) {
                 mpLogger->debug("[SESSION] [RECEIVE] receive loop timed out");
                 std::scoped_lock lock(mReceiveMutex);
@@ -513,7 +531,7 @@ namespace SmartHomeMediator {
                 }
                 tmp.pop_back();
                 mpLogger->debugf("[SESSION] [RECEIVE] Timed out message: [%s]", tmp.c_str());
-                mIsReceivedBufferReady = false;
+                mIsReceivedBufferReady.store(false, std::memory_order::release);
                 mReceivedBuffer.clear();
                 co_return std::vector<uint8_t>();
             }
@@ -522,17 +540,21 @@ namespace SmartHomeMediator {
         }
         timeoutTimer.cancel();
 
+        // Lock mutex for reading from buffer
         std::scoped_lock lock(mReceiveMutex);
         std::vector<uint8_t> result = mReceivedBuffer;
         mReceivedBuffer.clear();
-        mIsReceivedBufferReady = false;
-        std::string tmp;
+        mIsReceivedBufferReady.store(false, std::memory_order::release);
 
-        for (const auto &e: result) {
-            tmp += std::to_string(e) + ",";
+        // TODO remove before merging with main - left for debug
+        if (mpLogger->getLevel() == SmartHome::Utils::LogLevels::Level::DEBUG) {
+            std::string tmp;
+            for (const auto &e: result) {
+                tmp += std::to_string(e) + ",";
+            }
+            tmp.pop_back();
+            mpLogger->debugf("[SESSION] [RECEIVE] Received message: [%s]", tmp.c_str());
         }
-        tmp.pop_back();
-        mpLogger->debugf("[SESSION] [RECEIVE] Received message: [%s]", tmp.c_str());
         co_return result;
     }
 
@@ -542,6 +564,7 @@ namespace SmartHomeMediator {
             mpLogger->debug("[SESSION] [CHANGE_CHANNEL] isMultiChannel is set to false: skipping change channel");
             co_return true;
         }
+
         auto retryTimer = ba::steady_timer(co_await ba::this_coro::executor);
         bool isSuccessful = false;
         constexpr int retries = 3;
@@ -556,6 +579,7 @@ namespace SmartHomeMediator {
                                  e.what());
             }
             if (isSuccessful) co_return isSuccessful;
+            // Wait between retries
             retryTimer.expires_after(100ms);
             co_await retryTimer.async_wait(ba::use_awaitable);
         }

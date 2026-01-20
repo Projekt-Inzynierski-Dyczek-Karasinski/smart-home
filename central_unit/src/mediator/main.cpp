@@ -13,10 +13,10 @@ namespace bpo = boost::program_options;
 
 namespace SmartHomeMediator {
     std::optional<std::array<uint8_t, 6> > parseMacAddress(const std::string &macStr) {
-        std::array<uint8_t, 6> mac;
+        std::array<uint8_t, 6> mac = {};
 
         std::string strippedMacStr = macStr;
-        std::erase_if(strippedMacStr, ::isspace);
+        std::erase_if(strippedMacStr, isspace);
 
         if (strippedMacStr.length() != 17) {
             return std::nullopt;
@@ -101,8 +101,8 @@ namespace SmartHomeMediator {
 
     void loadYamlConfigs(su::ConfigManager &configManager, Mediator::Config &mediatorConfig) {
         std::string root = "mediator.rf_client";
-        configManager.getValue(root + ".default_mac_address", mediatorConfig.rfClient.defaultMac);
-        configManager.getValue(root + ".default_rf_channel", mediatorConfig.rfClient.defaultChannel);
+        configManager.getValue(root + ".default_mac_address", mediatorConfig.rfClient.uniqueNetworkId);
+        configManager.getValue(root + ".default_rf_channel", mediatorConfig.rfClient.mainRfChannel);
 
         root = "mediator.rf_client.rf_driver";
         configManager.getValue(root + ".uart_port_path", mediatorConfig.rfClient.rfDriverConfig.uartPortPath);
@@ -172,10 +172,10 @@ namespace SmartHomeMediator {
         // Load YAML config
         auto configManager = su::ConfigManager(logger);
         su::Logger::Config loggerConfig;
-        loggerConfig.logFile.path = s_DEFAULT_LOGFILE_PATH;
+        loggerConfig.logFile.path = sDEFAULT_LOGFILE_PATH;
         const std::string configPath = vm.contains("config")
                                            ? vm["config"].as<std::string>()
-                                           : s_DEFAULT_CONFIG_PATH.data();
+                                           : sDEFAULT_CONFIG_PATH.data();
         if (configManager.loadConfig(configPath)) {
             logger->debug("[MAIN] Loading YAML logger config");
             loadLoggerYamlConfig(configManager, loggerConfig);
@@ -234,23 +234,23 @@ int main(int argc, char *argv[]) {
 
     // Define instances
     auto &mediator = Mediator::Instance();
-    auto logger = std::make_shared<su::Logger>();
+    auto pLogger = std::make_shared<su::Logger>();
 
     // Define config struct with default values
     Mediator::Config mediatorConfig;
     const auto defaultMac = getDefaultMacAddress();
-    if (defaultMac.has_value()) mediatorConfig.rfClient.defaultMac = defaultMac.value();
+    if (defaultMac.has_value()) mediatorConfig.rfClient.uniqueNetworkId = defaultMac.value();
 
 
-    loadConfigs(vm, parsed, logger, mediatorConfig);
+    loadConfigs(vm, parsed, pLogger, mediatorConfig);
 
-    if (!mediator.initialize(mediatorConfig, logger)) {
-        logger->critical("[MAIN] Failed to initialize");
+    if (!mediator.initialize(mediatorConfig, pLogger)) {
+        pLogger->critical("[MAIN] Failed to initialize");
         return EXIT_FAILURE;
     }
 
     mediator.run();
 
-    logger->info("[MAIN] Exit");
+    pLogger->info("[MAIN] Exit");
     return EXIT_SUCCESS;
 }

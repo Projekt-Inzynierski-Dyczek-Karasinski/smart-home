@@ -2,22 +2,7 @@
 
 
 namespace SmartHomeMediator {
-    /*
-     * Start service
-     * Connect to smarthomed
-     * identify connection (implement id handshake in smarthomed)
-     * start rf device (depending on smarthomed config)
-     * start async read functions on IPC and RF with callbacks
-     *  - on IPC message check type (internal/external) handle/execute internal, send external via RF
-     *  - on RF message: decode, check sum, prepare API notification -> send to core (core decides on rf response)
-     *
-     *
-     *  additional classes:
-     *      RfTransceiver (virtual for rf read/write, device lifetime handling, device config)
-     *          - HC12 final
-     *      API client (for smarthomed connection)
-     *      RF connection (with addressing)
-     */
+
     Mediator &Mediator::Instance() {
         static Mediator instance;
         return instance;
@@ -30,11 +15,10 @@ namespace SmartHomeMediator {
         }
 
         // Initialize AsyncLogger, using Logger for further initialization
-        // mpLogger = std::make_shared<su::AsyncLogger>(logger, mMediatorUtilityIoContext);
-        mpLogger = logger;
+        mpLogger = std::make_shared<su::AsyncLogger>(logger, mMediatorUtilityIoContext);
 
         // Start service
-        mpService = su::ServiceManager::create(logger, ms_ServiceName, su::ServiceType::AUTO);
+        mpService = su::ServiceManager::create(logger, msSERVICE_NAME, su::ServiceType::AUTO);
         mpService->setIoContext(mMediatorIoContext);
         if (!mpService->onInitialize()) {
             logger->error("[MEDIATOR] Failed to initialize service");
@@ -133,7 +117,7 @@ namespace SmartHomeMediator {
 
         // Start signal handling
         mSignals.emplace(mMediatorUtilityIoContext);
-        for (const auto &sig: ms_SIGNALS_TO_HANDLE) {
+        for (const auto &sig: msSIGNALS_TO_HANDLE) {
             mSignals->add(sig);
         }
 
@@ -178,6 +162,8 @@ namespace SmartHomeMediator {
             mApiClientThread.reset();
         }
 
+        mpLogger->debug("[MEDIATOR] Threads joined, joining utils thread");
+
         if (mMediatorUtilityIoContext.stopped()) {
             mMediatorUtilityIoContext.stop();
         }
@@ -187,8 +173,6 @@ namespace SmartHomeMediator {
             mMediatorUtilityThread->join();
             mMediatorUtilityThread.reset();
         }
-
-        mpLogger->info("[MEDIATOR] Mediator finished running");
     }
 
     void Mediator::shutdown() {
@@ -216,7 +200,7 @@ namespace SmartHomeMediator {
         }
 
         // Start shutdown timeout timer
-        const auto timeoutTimer = std::make_shared<ba::steady_timer>(mMediatorUtilityIoContext, ms_SHUTDOWN_TIMEOUT);
+        const auto timeoutTimer = std::make_shared<ba::steady_timer>(mMediatorUtilityIoContext, msSHUTDOWN_TIMEOUT);
         timeoutTimer->async_wait([this](const bs::error_code& ec) {
             if (!ec) {
                 mpLogger->warning("[MEDIATOR] Shutdown timeout - force stopping IO contexts");
