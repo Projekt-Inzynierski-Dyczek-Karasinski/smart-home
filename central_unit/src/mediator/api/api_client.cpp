@@ -5,9 +5,7 @@ namespace bal = boost::asio::local;
 namespace SmartHomeMediator {
     using namespace std::chrono_literals;
 
-    ApiClient::ApiClient(ba::io_context *io_context, const std::shared_ptr<su::Logger> &logger)
-        : mpIoContext(io_context), mpLogger(logger) {
-    }
+    namespace sj = SmartHome::JsonRpcStrings;
 
     ApiClient::~ApiClient() {
         if (mConnection) {
@@ -53,17 +51,18 @@ namespace SmartHomeMediator {
     }
 
     bool ApiClient::handshake() {
+        // Build handshake request
         SmartHome::API::ApiRequest request;
-        request.method = "set";
         nlohmann::json jsonParams;
-        jsonParams["target"] = "core";
-        jsonParams["method_params"] = {"connection_type", "module_mediator"};
+        request.method = msSET_METHOD_STRING;
+        jsonParams[sj::ParamsKeys::TARGET] = msCORE_TARGET_STRING;
+        jsonParams[sj::ParamsKeys::METHOD_PARAMS] = {msCONNECTION_TYPE_STRING, msMEDIATOR_TARGET_STRING};
         request.params.emplace(jsonParams);
         request.id = 1;
 
-        std::string response;
-
         ba::steady_timer timer(*mpIoContext, 3s);
+
+        // Start timeout timer
         timer.async_wait([this](const bs::error_code &ec){
             if (!ec) {
                 mpLogger->error("[API_CLIENT] Handshake timeout");
@@ -71,6 +70,8 @@ namespace SmartHomeMediator {
             }
         });
 
+        // Send handshake and await response
+        std::string response;
         try {
             mConnection->write(request.to_string());
             response = mConnection->read();
@@ -98,7 +99,7 @@ namespace SmartHomeMediator {
             return false;
         }
 
-        if (apiResponse.result.has_value() && apiResponse.result.value() == jsonParams["method_params"].dump()) {
+        if (apiResponse.result.has_value() && apiResponse.result.value() == jsonParams[sj::ParamsKeys::METHOD_PARAMS].dump()) {
             return true;
         }
 
