@@ -113,3 +113,47 @@ namespace SmartHomeCLI {
  */
 namespace SmartHomeGUI {
 }
+
+/**
+ * @namespace SmartHomeMediator
+ * @brief RF communication module for managing wireless smart home devices.
+ *
+ * @details Implements RF (Radio Frequency) communication layer for Smart Home modules:
+ * - RF driver management (HC-12 transceiver support)
+ * - UART serial port communication with async operations
+ * - Session management for RF command/response handling
+ * - Protocol translation between Internal API and RF protocol
+ * - Configuration mode support for RF module setup
+ * - Asynchronous read/write operations with timeout handling
+ *
+ * Architecture:
+ * - Acts as a bridge between Core (via IPC) and RF modules (via UART)
+ * - Maintains active sessions for request-response correlation
+ * - Supports both synchronous config commands and async module communication
+ *
+ * @note This is a separate program that communicates with Core via TCP/UDS.
+ */
+namespace SmartHomeMediator {
+}
+
+/**
+ * @namespace SmartHomeMediator::RfTypes
+ * @brief RF protocol data structures and type definitions.
+ *
+ * @details Defines RF communication protocol types and structures:
+ * - Command types: GET, SET, EXECUTE, NOTIFY, PING, SLEEP, DEEP_SLEEP
+ * - MediatorConfigCommand - configuration commands for RF module itself
+ * - RfCommand - commands forwarded to wireless modules
+ * - Parameter serialization/deserialization for RF protocol
+ * - Request type enums (GetType, SetType, NotificationType, etc.)
+ * - Protocol constants and string mappings
+ *
+ * Key concepts:
+ * - Config commands control the mediator (baudrate, channel, power)
+ * - RF commands are forwarded to wireless modules via RF
+ * - Requests have IDs for correlation, notifications do not
+ *
+ * @note Protocol is optimized for low-bandwidth RF communication.
+ */
+namespace SmartHomeMediator::RfTypes {
+}
