@@ -13,20 +13,22 @@ namespace SmartHomeMediator {
           mIoContext(ioContext),
           mOriginalBaudRate(config.uartBaudrate),
           mLastWriteTime(std::chrono::steady_clock::now()) {
+        // Try initializing
         try {
+            constexpr bool setPinToOutput = true;
+            constexpr bool initialPinStateHigh = true;
+
             mpUart = std::make_unique<UartPort>(mIoContext, config.uartPortPath, config.uartBaudrate);
 
-            constexpr bool initialPinStateHigh = true;
-            constexpr bool setPinToOutput = true;
             mpSetPin = std::make_unique<GpioHandler>(config.setPin,
                                                      initialPinStateHigh,
                                                      setPinToOutput,
                                                      config.chipPath);
-
             mpUart->startReadLoop();
 
             mpLogger->infof("[HC12_DRIVER] Driver initialized on %s at %u baud",
-                            config.uartPortPath.c_str(), config.uartBaudrate);
+                            config.uartPortPath.c_str(),
+                            config.uartBaudrate);
         } catch (const std::exception &e) {
             mpLogger->errorf("[HC12_DRIVER] Failed to initialize: %s", e.what());
             throw;
@@ -35,7 +37,7 @@ namespace SmartHomeMediator {
 
     HC12Driver::~HC12Driver() {
         try {
-            if (mIsInConfigMode) {
+            if (mIsInConfigMode.load(std::memory_order::acquire)) {
                 mpSetPin->setHigh();
             }
         } catch (...) {
@@ -45,7 +47,7 @@ namespace SmartHomeMediator {
     }
 
     ba::awaitable<void> HC12Driver::write(const std::vector<uint8_t> data) {
-        // TODO !pr remove?
+        // TODO left for debug, remove before merging with main
         if (mpLogger->getLevel() == SmartHome::Utils::LogLevels::Level::DEBUG) {
             std::string tmp;
             for (const auto e: data) {
@@ -55,7 +57,7 @@ namespace SmartHomeMediator {
             mpLogger->debugf("[HC12_DRIVER] Write data: [%s]", tmp.data());
         }
 
-        // Calculate required delay based on FU mode
+        // Calculate required delay
         const auto now = std::chrono::steady_clock::now();
         const auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - mLastWriteTime);
         const auto required = getRequiredWriteDelay();
@@ -67,7 +69,6 @@ namespace SmartHomeMediator {
             co_await timer.async_wait(ba::use_awaitable);
         }
 
-        // Write
         co_await mpUart->writeAsync(data);
         mLastWriteTime = std::chrono::steady_clock::now();
     }
@@ -94,12 +95,12 @@ namespace SmartHomeMediator {
                 sprintf(buffer, "setOption received invalid value: expected numeric: %s", e.what());
                 throw std::invalid_argument(buffer);
             }
-        }
-        else {
+        } else {
             // Clear cache on reset to default
             mOptionsCache.clear();
         }
 
+        // Validate option value
         switch (parsedOption) {
             case Hc12Option::BAUDRATE:
                 if (!msVALID_BAUDRATE.contains(valueNum))
@@ -139,27 +140,30 @@ namespace SmartHomeMediator {
             auto command = buildSetCommand(parsedOption, value);
             auto response = co_await sendAtCommand(command, msCONFIG_TIMEOUT);
 
+            // Special case for setting and validating baud rate
             if (parsedOption == Hc12Option::BAUDRATE) {
-                // Exit and reenter config mode before confirming baud rate change
+                // Exit and reenter config mode before validating baud rate change
                 try {
                     co_await exitConfigMode();
-                }catch (const std::exception &e) {
+                } catch (const std::exception &e) {
                     throw;
                 }
 
+                // Change baudrate to send end receive in new baud rate
                 mpUart->setBaudRate(valueNum);
-                command = buildGetCommand(parsedOption);
 
-                // Delay for baud rate change
+                // Delay for baud rate change, and config mode reenter
                 ba::steady_timer timer(co_await ba::this_coro::executor, 250ms);
                 co_await timer.async_wait(ba::use_awaitable);
 
                 try {
                     co_await enterConfigMode();
-                }catch (const std::exception &e) {
+                } catch (const std::exception &e) {
                     throw;
                 }
 
+                // Validate baud rate
+                command = buildGetCommand(parsedOption);
                 response = co_await sendAtCommand(command, msCONFIG_TIMEOUT);
 
                 currentBaudRate = mpUart->getBaudRate();
@@ -168,11 +172,13 @@ namespace SmartHomeMediator {
 
             const auto responseValue = parseResponse(response);
 
+            // Extract values
             const std::string responseValueStr = {responseValue.begin(), responseValue.end()};
             const std::string responseStr = {response.begin(), response.end()};
 
-            if (value == responseValueStr || parsedOption == Hc12Option::DEFAULT && responseStr ==
-                RfTypes::DEFAULT_STRING) {
+            // Validate response, with spacial case for resetting to default
+            if (value == responseValueStr ||
+                (parsedOption == Hc12Option::DEFAULT && responseStr == RfTypes::DEFAULT_STRING)) {
                 success = true;
                 mpLogger->debugf("[HC12_DRIVER] [SET_OPTION] option set: %s=%s",
                                  option.data(), responseValueStr.c_str());
@@ -238,7 +244,7 @@ namespace SmartHomeMediator {
             const auto response = co_await sendAtCommand(command, msCONFIG_TIMEOUT);
             value = parseResponse(response);
 
-            std::string valueStr = {value.begin(), value.end()};
+            const std::string valueStr = {value.begin(), value.end()};
 
             if (!value.empty()) {
                 mpLogger->debugf("[HC12_DRIVER] [GET_OPTION] cached: %s=%s",
@@ -289,28 +295,45 @@ namespace SmartHomeMediator {
         co_return formatted;
     }
 
+    std::chrono::milliseconds HC12Driver::getRequiredWriteDelay() {
+        // Check FU mode from cache
+        const auto iter = mOptionsCache.find("fu_mode");
+        if (iter != mOptionsCache.end()) {
+            const std::string &mode = iter->second;
+            if (mode == "2" || mode == "4") {
+                return msHIGH_WRITE_DELAY;
+            }
+        }
+
+        return msLOW_WRITE_DELAY;
+    }
+
+    bool HC12Driver::isMultiChannel() {
+        return msIsMultiChannel;
+    }
+
     ba::awaitable<void> HC12Driver::enterConfigMode() {
-        if (mIsInConfigMode) {
+        if (mIsInConfigMode.load(std::memory_order::acquire)) {
             co_return;
         }
 
-        // Set pin LOW to enter config mode
+        // Set pin LOW to enter config mode, runtime_error on failure.
         mpSetPin->setLow();
 
         // Wait 40ms as per HC-12 specification
         ba::steady_timer timer(co_await ba::this_coro::executor, 40ms);
         co_await timer.async_wait(ba::use_awaitable);
 
-        mIsInConfigMode = true;
+        mIsInConfigMode.store(true, std::memory_order::release);
         mpLogger->debugf("[HC12_DRIVER] Entered config mode");
     }
 
     ba::awaitable<void> HC12Driver::exitConfigMode() {
-        if (!mIsInConfigMode) {
+        if (!mIsInConfigMode.load(std::memory_order::acquire)) {
             co_return;
         }
 
-        // Set pin HIGH to exit config mode
+        // Set pin HIGH to exit config mode, runtime_error on failure.
         mpSetPin->setHigh();
 
         // Wait 80ms as per HC-12 specification, with additional margin
@@ -318,7 +341,7 @@ namespace SmartHomeMediator {
         co_await timer.async_wait(ba::use_awaitable);
 
 
-        mIsInConfigMode = false;
+        mIsInConfigMode.store(false, std::memory_order::release);
         mpLogger->debugf("[HC12_DRIVER] Exited config mode");
     }
 
@@ -436,8 +459,9 @@ namespace SmartHomeMediator {
                 }
 
                 const std::string dbmStr(responseStr.substr(dbmPos, dbmEnd - dbmPos));
+                const std::string powerLevel = dbmToPowerLevel(dbmStr);
 
-                return dbmToPowerLevel(dbmStr);
+                return {powerLevel.begin(), powerLevel.end()};
             }
             return {};
         }
@@ -475,48 +499,14 @@ namespace SmartHomeMediator {
         return {valuePart.begin(), valuePart.end()};
     }
 
-    std::chrono::milliseconds HC12Driver::getRequiredWriteDelay() {
-        // Check FU mode from cache
-        const auto iter = mOptionsCache.find("fu_mode");
-        if (iter != mOptionsCache.end()) {
-            const std::string &mode = iter->second;
-            if (mode == "2" || mode == "4") {
-                return msHIGH_WRITE_DELAY;
-            }
-        }
-
-        return msLOW_WRITE_DELAY;
-    }
-
-    bool HC12Driver::isMultiChannel() {
-        return msIsMultiChannel;
-    }
-
-    //TODO !pr remove?
-    std::string_view HC12Driver::powerLevelToDbm(const std::string_view level) {
-        int parsedLevel = -1;
-
-        try {
-            parsedLevel = std::stoi(level.data());
-        } catch (...) {
-        }
-
-        if (parsedLevel >= 0 && parsedLevel < msDBM_ARRAY.size()) {
-            return msDBM_ARRAY[parsedLevel];
-        }
-        return msDBM_ARRAY[msDBM_ARRAY.size() - 1];
-    }
-
-    std::vector<uint8_t> HC12Driver::dbmToPowerLevel(const std::string_view dbm) {
+    std::string HC12Driver::dbmToPowerLevel(const std::string_view dbm) {
         const auto iter = std::ranges::find(msDBM_ARRAY, dbm);
         if (iter != msDBM_ARRAY.end()) {
             const size_t index = std::distance(msDBM_ARRAY.begin(), iter);
 
-            const std::string powerLevel = std::to_string(index + 1);
-
-            return {powerLevel.begin(), powerLevel.end()};
+            return std::to_string(index + 1);
         }
-        return {};
+        return "";
     }
 
     bool HC12Driver::isChannelValid(const int channel) {

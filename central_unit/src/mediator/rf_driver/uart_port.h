@@ -50,7 +50,7 @@ namespace SmartHomeMediator {
         /**
          * @brief Read until delimiter with timeout (for pseudo synchronous read).
          *
-         * @details Stops read loop, clears buffer, reads until CRLF.
+         * @details Stops read loop, clears buffer, reads until \c msDELIMITER.
          *          Uses timer for timeout. Restarts read loop after completion.
          *
          * @param timeoutDuration Max wait time for response.
@@ -64,7 +64,11 @@ namespace SmartHomeMediator {
         /**
          * @brief Read with grouping timeout.
          *
-         * @details Monitors buffer filled by readLoop. When no new data arrives for \c ms_READ_ASYNC_WAIT_TIMEOUT ms,
+         * @details Monitors buffer filled by readLoop. When no new data arrives for
+         *          \code
+         *              (msBITS_PER_BYTE / [baud rate] * msNANOSECONDS_PER_SECOND)ns
+         *              * msTIME_PER_BYTE_MULTIPLIER + msREAD_ASYNC_WAIT_MIN_TIMEOUT
+         *          \endcode
          *          returns all accumulated data.
          *
          * @return Accumulated data from buffer.
@@ -103,15 +107,15 @@ namespace SmartHomeMediator {
          */
         void readLoopCallback(const bs::error_code &ec, size_t bytesTransferred);
 
-        static constexpr std::string_view ms_DELIMITER = "\r\n";
+        static constexpr std::string_view msDELIMITER = "\r\n";
 
-        static constexpr size_t ms_BUFFER_CAPACITY = 1024;
-        static constexpr size_t ms_READ_CHUNK_SIZE = 512;
+        static constexpr size_t msBUFFER_CAPACITY = 1024;
+        static constexpr size_t msREAD_CHUNK_SIZE = 512;
 
-        static constexpr auto ms_NANOSECONDS_PER_SECOND = 1'000'000'000;
-        static constexpr auto ms_READ_ASYNC_WAIT_MIN_TIMEOUT = 5ms; // TODO test with lower values
-        static constexpr auto ms_TIME_PER_BYTE_MULTIPLIER = 10; // TODO test with lower values
-        static constexpr auto ms_BITS_PER_BYTE = 10; // 8N1
+        static constexpr auto msNANOSECONDS_PER_SECOND = 1'000'000'000;
+        static constexpr auto msREAD_ASYNC_WAIT_MIN_TIMEOUT = 5ms; // TODO test with lower values
+        static constexpr auto msTIME_PER_BYTE_MULTIPLIER = 10; // TODO test with lower values
+        static constexpr auto msBITS_PER_BYTE = 10; // 8N1
 
         ba::serial_port mPort;
         ba::io_context &mIoContext;
@@ -120,9 +124,9 @@ namespace SmartHomeMediator {
         ba::streambuf mBuffer;
 
         /// Flag to pause readLoop during sync operations
-        bool mIsSyncModeActive = false;
+        std::atomic_bool mIsSyncModeActive = false;
 
         /// For shutdown handling
-        bool mIsShuttingDown = false;
+        std::atomic_bool mIsShuttingDown = false;
     };
 }

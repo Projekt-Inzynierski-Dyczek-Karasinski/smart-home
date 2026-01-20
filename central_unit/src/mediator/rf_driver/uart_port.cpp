@@ -4,7 +4,7 @@ namespace SmartHomeMediator {
     UartPort::UartPort(ba::io_context &ioContext, const std::string_view portName, const uint baudRate)
         : mPort(ioContext, portName.data()),
           mIoContext(ioContext),
-          mBuffer(ms_BUFFER_CAPACITY) {
+          mBuffer(msBUFFER_CAPACITY) {
         // Configure UART with 8N1 format
         mPort.set_option(ba::serial_port::baud_rate(baudRate));
         mPort.set_option(ba::serial_port::character_size(8));
@@ -13,6 +13,7 @@ namespace SmartHomeMediator {
         mPort.set_option(ba::serial_port::flow_control(ba::serial_port::flow_control::none));
 
 #ifdef __linux__
+        // Make sure port is flushed
         const auto fd = mPort.native_handle();
         if (fd >= 0) {
             ::tcflush(fd, TCIOFLUSH);
@@ -21,7 +22,9 @@ namespace SmartHomeMediator {
     }
 
     UartPort::~UartPort() {
-        mIsShuttingDown = true;
+        bool expected = false;
+        constexpr bool desired = true;
+        if (!mIsShuttingDown.compare_exchange_strong(expected,desired, std::memory_order::acq_rel)) return;
         cancel();
         mPort.close();
     }
@@ -35,9 +38,9 @@ namespace SmartHomeMediator {
     }
 
     ba::awaitable<std::vector<uint8_t> > UartPort::readUntil(const std::chrono::milliseconds timeoutDuration) {
-        mIsSyncModeActive = true; // Stop read loop
-
-        cancel(); // Interrupt readLoop
+        // Interrupt readLoop
+        mIsSyncModeActive.exchange(true, std::memory_order::acq_rel);
+        cancel();
 
         // Clear buffer
         mBuffer.consume(mBuffer.size());
@@ -57,14 +60,14 @@ namespace SmartHomeMediator {
             size_t bytesTransferred = co_await ba::async_read_until(
                 mPort,
                 mBuffer,
-                ms_DELIMITER.data(),
+                msDELIMITER.data(),
                 ba::use_awaitable
             );
 
             timer.cancel();
 
             //  Restart read loop
-            mIsSyncModeActive = false;
+            mIsSyncModeActive.exchange(false, std::memory_order::acq_rel);
             ba::post(mIoContext, [this] {
                 if (!mIsShuttingDown) {
                     startReadLoop();
@@ -74,10 +77,10 @@ namespace SmartHomeMediator {
             const auto buffer = mBuffer.data();
 
             // Copy data without delimiter
-            if (bytesTransferred >= ms_DELIMITER.size()) {
+            if (bytesTransferred >= msDELIMITER.size()) {
                 result.assign(
                     ba::buffers_begin(buffer),
-                    ba::buffers_begin(buffer) + (bytesTransferred - ms_DELIMITER.size())
+                    ba::buffers_begin(buffer) + (bytesTransferred - msDELIMITER.size())
                 );
             }
 
@@ -89,7 +92,7 @@ namespace SmartHomeMediator {
             timer.cancel();
 
             // Restart read loop
-            mIsSyncModeActive = false;
+            mIsSyncModeActive.exchange(false, std::memory_order::acq_rel);
             ba::post(mIoContext, [this] {
                 if (!mIsShuttingDown) {
                     startReadLoop();
@@ -101,7 +104,6 @@ namespace SmartHomeMediator {
                 co_return result;
             }
 
-            // Other errors propagate up
             throw;
         }
     }
@@ -114,9 +116,9 @@ namespace SmartHomeMediator {
 
             // Set timer for inactivity timeout
             auto timePerByte = static_cast<uint64_t>(
-                static_cast<double>(ms_BITS_PER_BYTE) / getBaudRate() * ms_NANOSECONDS_PER_SECOND);
+                static_cast<double>(msBITS_PER_BYTE) / getBaudRate() * msNANOSECONDS_PER_SECOND);
             auto timePerByteNs = std::chrono::nanoseconds(timePerByte);
-            timer.expires_after(timePerByteNs * ms_TIME_PER_BYTE_MULTIPLIER + ms_READ_ASYNC_WAIT_MIN_TIMEOUT);
+            timer.expires_after(timePerByteNs * msTIME_PER_BYTE_MULTIPLIER + msREAD_ASYNC_WAIT_MIN_TIMEOUT);
             // Wait for timeout
             try {
                 co_await timer.async_wait(ba::use_awaitable);
@@ -150,12 +152,12 @@ namespace SmartHomeMediator {
     }
 
     void UartPort::startReadLoop() {
-        if (mIsShuttingDown || mIsSyncModeActive) {
+        if (mIsShuttingDown.load(std::memory_order::acquire) || mIsSyncModeActive.load(std::memory_order::acquire)) {
             return;
         }
 
         mPort.async_read_some(
-            mBuffer.prepare(ms_READ_CHUNK_SIZE),
+            mBuffer.prepare(msREAD_CHUNK_SIZE),
             [this](const bs::error_code &ec, const size_t bytesTransferred) {
                 readLoopCallback(ec, bytesTransferred);
             }
@@ -167,7 +169,7 @@ namespace SmartHomeMediator {
 
         mPort.set_option(ba::serial_port::baud_rate(baudRate));
 
-        if (!mIsSyncModeActive && !mIsShuttingDown) {
+        if (!mIsSyncModeActive.load(std::memory_order::acquire) && !mIsShuttingDown.load(std::memory_order::acquire)) {
             ba::post(mIoContext, [this] {
                 startReadLoop();
             });
@@ -192,7 +194,7 @@ namespace SmartHomeMediator {
         mBuffer.commit(bytesTransferred);
 
         // Chain next read
-        if (!mIsSyncModeActive && !mIsShuttingDown) {
+        if (!mIsSyncModeActive.load(std::memory_order::acquire) && !mIsShuttingDown.load(std::memory_order::acquire)) {
             startReadLoop();
         }
     }

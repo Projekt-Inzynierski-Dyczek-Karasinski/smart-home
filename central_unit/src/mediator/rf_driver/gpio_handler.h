@@ -28,17 +28,24 @@ namespace SmartHomeMediator {
 
         /**
          * @brief Set pin HIGH.
+         *
+         * @throws std::runtime_error on failure.
          */
         void setHigh() const;
 
         /**
          * @brief Set pin LOW.
+         *
+         * @throws std::runtime_error on failure.
          */
         void setLow() const;
 
         /**
          * @brief Read current pin value.
+         *
          * @return 1 if HIGH, 0 if LOW
+         *
+         * @throws std::runtime_error on failure.
          */
         int read() const;
 
