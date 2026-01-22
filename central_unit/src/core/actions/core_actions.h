@@ -10,12 +10,21 @@
 namespace ba = boost::asio;
 
 namespace SmartHome {
-    namespace API {
-        struct ApiResponse;
-    }
 
+    /**
+     * @brief Core system command handlers.
+     *
+     * @details Implements handlers for commands targeted at the Core system:
+     *          - Echo: Simple echo response for connectivity testing
+     *          - Get: Retrieves stored system data
+     *          - Set: Configures core parameters (e.g., connection types)
+     *          - Notify: Handles notification messages
+     *
+     * @details Manages connection type registration and cleanup of stale connections.
+     */
     class CoreActions {
         using cmdMetaPtr = std::shared_ptr<Actions::CommandMetadata>;
+
 
     public:
         enum class SetKeys {
@@ -33,7 +42,7 @@ namespace SmartHome {
          *
          * @return API response with echoed parameters.
          */
-        static ba::awaitable<std::optional<API::ApiResponse>> coreEchoHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse coreEchoHandler(const cmdMetaPtr &commandMetadata);
 
         /**
          * @brief Handle GET command for core data retrieval.
@@ -48,7 +57,7 @@ namespace SmartHome {
          * @note Expected params format: [query_target<string>, (optional)conditions<object>]
          * @warning Currently uses temporary hardcoded data - TODO implement core cached data object.
          */
-        static ba::awaitable<std::optional<API::ApiResponse>> coreGetHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse coreGetHandler(const cmdMetaPtr &commandMetadata);
 
         /**
          * @brief Handle SET command for core configuration.
@@ -62,7 +71,7 @@ namespace SmartHome {
          *
          * @note Expected params format: [key<string>, value<string>]
          */
-        static ba::awaitable<std::optional<API::ApiResponse>> coreSetHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse coreSetHandler(const cmdMetaPtr &commandMetadata);
 
         /**
          * @brief Handle NOTIFY command for core notifications.
@@ -75,7 +84,7 @@ namespace SmartHome {
          *
          * @warning Not yet implemented - TODO implement notify logic.
          */
-        static ba::awaitable<std::optional<API::ApiResponse>> coreNotifyHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse coreNotifyHandler(const cmdMetaPtr &commandMetadata);
 
         /**
          * @brief Convert SetKeys enum to string representation.

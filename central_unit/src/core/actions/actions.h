@@ -15,10 +15,23 @@ namespace SmartHome {
     using namespace std::chrono_literals;
 
     /**
-     * @brief Actions handler for processing internal API commands.
+     * @brief Return type for handlers.
+     */
+    using awaitOptApiResponse = ba::awaitable<std::optional<API::ApiResponse> >;
+
+
+    /**
+     * @brief Central request/response routing and command execution system.
      *
-     * @details Manages command registry, request lifecycle, and asynchronous
-     *          execution of API commands with timeout handling.
+     * @details Manages the complete lifecycle of API requests and responses including:
+     *          - Incoming request handling and command execution
+     *          - Outgoing request aggregation and timeout management
+     *          - Command handler registry and resolution
+     *          - Request/response state tracking
+     *          - Connection type mapping
+     *
+     * @note All operations are thread-safe with appropriate mutex protection.
+     *       Commands are executed asynchronously using boost::asio coroutines.
      */
     class Actions {
         friend class CoreActions;
@@ -112,13 +125,42 @@ namespace SmartHome {
          */
         static void handleOutgoingResponse(apiId_t responseId);
 
-
+        /**
+         * @brief Handles incoming response for outgoing request.
+         *
+         * @details Verifies if there is an awaiting request with matching connection ID and response ID.
+         *          If a valid pending request exists, its response promise is fulfilled via set_value().
+         *
+         * @param connectionId Connection from which the response was received.
+         * @param response Received response.
+         *
+         * @note Ignores responses without ID or without matching pending request.
+         */
         static void handleIncomingResponse(connectionId_t connectionId, const API::ApiResponse &response);
 
+        /**
+         * @brief Send aggregated request.
+         *
+         * @details Aggregates requests by connection ID and sends them in batches.
+         *          If no new messages are added within \c msAGGREGATE_OUTGOING_TIMEOUT sends the batch.
+         *
+         * @param connectionId Connection to which request will be sent.
+         * @param apiRequest Request to send.
+         * @param pResponsePromise Shared pointer to response promise.
+         */
         static void handleOutgoingRequest(connectionId_t connectionId, API::ApiRequest &&apiRequest,
                                           const std::shared_ptr<std::promise<API::ApiResponse> > &pResponsePromise);
 
 
+        /**
+         * @brief Retrieves active request by ID.
+         *
+         * @param requestId ID of the request to retrieve.
+         *
+         * @return Request if found, std::nullopt otherwise.
+         *
+         * @note Thread-safe access to active requests map.
+         */
         static std::optional<API::InternalApi::Request> getRequest(apiId_t requestId);
 
         /**
@@ -225,7 +267,7 @@ namespace SmartHome {
          *
          * @details Handlers receive command metadata and return API response asynchronously.
          */
-        using CommandHandler = std::function<ba::awaitable<std::optional<API::ApiResponse> >(const cmdMetaPtr &)>;
+        using CommandHandler = std::function<awaitOptApiResponse(const cmdMetaPtr &)>;
 
         /**
          * @brief Lookup command handler from registry.
@@ -332,9 +374,11 @@ namespace SmartHome {
         static std::unordered_map<sai::TargetTypes, std::unordered_set<connectionId_t> > msConnectionTypeMap;
         static std::mutex msConnectionTypeMapLock;
 
-        static constexpr auto ms_REQUEST_TIMEOUT = 30000ms; ///< Request timeout timer duration in ms
-        static constexpr auto ms_COMMAND_TIMEOUT = 15000ms; ///< Command timeout timer duration in ms
-        static constexpr auto ms_CLEANUP_TIMEOUT = 5000ms; ///< Timeout duration used in onCoreShutdown in ms
+        /// After not adding new messages to send for timeout duration, send aggregated batch message.
+        static constexpr auto msAGGREGATE_OUTGOING_TIMEOUT = 10ms;
+        static constexpr auto msREQUEST_TIMEOUT = 30000ms; ///< Request timeout timer duration in ms
+        static constexpr auto msCOMMAND_TIMEOUT = 15000ms; ///< Command timeout timer duration in ms
+        static constexpr auto msCLEANUP_TIMEOUT = 5000ms; ///< Timeout duration used in onCoreShutdown in ms
 
         // ======================================== CommandHandler functions ========================================
 
@@ -347,7 +391,7 @@ namespace SmartHome {
          * @param commandMetadata Command execution metadata.
          * @return API response with result or error.
          */
-        static ba::awaitable<std::optional<API::ApiResponse> > placeholderHandler(
+        static awaitOptApiResponse placeholderHandler(
             const cmdMetaPtr &commandMetadata);
     };
 }

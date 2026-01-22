@@ -21,7 +21,7 @@ namespace SmartHome {
                 requestId,
                 request,
                 std::make_shared<ba::steady_timer>(
-                    Core::Instance().getCoreUtilityIoContext(), ms_REQUEST_TIMEOUT),
+                    Core::Instance().getCoreUtilityIoContext(), msREQUEST_TIMEOUT),
                 request.commands.size(),
                 callback
             );
@@ -178,7 +178,7 @@ namespace SmartHome {
                 std::string messageToSend;
 
                 if (requests.size() == 1) {
-                    messageToSend = requests.at(0).to_string();
+                    messageToSend = requests.front().to_string();
                 } else {
                     auto messageJsonArray = nlohmann::json::array();
                     for (const auto &request: requests) {
@@ -189,13 +189,13 @@ namespace SmartHome {
                 API::InternalApi().handleOutgoing(connectionId, std::move(messageToSend));
                 requests.clear();
 
-                outgoingRequest->timeoutTimer->expires_after(ms_REQUEST_TIMEOUT);
+                outgoingRequest->timeoutTimer->expires_after(msREQUEST_TIMEOUT);
                 outgoingRequest->timeoutTimer->async_wait(timeoutHandler);
             }
         };
 
         // Aggregate outgoing requests
-        outgoingRequest->sendTimer->expires_after(10ms);
+        outgoingRequest->sendTimer->expires_after(msAGGREGATE_OUTGOING_TIMEOUT);
         outgoingRequest->sendTimer->async_wait(sendTimerHandler);
     }
 
@@ -210,7 +210,7 @@ namespace SmartHome {
 
     void Actions::onCoreShutdown() {
         auto cleanupTimeout = std::make_shared<ba::steady_timer>(Core::Instance().getCoreUtilityIoContext(),
-                                                                 ms_CLEANUP_TIMEOUT);
+                                                                 msCLEANUP_TIMEOUT);
         std::atomic_bool cleanupTimeoutCalled = false;
         auto cleanup = [&cleanupTimeout, &cleanupTimeoutCalled]() {
             auto expected = false;
@@ -429,7 +429,7 @@ namespace SmartHome {
         }
 
         if (auto timer = commandMetadata->commandTimeoutTimer.load()) {
-            timer->expires_after(ms_COMMAND_TIMEOUT);
+            timer->expires_after(msCOMMAND_TIMEOUT);
             timer->async_wait([commandMetadata](const bs::error_code &ec) {
                 if (!ec) {
                     handleCommandTimeout(commandMetadata);
@@ -470,7 +470,7 @@ namespace SmartHome {
             API::ApiError error;
             error.code = API::ErrorCodes::INTERNAL_ERROR;
             error.message = API::errorCodeToString(error.code);
-            error.data = "Command timeout: exceeded " + std::to_string(ms_COMMAND_TIMEOUT.count()) + "ms timeout";
+            error.data = "Command timeout: exceeded " + std::to_string(msCOMMAND_TIMEOUT.count()) + "ms timeout";
 
             timeoutResponse.error = error;
 
@@ -536,7 +536,7 @@ namespace SmartHome {
                 API::ApiError error;
                 error.code = API::ErrorCodes::INTERNAL_ERROR;
                 error.message = API::errorCodeToString(error.code);
-                error.data = "Command cancelled: request exceeded " + std::to_string(ms_REQUEST_TIMEOUT.count()) +
+                error.data = "Command cancelled: request exceeded " + std::to_string(msREQUEST_TIMEOUT.count()) +
                              "ms timeout";
 
                 timeoutResult.error = error;

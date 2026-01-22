@@ -79,8 +79,8 @@ namespace SmartHome {
                 // TODO implement condition handler
 
                 // TODO remove - temporary code for API testing
-                auto indx = conditionParam.find("id");
-                if (indx != conditionParam.end()) {
+                auto index = conditionParam.find("id");
+                if (index != conditionParam.end()) {
                     if (conditionParam["id"] == 22) {
                         nlohmann::json response;
                         response["id"] = 22;

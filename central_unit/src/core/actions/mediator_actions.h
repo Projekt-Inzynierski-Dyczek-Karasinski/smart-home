@@ -5,8 +5,16 @@
 #include <memory>
 
 namespace SmartHome {
-    class Actions;
 
+    /**
+     * @brief Mediator module command handlers
+     *
+     * @details Implements handlers for commands targeted at smart home modules via the Mediator:
+     *          - Get: Retrieves module values
+     *          - Set: Updates module values
+     *          - Execute: Triggers module actions
+     *          - Ping: Tests module connectivity and measures response time
+     */
     class MediatorActions {
         using cmdMetaPtr = std::shared_ptr<Actions::CommandMetadata>;
 
@@ -24,7 +32,7 @@ namespace SmartHome {
          *
          * @note Expected params format: [(optional){module_id: uint}, target_value_key<string>, optional_arguments<any>...]
          */
-        static ba::awaitable<std::optional<API::ApiResponse> > mediatorGetHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse mediatorGetHandler(const cmdMetaPtr &commandMetadata);
 
 
         /**
@@ -40,7 +48,7 @@ namespace SmartHome {
          *
          * @note Expected params format: [(optional){module_id: uint}, target_value_key<string>, target_new_value<any>]
          */
-        static ba::awaitable<std::optional<API::ApiResponse> > mediatorSetHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse mediatorSetHandler(const cmdMetaPtr &commandMetadata);
 
         /**
          * @brief Handle EXECUTE command for mediator/module.
@@ -56,8 +64,7 @@ namespace SmartHome {
          * @note Expected params format: [(optional){module_id: uint}, action<string>, (optional)action_argument<any>]
          */
 
-        static ba::awaitable<std::optional<API::ApiResponse> >
-        mediatorExecuteHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse mediatorExecuteHandler(const cmdMetaPtr &commandMetadata);
 
         /**
          * @brief Handle PING command for module connectivity check.
@@ -71,7 +78,7 @@ namespace SmartHome {
          *
          * @note Expected params format: [{module_id: uint}]
          */
-        static ba::awaitable<std::optional<API::ApiResponse> > mediatorPingHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse mediatorPingHandler(const cmdMetaPtr &commandMetadata);
 
         /**
          * @brief Send request to mediator and await response.

@@ -91,6 +91,11 @@ namespace SmartHomeMediator {
          */
         void setBaudRate(uint baudRate);
 
+        /**
+         * @brief Current UART baud rate getter.
+         *
+         * @return Current baud rate.
+         */
         uint getBaudRate() const;
 
         /**
