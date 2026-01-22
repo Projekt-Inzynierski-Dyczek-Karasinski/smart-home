@@ -3,7 +3,7 @@
 namespace SmartHome {
     using ai = API::InternalApi;
 
-    ba::awaitable<std::optional<API::ApiResponse>> MediatorActions::mediatorGetHandler(
+    ba::awaitable<std::optional<API::ApiResponse> > MediatorActions::mediatorGetHandler(
         const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[MEDIATOR_ACTIONS] [GET] called");
         const auto &command = commandMetadata->command;
@@ -50,7 +50,7 @@ namespace SmartHome {
         co_return commandResult;
     }
 
-    ba::awaitable<std::optional<API::ApiResponse>> MediatorActions::mediatorSetHandler(
+    ba::awaitable<std::optional<API::ApiResponse> > MediatorActions::mediatorSetHandler(
         const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[MEDIATOR_ACTIONS] [SET] called");
         const auto &command = commandMetadata->command;
@@ -95,7 +95,7 @@ namespace SmartHome {
         co_return commandResult;
     }
 
-    ba::awaitable<std::optional<API::ApiResponse>> MediatorActions::mediatorExecuteHandler(
+    ba::awaitable<std::optional<API::ApiResponse> > MediatorActions::mediatorExecuteHandler(
         const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[MEDIATOR_ACTIONS] [EXECUTE] called");
         const auto &command = commandMetadata->command;
@@ -141,7 +141,7 @@ namespace SmartHome {
         co_return commandResult;
     }
 
-    ba::awaitable<std::optional<API::ApiResponse>> MediatorActions::mediatorPingHandler(
+    ba::awaitable<std::optional<API::ApiResponse> > MediatorActions::mediatorPingHandler(
         const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[MEDIATOR_ACTIONS] [PING] called");
         const auto &command = commandMetadata->command;

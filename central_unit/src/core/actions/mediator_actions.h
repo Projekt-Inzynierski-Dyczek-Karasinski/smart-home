@@ -5,7 +5,6 @@
 #include <memory>
 
 namespace SmartHome {
-
     /**
      * @brief Mediator module command handlers
      *

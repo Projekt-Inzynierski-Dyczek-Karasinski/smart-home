@@ -3,7 +3,7 @@
 #include <boost/algorithm/string/case_conv.hpp>
 
 namespace SmartHome {
-    ba::awaitable<std::optional<API::ApiResponse>> CoreActions::coreEchoHandler(const cmdMetaPtr &commandMetadata) {
+    ba::awaitable<std::optional<API::ApiResponse> > CoreActions::coreEchoHandler(const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[CORE_ACTIONS] [ECHO] called");
         const auto &command = commandMetadata->command;
         API::ApiResponse commandResult;
@@ -21,7 +21,7 @@ namespace SmartHome {
         co_return commandResult;
     }
 
-    ba::awaitable<std::optional<API::ApiResponse>> CoreActions::coreGetHandler(const cmdMetaPtr &commandMetadata) {
+    ba::awaitable<std::optional<API::ApiResponse> > CoreActions::coreGetHandler(const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[CORE_ACTIONS] [GET] called");
         const auto &command = commandMetadata->command;
         API::ApiResponse commandResult;
@@ -104,7 +104,7 @@ namespace SmartHome {
         co_return commandResult;
     }
 
-    ba::awaitable<std::optional<API::ApiResponse>> CoreActions::coreSetHandler(const cmdMetaPtr &commandMetadata) {
+    ba::awaitable<std::optional<API::ApiResponse> > CoreActions::coreSetHandler(const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[CORE_ACTIONS] [SET] called");
         const auto &command = commandMetadata->command;
         API::ApiResponse commandResult;
@@ -159,7 +159,7 @@ namespace SmartHome {
         co_return commandResult;
     }
 
-    ba::awaitable<std::optional<API::ApiResponse>> CoreActions::coreNotifyHandler(const cmdMetaPtr &commandMetadata) {
+    ba::awaitable<std::optional<API::ApiResponse> > CoreActions::coreNotifyHandler(const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[CORE_ACTIONS] [NOTIFY] called");
 
         // TODO implement notify logic

@@ -4,13 +4,10 @@
 #include <string_view>
 #include <memory>
 
-#include <boost/asio.hpp>
-
 
 namespace ba = boost::asio;
 
 namespace SmartHome {
-
     /**
      * @brief Core system command handlers.
      *
@@ -24,7 +21,6 @@ namespace SmartHome {
      */
     class CoreActions {
         using cmdMetaPtr = std::shared_ptr<Actions::CommandMetadata>;
-
 
     public:
         enum class SetKeys {
