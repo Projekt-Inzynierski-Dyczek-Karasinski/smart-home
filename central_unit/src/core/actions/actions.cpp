@@ -157,8 +157,20 @@ namespace SmartHome {
                     "[ACTIONS] [HANDLE_OUTGOING_REQUEST] ApiRequest with duplicate id ignored");
         }
 
-        outgoingRequest->sendTimer->expires_after(10ms);
-        outgoingRequest->sendTimer->async_wait([outgoingRequest, connectionId](const bs::error_code &sendEc) {
+        const auto timeoutHandler = [outgoingRequest, connectionId](const bs::error_code &timeOutEc) {
+            if (!timeOutEc) {
+                std::scoped_lock timeoutLock(outgoingRequest->metadataMutex, msOutgoingRequestsLock);
+                for (const auto &promise: outgoingRequest->requestsPromises | std::views::values) {
+                    promise->set_exception(std::make_exception_ptr(std::runtime_error("Request timeout")));
+                }
+
+                if (outgoingRequest->requestsToSend.empty()) {
+                    msOutgoingRequests.erase(connectionId);
+                }
+            }
+        };
+
+        const auto sendTimerHandler = [outgoingRequest, connectionId, timeoutHandler](const bs::error_code &sendEc) {
             if (!sendEc) {
                 std::scoped_lock sendLock(outgoingRequest->metadataMutex, msOutgoingRequestsLock);
                 auto &requests = outgoingRequest->requestsToSend;
@@ -178,21 +190,13 @@ namespace SmartHome {
                 requests.clear();
 
                 outgoingRequest->timeoutTimer->expires_after(ms_REQUEST_TIMEOUT);
-                outgoingRequest->timeoutTimer->async_wait(
-                    [outgoingRequest, connectionId](const bs::error_code &timeOutEc) {
-                        if (!timeOutEc) {
-                            std::scoped_lock timeOutLock(outgoingRequest->metadataMutex, msOutgoingRequestsLock);
-                            for (const auto &promise: outgoingRequest->requestsPromises | std::views::values) {
-                                promise->set_exception(std::make_exception_ptr(std::runtime_error("Request timeout")));
-                            }
-
-                            if (outgoingRequest->requestsToSend.empty()) {
-                                msOutgoingRequests.erase(connectionId);
-                            }
-                        }
-                    });
+                outgoingRequest->timeoutTimer->async_wait(timeoutHandler);
             }
-        });
+        };
+
+        // Aggregate outgoing requests
+        outgoingRequest->sendTimer->expires_after(10ms);
+        outgoingRequest->sendTimer->async_wait(sendTimerHandler);
     }
 
 
