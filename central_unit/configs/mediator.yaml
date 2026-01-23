@@ -31,4 +31,4 @@ mediator:
       port: 43321
     uds:
       enabled: true
-      socket_path: "/var/run/mediator.sock"
+      socket_path: "/var/run/smarthomed.sock"
