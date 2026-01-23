@@ -1,7 +1,7 @@
 #pragma once
 
 #include "socket_server.h"
-#include "service/service_manager.h"
+#include "service_manager/service_manager.h"
 #include "async_logger.h"
 #include "api/internal_api.h"
 
@@ -182,10 +182,12 @@ namespace SmartHome {
          */
         static uint getThreadCount(int threadCountConfigValue);
 
+        static constexpr std::string_view ms_ServiceName = "smarthomed";
+
         // Configuration
         Config mConfig;
 
-        std::unique_ptr<Service::ServiceManager> mpService;
+        std::unique_ptr<Utils::ServiceManager> mpService;
         std::shared_ptr<API::InternalApi> mpApi;
 
         // Socket server resources

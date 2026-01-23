@@ -30,7 +30,8 @@ namespace SmartHome::IPC {
                 socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
                 socket.close(ec);
                 if (ec) {
-                    mpLogger->errorf("[SOCKET_SERVER_CONNECTION] IPC connection close failed: %s", ec.message().c_str());
+                    mpLogger->errorf("[SOCKET_SERVER_CONNECTION] IPC connection close failed: %s",
+                                     ec.message().c_str());
                 }
                 mpLogger->debugf("[SOCKET_SERVER_CONNECTION] IPC connection closed (ID:%d)", mConnectionId.load());
             }

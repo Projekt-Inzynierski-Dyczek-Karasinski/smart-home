@@ -11,6 +11,26 @@ namespace SmartHome::IPC {
         SocketConnection::close();
     }
 
+    bool SocketConnection::connect(const bal::stream_protocol::endpoint &udsEndpoint) {
+        try {
+            std::get<bal::stream_protocol::socket>(mSocket).connect(udsEndpoint);
+        } catch (std::exception &e) {
+            mpLogger->debugf("[SOCKET_CONNECTION] IPC UDS connection attempt failed: %s", e.what());
+            return false;
+        }
+        return true;
+    }
+
+    bool SocketConnection::connect(const bai::tcp::endpoint &tcpEndpoint) {
+        try {
+            std::get<bai::tcp::socket>(mSocket).connect(tcpEndpoint);
+        } catch (std::exception &e) {
+            mpLogger->debugf("[SOCKET_CONNECTION] IPC TCP connection attempt failed: %s", e.what());
+            return false;
+        }
+        return true;
+    }
+
     const boost::regex SocketConnection::ms_DELIMITER_REGEX(ms_MESSAGE_DELIMITER.data());
 
     std::string SocketConnection::read() {
@@ -90,20 +110,22 @@ namespace SmartHome::IPC {
                 socket.shutdown(boost::asio::ip::tcp::socket::shutdown_both, ec);
                 socket.close(ec);
                 if (ec) {
-                    mpLogger->errorf("[SOCKET_CONNECTION] IPC connection close failed: %s ", ec.message().c_str());
+                    mpLogger->debugf("[SOCKET_CONNECTION] IPC connection close failed: %s ", ec.message().c_str());
                 }
                 mpLogger->debug("[SOCKET_CONNECTION] IPC connection closed");
             }
         };
 
         std::visit(socketVisitor, mSocket);
+
+        // TODO consider implementing on close callback
     }
 
     void SocketConnection::shutdownSocket(ba::socket_base::shutdown_type mode) {
         std::visit([mode](auto &socket) {
             socket.shutdown(mode);
             //TODO Sockets do not close for incoming traffic consistently - more testing needed
-        },mSocket);
+        }, mSocket);
     }
 
     bool SocketConnection::isOpen() const {
@@ -127,10 +149,10 @@ namespace SmartHome::IPC {
     void SocketConnection::handleError(const bs::error_code &ec) {
         switch (ec.value()) {
             case ba::error::operation_aborted:
-                mpLogger->info("[SOCKET_CONNECTION] IPC operation aborted");
+                mpLogger->debug("[SOCKET_CONNECTION] IPC operation aborted");
                 break;
             case ba::error::eof:
-                mpLogger->info("[SOCKET_CONNECTION] IPC connection read EOF");
+                mpLogger->debug("[SOCKET_CONNECTION] IPC connection read EOF");
                 close();
                 break;
             case ba::error::connection_reset:
@@ -140,7 +162,7 @@ namespace SmartHome::IPC {
                 break;
             default:
                 if (ec) {
-                    mpLogger->errorf("[SOCKET_CONNECTION] IPC connection failed: %s ", ec.message().c_str());
+                    mpLogger->debugf("[SOCKET_CONNECTION] IPC connection failed: %s ", ec.message().c_str());
                     close();
                 }
         }

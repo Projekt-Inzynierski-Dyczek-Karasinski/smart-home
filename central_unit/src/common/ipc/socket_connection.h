@@ -54,6 +54,28 @@ namespace SmartHome::IPC {
         virtual ~SocketConnection();
 
         /**
+         * @brief Connect to Unix Domain Socket endpoint.
+         *
+         * @param udsEndpoint UDS endpoint with socket path.
+         *
+         * @return true if connection established successfully, false on failure.
+         *
+         * @note Socket type must be Type::UDS. Logs debug message on failure.
+         */
+        bool connect(const bal::stream_protocol::endpoint &udsEndpoint);
+
+        /**
+         * @brief Connect to TCP endpoint.
+         *
+         * @param tcpEndpoint TCP endpoint with IP address and port.
+         *
+         * @return true if connection established successfully, false on failure.
+         *
+         * @note Socket type must be Type::TCP. Logs debug message on failure.
+         */
+        bool connect(const bai::tcp::endpoint &tcpEndpoint);
+
+        /**
         * @brief Synchronously read a message from socket.
         *
         * @details Blocks until complete message (ending with \r\n) is received.

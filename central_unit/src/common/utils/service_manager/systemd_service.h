@@ -1,7 +1,6 @@
 #pragma once
 
 #include "service_manager.h"
-#include "../core.h"
 
 #include <optional>
 
@@ -9,7 +8,7 @@
 
 namespace ba = boost::asio;
 
-namespace SmartHome::Service {
+namespace SmartHome::Utils {
     /**
      * @brief Systemd service implementation.
      *
@@ -25,8 +24,9 @@ namespace SmartHome::Service {
          * @brief Construct systemd service manager.
          *
          * @param logger Shared logger instance for service messages.
+         * @param serviceName Service name used for LockFile.
          */
-        explicit SystemdService(const std::shared_ptr<Utils::Logger> &logger);
+        explicit SystemdService(const std::shared_ptr<Logger> &logger, std::string_view serviceName);
 
         /**
          * @brief Initialize systemd service.

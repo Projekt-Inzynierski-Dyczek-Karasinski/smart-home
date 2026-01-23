@@ -27,10 +27,17 @@ namespace SmartHome::JsonRpcStrings {
         inline constexpr std::string_view PARAMS = "params";
     }
 
+    // TODO consider moving target to method value (eg. "core.get", "module_mediator.set"), for params object simplification
     /// Custom parameter keys for SmartHome API
     namespace ParamsKeys {
         inline constexpr std::string_view TARGET = "target";
+        inline constexpr std::string_view MODULE_INFO = "module_info";
         inline constexpr std::string_view METHOD_PARAMS = "method_params";
+    }
+
+    namespace ModuleInfoKeys {
+        inline constexpr std::string_view LOGIC_ADDRESS = "logic_address";
+        inline constexpr std::string_view RF_CHANNEL = "rf_channel";
     }
 
     /// JSON-RPC response-specific keys
@@ -144,6 +151,12 @@ namespace SmartHome::API {
         METHOD_NOT_FOUND = -32601,
         INVALID_PARAMS = -32602,
         INTERNAL_ERROR = -32603,
+        // custom errors
+        UNKNOWN_ERROR = -32000,
+        MODULE_RUNTIME_ERROR = -32001,
+        MEDIATOR_COMMUNICATION_ERROR = -32002,
+        MEDIATOR_RUNTIME_ERROR = -32003,
+        NOT_IMPLEMENTED = -32004,
     };
 
     /**
@@ -245,9 +258,9 @@ namespace SmartHome::API {
          */
         explicit ApiRequest(std::string_view value);
 
-        nlohmann::json to_json();
+        nlohmann::json to_json() const;
 
-        std::string to_string();
+        std::string to_string() const;
 
         /// Update request from JSON object.
         ApiRequest operator()(const nlohmann::json &value);
@@ -283,6 +296,18 @@ namespace SmartHome::API {
         std::optional<ApiError> error; ///< Error object if request failed
         ApiId id; ///< Response identifier matching request
 
+
+        explicit ApiResponse() = default;
+
+        /**
+         * @brief Construct ApiResponse object.
+         *
+         * @param json nlohmann::json object to be parsed into ApiResponse.
+         *
+         * @throws std::invalid_argument Throws invalid argument when passed JSON object is not in JSON-RPC 2.0 format.
+         */
+        explicit ApiResponse(const nlohmann::json &json);
+
         /**
          * @brief Convert response to JSON object.
          *
@@ -304,7 +329,6 @@ namespace SmartHome::API {
 
         /// Update response from JSON string.
         ApiResponse operator()(std::string_view value);
-
 
     private:
         /**
@@ -328,17 +352,17 @@ namespace SmartHome::API {
          * @brief Handle incoming API request.
          *
          * @param connectionId Connection identifier for response routing.
-         * @param request Request string to process.
+         * @param message Message string to process.
          */
-        virtual void handleRequest(connectionId_t connectionId, std::string &&request) = 0;
+        virtual void handleIncoming(connectionId_t connectionId, std::string &&message) = 0;
 
         /**
-         * @brief Handle outgoing API response.
+         * @brief Handle outgoing API message.
          *
          * @param connectionId Connection identifier.
-         * @param response Response string to process.
+         * @param message Message string to process.
          */
-        virtual void handleResponse(connectionId_t connectionId, std::string &&response) = 0;
+        virtual void handleOutgoing(connectionId_t connectionId, std::string &&message) = 0;
     };
 
 

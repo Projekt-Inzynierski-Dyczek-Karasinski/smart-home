@@ -17,11 +17,10 @@ endif ()
 add_executable(smarthomed
         main.cpp
         core.cpp
-        core_actions.cpp
         api/internal_api.cpp
-        service/service_manager.cpp
-        service/systemd_service.cpp
-        service/standalone_service.cpp
+        actions/actions.cpp
+        actions/core_actions.cpp
+        actions/mediator_actions.cpp
 )
 
 

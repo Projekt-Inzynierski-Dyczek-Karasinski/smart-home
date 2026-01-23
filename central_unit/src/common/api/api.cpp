@@ -42,10 +42,10 @@ namespace SmartHome::API {
         const auto iter = json.find(JsonRpcStrings::Keys::ID);
         if (iter == json.end()) {
             mState = State::UNDEFINED;
-        } else if (iter.value().is_number()) {
+        } else if (iter->is_number() && iter.value() != nullptr) {
             mValue = json[JsonRpcStrings::Keys::ID];
             mState = State::HAS_VALUE;
-        } else if (iter.value().is_string() && iter.value() == JsonRpcStrings::Constants::NULL_VALUE) {
+        } else if (iter->is_string() && iter.value() == JsonRpcStrings::Constants::NULL_VALUE || iter.value() == nullptr) {
             mState = State::NULL_VALUE;
         } else {
             throw std::runtime_error("Cannot cast json to ApiId - Invalid ID value");
@@ -149,7 +149,7 @@ namespace SmartHome::API {
         return *this;
     }
 
-    nlohmann::json ApiRequest::to_json() {
+    nlohmann::json ApiRequest::to_json() const {
         nlohmann::json json;
 
         json[JsonRpcStrings::Keys::JSONRPC] = jsonrpc;
@@ -160,7 +160,7 @@ namespace SmartHome::API {
         return json;
     }
 
-    std::string ApiRequest::to_string() {
+    std::string ApiRequest::to_string() const {
         return nlohmann::to_string(to_json());
     }
 
@@ -229,6 +229,10 @@ namespace SmartHome::API {
         return *this;
     }
 
+    ApiResponse::ApiResponse(const nlohmann::json &json) {
+        setValues(json);
+    }
+
     nlohmann::json ApiResponse::to_json() {
         nlohmann::json json;
 
@@ -240,10 +244,14 @@ namespace SmartHome::API {
         } else if (error.has_value()) {
             json[JsonRpcStrings::ResponseKeys::ERROR] = error.value().to_json();
         } else {
-            throw std::invalid_argument("Invalid JSON-RPC response");
+            throw std::invalid_argument("Invalid JSON-RPC response: response must have result or error");
         }
 
-        if (!id.isUndefined()) json.update(id.toJson());
+        if (id.hasValue()) {
+            json[JsonRpcStrings::Keys::ID] = id.value();
+        } else if (id.isNull()) {
+            json[JsonRpcStrings::Keys::ID] = nullptr;
+        }
 
         return json;
     }
@@ -261,20 +269,29 @@ namespace SmartHome::API {
                     JsonRpcStrings::Constants::VERSION.data());
             throw std::invalid_argument(errorMessage);
         }
-        if (!(json.contains(JsonRpcStrings::Keys::ID) && !json[JsonRpcStrings::Keys::ID].get<std::string>().empty())) {
+        if (!json.contains(JsonRpcStrings::Keys::ID)) {
             throw std::invalid_argument("Invalid JSON-RPC request: response must contain id");
         }
 
-        if (json.contains(JsonRpcStrings::ResponseKeys::RESULT) && !json.contains(JsonRpcStrings::ResponseKeys::ERROR))
-            result = json[JsonRpcStrings::ResponseKeys::RESULT];
-        else if (json.contains(JsonRpcStrings::ResponseKeys::ERROR) && !json.contains(
-                     JsonRpcStrings::ResponseKeys::RESULT))
+        if (json.contains(JsonRpcStrings::ResponseKeys::RESULT) && !json.
+            contains(JsonRpcStrings::ResponseKeys::ERROR)) {
+            auto &jsonResult = json[JsonRpcStrings::ResponseKeys::RESULT];
+            if (jsonResult.is_string()) result = jsonResult.get<std::string>();
+            else result = jsonResult.dump();
+        } else if (json.contains(JsonRpcStrings::ResponseKeys::ERROR) && !json.contains(
+                       JsonRpcStrings::ResponseKeys::RESULT))
             error.emplace(
                 json[JsonRpcStrings::ResponseKeys::ERROR]);
         else throw std::invalid_argument("Invalid JSON-RPC request: response must contain either result or error");
 
         jsonrpc = json[JsonRpcStrings::Keys::JSONRPC];
-        id = json[JsonRpcStrings::Keys::ID];
+        auto & idJson = json[JsonRpcStrings::Keys::ID];
+        if (idJson.is_number()) {
+            id = idJson.get<int>();
+        }
+        else if (idJson == nullptr || idJson.is_null()) {
+            id = nullptr;
+        }
     }
 
     std::string_view errorCodeToString(const ErrorCodes errorCode) {
@@ -291,8 +308,18 @@ namespace SmartHome::API {
                 return "Invalid params";
             case ErrorCodes::INTERNAL_ERROR:
                 return "Internal error";
-            default:
+            case ErrorCodes::MODULE_RUNTIME_ERROR:
+                return "Module runtime error";
+            case ErrorCodes::MEDIATOR_COMMUNICATION_ERROR:
+                return "Mediator communication error";
+            case ErrorCodes::MEDIATOR_RUNTIME_ERROR:
+                return "Mediator runtime error";
+            case ErrorCodes::NOT_IMPLEMENTED:
+                return "Not implemented";
+            case ErrorCodes::UNKNOWN_ERROR:
                 return "Unknown error";
+            default:
+                return "Undefined error";
         }
     }
 
