@@ -12,6 +12,9 @@ pkg_check_modules(PQXX REQUIRED libpqxx>=6.4)
 # Target
 add_executable(smarthome-database
         main.cpp
+        database_service.cpp
+        database_connection.cpp
+        database_connection_manager.cpp
 )
 
 

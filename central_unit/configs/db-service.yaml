@@ -14,6 +14,7 @@ db_service:
     db_name: "smart_home" # Overwritten by env var "DB_NAME"
     db_user: "smart_home_admin" # Overwritten by env var "DB_USER"
     db_password: "insert_password"  # Overwritten by env var "DB_PASSWORD"
+    db_connections: 4
   logging:
     log_level: *info
     enable_console_log_output: true

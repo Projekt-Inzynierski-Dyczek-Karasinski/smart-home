@@ -1,28 +1,17 @@
 #pragma once
+#include "database_service.h"
 #include "logger.h"
 #include "config_manager/config_manager.h"
 
 #include <boost/asio.hpp>
 #include <boost/program_options.hpp>
 
-#include "socket_server.h" // TODO !pr remove tmp
 
 
 namespace bpo = boost::program_options;
 namespace su = SmartHome::Utils;
 
-namespace SmartHomeDatabase {
-    // TODO !pr remove temp
-    class DatabaseService {
-        public:
-        struct Config {
-            /// Default TCP config from socket server
-            SmartHome::IPC::SocketServer::Config::Tcp tcp;
-            /// Default UDS config from socket server
-            SmartHome::IPC::SocketServer::Config::Uds uds;
-        };
-    };
-
+namespace SmartHomeDB {
     /**
      * @brief Temporary storage for logger command-line options.
      *

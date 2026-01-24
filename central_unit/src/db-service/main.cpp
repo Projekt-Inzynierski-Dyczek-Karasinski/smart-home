@@ -11,7 +11,7 @@ namespace ba = boost::asio;
 namespace bai = boost::asio::ip;
 namespace bpo = boost::program_options;
 
-namespace SmartHomeDatabase {
+namespace SmartHomeDB {
     void loadLoggerYamlConfig(su::ConfigManager &configManager, su::Logger::Config &config) {
         std::string root = "db-service.logging";
         config.logLevel = su::LogLevels::toLevel(
@@ -112,7 +112,7 @@ namespace SmartHomeDatabase {
     }
 }
 
-using namespace SmartHomeDatabase;
+using namespace SmartHomeDB;
 
 int main(int argc, char *argv[]) {
     // Define program options
