@@ -194,7 +194,7 @@ int main(int argc, char *argv[]) {
             case Utils::ServiceType::STANDALONE:
                 if (std::filesystem::exists(mediatorConfig.execPath)) {
                     logger->info("[MAIN] Starting Mediator in STANDALONE mode");
-                    mediator = bp::child(mediatorConfig.execPath, "--config", mediatorConfig.execPath);
+                    mediator = bp::child(mediatorConfig.execPath, "--config", mediatorConfig.configPath);
                 } else {
                     logger->error("[MAIN] Could not find mediator executable");
                 }

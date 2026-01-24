@@ -40,7 +40,7 @@ core:
   ipc:
     threads: *two_threads # Recommended setting value >= 2
     tcp:
-      enabled: true
+      enabled: false
       address: "127.0.0.1"
       port: 43321
     uds:
@@ -49,10 +49,10 @@ core:
 
 services:
   mediator:
-    enabled: false
+    enabled: true
     service_type: *standalone_daemon
-    exec_path: ~ #Option for standalone mode - Default: /usr/local/bin/
-    config_path: "/etc/smarthome/mediator.yaml"
+    exec_path: ~ #Option for standalone mode - Default: /usr/local/bin/smarthome-mediator
+    config_path: ~ # Default: /etc/smarthome/mediator.yaml
 
 # TODO add more config options for gui
 gui:
