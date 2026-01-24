@@ -6,7 +6,7 @@ namespace UniversalModuleSystem::Transducers {
     /**
      * @brief Light sensor class for measuring light percentage.
      */
-    class LightSensor final : public Sensor {
+    class LightSensor final : public Sensor  {
     public:
         /**
          * @brief Construct the LightSensor object.

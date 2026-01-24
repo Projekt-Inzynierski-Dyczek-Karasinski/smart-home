@@ -771,6 +771,12 @@ namespace Comms {
                         ch.generateMessage(message);
                         com.sendMessage(message);
                     }
+                    // set test
+                    else if (uah::areArraysEqual(buffer, "set")) {
+                        API::CommandHandler ch(API::commandTypes::SET);
+                        ch.addParameter(API::APIParameter(static_cast<uint8_t>(84))); // uid
+
+                    }
                     // rest
                     else {
                         // check if is HC_12 command

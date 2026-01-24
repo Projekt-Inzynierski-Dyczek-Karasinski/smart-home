@@ -35,7 +35,6 @@ namespace UniversalModuleSystem {
         PowerManagerESP32(const PowerManagerESP32&) = delete;
         PowerManagerESP32& operator = (const PowerManagerESP32&) = delete;
 
-
         /**
          * @brief Puts the ESP32 into sleep mode for a specified duration.
          *
@@ -43,7 +42,7 @@ namespace UniversalModuleSystem {
          * @param enableWakeUpWithRfModule Enables wake-up through RF module.
          * @note Always enables waking up module by pressing PairingButton.
          */
-        void enterSleep(uint32_t milliSeconds, bool enableWakeUpWithRfModule) override;
+        void enterSleep(uint32_t milliSeconds, bool enableWakeUpWithRfModule) override __attribute__((noreturn));
 
         /**
          * @brief Restarts the ESP32.
@@ -52,7 +51,7 @@ namespace UniversalModuleSystem {
          *
          * @param source String describing the source of the restart (for log).
          */
-        void safeRestart(const char *source) const override;
+        void safeRestart(const char *source) const override __attribute__((noreturn));
 
         /**
          * @brief Disables the automatic sleep (if enabled) after waking up ESP by rf module.

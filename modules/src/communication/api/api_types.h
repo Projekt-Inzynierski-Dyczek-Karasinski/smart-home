@@ -26,6 +26,12 @@ namespace Comms::API {
         SENSOR_VALUE_WITH_FORCE_NEW_READING = 6
     };
 
+    enum class setTypes : uint8_t {
+        UNKNOWN = 0,
+        ACTUATOR_STATE = 1,
+        ACTUATOR_TOGGLE = 2
+    };
+
     enum class commandTypes : uint8_t {
         UNKNOWN = 0,
         ACKNOWLEDGE = 1,
