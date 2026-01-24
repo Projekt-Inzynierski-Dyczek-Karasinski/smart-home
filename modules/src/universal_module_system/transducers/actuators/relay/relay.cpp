@@ -8,14 +8,14 @@ namespace UniversalModuleSystem::Transducers {
     Relay::Relay(const std::shared_ptr<ul::Logger> &logger) : Actuator(logger) {}
 
     apiPv Relay::getState() {
-        apiPv result;
+        std::optional<apiPv> result;
         try {
-            result = apiPv{API::APIParameter(static_cast<uint8_t>(getStatePrivate()))};
+            result.emplace(apiPv{API::APIParameter(static_cast<uint8_t>(getStatePrivate()))}) ;
         } catch (std::exception &e) {
             mpLogger->error("Relay", e.what());
-            result = apiPv{API::APIParameter(static_cast<uint8_t>(ET::INTERNAL_ERROR), true)};
+            result.emplace(apiPv{API::APIParameter(static_cast<uint8_t>(ET::INTERNAL_ERROR), true)});
         }
-        return result;
+        return result.value();
     }
 
     apiPv Relay::toggle() {
