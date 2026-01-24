@@ -4,6 +4,10 @@ find_package(Boost 1.74 REQUIRED COMPONENTS
         system
 )
 
+find_package(PostgreSQL 15.15 REQUIRED)
+
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(PQXX REQUIRED libpqxx>=6.4)
 
 # Target
 add_executable(smarthome-database
@@ -18,6 +22,11 @@ target_link_libraries(smarthome-database PRIVATE
         smarthome::logger
         Boost::program_options
         Boost::system
+        ${PostgreSQL_LIBRARIES}
+        ${PQXX_LIBRARIES}
 )
+
+target_include_directories(smarthome-database PRIVATE ${PQXX_INCLUDE_DIRS})
+
 
 
