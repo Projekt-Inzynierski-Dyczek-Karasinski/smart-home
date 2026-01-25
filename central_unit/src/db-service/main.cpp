@@ -96,19 +96,19 @@ namespace SmartHomeDB {
                                            ? vm["config"].as<std::string>()
                                            : sDEFAULT_CONFIG_PATH.data();
         if (configManager.loadConfig(configPath)) {
-            logger->debug("[MAIN] Loading YAML logger config");
+            logger->debug("[MAIN_DB-SERVICE] Loading YAML logger config");
             loadLoggerYamlConfig(configManager, loggerConfig);
 
-            logger->debug("[MAIN] Loading YAML core config");
+            logger->debug("[MAIN_DB-SERVICE] Loading YAML core config");
             loadYamlConfigs(configManager, databaseServiceConfig);
         } else {
-            logger->error("[MAIN] Could not load YAML config");
+            logger->error("[MAIN_DB-SERVICE] Could not load YAML config");
         }
 
         overwriteConfigsWithProgramOptions(vm, logTmpOpt, databaseServiceConfig, loggerConfig);
 
         logger->applyConfig(loggerConfig);
-        logger->debug("[MAIN] Smarthome configured");
+        logger->debug("[MAIN_DB-SERVICE] Smarthome database service configured");
     }
 }
 
@@ -154,9 +154,21 @@ int main(int argc, char *argv[]) {
 
     // Define instances
     auto pLogger = std::make_shared<su::Logger>();
+    auto &dbService = DatabaseService::Instance();
+
+    su::Logger::Config loggerConfig;
+    loggerConfig.logLevel = SmartHome::Utils::LogLevels::Level::DEBUG;
+
+    pLogger->applyConfig(loggerConfig);
+
+    DatabaseService::Config dbConfig;
+    if (!dbService.initialize(dbConfig, pLogger)) {
+        pLogger->critical("[MAIN_DB-SERVICE] Failed to initialize database service");
+        return EXIT_FAILURE;
+    }
 
 
 
-    pLogger->info("[MAIN] Exit");
+    pLogger->info("[MAIN_DB-SERVICE] Exit");
     return EXIT_SUCCESS;
 }

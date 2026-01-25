@@ -177,19 +177,19 @@ namespace SmartHomeMediator {
                                            ? vm["config"].as<std::string>()
                                            : sDEFAULT_CONFIG_PATH.data();
         if (configManager.loadConfig(configPath)) {
-            logger->debug("[MAIN] Loading YAML logger config");
+            logger->debug("[MAIN_MEDIATOR] Loading YAML logger config");
             loadLoggerYamlConfig(configManager, loggerConfig);
 
-            logger->debug("[MAIN] Loading YAML core config");
+            logger->debug("[MAIN_MEDIATOR] Loading YAML core config");
             loadYamlConfigs(configManager, mediatorConfig);
         } else {
-            logger->error("[MAIN] Could not load YAML config");
+            logger->error("[MAIN_MEDIATOR] Could not load YAML config");
         }
 
         overwriteConfigsWithProgramOptions(vm, logTmpOpt, mediatorConfig, loggerConfig);
 
         logger->applyConfig(loggerConfig);
-        logger->debug("[MAIN] Smarthome configured");
+        logger->debug("[MAIN_MEDIATOR] Smarthome mediator configured");
     }
 }
 
@@ -245,12 +245,12 @@ int main(int argc, char *argv[]) {
     loadConfigs(vm, parsed, pLogger, mediatorConfig);
 
     if (!mediator.initialize(mediatorConfig, pLogger)) {
-        pLogger->critical("[MAIN] Failed to initialize");
+        pLogger->critical("[MAIN_MEDIATOR] Failed to initialize");
         return EXIT_FAILURE;
     }
 
     mediator.run();
 
-    pLogger->info("[MAIN] Exit");
+    pLogger->info("[MAIN_MEDIATOR] Exit");
     return EXIT_SUCCESS;
 }
