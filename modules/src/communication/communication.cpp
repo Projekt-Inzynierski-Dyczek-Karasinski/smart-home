@@ -683,13 +683,14 @@ namespace Comms {
                                 ch.addParameter(API::APIParameter(BATTERY_ID));
                             } else if (
                                 getType.value() == (uint8_t)API::getTypes::SENSOR_VALUE ||
-                                getType.value() == (uint8_t)API::getTypes::SENSOR_VALUE_WITH_FORCE_NEW_READING
+                                getType.value() == (uint8_t)API::getTypes::SENSOR_VALUE_WITH_FORCE_NEW_READING ||
+                                getType.value() == (uint8_t)API::getTypes::ACTUATOR_STATE
                             ) {
                                 std::optional<uint8_t> sensorId;
                                 try {
                                     sensorId = std::stoi((char*)&buffer[5]);
                                 } catch (...) {
-                                    com.mpLogger->error("Communication Input", "Bad sensorId");
+                                    com.mpLogger->error("Communication Input", "Bad sensorId/actuatorId.");
                                 }
                                 if (sensorId.has_value()) {
                                     ch.addParameter(API::APIParameter(sensorId.value()));

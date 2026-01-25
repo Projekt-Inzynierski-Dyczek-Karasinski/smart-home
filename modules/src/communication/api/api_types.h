@@ -23,7 +23,8 @@ namespace Comms::API {
         SENSOR_LIST = 3,
         LOGS = 4,
         BATTERY_STATE = 5,
-        SENSOR_VALUE_WITH_FORCE_NEW_READING = 6
+        SENSOR_VALUE_WITH_FORCE_NEW_READING = 6,
+        ACTUATOR_STATE = 7
     };
 
     enum class setTypes : uint8_t {

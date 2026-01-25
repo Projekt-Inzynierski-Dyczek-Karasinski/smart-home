@@ -2,8 +2,9 @@
 
 namespace UniversalModuleSystem::Transducers {
     using ET = API::errorTypes;
+    // FIXME: software reset (not wake up from deep sleep, not reset by en pin, only software reset) deletes RTC_DATA_ATTR memory, but not clears gpio_hold
 
-    RTC_DATA_ATTR std::atomic<uint32_t> Relay::relayStateBitmask = 0; // default every relay is off
+    RTC_DATA_ATTR std::atomic<uint32_t> Relay::relayStateBitmask = 0; // by default every relay is off
 
     Relay::Relay(const std::shared_ptr<ul::Logger> &logger) : Actuator(logger) {}
 

@@ -373,6 +373,29 @@ namespace Comms {
                         break;
                     }
 
+                    case static_cast<uint8_t>(GT::ACTUATOR_STATE): {
+                        mpLogger->verbose("MessageDecider CT::GET", "CT::ACTUATOR_STATE");
+                        std::optional<uint8_t> actuatorId;
+                        try {
+                            actuatorId = receivedCommand->getParameterValue<uint8_t>(2);
+                        } catch (std::exception &e) {
+                            responseWithError(sendCommand, ET::BAD_ARGUMENT, uid);
+                            break;
+                        }
+
+                        try {
+                            sendCommand.emplace(CT::RESPONSE);
+                        } catch (std::exception &e) {
+                            mpLogger->error("MessageDecider GT::ACTUATOR_STATE", e.what());
+                            responseWithError(sendCommand, ET::INTERNAL_ERROR, uid);
+                            break;
+                        }
+                        auto &actuatorManager = ums::Transducers::ActuatorsManager::getInstance(mpLogger);
+                        sendCommand->addParameter(API::APIParameter(uid.value()));
+                        sendCommand->addParameter(actuatorManager.getActuatorState(actuatorId.value()));
+                        break;
+                    }
+
                     default: {
                         mpLogger->errorv("MessageDecider CT::GET", "Got unknown get type: ", getType.value());
                         responseWithError(sendCommand, ET::BAD_ARGUMENT, uid);
