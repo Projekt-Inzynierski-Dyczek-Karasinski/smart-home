@@ -6,10 +6,12 @@ set(CMAKE_CXX_COMPILER aarch64-linux-gnu-g++)
 
 set(CMAKE_FIND_ROOT_PATH
         /usr/aarch64-linux-gnu
-        /usr/lib/aarch64-linux-gnu
-        /usr)
+        /usr/lib/aarch64-linux-gnu)
 set(CMAKE_LIBRARY_PATH /usr/lib/aarch64-linux-gnu)
 
 set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
 set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
+
+set(PostgreSQL_ROOT /usr/lib/aarch64 CACHE PATH "")
+set(PostgreSQL_INCLUDE_DIR /usr/include/postgresql CACHE PATH "")
