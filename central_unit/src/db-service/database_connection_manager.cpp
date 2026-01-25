@@ -11,7 +11,7 @@ namespace SmartHomeDB {
 
         sprintf(buffer,
                 "host=%s "
-                "port=%d"
+                "port=%d "
                 "dbname=%s "
                 "user=%s "
                 "password=%s "
