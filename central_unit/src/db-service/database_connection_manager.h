@@ -5,7 +5,7 @@
 #include <memory>
 #include <string>
 #include <queue>
-#include <pqxx/connection.hxx>
+#include <pqxx/pqxx>
 
 namespace SmartHomeDB {
     class DatabaseConnection;

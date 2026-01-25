@@ -12,7 +12,6 @@
 #include <utility>
 
 #include <boost/asio.hpp>
-#include <pqxx/pqxx>
 
 namespace SmartHomeDB {
     namespace ba = boost::asio;

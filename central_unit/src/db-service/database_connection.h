@@ -1,6 +1,6 @@
 #pragma once
 #include <memory>
-#include <pqxx/connection.hxx>
+#include <pqxx/pqxx>
 
 namespace SmartHomeDB {
     class DatabaseConnectionManager;

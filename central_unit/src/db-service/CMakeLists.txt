@@ -4,10 +4,25 @@ find_package(Boost 1.74 REQUIRED COMPONENTS
         system
 )
 
-find_package(PostgreSQL 15.15 REQUIRED)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(PQXX REQUIRED libpqxx>=6.4)
+include(FetchContent)
+
+FetchContent_Declare(
+        libpqxx
+        GIT_REPOSITORY  https://github.com/jtv/libpqxx.git
+        GIT_TAG         7.10.5
+        GIT_SHALLOW     ON
+)
+
+# Build libpqxx static
+set(BUILD_SHARED_LIBS OFF CACHE INTERNAL "")
+set(SKIP_BUILD_TEST ON CACHE INTERNAL "")
+set(SKIP_BUILD_TEST ON CACHE INTERNAL "")
+set(BUILD_DOC OFF CACHE INTERNAL "")
+
+FetchContent_MakeAvailable(libpqxx)
+
+find_package(PostgreSQL 15.15 REQUIRED)
 
 # Target
 add_executable(smarthome-database
@@ -25,8 +40,8 @@ target_link_libraries(smarthome-database PRIVATE
         smarthome::logger
         Boost::program_options
         Boost::system
+        pqxx
         ${PostgreSQL_LIBRARIES}
-        ${PQXX_LIBRARIES}
 )
 
 target_include_directories(smarthome-database PRIVATE ${PQXX_INCLUDE_DIRS})
