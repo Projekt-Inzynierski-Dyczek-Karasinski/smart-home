@@ -30,9 +30,8 @@ namespace SmartHome::IPC {
         return handshake();
     }
 
-    void SocketClient::initialize(const std::function<void(const std::string &message)> &messageHandler, const std::string_view targetTypeOfClient) {
+    void SocketClient::initialize(const std::function<void(const std::string &message)> &messageHandler) {
         mMessageHandler = messageHandler;
-        mTargetTypeOfClient = targetTypeOfClient;
 
         startReceiving();
     }
@@ -58,7 +57,7 @@ namespace SmartHome::IPC {
         ba::steady_timer timer(*mpIoContext, 3s);
 
         // Start timeout timer
-        timer.async_wait([this](const bs::error_code &ec){
+        timer.async_wait([this](const bs::error_code &ec) {
             if (!ec) {
                 mpLogger->error("[API_CLIENT] Handshake timeout");
                 mConnection->close();
@@ -70,8 +69,7 @@ namespace SmartHome::IPC {
         try {
             mConnection->write(request.to_string());
             response = mConnection->read();
-        }
-        catch (const std::exception &e) {
+        } catch (const std::exception &e) {
             mpLogger->errorf("[API_CLIENT] Error while handshaking connection: %s", e.what());
             return false;
         }
@@ -83,8 +81,7 @@ namespace SmartHome::IPC {
         try {
             mpLogger->debugf("[API_CLIENT] Handshake response: %s", response.c_str());
             apiResponse(std::string_view(response));
-        }
-        catch (const std::exception &e) {
+        } catch (const std::exception &e) {
             mpLogger->errorf("[API_CLIENT] Error while parsing handshake response: %s", e.what());
             return false;
         }
@@ -94,12 +91,12 @@ namespace SmartHome::IPC {
             return false;
         }
 
-        if (apiResponse.result.has_value() && apiResponse.result.value() == jsonParams[sj::ParamsKeys::METHOD_PARAMS].dump()) {
+        if (apiResponse.result.has_value() && apiResponse.result.value() == jsonParams[sj::ParamsKeys::METHOD_PARAMS].
+            dump()) {
             return true;
         }
 
         return false;
-
     }
 
     void SocketClient::startReceiving() {

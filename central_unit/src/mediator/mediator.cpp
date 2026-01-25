@@ -2,7 +2,6 @@
 
 
 namespace SmartHomeMediator {
-
     Mediator &Mediator::Instance() {
         static Mediator instance;
         return instance;
@@ -31,7 +30,7 @@ namespace SmartHomeMediator {
         mConfig = configStruct;
 
         // Attempt establishing connection with SmartHome daemon
-        mpApiClient = std::make_unique<si::SocketClient>(&mApiClientIoContext, mpLogger);
+        mpApiClient = std::make_unique<si::SocketClient>(&mApiClientIoContext, mpLogger, msCLIENT_TARGET_TYPE.data());
         bool isConnectionEstablished = false;
         if (mConfig.uds.isEnabled) {
             isConnectionEstablished = mpApiClient->connectToServer(mConfig.uds.endpointPath);
@@ -134,7 +133,7 @@ namespace SmartHomeMediator {
         mApiClientIoContext.post([this] {
             mpApiClient->initialize([this](const std::string &message) {
                 mpRfApi->handleIncoming(nullConnection, message.data());
-            }, msCLIENT_TARGET_TYPE);
+            });
         });
 
         ba::co_spawn(mRfClientIoContext, mpRfClient->run([this](const std::string &message) {
@@ -201,7 +200,7 @@ namespace SmartHomeMediator {
 
         // Start shutdown timeout timer
         const auto timeoutTimer = std::make_shared<ba::steady_timer>(mMediatorUtilityIoContext, msSHUTDOWN_TIMEOUT);
-        timeoutTimer->async_wait([this](const bs::error_code& ec) {
+        timeoutTimer->async_wait([this](const bs::error_code &ec) {
             if (!ec) {
                 mpLogger->warning("[MEDIATOR] Shutdown timeout - force stopping IO contexts");
 

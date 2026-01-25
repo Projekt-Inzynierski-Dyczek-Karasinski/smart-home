@@ -1,6 +1,6 @@
 #pragma once
 #include "rf_driver/hc12_driver.h"
-#include "rf_types.h"
+#include "rf_api/rf_types.h"
 
 #include <string>
 #include <chrono>

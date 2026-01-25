@@ -20,9 +20,10 @@ namespace SmartHome::IPC {
          *
          * @param io_context IO context for async operations.
          * @param logger Logger instance for diagnostic output.
+         * @param targetTypeOfClient TODO !pr
          */
-        explicit SocketClient(ba::io_context *io_context, const std::shared_ptr<su::Logger> &logger)
-            : mpIoContext(io_context), mpLogger(logger) {
+        explicit SocketClient(ba::io_context *io_context, const std::shared_ptr<su::Logger> &logger, const std::string &targetTypeOfClient)
+            : mpIoContext(io_context), mpLogger(logger), mTargetTypeOfClient(targetTypeOfClient) {
         }
 
         /**
@@ -60,12 +61,10 @@ namespace SmartHome::IPC {
          * @brief Initialize message handling and start receiving messages.
          *
          * @param messageHandler Callback function invoked for each received message.
-         * @param targetTypeOfClient
          *
          * @note Must be called after successful connection before messages can be received.
          */
-        void initialize(const std::function<void(const std::string &message)> &messageHandler,
-                        std::string_view targetTypeOfClient);
+        void initialize(const std::function<void(const std::string &message)> &messageHandler);
 
 
         /**
@@ -127,6 +126,6 @@ namespace SmartHome::IPC {
 
         std::function<void(const std::string &message)> mMessageHandler;
 
-        std::string mTargetTypeOfClient;
+        std::string mTargetTypeOfClient{};
     };
 }

@@ -1,6 +1,6 @@
 #include "rf_api.h"
 #include "../mediator.h"
-#include "../rf_client.h"
+#include "rf_client.h"
 
 #include <boost/algorithm/string/case_conv.hpp>
 namespace sj = SmartHome::JsonRpcStrings;

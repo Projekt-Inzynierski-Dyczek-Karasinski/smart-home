@@ -1,5 +1,5 @@
 #include "rf_client.h"
-#include "mediator.h"
+#include "../mediator.h"
 
 #include <boost/format.hpp>
 #include <boost/algorithm/string/join.hpp>
