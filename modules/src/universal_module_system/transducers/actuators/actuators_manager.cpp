@@ -16,6 +16,7 @@ namespace UniversalModuleSystem::Transducers {
             mpLogger = std::make_shared<ul::Logger>();
             mpLogger->error("ActuatorsManager", "ActuatorsManager's constructor didn't get pointer to logger instance.");
         }
+        mpLogger->verbose("ActuatorsManager", "ActuatorsManager initialized.");
     }
 
     apiPv ActuatorsManager::getActuatorState(const uint8_t actuatorId) {

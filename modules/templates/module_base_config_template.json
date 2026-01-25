@@ -34,6 +34,19 @@
       }
     ]
   },
+  "actuatorsData": {
+    "actuators": [
+      {
+        "type": "relay",
+        "data": {
+          "id": 1,
+          "logicPin": 10,
+          "additional": {
+          }
+        }
+      }
+    ]
+  },
   "ota": {
     "version": 1,
     "ota_pin": 3

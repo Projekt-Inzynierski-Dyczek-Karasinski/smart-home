@@ -3,6 +3,7 @@
 #include "communication/communication.h"
 #include "universal_module_system/power_manager/power_manager.h"
 #include "universal_module_system/transducers/sensors/sensors_manager.h"
+#include "universal_module_system/transducers/actuators/actuators_manager.h"
 
 namespace Comms {
     // ============================ Public ============================
@@ -271,17 +272,17 @@ namespace Comms {
                     uid = receivedCommand->getParameterValue<uint32_t>(0);
                     getType = receivedCommand->getParameterValue<uint8_t>(1);
                 } catch (std::exception &e) {
-                    responseWithError(sendCommand, ET::NOT_IMPLEMENTED, uid);
+                    responseWithError(sendCommand, ET::BAD_ARGUMENT, uid);
                     break;
                 }
 
                 using GT = API::getTypes;
                 auto &sensorManager = ums::Transducers::SensorsManager::getInstance(mpLogger);
                 switch (getType.value()) {
-                    case (uint8_t) GT::SENSOR_VALUE_WITH_FORCE_NEW_READING:
+                    case static_cast<uint8_t>(GT::SENSOR_VALUE_WITH_FORCE_NEW_READING):
                         mpLogger->verbose("MessageDecider CT::GET", "CT::SENSOR_VALUE_WITH_FORCE_NEW_READING");
                         sensorManager.clearCachedReadings();
-                    case (uint8_t) GT::SENSOR_VALUE: {
+                    case static_cast<uint8_t>(GT::SENSOR_VALUE): {
                         mpLogger->verbose("MessageDecider CT::GET", "CT::SENSOR_VALUE");
                         std::optional<uint8_t> sensorId;
                         try {
@@ -311,14 +312,14 @@ namespace Comms {
                         break;
                     }
 
-                    case (uint8_t) GT::CONFIG_VALUE: {
+                    case static_cast<uint8_t>(GT::CONFIG_VALUE): {
                         mpLogger->verbose("MessageDecider CT::GET", "CT::CONFIG_VALUE");
 
                         responseWithError(sendCommand, ET::NOT_IMPLEMENTED, uid);
                         break;
                     }
 
-                    case (uint8_t) GT::SENSOR_LIST: {
+                    case static_cast<uint8_t>(GT::SENSOR_LIST): {
                         mpLogger->verbose("MessageDecider CT::GET", "CT::SENSOR_LIST");
 
                         try {
@@ -342,13 +343,13 @@ namespace Comms {
                         break;
                     }
 
-                    case (uint8_t) GT::LOGS: {
+                    case static_cast<uint8_t>(GT::LOGS): {
                         mpLogger->verbose("MessageDecider CT::GET", "CT::LOGS");
                         responseWithError(sendCommand, ET::NOT_IMPLEMENTED, uid);
                         break;
                     }
 
-                    case (uint8_t) GT::BATTERY_STATE: {
+                    case static_cast<uint8_t>(GT::BATTERY_STATE): {
                         constexpr uint8_t BATTERY_SENSOR_ID = 1;
                         mpLogger->verbose("MessageDecider CT::GET", "CT::BATTERY_STATE");
 
@@ -384,13 +385,58 @@ namespace Comms {
             case CT::SET: {
                 mpLogger->verbose("MessageDecider", "CT::SET");
 
-                // TODO add handling for set
+                // get always required arguments for CT::SET
+                std::optional<uint8_t> setType;
+                std::optional<uint8_t> actuatorId;
                 try {
                     uid = receivedCommand->getParameterValue<uint32_t>(0);
+                    setType = receivedCommand->getParameterValue<uint8_t>(1);
+                    actuatorId = receivedCommand->getParameterValue<uint8_t>(2);
                 } catch (std::exception &e) {
-                    uid.reset();
+                    responseWithError(sendCommand, ET::BAD_ARGUMENT, uid);
+                    break;
                 }
-                responseWithError(sendCommand, ET::NOT_IMPLEMENTED, uid);
+
+                // setup response command
+                try {
+                    sendCommand.emplace(CT::RESPONSE);
+                } catch (std::exception &e) {
+                    sendCommand.reset();
+                    mpLogger->error("MessageDecider GT::BATTERY_STATE", e.what());
+                    break;
+                }
+                sendCommand->addParameter(API::APIParameter(uid.value()));
+
+                // execute the command and add its result
+                using ST = API::setTypes;
+                auto &actuatorManager = ums::Transducers::ActuatorsManager::getInstance(mpLogger);
+                switch (setType.value()) {
+                    case static_cast<uint8_t>(ST::ACTUATOR_OPERATION): {
+                        std::optional<API::APIParameterVariant> operation;
+                        // WARNING: to actuatorDoOperation is passed raw API::APIParameterVariant
+                        try {
+                            operation = receivedCommand->getParameter(3);
+                        } catch (std::exception &e) {
+                            responseWithError(sendCommand, ET::BAD_ARGUMENT, uid);
+                            break;
+                        }
+                        sendCommand->addParameter(actuatorManager.actuatorDoOperation(
+                            actuatorId.value(),
+                            operation.value()
+                        ));
+                        break;
+                    }
+
+                    case static_cast<uint8_t>(ST::ACTUATOR_TOGGLE):
+                        sendCommand->addParameter(actuatorManager.toggleActuator(actuatorId.value()));
+                        break;
+
+                    default: {
+                        mpLogger->errorv("MessageDecider CT::SET", "Got unknown set type: ", setType.value());
+                        responseWithError(sendCommand, ET::BAD_ARGUMENT, uid);
+                        break;
+                    }
+                }
                 break;
             }
 

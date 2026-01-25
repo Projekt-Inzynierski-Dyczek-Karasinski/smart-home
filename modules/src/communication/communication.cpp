@@ -661,13 +661,13 @@ namespace Comms {
                         }
                     } else if (uah::areArraysEqual(buffer, "end")) {
                         com.endConnection();
-                    } else if (uah::areArraysEqual(buffer, "test")) {
+                    }
+                    // get test
+                    else if (uah::areArraysEqual(buffer, "get")) {
                         API::CommandHandler ch(API::commandTypes::GET);
                         std::optional<uint8_t> getType;
                         try {
-                            char buffer2[MESSAGE_SIZE];
-                            std::memcpy(buffer2,buffer,MESSAGE_SIZE);
-                            getType = std::stoi((char*)&buffer[4]);
+                            getType = std::stoi((char*)&buffer[3]);
                         } catch (...) {
                             com.mpLogger->error("Communication Input", "Bad getType");
                         }
@@ -687,7 +687,7 @@ namespace Comms {
                             ) {
                                 std::optional<uint8_t> sensorId;
                                 try {
-                                    sensorId = std::stoi((char*)&buffer[6]);
+                                    sensorId = std::stoi((char*)&buffer[5]);
                                 } catch (...) {
                                     com.mpLogger->error("Communication Input", "Bad sensorId");
                                 }
@@ -775,7 +775,31 @@ namespace Comms {
                     else if (uah::areArraysEqual(buffer, "set")) {
                         API::CommandHandler ch(API::commandTypes::SET);
                         ch.addParameter(API::APIParameter(static_cast<uint8_t>(84))); // uid
+                        std::optional<uint8_t> setType;
+                        std::optional<uint8_t> actuatorId;
+                        try {
+                            setType = std::stoi((char*)&buffer[3]);
+                            actuatorId = std::stoi((char*)&buffer[5]);
+                        } catch (...) {
+                            com.mpLogger->error("Communication Input", "Bad getType or actuatorId.");
+                        }
+                        if (setType.has_value() && actuatorId.has_value()) {
+                            ch.addParameter(API::APIParameter(setType.value()));
+                            ch.addParameter(API::APIParameter(actuatorId.value()));
+                            if (setType.value() == static_cast<uint8_t>(API::setTypes::ACTUATOR_OPERATION)) {
+                                std::optional<uint8_t> operation;
+                                try {
+                                    operation = std::stoi((char*)&buffer[7]);
+                                } catch (...) {
+                                    com.mpLogger->error("Communication Input", "Bad operation.");
+                                }
+                                if (operation.has_value()) ch.addParameter(API::APIParameter(operation.value()));
+                            }
 
+                            uint8_t message[MESSAGE_SIZE] = {};
+                            ch.generateMessage(message);
+                            xQueueSend(com.mEncodeMessagesQueue, &message, portMAX_DELAY);
+                        }
                     }
                     // rest
                     else {
