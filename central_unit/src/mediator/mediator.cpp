@@ -31,7 +31,7 @@ namespace SmartHomeMediator {
         mConfig = configStruct;
 
         // Attempt establishing connection with SmartHome daemon
-        mpApiClient = std::make_unique<ApiClient>(&mApiClientIoContext, mpLogger);
+        mpApiClient = std::make_unique<si::SocketClient>(&mApiClientIoContext, mpLogger);
         bool isConnectionEstablished = false;
         if (mConfig.uds.isEnabled) {
             isConnectionEstablished = mpApiClient->connectToServer(mConfig.uds.endpointPath);
@@ -134,7 +134,7 @@ namespace SmartHomeMediator {
         mApiClientIoContext.post([this] {
             mpApiClient->initialize([this](const std::string &message) {
                 mpRfApi->handleIncoming(nullConnection, message.data());
-            });
+            }, msCLIENT_TARGET_TYPE);
         });
 
         ba::co_spawn(mRfClientIoContext, mpRfClient->run([this](const std::string &message) {

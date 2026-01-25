@@ -58,6 +58,7 @@ target_include_directories(smarthome_api PUBLIC
 
 # SMARTHOME IPC
 add_library(smarthome_ipc STATIC
+        ipc/socket_client.cpp
         ipc/socket_connection.cpp
         ipc/socket_server_connection.cpp
         ipc/socket_server.cpp
