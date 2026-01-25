@@ -34,7 +34,9 @@ namespace UniversalModuleSystem::Transducers {
 
         virtual apiPv getState();
 
-        uint8_t getId() const;
+        [[nodiscard]] uint8_t getId() const;
+
+        bool init(const nl::json &jsonData);
 
     protected:
         virtual bool loadAdditionalData(const nl::json &jsonData);

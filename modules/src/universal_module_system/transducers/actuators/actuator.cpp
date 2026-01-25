@@ -25,7 +25,11 @@ namespace UniversalModuleSystem::Transducers {
         xSemaphoreGive(mActuatorDataMutex);
         return result;
     }
-    
+
+    bool Actuator::init(const nl::json &jsonData) {
+        return loadData(jsonData);
+    }
+
     bool Actuator::loadData(const nl::json &jsonData) {
         bool isLoadedSuccessfully = true;
         xSemaphoreTake(mActuatorDataMutex, portMAX_DELAY);

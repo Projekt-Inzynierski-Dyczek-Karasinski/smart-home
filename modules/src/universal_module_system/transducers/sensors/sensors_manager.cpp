@@ -2,12 +2,12 @@
 
 #include <nlohmann/json.hpp>
 
+#include "universal_module_system/data_manager.h"
+
 #include "batterySensor/battery_sensor.h"
 #include "lightSensor/light_sensor.h"
 #include "dht_22_sensor/dht_22_sensor.h"
 #include "bme_280/bme_280.h"
-
-#include "universal_module_system/data_manager.h"
 
 namespace nl = nlohmann;
 
