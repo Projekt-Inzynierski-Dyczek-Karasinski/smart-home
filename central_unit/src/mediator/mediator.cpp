@@ -163,7 +163,7 @@ namespace SmartHomeMediator {
 
         mpLogger->debug("[MEDIATOR] Threads joined, joining utils thread");
 
-        if (mMediatorUtilityIoContext.stopped()) {
+        if (!mMediatorUtilityIoContext.stopped()) {
             mMediatorUtilityIoContext.stop();
         }
 
