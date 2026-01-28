@@ -36,6 +36,7 @@ namespace SmartHome {
     class Actions {
         friend class CoreActions;
         friend class MediatorActions;
+        friend class DatabaseActions;
 
     public:
         /**

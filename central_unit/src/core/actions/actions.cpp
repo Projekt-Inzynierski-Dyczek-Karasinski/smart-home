@@ -1,6 +1,7 @@
 #include "actions.h"
 #include "core_actions.h"
 #include "mediator_actions.h"
+#include "database_actions.h"
 
 #include <memory>
 
@@ -670,10 +671,10 @@ namespace SmartHome {
         {{sai::TargetTypes::MODULE_MEDIATOR, sai::MethodTypes::EXECUTE}, MediatorActions::mediatorExecuteHandler},
         {{sai::TargetTypes::MODULE_MEDIATOR, sai::MethodTypes::PING_REQUEST}, MediatorActions::mediatorPingHandler},
         //Database
-        {{sai::TargetTypes::DATABASE, sai::MethodTypes::GET}, placeholderHandler},
-        {{sai::TargetTypes::DATABASE, sai::MethodTypes::SET}, placeholderHandler},
-        {{sai::TargetTypes::DATABASE, sai::MethodTypes::EXECUTE}, placeholderHandler},
-        {{sai::TargetTypes::DATABASE, sai::MethodTypes::PING_REQUEST}, placeholderHandler},
+        {{sai::TargetTypes::DATABASE, sai::MethodTypes::GET}, DatabaseActions::databaseRequestHandler},
+        {{sai::TargetTypes::DATABASE, sai::MethodTypes::SET}, DatabaseActions::databaseRequestHandler},
+        {{sai::TargetTypes::DATABASE, sai::MethodTypes::DELETE}, DatabaseActions::databaseRequestHandler},
+        // {{sai::TargetTypes::DATABASE, sai::MethodTypes::PING_REQUEST}, placeholderHandler},
         //CLI
         {{sai::TargetTypes::CLI, sai::MethodTypes::SET}, placeholderHandler},
         {{sai::TargetTypes::CLI, sai::MethodTypes::EXECUTE}, placeholderHandler},
