@@ -30,6 +30,8 @@ add_executable(smarthome-database
         database_service.cpp
         database_connection.cpp
         database_connection_manager.cpp
+        database_api.cpp
+        database_client.cpp
 )
 
 
