@@ -19,7 +19,7 @@ namespace SmartHomeDB {
         DatabaseConnection(DatabaseConnection&&) noexcept;
         DatabaseConnection& operator=(DatabaseConnection&&) noexcept;
 
-        pqxx::connection &operator*();
-        pqxx::connection *operator->() ;
+        pqxx::connection &operator*() const;
+        pqxx::connection *operator->() const;
     };
 }
