@@ -711,7 +711,7 @@ namespace SmartHome {
     // ======================================== CommandHandler functions ========================================
 
     // THIS PLACEHOLDER IS AN EXAMPLE AND IT SHOULD BE USED AS A TEMPLATE FOR OTHER COMMAND HANDLERS.
-    ba::awaitable<std::optional<API::ApiResponse> > Actions::placeholderHandler(
+    awaitOptApiResponse Actions::placeholderHandler(
         const cmdMetaPtr &commandMetadata) {
         // Optional debug log
         Core::Instance().mpLogger->debug("[ACTIONS] [PLACEHOLDER_HANDLER] called");
