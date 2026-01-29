@@ -63,6 +63,12 @@ namespace UniversalModuleSystem {
          */
         void restartIdleTimer() override;
 
+        /**
+         * @brief Checks whether the module booted after a reset or after waking from deep sleep.
+         * @return True if the module booted after a reset, false if it booted after waking from deep sleep.
+         */
+        bool wasModuleRestarted() const override;
+
     private:
         /**
          * @brief Private constructor for singleton pattern.

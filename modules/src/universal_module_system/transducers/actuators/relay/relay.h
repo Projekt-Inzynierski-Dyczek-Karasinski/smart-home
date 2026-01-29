@@ -19,6 +19,8 @@ namespace UniversalModuleSystem::Transducers {
 
         apiPv doOperation(apiPv operation) override;
 
+        void onBoot(const nl::json &jsonData) override;
+
     private:
         actuatorState getStatePrivate() const;
 

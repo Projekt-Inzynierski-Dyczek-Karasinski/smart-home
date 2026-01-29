@@ -38,6 +38,8 @@ namespace UniversalModuleSystem::Transducers {
 
         bool init(const nl::json &jsonData);
 
+        virtual void onBoot(const nl::json &jsonData);
+
     protected:
         virtual bool loadAdditionalData(const nl::json &jsonData);
 

@@ -30,6 +30,8 @@ namespace UniversalModuleSystem::Transducers {
         return loadData(jsonData);
     }
 
+    void Actuator::onBoot(const nl::json &jsonData) {}
+
     bool Actuator::loadData(const nl::json &jsonData) {
         bool isLoadedSuccessfully = true;
         xSemaphoreTake(mActuatorDataMutex, portMAX_DELAY);

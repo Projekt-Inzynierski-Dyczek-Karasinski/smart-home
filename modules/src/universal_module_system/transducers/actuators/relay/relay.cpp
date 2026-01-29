@@ -1,9 +1,9 @@
 #include "relay.h"
 
+#include "universal_module_system/power_manager/power_manager.h"
+
 namespace UniversalModuleSystem::Transducers {
     using ET = API::errorTypes;
-    // FIXME: software reset (not wake up from deep sleep, not reset by en pin, only software reset) deletes RTC_DATA_ATTR memory, but not clears gpio_hold
-
     RTC_DATA_ATTR std::atomic<uint32_t> Relay::relayStateBitmask = 0; // by default every relay is off
 
     Relay::Relay(const std::shared_ptr<ul::Logger> &logger) : Actuator(logger) {}
@@ -71,8 +71,24 @@ namespace UniversalModuleSystem::Transducers {
                 return apiPv{API::APIParameter(operationValue)};
 
             default:
-                mpLogger->error("Relay", "Relay does not support this operation.");
+                mpLogger->error("Relay", "Relay does not support this operation");
                 return apiPv{API::APIParameter(static_cast<uint8_t>(ET::BAD_ARGUMENT), true)};
+        }
+    }
+
+    void Relay::onBoot(const nl::json &jsonData) {
+        if (!init(jsonData)) {
+            mpLogger->error("Relay", "Relay failed to init on boot");
+            return;
+        }
+
+        // if module was restarted (not woke up from sleep) make sure that relay is off
+        if (
+            const auto &powerManager = PowerManager::getInstance(nullptr);
+            powerManager.wasModuleRestarted()
+        ) {
+            changePinOutput(false);
+            mpLogger->debug("Relay", "Turning off relay after restart");
         }
     }
 
@@ -81,7 +97,7 @@ namespace UniversalModuleSystem::Transducers {
         const uint8_t id = getId();
         if (id >= sizeof(relayStateBitmask)) {
             mpLogger->errorv("Relay RTC_DATA_ATTR", "Relay id is bigger that size of relayStateBitmask, relay id: ", id);
-            throw std::invalid_argument("Relay id is bigger that size of relayStateBitmask.");
+            throw std::invalid_argument("Relay id is bigger that size of relayStateBitmask");
         }
 
         // get state from bitmask based on relay id

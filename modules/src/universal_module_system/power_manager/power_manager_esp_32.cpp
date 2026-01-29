@@ -92,6 +92,18 @@ namespace UniversalModuleSystem {
         }
     }
 
+    bool PowerManagerESP32::wasModuleRestarted() const {
+        switch (esp_sleep_get_wakeup_cause()) {
+            // add here more wake up reasons if needed
+            case ESP_SLEEP_WAKEUP_EXT1:
+            case ESP_SLEEP_WAKEUP_TIMER:
+            case ESP_SLEEP_WAKEUP_EXT0:
+                return false;
+            default:
+                return true;
+        }
+    }
+
     PowerManagerESP32::PowerManagerESP32(const std::shared_ptr<ul::Logger> &logger) : mpLogger(logger) {
         handleWakeUpReason();
         createIdleTimer();

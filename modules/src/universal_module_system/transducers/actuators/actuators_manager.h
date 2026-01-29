@@ -68,6 +68,8 @@ namespace UniversalModuleSystem::Transducers {
 
         ~ActuatorsManager() = default;
 
+        void handleAcuratorsOnBoot();
+
         ActuatorCreationResult handleCreatingActuator(uint8_t actuatorId);
 
         [[nodiscard]] std::optional<nl::json> getActuatorJsonData(uint8_t actuatorId) const;

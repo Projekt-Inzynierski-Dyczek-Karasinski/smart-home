@@ -17,6 +17,8 @@ namespace UniversalModuleSystem::Transducers {
             mpLogger->error("ActuatorsManager", "ActuatorsManager's constructor didn't get pointer to logger instance.");
         }
         mpLogger->verbose("ActuatorsManager", "ActuatorsManager initialized.");
+
+        handleAcuratorsOnBoot();
     }
 
     apiPv ActuatorsManager::getActuatorState(const uint8_t actuatorId) {
@@ -44,6 +46,22 @@ namespace UniversalModuleSystem::Transducers {
         }
 
         return actuator->doOperation(operation);
+    }
+
+    void ActuatorsManager::handleAcuratorsOnBoot() {
+        const auto &dataManager = DataManager::getInstance();
+
+        nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
+        nl::json &actuatorsData = jsonData[ms_ALL_ACTUATORS_DATA];
+
+        for (auto &actuatorData : actuatorsData[ms_ACTUATORS_ARRAY]) {
+            if (
+                std::unique_ptr<Actuator> actuator = createActuator(actuatorData[ms_ACTUATOR_TYPE].get<std::string>().c_str());
+                actuator != nullptr
+            ) {
+                actuator->onBoot(actuatorData[ms_ACTUATOR_DATA]);
+            }
+        }
     }
 
     ActuatorsManager::ActuatorCreationResult ActuatorsManager::handleCreatingActuator(const uint8_t actuatorId) {
