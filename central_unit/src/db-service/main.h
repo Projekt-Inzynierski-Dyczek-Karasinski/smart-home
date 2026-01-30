@@ -3,15 +3,29 @@
 #include "logger.h"
 #include "config_manager/config_manager.h"
 
+#include <termios.h>
+
 #include <boost/asio.hpp>
 #include <boost/program_options.hpp>
-
 
 
 namespace bpo = boost::program_options;
 namespace su = SmartHome::Utils;
 
 namespace SmartHomeDB {
+
+    /**
+     * TODO !pr
+     */
+    class TerminalPasswordGuard {
+        termios mOldSettings;
+
+    public:
+        TerminalPasswordGuard();
+
+        ~TerminalPasswordGuard();
+    };
+
     /**
      * @brief Temporary storage for logger command-line options.
      *
@@ -49,6 +63,15 @@ namespace SmartHomeDB {
                          DatabaseService::Config &databaseServiceConfig);
 
     /**
+     * @brief TODO !pr
+     *
+     *
+     * @param databaseServiceConfig
+     * @param pLogger
+     */
+    void overWriteConfigsWithEnvironmentVariables(DatabaseService::Config &databaseServiceConfig, const std::shared_ptr<su::Logger> &pLogger);
+
+    /**
      * @brief Overwrites configurations with command-line options.
      *
      * @details Command-line arguments override YAML configuration values.
@@ -70,25 +93,26 @@ namespace SmartHomeDB {
      * @details Main configuration loading function that:
      *          1. Sets temporary logger settings from command-line
      *          2. Loads YAML configuration file
-     *          3. Overwrites YAML values with command-line options
-     *          4. Overwrites command-line values with environment variables
+     *          3. Overwrites YAML values with environment variables
+     *          4. Overwrites environment variables values with command-line options
      *          5. Applies final configuration to logger
      *
      * @param vm Variables map containing parsed command-line options.
      * @param parsed Parsed options structure for counting repeated flags (e.g., -vvv).
-     * @param logger Logger instance to configure and use for loading messages.
+     * @param pLogger Logger instance to configure and use for loading messages.
      * @param databaseServiceConfig Database service configuration struct to fill.
      *
-     * @note Priority order: defaults -> YAML -> command-line -> environment variables.
+     * @note Priority order: defaults -> YAML -> environment variables -> command-line.
      */
     void loadConfigs(const bpo::variables_map &vm,
                      const bpo::parsed_options &parsed,
-                     const std::shared_ptr<su::Logger> &logger,
+                     const std::shared_ptr<su::Logger> &pLogger,
                      DatabaseService::Config &databaseServiceConfig);
+
+
 
 
     // Default paths for db-service
     static constexpr std::string_view sDEFAULT_CONFIG_PATH = "/etc/smarthome/db-service.yaml";
     static constexpr std::string_view sDEFAULT_LOGFILE_PATH = "/var/log/smarthome/db-service.log";
-
 }
