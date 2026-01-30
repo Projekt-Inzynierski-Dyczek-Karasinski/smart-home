@@ -226,6 +226,55 @@ namespace SmartHomeDB {
     DatabaseService::~DatabaseService() {
         if (isRunning()) {
             shutdown();
+            return;
+        }
+
+        // Shutdown after failed initialization
+        if (!isRunning() && !mIsInitialized.load(std::memory_order_acquire)) {
+            mpLogger->warning("[DB-SERVICE] Running cleanup after failed initialization");
+
+            if (mSignals.has_value()) {
+                mSignals->cancel();
+                mSignals.reset();
+            }
+
+            if (mpService) {
+                mpService->onStop();
+            }
+
+            mMainGuard.reset();
+            mSocketClientGuard.reset();
+            mDbApiGuard.reset();
+            mUtilityGuard.reset();
+
+            if (!mMainIoContext.stopped()) {
+                mMainIoContext.stop();
+            }
+
+            if (!mDbApiIoContext.stopped()) {
+                mDbApiIoContext.stop();
+            }
+
+            if (!mSocketClientIoContext.stopped()) {
+                mSocketClientIoContext.stop();
+            }
+
+            if (!mUtilityIoContext.stopped()) {
+                mUtilityIoContext.stop();
+            }
+
+            if (mMainThread && mMainThread->joinable()) {
+                mMainThread->join();
+            }
+            if (mDbApiThread && mDbApiThread->joinable()) {
+                mDbApiThread->join();
+            }
+            if (mSocketClientThread && mSocketClientThread->joinable()) {
+                mSocketClientThread->join();
+            }
+            if (mUtilityThread && mUtilityThread->joinable()) {
+                mUtilityThread->join();
+            }
         }
     }
 

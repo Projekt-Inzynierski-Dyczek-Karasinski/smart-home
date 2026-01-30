@@ -239,6 +239,7 @@ namespace SmartHomeMediator {
     Mediator::Mediator() = default;
 
     Mediator::~Mediator() {
+        // FIXME rework shutdown - implement shutdown from db-service
         if (isRunning()) {
             shutdown();
         }
