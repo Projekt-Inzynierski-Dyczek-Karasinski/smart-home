@@ -13,7 +13,7 @@ namespace SmartHomeDB {
     class DatabaseConnectionManager {
     public:
         struct Config {
-            uint dbMaxConnections = 1;
+            uint dbConnections = 1;
 
             // DB connection target
             std::string dbHost = "127.0.0.1";

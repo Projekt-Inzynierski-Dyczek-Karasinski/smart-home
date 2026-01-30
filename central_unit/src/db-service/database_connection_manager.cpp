@@ -34,7 +34,7 @@ namespace SmartHomeDB {
 
         mpLogger->debugf("[DB_CONN_MANAGER] [CONSTRUCTOR] Attempting to connect with: %s", mConnectionStr.c_str());
 
-        for (auto i = 0; i < config.dbMaxConnections; ++i) {
+        for (auto i = 0; i < config.dbConnections; ++i) {
             try {
                 mConnections.push(std::make_unique<pqxx::connection>(mConnectionStr));
             } catch (std::exception &e) {
@@ -46,7 +46,7 @@ namespace SmartHomeDB {
             throw std::runtime_error("No connections available");
         }
         mpLogger->infof("[DB_CONN_MANAGER] [CONSTRUCTOR] Successfully initialized %d of %d connections",
-                        mConnections.size(), config.dbMaxConnections);
+                        mConnections.size(), config.dbConnections);
     }
 
     DatabaseConnection DatabaseConnectionManager::acquireConnection() {

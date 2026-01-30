@@ -17,7 +17,7 @@ namespace SmartHomeDB {
         mpLogger = std::make_shared<su::AsyncLogger>(logger, mUtilityIoContext);
 
         // Start service
-        mpService = su::ServiceManager::create(logger, msSERVICE_NAME, su::ServiceType::AUTO);
+        mpService = su::ServiceManager::create(logger, configStruct.serviceName, su::ServiceType::AUTO);
         mpService->setIoContext(mMainIoContext);
         if (!mpService->onInitialize()) {
             logger->error("[DB_SERVICE] Failed to initialize service");

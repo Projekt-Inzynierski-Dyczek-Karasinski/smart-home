@@ -26,11 +26,17 @@ namespace SmartHomeDB {
     class DatabaseClient;
 
     class DatabaseService {
+        /// Service name
+        static constexpr std::string_view msDEFAULT_SERVICE_NAME = "smarthome-databased";
     public:
         /**
          * @brief Configuration structure for DatabaseService initialization.
          */
         struct Config {
+            std::string serviceName = msDEFAULT_SERVICE_NAME.data();
+
+            DatabaseConnectionManager::Config dbConnConfig{};
+
             /// Default TCP config from socket server
             si::SocketServer::Config::Tcp tcp{
                 .isEnabled = true, .endpointAddress = "127.0.0.1", .endpointPort = 43321
@@ -40,7 +46,6 @@ namespace SmartHomeDB {
                 .isEnabled = true, .endpointPath = "/var/run/smarthomed.sock"
             };
 
-            DatabaseConnectionManager::Config dbConnConfig{};
         };
 
 
@@ -131,8 +136,7 @@ namespace SmartHomeDB {
         static constexpr std::array msSIGNALS_TO_HANDLE = {SIGINT, SIGTERM, SIGHUP};
         /// Maximum time to wait for graceful shutdown
         static constexpr auto msSHUTDOWN_TIMEOUT = 2500ms;
-        /// Service name
-        static constexpr std::string_view msSERVICE_NAME = "smarthome-databased";
+        /// IPC target type for handshake
         static constexpr std::string_view msCLIENT_TARGET_TYPE = "database";
 
         Config mConfig;

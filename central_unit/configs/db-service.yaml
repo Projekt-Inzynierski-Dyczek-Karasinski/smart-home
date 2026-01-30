@@ -8,13 +8,17 @@ preset_values:
     debug: &debug 5
 
 db_service:
+  service_name: "smarthome-databased"
   db_server:
-    db_host: "127.0.0.0" # Overwritten by env var "DB_HOST"
-    db_port: 5432 # Overwritten by env var "DB_PORT"
-    db_name: "smart_home" # Overwritten by env var "DB_NAME"
-    db_user: "smart_home_admin" # Overwritten by env var "DB_USER"
-    db_password: "insert_password"  # Overwritten by env var "DB_PASSWORD"
-    db_connections: 4
+    connections: 4
+    host: "127.0.0.0" # Overwritten by env var "SH_DB_HOST"
+    port: 5432 # Overwritten by env var "SH_DB_PORT"
+    name: "smart_home" # Overwritten by env var "SH_DB_NAME"
+    user: "smart_home_admin" # Overwritten by env var "SH_DB_USER"
+    password: "insert_password"  # Overwritten by env var "SH_DB_PASSWORD"
+    connection_timeout_seconds: 10
+    keep_alive_enabled: true
+    keep_alive_interval_seconds: 30
   logging:
     log_level: *info
     enable_console_log_output: true
