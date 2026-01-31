@@ -27,7 +27,7 @@ namespace UniversalModuleSystem {
     void PowerManagerESP32::safeRestart(const char *source) const {
         mpLogger->warning(source, "Safe Rebooting...");
         waitAndDisableCriticalFeatures();
-        ESP.restart();
+        esp_restart();
     }
 
     void PowerManagerESP32::enterSleep(const uint32_t milliSeconds, const bool enableWakeUpWithRfModule) {

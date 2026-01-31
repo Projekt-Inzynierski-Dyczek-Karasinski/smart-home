@@ -28,7 +28,7 @@ namespace UniversalModuleSystem {
          *
          * @param source String describing the source of the restart (for log).
          */
-        virtual void safeRestart(const char *source) const = 0;
+        virtual void safeRestart(const char *source) const  __attribute__((noreturn)) = 0;
 
         /**
          * @brief Disables the automatic sleep (if enabled) after waking up the module by the rf module.
