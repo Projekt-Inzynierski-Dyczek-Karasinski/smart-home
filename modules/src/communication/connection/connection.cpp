@@ -551,9 +551,10 @@ namespace Comms {
         auto &powerManager = ums::PowerManager::getInstance(mpLogger);
         powerManager.restartIdleTimer();
 
-
-        // TODO !pr change to CommandHandler and remove ConnectionMessages
-        if (!uah::areArraysEqual(message, ConnectionMessages::s_CONNECTION_REPEAT_MESSAGE)) {
+        if (
+            const API::CommandHandler ch(message);
+            ch.getCommandType() != API::commandTypes::REPEAT
+        ) {
             mpLogger->debug("Connection Method", "setLastTransmittedMessage(message)");
             setLastTransmittedMessage(message);
         }
