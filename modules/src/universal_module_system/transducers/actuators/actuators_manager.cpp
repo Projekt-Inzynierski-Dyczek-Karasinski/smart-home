@@ -18,7 +18,7 @@ namespace UniversalModuleSystem::Transducers {
         }
         mpLogger->verbose("ActuatorsManager", "ActuatorsManager initialized.");
 
-        handleAcuratorsOnBoot();
+        handleActuatorsOnBoot();
     }
 
     apiPv ActuatorsManager::getActuatorState(const uint8_t actuatorId) {
@@ -48,7 +48,7 @@ namespace UniversalModuleSystem::Transducers {
         return actuator->doOperation(operation);
     }
 
-    void ActuatorsManager::handleAcuratorsOnBoot() {
+    void ActuatorsManager::handleActuatorsOnBoot() {
         const auto &dataManager = DataManager::getInstance();
 
         nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);

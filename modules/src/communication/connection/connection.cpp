@@ -495,7 +495,7 @@ namespace Comms {
             sendCommand->generateMessage(sendBuffer);
             mpCommunication->sendMessage(sendBuffer);
 
-            // TODO !mm remove
+            // TODO !mm add #ifdef CENTRAL_UNIT
             if (sendCommand->getCommandType() == CT::END)
                 endConnection();
         }

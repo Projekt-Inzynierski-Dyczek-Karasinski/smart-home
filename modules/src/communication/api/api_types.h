@@ -1,38 +1,10 @@
 #pragma once
 
-#include <Arduino.h>
 #include <variant>
 #include <string_view>
 
-
-// TODO !pr add one line commets for enums
 namespace Comms::API {
-    enum class errorTypes : uint8_t {
-        UNKNOWN = 0,
-        BAD_COMMAND = 1,
-        UNKNOWN_COMMAND = 2,
-        BAD_ARGUMENT = 3,
-        NOT_IMPLEMENTED = 4,
-        INTERNAL_ERROR = 5,
-    };
-
-    enum class getTypes : uint8_t {
-        UNKNOWN = 0,
-        SENSOR_VALUE = 1,
-        CONFIG_VALUE = 2,
-        SENSOR_LIST = 3,
-        LOGS = 4,
-        BATTERY_STATE = 5,
-        SENSOR_VALUE_WITH_FORCE_NEW_READING = 6,
-        ACTUATOR_STATE = 7
-    };
-
-    enum class setTypes : uint8_t {
-        UNKNOWN = 0,
-        ACTUATOR_OPERATION = 1,
-        ACTUATOR_TOGGLE = 2
-    };
-
+    /// @brief High-level command identifiers used in the communication protocol (control, GET/SET, etc.).
     enum class commandTypes : uint8_t {
         UNKNOWN = 0,
         ACKNOWLEDGE = 1,
@@ -49,6 +21,36 @@ namespace Comms::API {
         NOTIFY = 12
     };
 
+    /// @brief Error codes returned by the API to describe why a request failed.
+    enum class errorTypes : uint8_t {
+        UNKNOWN = 0,
+        BAD_COMMAND = 1,
+        UNKNOWN_COMMAND = 2,
+        BAD_ARGUMENT = 3,
+        NOT_IMPLEMENTED = 4,
+        INTERNAL_ERROR = 5,
+    };
+
+    /// @brief GET request subtypes that specify what information should be read from the device.
+    enum class getTypes : uint8_t {
+        UNKNOWN = 0,
+        SENSOR_VALUE = 1,
+        CONFIG_VALUE = 2,
+        SENSOR_LIST = 3,
+        LOGS = 4,
+        BATTERY_STATE = 5,
+        SENSOR_VALUE_WITH_FORCE_NEW_READING = 6,
+        ACTUATOR_STATE = 7
+    };
+
+    /// @brief SET request subtypes that specify what action the module should perform.
+    enum class setTypes : uint8_t {
+        UNKNOWN = 0,
+        ACTUATOR_OPERATION = 1,
+        ACTUATOR_TOGGLE = 2
+    };
+
+    /// @brief Notification event types to report important events.
     enum class notifyTypes : uint8_t {
         UNKNOWN = 0,
         MANUAL_WAKE_UP = 1,
@@ -56,6 +58,7 @@ namespace Comms::API {
         SENSOR_ALERT = 3
     };
 
+    /// @brief Parameter types used to describe the format of a transmitted value.
     enum class parametersTypes : uint8_t {
         UNKNOWN = 0,
         UINT = 1,
@@ -94,6 +97,7 @@ namespace Comms::API {
         const uint8_t*
     >;
 
+    /// @brief Enumerates the concrete C++ types that can be stored in parameterVariant for serialization/deserialization.
     enum class ParameterVariantEnum : uint8_t {
         MONOSTATE = 0,
         UINT8  = 1,

@@ -68,7 +68,7 @@ namespace UniversalModuleSystem::Transducers {
 
         ~ActuatorsManager() = default;
 
-        void handleAcuratorsOnBoot();
+        void handleActuatorsOnBoot();
 
         ActuatorCreationResult handleCreatingActuator(uint8_t actuatorId);
 
