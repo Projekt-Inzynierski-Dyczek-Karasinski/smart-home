@@ -167,7 +167,6 @@ namespace Comms {
         uint8_t buffer[MESSAGE_SIZE];
 
         if (xQueueReceive(mReceiveMessageQueue, buffer, 0) == pdTRUE) {
-            // TODO !mm consider change isReadingRawMessage flag to mpAddressing->getIsAddressingInProgress()
             // TODO !mm change/remove addressing algorithm
             // if it is addressing message
             if ((buffer[0] == (uint8_t)'A' && buffer[1] == (uint8_t)'D') || *isReadingRawMessage) {
@@ -357,7 +356,6 @@ namespace Comms {
 
         // task loop
         for (;;) {
-            // TODO consider adding method for handling notifications (it require to change lambda functions to class methods)
             // notifications handling
             if (xTaskNotifyWait(0, ULONG_MAX, &timeoutStatus, 0) == pdTRUE) {
                 if (timeoutStatus == READ_RAW_MESSAGE_NOTIF) {

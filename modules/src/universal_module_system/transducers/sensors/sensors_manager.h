@@ -151,7 +151,6 @@ namespace UniversalModuleSystem::Transducers {
 
         uint8_t mSensorsPowerPin;
 
-        // TODO assign final value
         static constexpr uint16_t ms_DELAY_AFTER_POWERING_ON_SENSORS = 100; // ms
 
         // JSON keys

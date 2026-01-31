@@ -476,13 +476,10 @@ namespace Comms {
                         }
                         // off
                         if (operation.value() == 0) {
-                            mpLogger->verbose("MessageDecider", "CT::OTA OFF"); // TODO !pr remove
-
                             responseWithError(sendCommand, ET::NOT_IMPLEMENTED, uid);
                         }
                         // on
                         else {
-                            mpLogger->verbose("MessageDecider", "CT::OTA ON"); // TODO !pr remove
                             responseWithError(sendCommand, ET::NOT_IMPLEMENTED, uid);
                         }
                         break;

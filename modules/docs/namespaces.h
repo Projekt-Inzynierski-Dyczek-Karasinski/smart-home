@@ -50,7 +50,10 @@ namespace UniversalModuleSystem {}
  * @details Contains:
  * - class SensorManager - singleton handling all module's sensors
  * - class Sensor - abstract Sensor base class
+ * - class ActuatorManager - singleton handling all module's actuators
+ * - class Actuator - abstract Actuator base class
  * - multiple derived Sensor classes
+ * - multiple derived Actuator classes
  */
 namespace UniversalModuleSystem::Transducers {}
 

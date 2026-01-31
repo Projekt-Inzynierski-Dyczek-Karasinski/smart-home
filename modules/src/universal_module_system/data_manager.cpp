@@ -121,7 +121,7 @@ namespace UniversalModuleSystem {
             return;
         }
 
-        // TODO add here other files to create
+        // add here other files to create
         if (overrideExistingFiles || !SPIFFS.exists(ADDRESSING_DATA_PATH)) {
             saveJson(ADDRESSING_DATA_PATH, baseConfig["addressing"]);
         }

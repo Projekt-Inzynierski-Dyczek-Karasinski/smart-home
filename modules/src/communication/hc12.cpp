@@ -232,18 +232,6 @@ namespace Comms {
                     vTaskSuspend(hc12.mTransmitTaskHandle);
                     break;
 
-                // case CREATE_SETUP_HC12_TASK_NOTIF:
-                //     hc12.mpLogger->debug("HC12 Main", "CREATE_SETUP_HC12_TASK_NOTIF");
-                //     // isSetupHC12Working = true;
-                //     hc12.createSetupHC12Task();
-                //     break;
-                //
-                // case DELETE_SETUP_HC12_TASK_NOTIF:
-                //     hc12.mpLogger->debug("HC12 Main", "DELETE_SETUP_HC12_TASK_NOTIF");
-                //     hc12.deleteSetupHC12Task();
-                //     // isSetupHC12Working = false;
-                //     break;
-
                 default:
                     hc12.mpLogger->errorv("HC12 Main", "Got unknow status. Received Status: ", status);
                     break;
@@ -364,7 +352,6 @@ namespace Comms {
 
                 hc12.mpLogger->verbosea("HC12 Setup", "Received command: ", commandBuffer, SETUP_COMMAND_SIZE);
 
-                // TODO !o add better protection against bad commands
                 if (!(commandBuffer[0] == (uint8_t) 'H' && commandBuffer[1] == (uint8_t) 'C')) {
                     hc12.mpLogger->error("HC12 Setup", "Received array is not hc12 command.");
                 } else {
@@ -397,23 +384,11 @@ namespace Comms {
                 }
                 xSemaphoreTake(hc12.mSetupWorkingSemaphore, 0);
                 xSemaphoreGive(hc12.mSendingDataMutex);
-            } else {
-                // constexpr uint8_t notificationValue = DELETE_SETUP_HC12_TASK_NOTIF;
-                // xQueueSend(hc12.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
-                // for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
             }
         }
     }
 
     void HC12::createSetupHC12Task() {
-        // xSemaphoreTake(mSendingDataMutex, portMAX_DELAY);
-        //
-        // // signalize that setup has started working (if setup isn't forced to be done first, it will do nothing)
-        // xSemaphoreGive(mFirstSetupSemaphore);
-        //
-        // digitalWrite(m_HC12_DATA.setPin, LOW);
-        // vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_LOW*2));
-
         if (mSetupHC12TaskHandle == nullptr) {
             xTaskCreate(
                 setupHC12Task,
@@ -435,14 +410,6 @@ namespace Comms {
         }
 
         deleteSetupHC12Queues();
-
-        // digitalWrite(m_HC12_DATA.setPin, HIGH);
-        // vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_HIGH));
-        // // clear random hc12 output after changing state of SET_PIN
-        // while (mpSerial->available() > 0) {
-        //     mpSerial->read();
-        // }
-        // xSemaphoreGive(mSendingDataMutex);
     }
 
     HC12::HC12Data::HC12Data(const nl::json &data) :
