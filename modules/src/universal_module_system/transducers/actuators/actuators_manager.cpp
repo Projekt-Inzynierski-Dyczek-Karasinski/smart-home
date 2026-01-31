@@ -102,7 +102,7 @@ namespace UniversalModuleSystem::Transducers {
             if (actuator[ms_ACTUATOR_DATA][ms_ACTUATOR_ID] == actuatorId) return actuator;
         }
 
-        return std::nullopt;
+        return std::optional<nl::json>{};
     }
 
     std::unique_ptr<Actuator> ActuatorsManager::createActuator(const char *actuatorName) {

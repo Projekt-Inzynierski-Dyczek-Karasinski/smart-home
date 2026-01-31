@@ -24,7 +24,6 @@ void setup() {
     // ums::Ota ota(logger);
     // ota.autoEnableOta();
 
-
     const auto debugLed = std::make_shared<ums::DebugLED>(logger);
     auto &communication = Comms::Communication::getInstance(debugLed, logger);
     auto &pairingButton = ums::PairingButton::getInstance(debugLed, &communication, logger);
@@ -35,6 +34,7 @@ void setup() {
 
     logger->info("Main", "All components initialized.");
     logger->verbose("Main", "Deleting functions setup() and loop()...");
+
     vTaskDelete(nullptr);
 
     // everything below this comment should never be executed

@@ -96,8 +96,8 @@ namespace UniversalModuleSystem::Transducers {
         // bitmask "overflow" protection
         const uint8_t id = getId();
         if (id >= sizeof(relayStateBitmask)) {
-            mpLogger->errorv("Relay RTC_DATA_ATTR", "Relay id is bigger that size of relayStateBitmask, relay id: ", id);
-            throw std::invalid_argument("Relay id is bigger that size of relayStateBitmask");
+            mpLogger->errorv("Relay RTC_DATA_ATTR", "Relay id is bigger than size of relayStateBitmask, relay id: ", id);
+            throw std::invalid_argument("Relay id is bigger than the size of relayStateBitmask");
         }
 
         // get state from bitmask based on relay id

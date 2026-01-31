@@ -38,7 +38,7 @@ namespace UniversalModuleSystem::Transducers {
         try {
             mCommonActuatorData = CommonActuatorData(jsonData);
         } catch (...) {
-            mpLogger->error("Sensor class", "Failed to load common sensor data.");
+            mpLogger->error("Actuator class", "Failed to load common sensor data.");
             isLoadedSuccessfully = false;
         }
         if (isLoadedSuccessfully) {

@@ -67,7 +67,7 @@ namespace UniversalModuleSystem {
          * @brief Checks whether the module booted after a reset or after waking from deep sleep.
          * @return True if the module booted after a reset, false if it booted after waking from deep sleep.
          */
-        bool wasModuleRestarted() const override;
+        [[nodiscard]] bool wasModuleRestarted() const override;
 
     private:
         /**
