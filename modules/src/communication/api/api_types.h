@@ -47,7 +47,8 @@ namespace Comms::API {
     enum class setTypes : uint8_t {
         UNKNOWN = 0,
         ACTUATOR_OPERATION = 1,
-        ACTUATOR_TOGGLE = 2
+        ACTUATOR_TOGGLE = 2,
+        OTA = 3
     };
 
     /// @brief Notification event types to report important events.

@@ -1,7 +1,7 @@
 #include "power_manager_esp_32.h"
 
 #include <driver/rtc_io.h>
-// TODO !pr uncomment
+// TODO !mm uncomment
 // #include <WiFi.h>
 // #include <esp_wifi.h>
 
@@ -34,7 +34,7 @@ namespace UniversalModuleSystem {
         constexpr uint16_t US_TO_MILLISECONDS_FACTOR = 1000;
 
         // disable WiFi
-        // TODO !pr uncomment
+        // TODO !mm uncomment
         // WiFi.disconnect(true);
         // WiFi.mode(WIFI_OFF);
         // esp_wifi_stop();

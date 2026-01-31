@@ -782,7 +782,7 @@ namespace Comms {
                             setType = std::stoi((char*)&buffer[3]);
                             actuatorId = std::stoi((char*)&buffer[5]);
                         } catch (...) {
-                            com.mpLogger->error("Communication Input", "Bad getType or actuatorId.");
+                            com.mpLogger->error("Communication Input", "Bad setType or actuatorId.");
                         }
                         if (setType.has_value() && actuatorId.has_value()) {
                             ch.addParameter(API::APIParameter(setType.value()));

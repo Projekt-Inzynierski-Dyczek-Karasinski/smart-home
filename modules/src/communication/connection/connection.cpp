@@ -410,11 +410,10 @@ namespace Comms {
 
                 // get always required arguments for CT::SET
                 std::optional<uint8_t> setType;
-                std::optional<uint8_t> actuatorId;
+
                 try {
                     uid = receivedCommand->getParameterValue<uint32_t>(0);
                     setType = receivedCommand->getParameterValue<uint8_t>(1);
-                    actuatorId = receivedCommand->getParameterValue<uint8_t>(2);
                 } catch (std::exception &e) {
                     responseWithError(sendCommand, ET::BAD_ARGUMENT, uid);
                     break;
@@ -435,14 +434,17 @@ namespace Comms {
                 auto &actuatorManager = ums::Transducers::ActuatorsManager::getInstance(mpLogger);
                 switch (setType.value()) {
                     case static_cast<uint8_t>(ST::ACTUATOR_OPERATION): {
+                        std::optional<uint8_t> actuatorId;
                         std::optional<API::APIParameterVariant> operation;
                         // WARNING: to actuatorDoOperation is passed raw API::APIParameterVariant
                         try {
+                            actuatorId = receivedCommand->getParameterValue<uint8_t>(2);
                             operation = receivedCommand->getParameter(3);
                         } catch (std::exception &e) {
                             responseWithError(sendCommand, ET::BAD_ARGUMENT, uid);
                             break;
                         }
+
                         sendCommand->addParameter(actuatorManager.actuatorDoOperation(
                             actuatorId.value(),
                             operation.value()
@@ -450,9 +452,41 @@ namespace Comms {
                         break;
                     }
 
-                    case static_cast<uint8_t>(ST::ACTUATOR_TOGGLE):
+                    case static_cast<uint8_t>(ST::ACTUATOR_TOGGLE): {
+                        std::optional<uint8_t> actuatorId;
+                        try {
+                            actuatorId = receivedCommand->getParameterValue<uint8_t>(2);
+                        } catch (std::exception &e) {
+                            responseWithError(sendCommand, ET::BAD_ARGUMENT, uid);
+                            break;
+                        }
+
                         sendCommand->addParameter(actuatorManager.toggleActuator(actuatorId.value()));
                         break;
+                    }
+
+                    case static_cast<uint8_t>(ST::OTA): {
+                        mpLogger->verbose("MessageDecider", "CT::OTA");
+                        std::optional<uint8_t> operation;
+                        try {
+                            operation = receivedCommand->getParameterValue<uint8_t>(2);
+                        } catch (std::exception &e) {
+                            responseWithError(sendCommand, ET::BAD_ARGUMENT, uid);
+                            break;
+                        }
+                        // off
+                        if (operation.value() == 0) {
+                            mpLogger->verbose("MessageDecider", "CT::OTA OFF"); // TODO !pr remove
+
+                            responseWithError(sendCommand, ET::NOT_IMPLEMENTED, uid);
+                        }
+                        // on
+                        else {
+                            mpLogger->verbose("MessageDecider", "CT::OTA ON"); // TODO !pr remove
+                            responseWithError(sendCommand, ET::NOT_IMPLEMENTED, uid);
+                        }
+                        break;
+                    }
 
                     default: {
                         mpLogger->errorv("MessageDecider CT::SET", "Got unknown set type: ", setType.value());
