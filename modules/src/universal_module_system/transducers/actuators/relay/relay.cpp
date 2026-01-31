@@ -119,10 +119,13 @@ namespace UniversalModuleSystem::Transducers {
 
         // change bitmask
         // id should be already checked, no bitmask "overflow" protection
+        uint32_t relayStateBitmaskTmp = relayStateBitmask.load();
         if (state)
-            relayStateBitmask |=  (1UL << mCommonActuatorData.id);
+            relayStateBitmaskTmp |=  (1UL << mCommonActuatorData.id);
         else
-            relayStateBitmask &= ~(1UL << mCommonActuatorData.id);
+            relayStateBitmaskTmp &= ~(1UL << mCommonActuatorData.id);
+
+        relayStateBitmask.store(relayStateBitmaskTmp);
 
         xSemaphoreGive(mActuatorDataMutex);
     }
