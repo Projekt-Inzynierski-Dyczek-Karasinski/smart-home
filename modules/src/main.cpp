@@ -15,11 +15,11 @@ namespace ul = Utils::Logging;
 namespace ums = UniversalModuleSystem;
 
 void setup() {
-    // TODO !pr remove VERBOSE
-    const auto logger = std::make_shared<ul::Logger>(ul::Level::VERBOSE);
+    const auto logger = std::make_shared<ul::Logger>();
 
     auto &dataManager = ums::DataManager::getInstance(logger);
 
+    // FIXME !mm ota
     // start Ota if CONFIG_VERSION and "version" in /data/base_config.json do not match.
     // ums::Ota ota(logger);
     // ota.autoEnableOta();
