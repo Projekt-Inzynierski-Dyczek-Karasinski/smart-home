@@ -5,6 +5,7 @@
 #include "api.h"
 
 #include <string_view>
+#include <utility>
 
 namespace sj = SmartHome::JsonRpcStrings;
 namespace su = SmartHome::Utils;
@@ -13,17 +14,28 @@ namespace sa = SmartHome::API;
 namespace SmartHome::IPC {
     using namespace std::chrono_literals;
 
+    /**
+     * @brief Client for communicating with the core via sockets.
+     *
+     * @details Implements JSON-RPC API client functionality on top of a \c SocketConnection.
+     *          Provides synchronous handshake for registration and an asynchronous receive
+     *          loop that dispatches incoming messages to a user-provided handler.
+     */
     class SocketClient final : public API::Api {
     public:
         /**
          * @brief Construct socket client.
          *
+         * @details Stores the provided IO context and logger and records the client target
+         *          type used when performing the initial handshake with the core.
+         *
          * @param io_context IO context for async operations.
          * @param logger Logger instance for diagnostic output.
-         * @param targetTypeOfClient TODO !pr
+         * @param targetTypeOfClient Logical target type used during handshake (e.g. \c "database").
          */
-        explicit SocketClient(ba::io_context *io_context, const std::shared_ptr<su::Logger> &logger, const std::string &targetTypeOfClient)
-            : mpIoContext(io_context), mpLogger(logger), mTargetTypeOfClient(targetTypeOfClient) {
+        explicit SocketClient(ba::io_context *io_context, const std::shared_ptr<su::Logger> &logger,
+                              std::string targetTypeOfClient)
+            : mpIoContext(io_context), mpLogger(logger), mTargetTypeOfClient(std::move(targetTypeOfClient)) {
         }
 
         /**
