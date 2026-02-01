@@ -53,7 +53,10 @@ namespace SmartHomeMediator {
          *           "logic_address": <uint>,
          *           "rf_channel": <uint>
          *         },
-         *         "method_params": []  // Array of positional parameters for the specific method
+         *         "method_params": {
+         *           "type": <string> // Method type / execute action
+                     "args": [] // Array of positional parameters for the specific method and type
+                    }
          *       }
          *       \endcode
          */
