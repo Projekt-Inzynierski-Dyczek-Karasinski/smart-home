@@ -91,8 +91,8 @@ namespace SmartHome::IPC {
             return false;
         }
 
-        if (apiResponse.result.has_value() && apiResponse.result.value() == jsonParams[sj::ParamsKeys::METHOD_PARAMS].
-            dump()) {
+        if (apiResponse.result.has_value() &&
+            apiResponse.result.value() == jsonParams[sj::ParamsKeys::METHOD_PARAMS].dump()) {
             return true;
         }
 

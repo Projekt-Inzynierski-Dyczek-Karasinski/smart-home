@@ -14,7 +14,7 @@ namespace SmartHomeDB {
         }
 
         // Initialize AsyncLogger, using Logger for further initialization
-        mpLogger = std::make_shared<su::AsyncLogger>(logger, mUtilityIoContext);
+        pLogger = std::make_shared<su::AsyncLogger>(logger, mUtilityIoContext);
 
         // Start service
         mpService = su::ServiceManager::create(logger, configStruct.serviceName, su::ServiceType::AUTO);
@@ -30,19 +30,19 @@ namespace SmartHomeDB {
         mConfig = configStruct;
 
         // Attempt establishing connection with SmartHome daemon
-        mpSocketClient = std::make_unique<si::SocketClient>(&mSocketClientIoContext, mpLogger,
+        mpSocketClient = std::make_unique<si::SocketClient>(&mSocketClientIoContext, pLogger,
                                                             msCLIENT_TARGET_TYPE.data());
         bool isConnectionEstablished = false;
         if (mConfig.uds.isEnabled) {
             isConnectionEstablished = mpSocketClient->connectToServer(mConfig.uds.endpointPath);
             if (isConnectionEstablished)
-                mpLogger->info("[DB_SERVICE] Connection established via UDS");
+                pLogger->info("[DB_SERVICE] Connection established via UDS");
         }
         if (!isConnectionEstablished && mConfig.tcp.isEnabled) {
             isConnectionEstablished = mpSocketClient->connectToServer(mConfig.tcp.endpointAddress,
                                                                       mConfig.tcp.endpointPort);
             if (isConnectionEstablished)
-                mpLogger->info("[DB_SERVICE] Connection established via TCP");
+                pLogger->info("[DB_SERVICE] Connection established via TCP");
         }
         if (!isConnectionEstablished) {
             logger->error("[DB_SERVICE] Failed to connect with SmartHome daemon");
@@ -76,7 +76,7 @@ namespace SmartHomeDB {
         });
 
         try {
-            mpDatabaseConnectionManager = std::make_shared<DatabaseConnectionManager>(mpLogger, mConfig.dbConnConfig);
+            mpDatabaseConnectionManager = std::make_shared<DatabaseConnectionManager>(pLogger, mConfig.dbConnConfig);
         } catch (const std::exception &e) {
             logger->criticalf("[DB_SERVICE] Failed to initialize database connection manager: %s", e.what());
             return false;
@@ -91,16 +91,16 @@ namespace SmartHomeDB {
 
     void DatabaseService::run() {
         if (!mIsInitialized.load(std::memory_order_acquire)) {
-            mpLogger->error("[DB_SERVICE] Database service not initialized");
+            pLogger->error("[DB_SERVICE] Database service not initialized");
             return;
         }
         if (mIsRunning.load(std::memory_order_acquire)) {
-            mpLogger->error("[DB_SERVICE] Database service is already running");
+            pLogger->error("[DB_SERVICE] Database service is already running");
             return;
         }
 
         mIsRunning.store(true, std::memory_order_release);
-        mpLogger->info("[DB_SERVICE] Database service starting");
+        pLogger->info("[DB_SERVICE] Database service starting");
 
         mpService->onStart();
 
@@ -133,14 +133,14 @@ namespace SmartHomeDB {
             });
         });
 
-        mpLogger->info("[DB_SERVICE] Database service running");
+        pLogger->info("[DB_SERVICE] Database service running");
 
         if (mMainThread && mMainThread->joinable()) {
             mMainThread->join();
             mMainThread.reset();
         }
 
-        mpLogger->debug("[DB-SERVICE] Main thread finished");
+        pLogger->debug("[DB-SERVICE] Main thread finished");
 
         if (mDbApiThreadPool) {
             mDbApiThreadPool->join();
@@ -152,7 +152,7 @@ namespace SmartHomeDB {
             mSocketClientThread.reset();
         }
 
-        mpLogger->debug("[DB-SERVICE] Threads joined, stopping utils");
+        pLogger->debug("[DB-SERVICE] Threads joined, stopping utils");
 
         if (!mUtilityIoContext.stopped()) {
             mUtilityIoContext.stop();
@@ -165,12 +165,12 @@ namespace SmartHomeDB {
     }
 
     void DatabaseService::shutdown() {
-        mpLogger->info("[DB_SERVICE] Shutdown requested");
+        pLogger->info("[DB_SERVICE] Shutdown requested");
 
         bool expected = true;
         constexpr bool desired = false;
         if (!mIsRunning.compare_exchange_strong(expected, desired)) {
-            mpLogger->error("[DB_SERVICE] Shutdown called while database service is not running");
+            pLogger->error("[DB_SERVICE] Shutdown called while database service is not running");
             return;
         }
 
@@ -192,7 +192,7 @@ namespace SmartHomeDB {
         const auto timeoutTimer = std::make_shared<ba::steady_timer>(mUtilityIoContext, msSHUTDOWN_TIMEOUT);
         timeoutTimer->async_wait([this, timeoutTimer](const bs::error_code &ec) {
             if (!ec) {
-                mpLogger->warning("[DB_SERVICE] Shutdown timeout - force stopping IO contexts");
+                pLogger->warning("[DB_SERVICE] Shutdown timeout - force stopping IO contexts");
 
                 if (!mDbApiIoContext.stopped()) {
                     mDbApiIoContext.stop();
@@ -213,7 +213,7 @@ namespace SmartHomeDB {
         mpService.reset();
 
 
-        mpLogger->debug("[DB_SERVICE] Shutdown complete - waiting for threads to join in run()");
+        pLogger->debug("[DB_SERVICE] Shutdown complete - waiting for threads to join in run()");
 
         // Reset utility guard
         mUtilityGuard.reset();
@@ -235,7 +235,7 @@ namespace SmartHomeDB {
 
         // Shutdown after failed initialization
         if (!isRunning() && !mIsInitialized.load(std::memory_order_acquire)) {
-            if (mpLogger) mpLogger->warning("[DB-SERVICE] Running cleanup after failed initialization");
+            if (pLogger) pLogger->warning("[DB-SERVICE] Running cleanup after failed initialization");
 
             if (mSignals.has_value()) {
                 mSignals->cancel();
@@ -283,7 +283,7 @@ namespace SmartHomeDB {
     }
 
     void DatabaseService::signalHandler(const boost::system::error_code &ec, const int signal) {
-        mpLogger->debug("[DB_SERVICE] signalHandler called");
+        pLogger->debug("[DB_SERVICE] signalHandler called");
         if (!ec) {
             // Handle signal
             switch (signal) {
@@ -294,19 +294,19 @@ namespace SmartHomeDB {
                     });
                     return;
                 case SIGHUP:
-                    mpLogger->debug("[DB_SERVICE] Signal not implemented");
+                    pLogger->debug("[DB_SERVICE] Signal not implemented");
                     //TODO implement reload
                     break;
                 default:
-                    mpLogger->debug("[DB_SERVICE] Undefined signal");
+                    pLogger->debug("[DB_SERVICE] Undefined signal");
                     break;
             }
         } else {
             // Handle signal error
             if (ec.value() == ba::error::operation_aborted) {
-                mpLogger->debug("[DB_SERVICE] Signal handler aborted");
+                pLogger->debug("[DB_SERVICE] Signal handler aborted");
             } else {
-                mpLogger->errorf("[DB_SERVICE] Signal handler error: %s", ec.message().c_str());
+                pLogger->errorf("[DB_SERVICE] Signal handler error: %s", ec.message().c_str());
             }
         }
         if (isRunning()) {

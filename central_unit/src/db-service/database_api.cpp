@@ -35,7 +35,7 @@ namespace SmartHomeDB {
         for (const auto &row: resultSql) {
             nlohmann::json rowJson;
 
-            for (size_t col = 0; col < row.size(); col++) {
+            for (int col = 0; col < row.size(); col++) {
                 const std::string colName = resultSql.column_name(col);
                 rowJson[colName] = fieldValueToJson(row[col]);
             }
@@ -93,8 +93,8 @@ namespace SmartHomeDB {
                 return nlohmann::json::parse(field.c_str());
             }
         } catch (const std::exception &e) {
-            DatabaseService::Instance().mpLogger->debugf("[DB_API] Failed to parse pqxx into JSON: %s", e.what());
-            DatabaseService::Instance().mpLogger->debug("[DB_API] Falling back to string representation");
+            DatabaseService::Instance().pLogger->debugf("[DB_API] Failed to parse pqxx into JSON: %s", e.what());
+            DatabaseService::Instance().pLogger->debug("[DB_API] Falling back to string representation");
         }
 
         // Default return as string
@@ -149,7 +149,7 @@ namespace SmartHomeDB {
 
 
     void DatabaseApi::handleIncoming(SmartHome::connectionId_t connectionId, std::string &&message) {
-        auto pLogger = DatabaseService::Instance().mpLogger;
+        auto pLogger = DatabaseService::Instance().pLogger;
         pLogger->debugf("[DB_API] [HANDLE_INCOMING] Message: %s", message.c_str());
 
         if (!nlohmann::json::accept(message)) {
@@ -219,21 +219,21 @@ namespace SmartHomeDB {
 
                 // Handle transaction error - return error response to every request in batch.
                 if (batchResult.transactionError.has_value()) {
-                    DatabaseService::Instance().mpLogger->errorf("[DB_API] [HANDLE_INCOMING] Transaction error: %s",
-                                                                 batchResult.transactionError.value().c_str());
-                    sa::ApiError errorApi;
-                    sa::ApiResponse responseApi;
+                    DatabaseService::Instance().pLogger->errorf("[DB_API] [HANDLE_INCOMING] Transaction error: %s",
+                                                                batchResult.transactionError.value().c_str());
+                    sa::ApiError callbackErrorApi;
+                    sa::ApiResponse callbackResponseApi;
 
-                    errorApi.code = SmartHome::API::ErrorCodes::INTERNAL_ERROR;
-                    errorApi.message = SmartHome::API::errorCodeToString(errorApi.code);
-                    errorApi.data = "Transaction Error: "s + batchResult.transactionError.value();
+                    callbackErrorApi.code = SmartHome::API::ErrorCodes::INTERNAL_ERROR;
+                    callbackErrorApi.message = SmartHome::API::errorCodeToString(callbackErrorApi.code);
+                    callbackErrorApi.data = "Transaction Error: "s + batchResult.transactionError.value();
 
-                    responseApi.error = errorApi;
+                    callbackResponseApi.error = callbackErrorApi;
 
                     for (const auto id: apiIds) {
                         if (!id.hasValue()) continue;
-                        responseApi.id = id;
-                        resultJsonArray.push_back(responseApi.to_json());
+                        callbackResponseApi.id = id;
+                        resultJsonArray.push_back(callbackResponseApi.to_json());
                     }
 
                     if (resultJsonArray.empty()) return;
@@ -318,14 +318,13 @@ namespace SmartHomeDB {
     }
 
     void DatabaseApi::handleOutgoing(SmartHome::connectionId_t connectionId, std::string &&message) {
-        const auto pLogger = DatabaseService::Instance().mpLogger;
+        const auto pLogger = DatabaseService::Instance().pLogger;
         pLogger->debugf("[DB_API] [HANDLE_OUTGOING] Message: %s", message.c_str());
         mCallback(message);
     }
 
     DatabaseClient::DbQuery DatabaseApi::buildSelectQuery(const std::string &table, const nlohmann::json &params) {
         DatabaseClient::DbQuery query;
-        int paramIndex = 1;
 
         query.sql = toUpper(sk::SELECT_STR) + " ";
 
@@ -344,7 +343,9 @@ namespace SmartHomeDB {
         query.sql += " " + toUpper(sk::FROM_STR) + " " + sqlIdentifier(table);
 
         if (params.contains(ak::WHERE_STR)) {
-            query.sql += " " + toUpper(sk::WHERE_STR) + " " + buildWhereClause(params[ak::WHERE_STR], query.params, paramIndex);
+            int paramIndex = 1;
+            query.sql += " " + toUpper(sk::WHERE_STR);
+            query.sql += " " + buildWhereClause(params[ak::WHERE_STR], query.params, paramIndex);
         }
 
         if (params.contains(ak::ORDER_BY_STR)) {
@@ -363,7 +364,7 @@ namespace SmartHomeDB {
             query.sql += " " + toUpper(sk::LIMIT_STR) + " " + std::to_string(limit);
         }
 
-        const auto pLogger = DatabaseService::Instance().mpLogger;
+        const auto pLogger = DatabaseService::Instance().pLogger;
         pLogger->debugf("[DB_API] [BUILD_SELECT] SQL: %s", query.sql.c_str());
         return query;
     }
@@ -400,7 +401,7 @@ namespace SmartHomeDB {
             query.sql += buildReturning(params[ak::RETURNING_STR]);
         }
 
-        const auto pLogger = DatabaseService::Instance().mpLogger;
+        const auto pLogger = DatabaseService::Instance().pLogger;
         pLogger->debugf("[DB_API] [BUILD_INSERT] SQL: %s", query.sql.c_str());
         return query;
     }
@@ -431,13 +432,14 @@ namespace SmartHomeDB {
 
         query.sql = toUpper(sk::UPDATE_STR) + " " + sqlIdentifier(table) + " " + toUpper(sk::SET_STR) + " ";
         query.sql += joinStrings(setParts, ", ");
-        query.sql += " " + toUpper(sk::WHERE_STR) + " " + buildWhereClause(params[ak::WHERE_STR], query.params, paramIndex);
+        query.sql += " " + toUpper(sk::WHERE_STR);
+        query.sql += " " + buildWhereClause(params[ak::WHERE_STR], query.params, paramIndex);
 
         if (params.contains(ak::RETURNING_STR)) {
             query.sql += " " + buildReturning(params[ak::RETURNING_STR]);
         }
 
-        const auto pLogger = DatabaseService::Instance().mpLogger;
+        const auto pLogger = DatabaseService::Instance().pLogger;
         pLogger->debugf("[DB_API] [BUILD_UPDATE] SQL: %s", query.sql.c_str());
         return query;
     }
@@ -451,13 +453,14 @@ namespace SmartHomeDB {
         int paramIndex = 1;
 
         query.sql = toUpper(sk::DELETE_STR) + " " + toUpper(sk::FROM_STR) + " " + sqlIdentifier(table);
-        query.sql += " " + toUpper(sk::WHERE_STR) + " " + buildWhereClause(params[ak::WHERE_STR], query.params, paramIndex);
+        query.sql += " " + toUpper(sk::WHERE_STR);
+        query.sql += " " + buildWhereClause(params[ak::WHERE_STR], query.params, paramIndex);
 
         if (params.contains(ak::RETURNING_STR)) {
             query.sql += " " + buildReturning(params[ak::RETURNING_STR]);
         }
 
-        const auto pLogger = DatabaseService::Instance().mpLogger;
+        const auto pLogger = DatabaseService::Instance().pLogger;
         pLogger->debugf("[DB_API] [BUILD_DELETE] SQL: %s", query.sql.c_str());
         return query;
     }
@@ -579,7 +582,7 @@ namespace SmartHomeDB {
                 throw std::runtime_error("Aggregate column must be a string");
             }
 
-            std::string colStr = column.get<std::string>();
+            auto colStr = column.get<std::string>();
 
             if (colStr == sk::WILDCARD_STR) {
                 if (func != sk::COUNT_STR) {

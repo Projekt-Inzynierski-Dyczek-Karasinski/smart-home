@@ -78,6 +78,7 @@ namespace SmartHomeDB {
          *
          * @param configStruct Configuration parameters.
          * @param logger Shared pointer instance reference of configured logger.
+         *
          * @return true if successful, false on error.
          */
         bool initialize(const Config &configStruct, const std::shared_ptr<su::Logger> &logger);
@@ -119,7 +120,7 @@ namespace SmartHomeDB {
          */
         ba::io_context &getUtilityIoContext();
 
-        std::shared_ptr<su::Logger> mpLogger; ///< Shared asynchronous logger used by the service.
+        std::shared_ptr<su::Logger> pLogger; ///< Shared asynchronous logger used by the service.
 
     private:
         DatabaseService() = default;

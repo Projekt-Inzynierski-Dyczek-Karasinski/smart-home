@@ -59,7 +59,7 @@ namespace SmartHomeDB {
         auto connection = std::move(mConnections.front());
         mConnections.pop();
 
-        return DatabaseConnection(*this, std::move(connection));
+        return {*this, std::move(connection)};
     }
 
     void DatabaseConnectionManager::returnConnection(std::unique_ptr<pqxx::connection> connection) {

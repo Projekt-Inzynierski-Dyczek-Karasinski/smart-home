@@ -4,7 +4,8 @@
 
 
 namespace SmartHomeDB {
-    void DatabaseClient::handleQuery(const DbQuery &query, const std::function<void(DbQueryResult &&result)>& callback) const {
+    void DatabaseClient::handleQuery(const DbQuery &query,
+                                     const std::function<void(DbQueryResult &&result)> &callback) const {
         auto isCancelled = std::make_shared<std::atomic_bool>(false);
 
         const auto timeoutTimer = std::make_shared<ba::steady_timer>(DatabaseService::Instance().getUtilityIoContext(),
@@ -80,12 +81,12 @@ namespace SmartHomeDB {
             std::string error;
             DbBatchQueryResult queryResult;
 
-            for (const auto &query: queries) {
+            for (const auto &[sql, params]: queries) {
                 if (isCancelled->load(std::memory_order_acquire)) {
                     return; // Cancel without committing, transaction will be rolled back
                 };
                 try {
-                    result = txn.exec(query.sql, query.params);
+                    result = txn.exec(sql, params);
                 } catch (const pqxx::sql_error &e) {
                     std::string_view whatStr(e.what());
                     const auto newLinePos = whatStr.find('\n');

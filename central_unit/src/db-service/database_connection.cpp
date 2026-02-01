@@ -6,7 +6,7 @@ namespace SmartHomeDB {
                                            std::unique_ptr<pqxx::connection> connection)
         : mDbConnectionManager(dbConnectionManager),
           mpConnection(std::move(connection)) {
-    };
+    }
 
     DatabaseConnection::~DatabaseConnection() {
         if (mpConnection) {
