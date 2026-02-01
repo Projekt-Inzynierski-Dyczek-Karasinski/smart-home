@@ -13,9 +13,6 @@ namespace SmartHomeDB {
      *          The type is move-only to ensure single ownership of the underlying connection.
      */
     class DatabaseConnection {
-        DatabaseConnectionManager &mDbConnectionManager;
-        std::unique_ptr<pqxx::connection> mpConnection;
-
     public:
         /**
          * @brief Construct a DatabaseConnection.
@@ -76,5 +73,9 @@ namespace SmartHomeDB {
          * @return Pointer to the underlying pqxx::connection.
          */
         pqxx::connection *operator->() const noexcept;
+
+    private:
+        DatabaseConnectionManager &mDbConnectionManager;
+        std::unique_ptr<pqxx::connection> mpConnection;
     };
 }
