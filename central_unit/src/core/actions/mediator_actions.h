@@ -22,7 +22,7 @@ namespace SmartHome {
          * @brief Handle GET command for mediator/module.
          *
          * @details Routes GET requests to mediator or specific module based on parameters.
-         *          If first parameter contains module_id object, fetches module info and
+         *          If parameters contains \c "module_id" object, fetches module info and
          *          forwards request with RF addressing. Otherwise sends directly to mediator.
          *
          * @param commandMetadata Command execution metadata.
@@ -38,7 +38,7 @@ namespace SmartHome {
          * @brief Handle SET command for mediator/module.
          *
          * @details Routes SET requests to mediator or specific module based on parameters.
-         *          If first parameter contains module_id object, fetches module info and
+         *          If parameters contains \c "module_id" object, fetches module info and
          *          forwards request with RF addressing. Otherwise sends directly to mediator.
          *
          * @param commandMetadata Command execution metadata.
@@ -53,7 +53,7 @@ namespace SmartHome {
          * @brief Handle EXECUTE command for mediator/module.
          *
          * @details Routes EXECUTE requests to mediator or specific module based on parameters.
-         *          If first parameter contains module_id object, fetches module info and
+         *          If parameters contains \c "module_id" object, fetches module info and
          *          forwards request with RF addressing. Otherwise sends directly to mediator.
          *
          * @param commandMetadata Command execution metadata.
@@ -68,7 +68,7 @@ namespace SmartHome {
          * @brief Handle PING command for module connectivity check.
          *
          * @details Sends PING to specified module and measures round-trip time.
-         *          Requires module_id in parameters to identify target module.
+         *          Requires \c "module_id" in parameters to identify target module.
          *
          * @param commandMetadata Command execution metadata.
          *
@@ -117,18 +117,55 @@ namespace SmartHome {
         static nlohmann::json &prepareRequestToMediator(API::ApiRequest &request,
                                                         const API::InternalApi::Command &command);
 
+        /**
+         * @brief Parse incoming params for mediator forwarding.
+         *
+         * @details Extracts optional module id, type and args from incoming params and
+         *          mirrors applicable values into the prepared mediator params object.
+         *
+         * @param incomingParams JSON object received with the original command.
+         * @param rtmParams Prepared mediator params to be populated.
+         *
+         * @return Parsed MediatorRequestParams with optional fields set.
+         */
         static MediatorRequestParams parseMediatorParams(const nlohmann::json &incomingParams,
                                                          nlohmann::json &rtmParams);
 
+        /**
+         * @brief Retrieve RF addressing info for a module from the database.
+         *
+         * @details Calls \c DatabaseActions::getModuleAddressingInfo and inserts returned
+         *          addressing fields into \p preparedParams. On failure, sets \p error.
+         *
+         * @param preparedParams Prepared mediator params JSON to receive \c "module_info" object.
+         * @param moduleId Numeric module id to look up.
+         * @param error Output string set on failure with error reason.
+         *
+         * @return true on success, false on failure.
+         */
         static ba::awaitable<bool> getModuleAddressingInfo(nlohmann::json &preparedParams, uint moduleId,
                                                            std::string &error);
 
+        /**
+         * @brief Optionally post sensor reading to database when mediator result applies.
+         *
+         * @details Based on parsed params, checks whether the mediator result should be
+         *          recorded as a sensor reading and posts it to the database.
+         *
+         * @param parsedParams Parsed mediator params.
+         * @param result JSON result returned from mediator.
+         * @param applicableTypes Set of mediator method types that should trigger posting.
+         */
         static void postSensorReadingIfApplicable(const MediatorRequestParams &parsedParams,
                                                   const nlohmann::json &result,
                                                   const std::set<std::string_view> &applicableTypes);
 
+        /**
+         * @brief Post error log entry for a module into database.
+         *
+         * @param moduleId Module identifier for which to log the error.
+         * @param result API response containing error details to be recorded.
+         */
         static void postErrorLog(uint moduleId, const API::ApiResponse &result);
-
-        const std::set<std::string> msSENSOR_READ_APPLICABLE_GET_TYPES = {        "sensor_value", "force_read_sensor_value", "actuator_value"}        ;
     };
 }

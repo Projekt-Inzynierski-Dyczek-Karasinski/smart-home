@@ -162,8 +162,8 @@ namespace SmartHome {
 
                 char buffer[1024];
 
-                std::string action;
-                std::string actionArgument;
+                std::string action = "<none>";
+                std::string actionArgument = "<none>";
                 if (parsedParams.type.has_value()) {
                     action = parsedParams.type.value();
                 }
@@ -352,6 +352,7 @@ namespace SmartHome {
         if (!parsedParams.moduleId.has_value()) return;
         if (!parsedParams.type.has_value() || !applicableTypes.contains(parsedParams.type.value())) return;
         if (!parsedParams.args.has_value()) return;
+        if (!parsedParams.args.value().empty()) return;
 
 
         DatabaseActions::postSensorReading(parsedParams.moduleId.value(),
