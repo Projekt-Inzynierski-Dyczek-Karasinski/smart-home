@@ -35,6 +35,13 @@ namespace SmartHome::JsonRpcStrings {
         inline constexpr std::string_view METHOD_PARAMS = "method_params";
     }
 
+    namespace MediatorMethodParams {
+        inline constexpr std::string_view MODULE_ID = "module_id";
+        inline constexpr std::string_view TYPE = "type";
+        inline constexpr std::string_view ARGS = "args";
+
+    }
+
     namespace ModuleInfoKeys {
         inline constexpr std::string_view LOGIC_ADDRESS = "logic_address";
         inline constexpr std::string_view RF_CHANNEL = "rf_channel";
