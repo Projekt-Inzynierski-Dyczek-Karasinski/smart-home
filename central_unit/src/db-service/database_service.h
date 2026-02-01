@@ -125,6 +125,19 @@ namespace SmartHomeDB {
         DatabaseService() = default;
 
 
+        /**
+         * @brief Destructor performs cleanup of all DatabaseService resources.
+         *
+         * @details If the service is running, the destructor will request a graceful shutdown
+         *          and then return to allow the shutdown procedure to join threads and release resources.
+         *
+         * @details For partially-initialized instances (failed \c initialize()),
+         *          the destructor performs ordered cleanup of created subsystems: cancels signals,
+         *          stops IO contexts, resets work guards, joins threads and destroys owned
+         *          objects to ensure no resources are leaked.
+         *
+         * @note Errors during shutdown are logged via the configured logger when available.
+         */
         ~DatabaseService();
 
         /**
