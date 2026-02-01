@@ -461,6 +461,48 @@ namespace SmartHomeDB {
         return query;
     }
 
+    std::string DatabaseApi::buildSubSelect(const nlohmann::json &subSelect, pqxx::params &params, int &paramIndex) {
+        if (!subSelect.is_object()) {
+            throw std::runtime_error("'$subselect' must be an object");
+        }
+
+        if (!subSelect.contains(ak::TABLE) || !subSelect[ak::TABLE].is_string()) {
+            throw std::runtime_error("Subselect requires 'table' field");
+        }
+
+        std::string sql = "(" + toUpper(sk::SELECT) + " ";
+
+        if (subSelect.contains(ak::COLUMNS)) {
+            sql += buildColumns(subSelect[ak::COLUMNS]);
+        } else {
+            sql += sk::WILDCARD;
+        }
+
+        sql += " " + toUpper(sk::FROM) + " " + sqlIdentifier(subSelect[ak::TABLE]);
+
+        if (subSelect.contains(ak::WHERE)) {
+            sql += " " + toUpper(sk::WHERE) + " " + buildWhereClause(subSelect[ak::WHERE], params, paramIndex);
+        }
+
+        if (subSelect.contains(ak::ORDER_BY)) {
+            sql += " " + toUpper(sk::ORDER_BY) + " " + buildOrderBy(subSelect[ak::ORDER_BY]);
+        }
+
+        if (subSelect.contains(ak::LIMIT)) {
+            if (!subSelect[ak::LIMIT].is_number_integer()) {
+                throw std::runtime_error("Subselect 'limit' field must be an integer");
+            }
+            sql += " " + toUpper(sk::LIMIT) + " " + std::to_string(subSelect[ak::LIMIT].get<int>());
+        } else {
+            // By default, set limit on subselect to 1
+            sql += " " + toUpper(sk::LIMIT) + " 1";
+        }
+
+        sql += ")";
+
+        return sql;
+    }
+
     std::string DatabaseApi::buildWhereClause(const nlohmann::json &where, pqxx::params &params, int &paramIndex) {
         if (!where.is_object() || where.empty()) {
             throw std::runtime_error("'where' must be non-empty object");
@@ -602,6 +644,11 @@ namespace SmartHomeDB {
     }
 
     std::string DatabaseApi::addParam(const nlohmann::json &value, pqxx::params &params, int &paramIndex) {
+        // Handle special case - subselect
+        if (value.is_object() && value.contains(ak::SUBSELECT)) {
+            return buildSubSelect(value[ak::SUBSELECT], params, paramIndex);
+        }
+
         std::string placeholder = "$" + std::to_string(paramIndex++);
 
         if (value.is_null()) {

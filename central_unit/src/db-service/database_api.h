@@ -68,6 +68,7 @@ namespace SmartHomeDB {
         inline constexpr std::string_view SET = "set";
         inline constexpr std::string_view GET = "get";
         inline constexpr std::string_view DELETE_STR = "delete";
+        inline constexpr std::string_view SUBSELECT = "$subselect";
 
         inline constexpr std::string_view TABLE = "table";
         inline constexpr std::string_view COLUMNS = "columns";
@@ -102,6 +103,7 @@ namespace SmartHomeDB {
         void handleOutgoing(SmartHome::connectionId_t connectionId, std::string &&message) override;
 
     private:
+
         static DatabaseClient::DbQuery buildSelectQuery(const std::string &table, const nlohmann::json &params);
 
         static DatabaseClient::DbQuery buildInsertQuery(const std::string &table, const nlohmann::json &params);
@@ -109,6 +111,8 @@ namespace SmartHomeDB {
         static DatabaseClient::DbQuery buildUpdateQuery(const std::string &table, const nlohmann::json &params);
 
         static DatabaseClient::DbQuery buildDeleteQuery(const std::string &table, const nlohmann::json &params);
+
+        static std::string buildSubSelect(const nlohmann::json &subSelect, pqxx::params &params, int &paramIndex);
 
         static std::string buildWhereClause(const nlohmann::json &where,
                                             pqxx::params &params,
