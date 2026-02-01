@@ -29,7 +29,7 @@ namespace SmartHome {
          *
          * @return API response with requested value or error.
          *
-         * @note Expected params format: [(optional){module_id: uint}, target_value_key<string>, optional_arguments<any>...]
+         * @note Expected params format: {(optional)module_id: uint, type: <string>, (optional)args: [<any>...]}
          */
         static awaitOptApiResponse mediatorGetHandler(const cmdMetaPtr &commandMetadata);
 
@@ -45,7 +45,7 @@ namespace SmartHome {
          *
          * @return API response with confirmation or error.
          *
-         * @note Expected params format: [(optional){module_id: uint}, target_value_key<string>, target_new_value<any>]
+         * @note Expected params format: {(optional)module_id: uint, type: <string>, args: [<any>...]}
          */
         static awaitOptApiResponse mediatorSetHandler(const cmdMetaPtr &commandMetadata);
 
@@ -60,9 +60,8 @@ namespace SmartHome {
          *
          * @return API response with execution result or error.
          *
-         * @note Expected params format: [(optional){module_id: uint}, action<string>, (optional)action_argument<any>]
+         * @note Expected params format: {(optional)module_id: uint, type: <string>, (optional)args: [<any>...]}
          */
-
         static awaitOptApiResponse mediatorExecuteHandler(const cmdMetaPtr &commandMetadata);
 
         /**
@@ -75,7 +74,7 @@ namespace SmartHome {
          *
          * @return API response with round-trip time in milliseconds or error.
          *
-         * @note Expected params format: [{module_id: uint}]
+         * @note Expected params format: {module_id: uint}
          */
         static awaitOptApiResponse mediatorPingHandler(const cmdMetaPtr &commandMetadata);
 
@@ -96,21 +95,13 @@ namespace SmartHome {
         static ba::awaitable<API::ApiResponse> sendRequestToMediator(API::ApiRequest &&request,
                                                                      cmdMetaPtr commandMetadata);
 
-        /**
-         * @brief Validate command parameters count and type.
-         *
-         * @details Checks if params exist, are array type, and meet minimum count requirement.
-         *          Updates error object with descriptive message on validation failure.
-         *
-         * @param error Error object to populate on validation failure.
-         * @param command Command to validate parameters for.
-         * @param numOfExpectedParams Minimum required parameter count.
-         *
-         * @return true if parameters valid, false otherwise.
-         */
-        static bool areParamsValid(API::ApiError &error,
-                                   const API::InternalApi::Command &command,
-                                   uint numOfExpectedParams);
+    private:
+        struct MediatorRequestParams {
+            std::optional<uint> moduleId;
+            std::optional<std::string> type;
+            std::optional<nlohmann::json> args;
+        };
+
 
         /**
          * @brief Prepare API request structure for mediator.
@@ -125,5 +116,19 @@ namespace SmartHome {
          */
         static nlohmann::json &prepareRequestToMediator(API::ApiRequest &request,
                                                         const API::InternalApi::Command &command);
+
+        static MediatorRequestParams parseMediatorParams(const nlohmann::json &incomingParams,
+                                                         nlohmann::json &rtmParams);
+
+        static ba::awaitable<bool> getModuleAddressingInfo(nlohmann::json &preparedParams, uint moduleId,
+                                                           std::string &error);
+
+        static void postSensorReadingIfApplicable(const MediatorRequestParams &parsedParams,
+                                                  const nlohmann::json &result,
+                                                  const std::set<std::string_view> &applicableTypes);
+
+        static void postErrorLog(uint moduleId, const API::ApiResponse &result);
+
+        const std::set<std::string> msSENSOR_READ_APPLICABLE_GET_TYPES = {        "sensor_value", "force_read_sensor_value", "actuator_value"}        ;
     };
 }
