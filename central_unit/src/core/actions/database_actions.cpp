@@ -33,6 +33,193 @@ namespace SmartHome {
         co_return commandResult;
     }
 
+    ba::awaitable<nlohmann::json> DatabaseActions::getModuleAddressingInfo(uint moduleId) {
+        API::ApiRequest request;
+
+        nlohmann::json dbQuery = {
+            {"table", "modules"},
+            {"columns", {"logic_address", "config"}},
+            {"where", {{"id", moduleId}}},
+        };
+
+        const API::InternalApi::Method method(API::InternalApi::MethodTypes::GET);
+        request.method = method.to_string();
+        request.id = Actions::getNextId();
+
+
+        const API::InternalApi::Target target(API::InternalApi::TargetTypes::DATABASE);
+
+        request.params = nlohmann::json::object({
+            {JsonRpcStrings::ParamsKeys::TARGET, target.to_string()},
+            {JsonRpcStrings::ParamsKeys::METHOD_PARAMS, dbQuery}
+        });
+
+
+        API::InternalApi::Command command(request);
+        auto pCmdMeta = std::make_shared<Actions::CommandMetadata>(
+            command,
+            std::make_shared<ba::steady_timer>(Core::Instance().getCoreUtilityIoContext()),
+            Actions::getNextId());
+
+
+        auto response = co_await sendRequestToDbService(std::move(request), pCmdMeta);
+
+        nlohmann::json result;
+
+        if (response.error.has_value()) {
+            result["error"] = response.error.value().data;
+            co_return result;
+        }
+
+        if (response.result.has_value()) {
+            auto responseResultJson = nlohmann::json::parse(response.result.value());
+
+            if (responseResultJson.contains("affected_rows") &&
+                responseResultJson["affected_rows"] == 1 &&
+                responseResultJson.contains("rows")) {
+                auto row = responseResultJson["rows"].front();
+
+                try {
+                    result["logic_address"] = row["logic_address"];
+                    result["rf_channel"] = row["config"]["rf_channel"];
+                } catch (const std::exception &e) {
+                    Core::Instance().mpLogger->errorf(
+                        "[DATABASE_ACTIONS] [GET_ADDR_INFO] Failed to parse db response %s", e.what());
+                }
+            } else {
+                result["error"] = "Module not found";
+            }
+        }
+        co_return result;
+    }
+
+
+    void DatabaseActions::postSensorReading(uint moduleId, uint sensorLogicId,
+                                            nlohmann::json value,
+                                            nlohmann::json metadata) {
+        API::ApiRequest notification;
+
+
+        nlohmann::json dbQuerySubselect = {
+            {"table", "sensors"},
+            {"columns", {"id"}},
+            {
+                "where", {
+                    {"module_id", moduleId},
+                    {"logic_id", sensorLogicId}
+                }
+            }
+        };
+
+        nlohmann::json dbQuery = {
+            {"table", "sensor_readings"},
+            {
+                "values", {
+                    {"sensor_id", {{"$subselect", dbQuerySubselect}}},
+                    {value.is_number() ? "value_numeric" : "value_text", value},
+                    {"metadata", metadata}
+                }
+            },
+        };
+
+        const API::InternalApi::Method method(API::InternalApi::MethodTypes::SET);
+        notification.method = method.to_string();
+
+        const API::InternalApi::Target target(API::InternalApi::TargetTypes::DATABASE);
+
+        notification.params = nlohmann::json::object({
+            {JsonRpcStrings::ParamsKeys::TARGET, target.to_string()},
+            {JsonRpcStrings::ParamsKeys::METHOD_PARAMS, dbQuery}
+        });
+
+        sendNotificationToDbService(std::move(notification));
+    }
+
+    void DatabaseActions::postLog(uint moduleId, std::string type, std::string content) {
+        API::ApiRequest notification;
+
+
+        nlohmann::json dbQuery = {
+            {"table", "logs"},
+            {
+                "values", {
+                    {"type", type},
+                    {"content", content},
+                    {"module_id", moduleId}
+                }
+            },
+        };
+
+        const API::InternalApi::Method method(API::InternalApi::MethodTypes::SET);
+        notification.method = method.to_string();
+
+        const API::InternalApi::Target target(API::InternalApi::TargetTypes::DATABASE);
+
+        notification.params = nlohmann::json::object({
+            {JsonRpcStrings::ParamsKeys::TARGET, target.to_string()},
+            {JsonRpcStrings::ParamsKeys::METHOD_PARAMS, dbQuery}
+        });
+
+        sendNotificationToDbService(std::move(notification));
+    }
+
+    void DatabaseActions::updateModuleLastOnline(uint moduleId) {
+        API::ApiRequest notification;
+
+        auto nowTimeP = std::chrono::system_clock::now();
+        auto nowTimeT = std::chrono::system_clock::to_time_t(nowTimeP);
+
+        std::tm tmUTC;
+        gmtime_r(&nowTimeT, &tmUTC);
+
+        std::ostringstream oss;
+        oss << std::put_time(&tmUTC, "%Y-%m-%dT%H:%M:%SZ");
+
+        nlohmann::json dbQuery = {
+            {"table", "modules"},
+            {"values", {{"last_online", oss.str()}}},
+            {"where", {{"id", moduleId}}}
+        };
+
+        const API::InternalApi::Method method(API::InternalApi::MethodTypes::SET);
+        notification.method = method.to_string();
+
+        const API::InternalApi::Target target(API::InternalApi::TargetTypes::DATABASE);
+
+        notification.params = nlohmann::json::object({
+            {JsonRpcStrings::ParamsKeys::TARGET, target.to_string()},
+            {JsonRpcStrings::ParamsKeys::METHOD_PARAMS, dbQuery}
+        });
+
+        sendNotificationToDbService(std::move(notification));
+    }
+
+    void DatabaseActions::sendNotificationToDbService(API::ApiRequest &&notification) {
+        connectionId_t dbServiceConnectionId;
+        bool foundDbServiceConnection = false;
+
+        // Find db-service connection
+        {
+            std::scoped_lock lock(Actions::msConnectionTypeMapLock);
+
+            auto iter = Actions::msConnectionTypeMap.find(sai::TargetTypes::DATABASE);
+            if (iter != Actions::msConnectionTypeMap.end() && !iter->second.empty()) {
+                dbServiceConnectionId = *iter->second.begin();
+                foundDbServiceConnection = true;
+            }
+        }
+
+        if (!foundDbServiceConnection) {
+            Core::Instance().mpLogger->error(
+                "[DATABASE_ACTIONS] [SEND_NOTIFY] Failed to send notification to database: connection not found");
+            return;
+        }
+
+        ba::post(Core::Instance().getCoreWorkerIoContext(), [notification, dbServiceConnectionId]()mutable {
+            Actions::handleOutgoingRequest(dbServiceConnectionId, std::move(notification), nullptr);
+        });
+    }
+
 
     ba::awaitable<API::ApiResponse> DatabaseActions::sendRequestToDbService(API::ApiRequest &&request,
                                                                             cmdMetaPtr commandMetadata) {
