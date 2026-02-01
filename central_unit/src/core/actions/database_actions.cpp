@@ -66,8 +66,7 @@ namespace SmartHome {
         }
 
         ba::post(Core::Instance().getCoreWorkerIoContext(),
-                 [promise, commandMetadata, request, dbServiceConnectionId]()mutable {
-                     Actions::startCommandTimeoutTimer(commandMetadata);
+                 [promise, request, dbServiceConnectionId]()mutable {
                      Actions::handleOutgoingRequest(dbServiceConnectionId, std::move(request), promise);
                  });
 
