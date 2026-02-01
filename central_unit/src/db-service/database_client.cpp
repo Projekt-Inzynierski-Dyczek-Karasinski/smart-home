@@ -32,8 +32,12 @@ namespace SmartHomeDB {
                 result = txn.exec(query.sql, query.params);
                 txn.commit();
             } catch (const pqxx::sql_error &e) {
-                error = "SQL Error: "s + e.what();
-                error += "\nQuery: "s + e.query();
+                std::string_view whatStr(e.what());
+                const auto newLinePos = whatStr.find('\n');
+
+                error = "SQL Error ("s + std::string(whatStr.substr(0, newLinePos));
+                error += ") \nQuery ("s + e.query() + ")";
+
             } catch (const std::exception &e) {
                 error = "Unexpected error: "s + e.what();
             }
@@ -82,8 +86,12 @@ namespace SmartHomeDB {
                 try {
                     result = txn.exec(query.sql, query.params);
                 } catch (const pqxx::sql_error &e) {
-                    error = "SQL Error: "s + e.what();
-                    error += "\nQuery: "s + e.query();
+                    std::string_view whatStr(e.what());
+                    const auto newLinePos = whatStr.find('\n');
+
+                    error = "SQL Error ("s + std::string(whatStr.substr(0, newLinePos));
+                    error += ") \nQuery ("s + e.query() + ")";
+
                     break;
                 } catch (const std::exception &e) {
                     error = "Unexpected error: "s + e.what();
