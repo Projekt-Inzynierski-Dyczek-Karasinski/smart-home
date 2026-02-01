@@ -3,6 +3,8 @@
 namespace SmartHome {
     using ai = API::InternalApi;
 
+    namespace jmik = JsonRpcStrings::ModuleInfoKeys;
+
     awaitOptApiResponse DatabaseActions::databaseRequestHandler(const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[DATABASE_ACTIONS] [REQUEST_HANDLER] called");
         const auto &command = commandMetadata->command;
@@ -24,8 +26,8 @@ namespace SmartHome {
         const auto &params = command.params.value();
         API::ApiRequest requestToDatabase;
 
-        auto &rtdParams = prepareRequestToDatabase(requestToDatabase, command);
-        rtdParams[JsonRpcStrings::ParamsKeys::METHOD_PARAMS] = params; // Copy original params
+        auto &databaseRequestParams = prepareRequestToDatabase(requestToDatabase, command);
+        databaseRequestParams[JsonRpcStrings::ParamsKeys::METHOD_PARAMS] = params; // Copy original params
 
 
         commandResult = co_await sendRequestToDbService(std::move(requestToDatabase), commandMetadata);
@@ -80,8 +82,8 @@ namespace SmartHome {
                 auto row = responseResultJson["rows"].front();
 
                 try {
-                    result["logic_address"] = row["logic_address"];
-                    result["rf_channel"] = row["config"]["rf_channel"];
+                    result[jmik::LOGIC_ADDRESS] = row[jmik::LOGIC_ADDRESS];
+                    result[jmik::RF_CHANNEL] = row["config"][jmik::RF_CHANNEL];
                 } catch (const std::exception &e) {
                     Core::Instance().mpLogger->errorf(
                         "[DATABASE_ACTIONS] [GET_ADDR_INFO] Failed to parse db response %s", e.what());
@@ -135,7 +137,7 @@ namespace SmartHome {
         sendNotificationToDbService(std::move(notification));
     }
 
-    void DatabaseActions::postLog(uint moduleId, std::string type, std::string content) {
+    void DatabaseActions::postLog(uint moduleId, std::string_view type, std::string_view content) {
         API::ApiRequest notification;
 
 
