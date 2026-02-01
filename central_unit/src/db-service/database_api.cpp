@@ -10,7 +10,7 @@ namespace SmartHomeDB {
     }
 
     nlohmann::json DatabaseApi::dbResultToApiJson(DatabaseClient::DbQueryResult &&queryResult,
-                                                  const SmartHome::apiId_t apiId) {
+                                                  const SmartHome::API::ApiId apiId) {
         sa::ApiResponse response;
         response.id = apiId;
 
@@ -167,7 +167,7 @@ namespace SmartHomeDB {
 
         if (requestJson.is_array()) {
             // Handle batch request
-            std::vector<SmartHome::apiId_t> apiIds;
+            std::vector<SmartHome::API::ApiId> apiIds;
             std::vector<DatabaseClient::DbQuery> queries;
 
             sa::ApiRequest requestApi;
@@ -185,11 +185,6 @@ namespace SmartHomeDB {
                     break;
                 }
 
-                if (!requestApi.id.hasValue()) {
-                    pLogger->error("[DB_API] Request is batch request does not have ID");
-                    errorApi.data = "Request does not have ID";
-                    break;
-                }
 
                 try {
                     queries.push_back(apiRequestToDbQuery(requestApi));
@@ -202,7 +197,8 @@ namespace SmartHomeDB {
                     break;
                 }
 
-                apiIds.push_back(requestApi.id.value());
+
+                apiIds.push_back(requestApi.id);
             }
 
             // Return error if one of requests in batch was invalid
@@ -222,6 +218,8 @@ namespace SmartHomeDB {
 
                 // Handle transaction error - return error response to every request in batch.
                 if (batchResult.transactionError.has_value()) {
+                    DatabaseService::Instance().mpLogger->errorf("[DB_API] [HANDLE_INCOMING] Transaction error: %s",
+                                                                 batchResult.transactionError.value().c_str());
                     sa::ApiError errorApi;
                     sa::ApiResponse responseApi;
 
@@ -232,9 +230,12 @@ namespace SmartHomeDB {
                     responseApi.error = errorApi;
 
                     for (const auto id: apiIds) {
+                        if (!id.hasValue()) continue;
                         responseApi.id = id;
                         resultJsonArray.push_back(responseApi.to_json());
                     }
+
+                    if (resultJsonArray.empty()) return;
 
                     handleOutgoing(connectionId, to_string(resultJsonArray));
                     return;
@@ -242,6 +243,7 @@ namespace SmartHomeDB {
 
                 auto resultsVector = batchResult.results;
                 for (auto i = 0u; i < resultsVector.size(); i++) {
+                    if (!apiIds[i].hasValue()) continue;
                     resultJsonArray.push_back(dbResultToApiJson(std::move(resultsVector[i]), apiIds[i]));
                 }
 
@@ -280,17 +282,7 @@ namespace SmartHomeDB {
         }
 
 
-        if (!requestApi.id.hasValue()) {
-            pLogger->debug("[DB_API] Request does not have ID");
-
-            errorApi.data = "Request does not have ID";
-            responseApi.error = errorApi;
-
-            handleOutgoing(connectionId, responseApi.to_string());
-            return;
-        }
-
-        auto apiId = requestApi.id.value();;
+        auto apiId = requestApi.id;
         responseApi.id = apiId;
 
         DatabaseClient::DbQuery query;
@@ -305,13 +297,16 @@ namespace SmartHomeDB {
 
             responseApi.error = errorApi;
 
-            handleOutgoing(connectionId, responseApi.to_string());
+            if (responseApi.id.hasValue()) {
+                handleOutgoing(connectionId, responseApi.to_string());
+            }
             return;
         }
 
 
         mpDatabaseClient->handleQuery(
             query, [this, connectionId, apiId, pLogger](DatabaseClient::DbQueryResult &&result) {
+                if (!apiId.hasValue()) return;
                 const auto responseJson = dbResultToApiJson(std::move(result), apiId);
                 if (responseJson.empty()) {
                     pLogger->debug("[DB_API] Ignoring empty response");

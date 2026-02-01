@@ -91,7 +91,7 @@ namespace SmartHomeDB {
 
         void initialize(const std::function<void(const std::string &message)> &callback);
 
-        static nlohmann::json dbResultToApiJson(DatabaseClient::DbQueryResult &&queryResult, SmartHome::apiId_t apiId);
+        static nlohmann::json dbResultToApiJson(DatabaseClient::DbQueryResult &&queryResult, SmartHome::API::ApiId apiId);
 
         static nlohmann::json fieldValueToJson(const pqxx::field &field);
 
