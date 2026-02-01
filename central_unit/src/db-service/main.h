@@ -13,16 +13,25 @@ namespace bpo = boost::program_options;
 namespace su = SmartHome::Utils;
 
 namespace SmartHomeDB {
-
     /**
-     * TODO !pr
+     * @brief RAII helper that disables terminal echo for secure password input.
+     *
+     * @details On construction the object captures current terminal settings and
+     *          disables echoing so passwords can be entered without being printed to the terminal.
+     *          On destruction the original terminal settings are restored.
      */
     class TerminalPasswordGuard {
-        termios mOldSettings;
+        termios mOldSettings{};
 
     public:
+        /**
+         * @brief Disable terminal echo and save current settings.
+         */
         TerminalPasswordGuard();
 
+        /**
+         * @brief Restore previously saved terminal settings.
+         */
         ~TerminalPasswordGuard();
     };
 
@@ -63,13 +72,22 @@ namespace SmartHomeDB {
                          DatabaseService::Config &databaseServiceConfig);
 
     /**
-     * @brief TODO !pr
+     * @brief Read and apply environment overrides for database configuration.
      *
+     * @details Checks environment variables and overwrites corresponding fields in \p databaseServiceConfig when present.
+     *          Recognized variables:
+     *              - `SH_DB_HOST` -> dbHost
+     *              - `SH_DB_PORT` -> dbPort (parsed as integer)
+     *              - `SH_DB_NAME` -> dbName
+     *              - `SH_DB_USER` -> dbUser
+     *              - `SH_DB_PASSWORD` -> dbPassword
+     * @details Parsing failures (e.g. non-numeric port) are logged via \p pLogger.
      *
-     * @param databaseServiceConfig
-     * @param pLogger
+     * @param databaseServiceConfig Configuration struct to modify with environment values.
+     * @param pLogger Logger used to report parse errors and informational messages.
      */
-    void overWriteConfigsWithEnvironmentVariables(DatabaseService::Config &databaseServiceConfig, const std::shared_ptr<su::Logger> &pLogger);
+    void overWriteConfigsWithEnvironmentVariables(DatabaseService::Config &databaseServiceConfig,
+                                                  const std::shared_ptr<su::Logger> &pLogger);
 
     /**
      * @brief Overwrites configurations with command-line options.
@@ -108,8 +126,6 @@ namespace SmartHomeDB {
                      const bpo::parsed_options &parsed,
                      const std::shared_ptr<su::Logger> &pLogger,
                      DatabaseService::Config &databaseServiceConfig);
-
-
 
 
     // Default paths for db-service

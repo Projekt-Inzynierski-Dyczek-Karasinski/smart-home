@@ -99,7 +99,7 @@ namespace SmartHomeDB {
         if (vm.contains("ipv4")) databaseServiceConfig.tcp.endpointAddress = vm["ipv4"].as<std::string>();
 
         if (vm.contains("db-host")) databaseServiceConfig.dbConnConfig.dbHost = vm["db-host"].as<std::string>();
-        if (vm.contains("dp-port")) databaseServiceConfig.dbConnConfig.dbPort = vm["dp-port"].as<int>();
+        if (vm.contains("db-port")) databaseServiceConfig.dbConnConfig.dbPort = vm["db-port"].as<int>();
         if (vm.contains("db-name")) databaseServiceConfig.dbConnConfig.dbName = vm["db-name"].as<std::string>();
         if (vm.contains("db-user")) databaseServiceConfig.dbConnConfig.dbUser = vm["db-user"].as<std::string>();
     }

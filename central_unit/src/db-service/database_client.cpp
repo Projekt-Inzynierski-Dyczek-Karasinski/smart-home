@@ -4,7 +4,7 @@
 
 
 namespace SmartHomeDB {
-    void DatabaseClient::handleQuery(const DbQuery &query, std::function<void(DbQueryResult &&result)> callback) const {
+    void DatabaseClient::handleQuery(const DbQuery &query, const std::function<void(DbQueryResult &&result)>& callback) const {
         auto isCancelled = std::make_shared<std::atomic_bool>(false);
 
         const auto timeoutTimer = std::make_shared<ba::steady_timer>(DatabaseService::Instance().getUtilityIoContext(),
@@ -19,7 +19,7 @@ namespace SmartHomeDB {
         });
 
 
-        mIoContext.post([this, isCancelled, query, callback] {
+        mIoContext.post([this, isCancelled, query, callback, timeoutTimer] {
             // Block until connection is available
             const auto conn = mpDbConnManager->acquireConnection();
             if (isCancelled->load(std::memory_order_acquire)) return;
@@ -37,10 +37,11 @@ namespace SmartHomeDB {
 
                 error = "SQL Error ("s + std::string(whatStr.substr(0, newLinePos));
                 error += ") \nQuery ("s + e.query() + ")";
-
             } catch (const std::exception &e) {
                 error = "Unexpected error: "s + e.what();
             }
+
+            timeoutTimer->cancel();
 
             if (!isCancelled->load(std::memory_order_acquire)) {
                 DbQueryResult queryResult;
@@ -69,7 +70,7 @@ namespace SmartHomeDB {
         });
 
 
-        mIoContext.post([this, isCancelled, queries = queries, callback = callback] {
+        mIoContext.post([this, isCancelled, queries = queries, callback = callback, timeoutTimer] {
             // Block until connection is available
             const auto conn = mpDbConnManager->acquireConnection();
             if (isCancelled->load(std::memory_order_acquire)) return;
@@ -81,7 +82,7 @@ namespace SmartHomeDB {
 
             for (const auto &query: queries) {
                 if (isCancelled->load(std::memory_order_acquire)) {
-                    return; // Cancel without commiting, transaction will be rolled back
+                    return; // Cancel without committing, transaction will be rolled back
                 };
                 try {
                     result = txn.exec(query.sql, query.params);
@@ -99,6 +100,8 @@ namespace SmartHomeDB {
                 }
                 queryResult.results.push_back(DbQueryResult{.result = result});
             }
+
+            timeoutTimer->cancel();
 
             if (error.empty()) {
                 txn.commit(); // Commit only when transaction run without errors

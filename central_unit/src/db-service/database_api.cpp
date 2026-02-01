@@ -28,7 +28,7 @@ namespace SmartHomeDB {
 
         nlohmann::json resultJson;
         resultJson["affected_rows"] = resultSql.affected_rows();
-        // resultJson["rows"] = nlohmann::json::array(); TODO !pr uncomment if not working
+        resultJson["rows"] = nlohmann::json::array();
 
         auto &rowsJsonArray = resultJson["rows"];
 
@@ -93,7 +93,8 @@ namespace SmartHomeDB {
                 return nlohmann::json::parse(field.c_str());
             }
         } catch (const std::exception &e) {
-            // Ignore exceptions
+            DatabaseService::Instance().mpLogger->debugf("[DB_API] Failed to parse pqxx into JSON: %s", e.what());
+            DatabaseService::Instance().mpLogger->debug("[DB_API] Falling back to string representation");
         }
 
         // Default return as string
@@ -575,14 +576,14 @@ namespace SmartHomeDB {
             }
 
             if (!column.is_string()) {
-                throw std::runtime_error("Aggregate column must ba a string");
+                throw std::runtime_error("Aggregate column must be a string");
             }
 
             std::string colStr = column.get<std::string>();
 
             if (colStr == sk::WILDCARD) {
                 if (func != sk::COUNT) {
-                    throw std::runtime_error("Only COUNT function can user '*'");
+                    throw std::runtime_error("Only COUNT function can use '*'");
                 }
                 parts.push_back(toUpper(func) + "(*)");
             } else {

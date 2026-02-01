@@ -28,6 +28,7 @@ namespace SmartHomeDB {
     class DatabaseService {
         /// Service name
         static constexpr std::string_view msDEFAULT_SERVICE_NAME = "smarthome-databased";
+
     public:
         /**
          * @brief Configuration structure for DatabaseService initialization.
@@ -45,7 +46,6 @@ namespace SmartHomeDB {
             si::SocketServer::Config::Uds uds{
                 .isEnabled = true, .endpointPath = "/var/run/smarthomed.sock"
             };
-
         };
 
 
@@ -85,9 +85,12 @@ namespace SmartHomeDB {
         /**
          * @brief Starts DatabaseService and runs main loop.
          *
-         * @details TODO !pr
+         * @details Starts service internals and background workers, registers signal handlers,
+         *          wires IPC incoming/outgoing handlers and then blocks on the main IO context.
+         *          This function is long-running and will only return once the main loop exits
+         *          and worker threads have been joined.
          *
-         * @pre initialize() must be successfully called first.
+         * @pre \c initialize() must be successfully called first.
          */
         void run();
 
@@ -96,7 +99,9 @@ namespace SmartHomeDB {
          *
          * @details Requests graceful shutdown of all subsystems with timeout protection.
          *          Resets work guards to allow IO contexts to finish, cancels signals, stops service,
-         *          and destroys objects in dependency order. Forces IO context stop if timeout expires.
+         *          and destroys objects in dependency order.
+
+         * @note Forces IO context stop if timeout expires.
          */
         void shutdown();
 
@@ -110,11 +115,11 @@ namespace SmartHomeDB {
         /**
          * @brief Utility IO context getter.
          *
-         * @return IO context reference.
+         * @return IO context reference used for timers, signal handling and utility tasks.
          */
         ba::io_context &getUtilityIoContext();
 
-        std::shared_ptr<su::Logger> mpLogger;
+        std::shared_ptr<su::Logger> mpLogger; ///< Shared asynchronous logger used by the service.
 
     private:
         DatabaseService() = default;
@@ -155,7 +160,7 @@ namespace SmartHomeDB {
 
         // Database API resources
         ba::io_context mDbApiIoContext;
-        std::optional<std::thread> mDbApiThread;
+        std::optional<ba::thread_pool> mDbApiThreadPool;
         std::optional<ba::executor_work_guard<ba::io_context::executor_type> > mDbApiGuard;
 
 

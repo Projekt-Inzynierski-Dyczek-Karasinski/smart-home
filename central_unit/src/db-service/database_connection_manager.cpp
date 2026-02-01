@@ -7,37 +7,38 @@
 namespace SmartHomeDB {
     DatabaseConnectionManager::DatabaseConnectionManager(const std::shared_ptr<SmartHome::Utils::Logger> &pLogger,
                                                          const Config &config) : mpLogger(pLogger) {
-        char buffer[1024];
+        char buffer[2048];
 
-        sprintf(buffer,
-                "host=%s "
-                "port=%d "
-                "dbname=%s "
-                "user=%s "
-                "password=%s "
-                "application_name=%s "
-                "connect_timeout=%d "
-                "keepalives=%d "
-                "keepalives_idle=%d",
-                config.dbHost.c_str(),
-                config.dbPort,
-                config.dbName.c_str(),
-                config.dbUser.c_str(),
-                config.dbPassword.c_str(),
-                config.serviceName.c_str(),
-                config.connectionTimeoutSeconds,
-                config.isKeepAliveEnabled ? 1 : 0,
-                config.keepAliveSeconds
+        snprintf(buffer,
+                 sizeof (buffer),
+                 "host=%s "
+                 "port=%d "
+                 "dbname=%s "
+                 "user=%s "
+                 "password=%s "
+                 "application_name=%s "
+                 "connect_timeout=%d "
+                 "keepalives=%d "
+                 "keepalives_idle=%d",
+                 config.dbHost.c_str(),
+                 config.dbPort,
+                 config.dbName.c_str(),
+                 config.dbUser.c_str(),
+                 config.dbPassword.c_str(),
+                 config.serviceName.c_str(),
+                 config.connectionTimeoutSeconds,
+                 config.isKeepAliveEnabled ? 1 : 0,
+                 config.keepAliveSeconds
         );
 
         mConnectionStr = std::string(buffer);
 
-        mpLogger->debugf("[DB_CONN_MANAGER] [CONSTRUCTOR] Attempting to connect with: %s", mConnectionStr.c_str());
+        mpLogger->debugf("[DB_CONN_MANAGER] [CONSTRUCTOR] Attempting to connect with: %s", config.dbHost.c_str());
 
         for (auto i = 0; i < config.dbConnections; ++i) {
             try {
                 mConnections.push(std::make_unique<pqxx::connection>(mConnectionStr));
-            } catch (std::exception &e) {
+            } catch (const std::exception &e) {
                 mpLogger->errorf("[DB_CONN_MANAGER] [CONSTRUCTOR] Failed to initialize connection: %s", e.what());
             }
         }
@@ -52,7 +53,7 @@ namespace SmartHomeDB {
     DatabaseConnection DatabaseConnectionManager::acquireConnection() {
         std::unique_lock lock(mConnectionsMutex);
 
-        // Await for connection if non are available in pool
+        // Await for connection if none are available in pool
         mConnectionsCond.wait(lock, [this]() { return !mConnections.empty(); });
 
         auto connection = std::move(mConnections.front());
@@ -70,7 +71,7 @@ namespace SmartHomeDB {
             try {
                 mConnections.push(std::make_unique<pqxx::connection>(mConnectionStr));
             } catch (std::exception &e) {
-                mpLogger->errorf("[DB_CONN_MANAGER] [RETURN_CONN] Failed to re-initialize connection: %s]", e.what());
+                mpLogger->errorf("[DB_CONN_MANAGER] [RETURN_CONN] Failed to re-initialize connection: %s", e.what());
             }
         }
 

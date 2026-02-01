@@ -55,11 +55,15 @@ namespace SmartHomeDB {
             mUtilityIoContext.run();
         });
 
+        uint dbApiThreadCount = configStruct.dbConnConfig.dbConnections;
+
+        if (dbApiThreadCount > 2) dbApiThreadCount -= 2; // dbApi threads are in n+2 relation to db connections
+
+        mDbApiThreadPool.emplace(dbApiThreadCount);
         mDbApiGuard.emplace(ba::make_work_guard(mDbApiIoContext));
-        // TODO !pr change to thread pool
-        mDbApiThread = std::thread([this] {
-            mDbApiIoContext.run();
-        });
+        for (size_t i = 0; i < dbApiThreadCount; i++) {
+            ba::post(*mDbApiThreadPool, [this] { mDbApiIoContext.run(); });
+        }
 
         mSocketClientGuard.emplace(ba::make_work_guard(mSocketClientIoContext));
         mSocketClientThread = std::thread([this] {
@@ -138,9 +142,9 @@ namespace SmartHomeDB {
 
         mpLogger->debug("[DB-SERVICE] Main thread finished");
 
-        if (mDbApiThread && mDbApiThread->joinable()) {
-            mDbApiThread->join();
-            mDbApiThread.reset();
+        if (mDbApiThreadPool) {
+            mDbApiThreadPool->join();
+            mDbApiThreadPool.reset();
         }
 
         if (mSocketClientThread && mSocketClientThread->joinable()) {
@@ -148,7 +152,7 @@ namespace SmartHomeDB {
             mSocketClientThread.reset();
         }
 
-        mpLogger->debug("[DB-SERVICE] Threads joined, stoping utils");
+        mpLogger->debug("[DB-SERVICE] Threads joined, stopping utils");
 
         if (!mUtilityIoContext.stopped()) {
             mUtilityIoContext.stop();
@@ -186,7 +190,7 @@ namespace SmartHomeDB {
 
         // Start shutdown timeout timer
         const auto timeoutTimer = std::make_shared<ba::steady_timer>(mUtilityIoContext, msSHUTDOWN_TIMEOUT);
-        timeoutTimer->async_wait([this](const bs::error_code &ec) {
+        timeoutTimer->async_wait([this, timeoutTimer](const bs::error_code &ec) {
             if (!ec) {
                 mpLogger->warning("[DB_SERVICE] Shutdown timeout - force stopping IO contexts");
 
@@ -231,7 +235,7 @@ namespace SmartHomeDB {
 
         // Shutdown after failed initialization
         if (!isRunning() && !mIsInitialized.load(std::memory_order_acquire)) {
-            mpLogger->warning("[DB-SERVICE] Running cleanup after failed initialization");
+            if (mpLogger) mpLogger->warning("[DB-SERVICE] Running cleanup after failed initialization");
 
             if (mSignals.has_value()) {
                 mSignals->cancel();
@@ -266,8 +270,8 @@ namespace SmartHomeDB {
             if (mMainThread && mMainThread->joinable()) {
                 mMainThread->join();
             }
-            if (mDbApiThread && mDbApiThread->joinable()) {
-                mDbApiThread->join();
+            if (mDbApiThreadPool) {
+                mDbApiThreadPool->join();
             }
             if (mSocketClientThread && mSocketClientThread->joinable()) {
                 mSocketClientThread->join();

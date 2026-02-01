@@ -29,11 +29,11 @@ namespace SmartHomeDB {
         return *this;
     }
 
-    pqxx::connection &DatabaseConnection::operator*() const {
+    pqxx::connection &DatabaseConnection::operator*() const noexcept {
         return *mpConnection;
     }
 
-    pqxx::connection *DatabaseConnection::operator->() const {
+    pqxx::connection *DatabaseConnection::operator->() const noexcept {
         return mpConnection.get();
     }
 }
