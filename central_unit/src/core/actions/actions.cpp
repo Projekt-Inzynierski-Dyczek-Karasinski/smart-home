@@ -674,7 +674,7 @@ namespace SmartHome {
         {{sai::TargetTypes::DATABASE, sai::MethodTypes::GET}, DatabaseActions::databaseRequestHandler},
         {{sai::TargetTypes::DATABASE, sai::MethodTypes::SET}, DatabaseActions::databaseRequestHandler},
         {{sai::TargetTypes::DATABASE, sai::MethodTypes::DELETE}, DatabaseActions::databaseRequestHandler},
-        // {{sai::TargetTypes::DATABASE, sai::MethodTypes::PING_REQUEST}, placeholderHandler},
+        // TODO consider implementing database ping and execute
         //CLI
         {{sai::TargetTypes::CLI, sai::MethodTypes::SET}, placeholderHandler},
         {{sai::TargetTypes::CLI, sai::MethodTypes::EXECUTE}, placeholderHandler},
