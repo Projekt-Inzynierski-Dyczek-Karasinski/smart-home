@@ -1,11 +1,11 @@
 #pragma once
 
-#include "rf_client.h"
 #include "async_logger.h"
 #include "socket_server.h"
 #include "service_manager/service_manager.h"
-#include "api/api_client.h"
-#include "api/rf_api.h"
+#include "socket_client.h"
+#include "rf_api/rf_client.h"
+#include "rf_api/rf_api.h"
 
 #include <memory>
 
@@ -133,12 +133,13 @@ namespace SmartHomeMediator {
         static constexpr auto msSHUTDOWN_TIMEOUT = 2500ms;
         /// Service name
         static constexpr std::string_view msSERVICE_NAME = "smarthome-radiod";
+        static constexpr std::string_view msCLIENT_TARGET_TYPE = "module_mediator";
 
         Config mConfig;
 
         std::unique_ptr<su::ServiceManager> mpService;
         std::unique_ptr<RfApi> mpRfApi;
-        std::shared_ptr<ApiClient> mpApiClient;
+        std::shared_ptr<si::SocketClient> mpApiClient;
         std::shared_ptr<RfClient> mpRfClient;
 
         // IPC API client resources

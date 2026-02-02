@@ -1,0 +1,37 @@
+preset_values:
+  log_levels:
+    none: &none 0
+    critical: &critical 1
+    error: &error 2
+    warning: &warning 3
+    info: &info 4
+    debug: &debug 5
+
+db_service:
+  service_name: "smarthome-databased"
+  db_server:
+    connections: 4
+    host: "127.0.0.0" # Overwritten by env var "SH_DB_HOST"
+    port: 5432 # Overwritten by env var "SH_DB_PORT"
+    name: "smart_home" # Overwritten by env var "SH_DB_NAME"
+    user: "smart_home_admin" # Overwritten by env var "SH_DB_USER"
+    password: "insert_password"  # Overwritten by env var "SH_DB_PASSWORD"
+    connection_timeout_seconds: 10
+    keep_alive_enabled: true
+    keep_alive_interval_seconds: 30
+  logging:
+    log_level: *info
+    enable_console_log_output: true
+    log_file:
+      enabled: true
+      create_new: true
+      archive_old: true
+      path: "/var/log/smarthome/db-service.log"
+  ipc:
+    tcp:
+      enabled: true
+      address: "127.0.0.1"
+      port: 43321
+    uds:
+      enabled: true
+      socket_path: "/var/run/smarthomed.sock"

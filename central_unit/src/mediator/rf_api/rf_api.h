@@ -1,8 +1,7 @@
 #pragma once
 
-#include "../rf_types.h"
+#include "rf_types.h"
 #include "api.h"
-#include "api_client.h"
 #include "../../core/api/internal_api.h"
 
 
@@ -54,7 +53,10 @@ namespace SmartHomeMediator {
          *           "logic_address": <uint>,
          *           "rf_channel": <uint>
          *         },
-         *         "method_params": []  // Array of positional parameters for the specific method
+         *         "method_params": {
+         *           "type": <string> // Method type / execute action
+                     "args": [] // Array of positional parameters for the specific method and type
+                    }
          *       }
          *       \endcode
          */

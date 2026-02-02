@@ -1,6 +1,7 @@
 #include "actions.h"
 #include "core_actions.h"
 #include "mediator_actions.h"
+#include "database_actions.h"
 
 #include <memory>
 
@@ -670,10 +671,10 @@ namespace SmartHome {
         {{sai::TargetTypes::MODULE_MEDIATOR, sai::MethodTypes::EXECUTE}, MediatorActions::mediatorExecuteHandler},
         {{sai::TargetTypes::MODULE_MEDIATOR, sai::MethodTypes::PING_REQUEST}, MediatorActions::mediatorPingHandler},
         //Database
-        {{sai::TargetTypes::DATABASE, sai::MethodTypes::GET}, placeholderHandler},
-        {{sai::TargetTypes::DATABASE, sai::MethodTypes::SET}, placeholderHandler},
-        {{sai::TargetTypes::DATABASE, sai::MethodTypes::EXECUTE}, placeholderHandler},
-        {{sai::TargetTypes::DATABASE, sai::MethodTypes::PING_REQUEST}, placeholderHandler},
+        {{sai::TargetTypes::DATABASE, sai::MethodTypes::GET}, DatabaseActions::databaseRequestHandler},
+        {{sai::TargetTypes::DATABASE, sai::MethodTypes::SET}, DatabaseActions::databaseRequestHandler},
+        {{sai::TargetTypes::DATABASE, sai::MethodTypes::DELETE}, DatabaseActions::databaseRequestHandler},
+        // TODO consider implementing database ping and execute
         //CLI
         {{sai::TargetTypes::CLI, sai::MethodTypes::SET}, placeholderHandler},
         {{sai::TargetTypes::CLI, sai::MethodTypes::EXECUTE}, placeholderHandler},
@@ -710,7 +711,7 @@ namespace SmartHome {
     // ======================================== CommandHandler functions ========================================
 
     // THIS PLACEHOLDER IS AN EXAMPLE AND IT SHOULD BE USED AS A TEMPLATE FOR OTHER COMMAND HANDLERS.
-    ba::awaitable<std::optional<API::ApiResponse> > Actions::placeholderHandler(
+    awaitOptApiResponse Actions::placeholderHandler(
         const cmdMetaPtr &commandMetadata) {
         // Optional debug log
         Core::Instance().mpLogger->debug("[ACTIONS] [PLACEHOLDER_HANDLER] called");

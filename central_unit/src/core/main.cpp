@@ -107,19 +107,19 @@ namespace SmartHome {
                                            ? vm["config"].as<std::string>()
                                            : s_DEFAULT_CONFIG_PATH.data();
         if (configManager.loadConfig(configPath)) {
-            logger->debug("[MAIN] Loading YAML logger config");
+            logger->debug("[MAIN_CORE] Loading YAML logger config");
             loadLoggerYamlConfig(configManager, loggerConfig);
 
-            logger->debug("[MAIN] Loading YAML core config");
+            logger->debug("[MAIN_CORE] Loading YAML core config");
             loadYamlConfigs(configManager, coreConfig, mediatorConfig);
         } else {
-            logger->error("[MAIN] Could not load YAML config");
+            logger->error("[MAIN_CORE] Could not load YAML config");
         }
 
         overwriteConfigsWithProgramOptions(vm, logTmpOpt, coreConfig, loggerConfig);
 
         logger->applyConfig(loggerConfig);
-        logger->debug("[MAIN] Smarthome configured");
+        logger->debug("[MAIN_CORE] Smarthome configured");
     }
 }
 
@@ -175,52 +175,52 @@ int main(int argc, char *argv[]) {
     loadConfigs(vm, parsed, logger, coreConfig, mediatorConfig);
 
     // Initialize Core
-    logger->debug("[MAIN] Initializing Core...");
+    logger->debug("[MAIN_CORE] Initializing Core...");
     if (!core.initialize(coreConfig, logger)) {
-        logger->critical("[MAIN] Failed to initialize Core");
+        logger->critical("[MAIN_CORE] Failed to initialize Core");
         return 1;
     }
-    logger->debug("[MAIN] Initialized Core");
+    logger->debug("[MAIN_CORE] Initialized Core");
 
 
     // TODO launch gui if in gui mode
 
     // Launch mediator if enabled
     if (mediatorConfig.isEnabled) {
-        logger->debug("[MAIN] Initializing Mediator...");
+        logger->debug("[MAIN_CORE] Initializing Mediator...");
         switch (mediatorConfig.serviceType) {
             default:
             case Utils::ServiceType::AUTO:
             case Utils::ServiceType::STANDALONE:
                 if (std::filesystem::exists(mediatorConfig.execPath)) {
-                    logger->info("[MAIN] Starting Mediator in STANDALONE mode");
+                    logger->info("[MAIN_CORE] Starting Mediator in STANDALONE mode");
                     mediator = bp::child(mediatorConfig.execPath, "--config", mediatorConfig.configPath);
                 } else {
-                    logger->error("[MAIN] Could not find mediator executable");
+                    logger->error("[MAIN_CORE] Could not find mediator executable");
                 }
                 break;
             case Utils::ServiceType::SYSTEMD:
-                logger->info("[MAIN] Mediator in SYSTEMD mode - waiting for service to be ready"); {
+                logger->info("[MAIN_CORE] Mediator in SYSTEMD mode - waiting for service to be ready"); {
                     bool isRunning = false;
 
                     for (int attempt = 1; attempt <= s_MAX_RETRIES; ++attempt) {
                         int ret = std::system("systemctl is-active --quiet smarthome-mediator.service");
                         if (ret == 0) {
-                            logger->info("[MAIN] Mediator service is running");
+                            logger->info("[MAIN_CORE] Mediator service is running");
                             isRunning = true;
                             break;
                         }
 
                         if (attempt < s_MAX_RETRIES) {
-                            logger->debugf("[MAIN] Mediator not ready yet, retry %d/%d", attempt, s_MAX_RETRIES);
+                            logger->debugf("[MAIN_CORE] Mediator not ready yet, retry %d/%d", attempt, s_MAX_RETRIES);
                             std::this_thread::sleep_for(s_RETRY_DELAY);
                         }
                     }
 
                     if (!isRunning) {
-                        logger->warning("[MAIN] Mediator service did not start within timeout");
-                        logger->warning("[MAIN] RF features will be unavailable");
-                        logger->info("[MAIN] Check status: sudo systemctl status smarthome-mediator.service");
+                        logger->warning("[MAIN_CORE] Mediator service did not start within timeout");
+                        logger->warning("[MAIN_CORE] RF features will be unavailable");
+                        logger->info("[MAIN_CORE] Check status: sudo systemctl status smarthome-mediator.service");
                     }
                     break;
                 }
@@ -228,14 +228,14 @@ int main(int argc, char *argv[]) {
     }
 
     // Run core main loop
-    logger->debug("[MAIN] Running Core...");
+    logger->debug("[MAIN_CORE] Running Core...");
     core.run();
-    logger->debug("[MAIN] Core stopped running");
+    logger->debug("[MAIN_CORE] Core stopped running");
 
 
     // Wait for mediator to exit if enabled
     if (mediatorConfig.isEnabled && mediator) {
-        logger->debug("[MAIN] Waiting for mediator shutdown");
+        logger->debug("[MAIN_CORE] Waiting for mediator shutdown");
         if (mediatorConfig.serviceType == Utils::ServiceType::STANDALONE) {
             mediator.terminate(); //SIGTERM
             if (!mediator.wait_for(15s)) {
@@ -243,10 +243,10 @@ int main(int argc, char *argv[]) {
                 mediator.wait();
             }
         } else if (mediatorConfig.serviceType == Utils::ServiceType::SYSTEMD) {
-            logger->debug("[MAIN] Mediator in SYSTEMD mode - not stopping (managed by systemd)");
+            logger->debug("[MAIN_CORE] Mediator in SYSTEMD mode - not stopping (managed by systemd)");
         }
     }
 
-    logger->debug("[MAIN] Exiting");
+    logger->debug("[MAIN_CORE] Exiting");
     return 0;
 }

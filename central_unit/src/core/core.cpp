@@ -21,6 +21,7 @@ namespace SmartHome {
     Core::Core() = default;
 
     Core::~Core() {
+        // FIXME rework shutdown - implement shutdown from db-service
         if (mIsRunning.load()) {
             shutdown();
         }
@@ -162,6 +163,7 @@ namespace SmartHome {
     }
 
     void Core::shutdown() {
+        // FIXME rework shutdown - implement shutdown from db-service
         //TODO add is shutting down check
         mpLogger->debug("[CORE] Starting core shutdown");
 

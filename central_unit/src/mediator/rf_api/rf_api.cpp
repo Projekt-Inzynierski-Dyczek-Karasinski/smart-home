@@ -1,6 +1,6 @@
 #include "rf_api.h"
 #include "../mediator.h"
-#include "../rf_client.h"
+#include "rf_client.h"
 
 #include <boost/algorithm/string/case_conv.hpp>
 namespace sj = SmartHome::JsonRpcStrings;
@@ -141,6 +141,12 @@ namespace SmartHomeMediator {
                     error.data = RfTypes::getStringFromRfErrorCode(rfErrorCode);
                     response.error = error;
                 } else {
+                    // Pass singular response param as result value
+                    if (rfCommand.parameters.size() == 1) {
+                        response.result = rfCommand.parameters.front().parameterToJson().dump();
+                        return response.to_string();
+                    }
+
                     // Store response parameters inside result as an array
                     auto paramJsonArray = nlohmann::json::array();
                     for (const auto &param: rfCommand.parameters) {
@@ -197,9 +203,9 @@ namespace SmartHomeMediator {
         }
 
         std::unique_ptr<nlohmann::json> pMethodParams;
-        if (params.contains(sj::ParamsKeys::METHOD_PARAMS)) {
+        if (params.contains(sj::ParamsKeys::METHOD_PARAMS)){
             pMethodParams = make_unique<nlohmann::json>(params[sj::ParamsKeys::METHOD_PARAMS]);
-        } else {
+        } else if (apiRequest.method != RfTypes::PING_STRING) {
             throw std::invalid_argument("Missing method params");
         }
 
@@ -238,37 +244,34 @@ namespace SmartHomeMediator {
             pConfigCommand->requestId = apiRequest.id.value();
         }
 
-        size_t requiredSize;
+        size_t argsRequired = false;
 
         if (method == RfTypes::GET_STRING) {
             pConfigCommand->configCommandType = RfTypes::MediatorConfigCommandType::GET;
-            requiredSize = 1;
         } else if (method == RfTypes::SET_STRING) {
             pConfigCommand->configCommandType = RfTypes::MediatorConfigCommandType::SET;
-            requiredSize = 2;
+            argsRequired = true;
         } else if (method == RfTypes::EXECUTE_STRING) {
             pConfigCommand->configCommandType = RfTypes::MediatorConfigCommandType::EXECUTE;
-            requiredSize = 2;
+            argsRequired = true;
         } else {
             throw std::invalid_argument("Invalid method for mediator config command: "s + method.data());
         }
 
-        if (pMethodParams->size() != requiredSize) {
-            sprintf(buffer,
-                    "Invalid method params size: received %lu, required %lu",
-                    pMethodParams->size(),
-                    requiredSize);
-            throw std::invalid_argument(buffer);
+        if (!pMethodParams->contains(sj::MediatorMethodParams::TYPE) || !pMethodParams->at(sj::MediatorMethodParams::TYPE).is_string()) {
+            throw std::invalid_argument("Invalid method params: 'type' field is required and must be a string");
         }
 
-        pConfigCommand->commandKey = pMethodParams->front().is_string()
-                                         ? pMethodParams->front().get<std::string>()
-                                         : to_string(pMethodParams->front());
+        pConfigCommand->commandKey = pMethodParams->at(sj::MediatorMethodParams::TYPE).get<std::string>();
 
-        if (requiredSize == 2) {
-            pConfigCommand->commandValue = pMethodParams->at(1).is_string()
-                                               ? pMethodParams->at(1).get<std::string>()
-                                               : to_string(pMethodParams->at(1));
+        if (argsRequired) {
+            if (!pMethodParams->contains(sj::MediatorMethodParams::ARGS) || !pMethodParams->at(sj::MediatorMethodParams::ARGS).is_array()) {
+                throw std::invalid_argument("Invalid method params: 'args' field is required and must be an array");
+            }
+
+            pConfigCommand->commandValue = pMethodParams->at(sj::MediatorMethodParams::TYPE).front().is_string()
+                                               ? pMethodParams->at(sj::MediatorMethodParams::TYPE).front().get<std::string>()
+                                               : to_string(pMethodParams->at(sj::MediatorMethodParams::TYPE).front());
         }
 
         return pConfigCommand;
@@ -277,46 +280,49 @@ namespace SmartHomeMediator {
     void RfApi::parseRequest(RfTypes::RfCommand *pCommand,
                              const std::string_view method,
                              nlohmann::json *pMethodParams) {
+        if (method == RfTypes::PING_STRING) {
+            pCommand->rfCommandType = RfTypes::RfCommandType::PING;
+            return;
+        }
+
+        if (!(pMethodParams &&
+              pMethodParams->contains(sj::MediatorMethodParams::TYPE) &&
+              pMethodParams->at(sj::MediatorMethodParams::TYPE).is_string())) {
+            throw std::invalid_argument("Invalid method specified");
+        }
+
         int paramOffset = 1;
 
-        if (method == RfTypes::SET_STRING &&
-            pMethodParams != nullptr &&
-            pMethodParams->is_array() &&
-            pMethodParams->size() > 1) {
+        if (method == RfTypes::SET_STRING) {
             // Handle set command
             pCommand->rfCommandType = RfTypes::RfCommandType::SET;
-            // Read set type from first index
+            // Read set type from 'type' field
             try {
                 pCommand->requestType.emplace(
-                    RfTypes::setTypeFromString(pMethodParams->front().get<std::string>()));
+                    RfTypes::setTypeFromString(pMethodParams->at(sj::MediatorMethodParams::TYPE).get<std::string>()));
             } catch (const std::exception &e) {
                 throwParseError("set", e.what(), pMethodParams->dump());
             }
-        } else if (method == RfTypes::GET_STRING &&
-                   pMethodParams != nullptr &&
-                   pMethodParams->is_array() &&
-                   !pMethodParams->empty()) {
+        } else if (method == RfTypes::GET_STRING) {
             // Handle get command
             pCommand->rfCommandType = RfTypes::RfCommandType::GET;
-            // Read get type from first index
+            // Read get type from 'type' field
             try {
                 pCommand->requestType.emplace(
-                    RfTypes::getTypeFromString(pMethodParams->front().get<std::string>()));
+                    RfTypes::getTypeFromString(pMethodParams->at(sj::MediatorMethodParams::TYPE).get<std::string>()));
             } catch (const std::exception &e) {
                 throwParseError("get", e.what(), pMethodParams->dump());
             }
-        } else if (method == RfTypes::EXECUTE_STRING &&
-                   pMethodParams != nullptr &&
-                   pMethodParams->is_array() &&
-                   !pMethodParams->empty()) {
+        } else if (method == RfTypes::EXECUTE_STRING) {
             // Handle execute command
             std::string action;
             try {
-                action = pMethodParams->front().get<std::string>();
+                action = pMethodParams->at(sj::MediatorMethodParams::TYPE).get<std::string>();
             } catch (const std::exception &e) {
                 throwParseError("execute", e.what(), pMethodParams->dump());
             }
 
+            // TODO implement function when adding more actions
             if (action == RfTypes::SLEEP_STRING) {
                 pCommand->rfCommandType = RfTypes::RfCommandType::SLEEP;
             } else if (action == RfTypes::DEEP_SLEEP_STRING)
@@ -324,17 +330,13 @@ namespace SmartHomeMediator {
             else {
                 throw std::invalid_argument("Invalid action parameter specified");
             }
-        } else if (method == RfTypes::PING_STRING) {
-            pCommand->rfCommandType = RfTypes::RfCommandType::PING;
-            paramOffset = 0; // ping does not have a type as first param
-        } else {
-            throw std::invalid_argument("Invalid method specified");
         }
 
-        // Pass remaining method params to rfCommand parameter vector
-        if (pMethodParams != nullptr && pMethodParams->is_array()) {
-            for (auto i = paramOffset; i < pMethodParams->size(); i++) {
-                pCommand->parameters.push_back(RfTypes::Parameter::parameterFromJson(pMethodParams->at(i)));
+
+        // Pass args to rfCommand parameter vector
+        if (pMethodParams->contains(sj::MediatorMethodParams::ARGS) && pMethodParams->at(sj::MediatorMethodParams::ARGS).is_array()) {
+            for (const auto &arg: pMethodParams->at(sj::MediatorMethodParams::ARGS)) {
+                pCommand->parameters.push_back(RfTypes::Parameter::parameterFromJson(arg));
             }
         }
     }
@@ -347,10 +349,10 @@ namespace SmartHomeMediator {
         }
 
         pCommand->rfCommandType = RfTypes::RfCommandType::NOTIFY;
-        // Read notify type from first index
+        // Read notify type from 'type' field
         try {
             pCommand->requestType.emplace(
-                RfTypes::notificationTypeFromString(pMethodParams->front().get<std::string>()));
+                RfTypes::notificationTypeFromString(pMethodParams->at(sj::MediatorMethodParams::TYPE).get<std::string>()));
         } catch (const std::exception &e) {
             throwParseError("notify", e.what(), pMethodParams->dump());
         }

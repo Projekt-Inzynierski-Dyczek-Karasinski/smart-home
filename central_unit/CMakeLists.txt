@@ -23,6 +23,8 @@ option(BUILD_CORE "Build SmartHome daemon" ON)
 
 option(BUILD_MEDIATOR "Build module mediator" ON)
 
+option(BUILD_DB_SERVICE "Build SmartHome database daemon" ON)
+
 option(BUILD_CLI "Build SmartHome CLI" ON)
 
 option(BUILD_GUI "Build SmartHome GUI" ON)
@@ -58,6 +60,10 @@ endif ()
 
 if (BUILD_MEDIATOR)
     add_subdirectory(src/mediator)
+endif ()
+
+if (BUILD_DB_SERVICE)
+    add_subdirectory(src/db-service)
 endif ()
 
 if (BUILD_CLI)

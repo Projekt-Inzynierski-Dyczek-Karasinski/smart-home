@@ -42,6 +42,8 @@ namespace SmartHome::API {
                 return msNOTIFY_STRING;
             case MethodTypes::EXECUTE:
                 return msEXECUTE_STRING;
+            case MethodTypes::DELETE:
+                return msDELETE_STRING;
             case MethodTypes::ECHO_REQUEST:
                 return msECHO_STRING;
             case MethodTypes::PING_REQUEST:
@@ -57,6 +59,7 @@ namespace SmartHome::API {
             {msSET_STRING, MethodTypes::SET},
             {msNOTIFY_STRING, MethodTypes::NOTIFY},
             {msEXECUTE_STRING, MethodTypes::EXECUTE},
+            {msDELETE_STRING, MethodTypes::DELETE},
             {msECHO_STRING, MethodTypes::ECHO_REQUEST},
             {msPING_STRING, MethodTypes::PING_REQUEST},
             {msUNKNOWN_STRING, MethodTypes::UNKNOWN}

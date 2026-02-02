@@ -36,6 +36,7 @@ namespace SmartHome {
     class Actions {
         friend class CoreActions;
         friend class MediatorActions;
+        friend class DatabaseActions;
 
     public:
         /**
@@ -164,6 +165,13 @@ namespace SmartHome {
         static std::optional<API::InternalApi::Request> getRequest(apiId_t requestId);
 
         /**
+         * @brief Generate unique request ID.
+         *
+         * @return Next sequential ID value.
+         */
+        static apiId_t getNextId();
+
+        /**
          * @brief Start command timeout timer.
          *
          * @param commandMetadata Command to set timeout for.
@@ -252,14 +260,6 @@ namespace SmartHome {
              */
             void cancel();
         };
-
-
-        /**
-         * @brief Generate unique request ID.
-         *
-         * @return Next sequential ID value.
-         */
-        static apiId_t getNextId();
 
 
         /**

@@ -21,6 +21,7 @@ add_executable(smarthomed
         actions/actions.cpp
         actions/core_actions.cpp
         actions/mediator_actions.cpp
+        actions/database_actions.cpp
 )
 
 

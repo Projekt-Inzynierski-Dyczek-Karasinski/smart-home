@@ -1,21 +1,15 @@
-#include "api_client.h"
+#include "socket_client.h"
 
-namespace bal = boost::asio::local;
-
-namespace SmartHomeMediator {
-    using namespace std::chrono_literals;
-
-    namespace sj = SmartHome::JsonRpcStrings;
-
-    ApiClient::~ApiClient() {
+namespace SmartHome::IPC {
+    SocketClient::~SocketClient() {
         if (mConnection) {
             mConnection->close();
             mConnection.reset();
         }
     }
 
-    bool ApiClient::connectToServer(const std::string_view udsPath) {
-        mConnection.emplace(*mpIoContext, si::SocketConnection::Type::UDS, mpLogger);
+    bool SocketClient::connectToServer(const std::string_view udsPath) {
+        mConnection.emplace(*mpIoContext, SocketConnection::Type::UDS, mpLogger);
         const auto endpoint = bal::stream_protocol::endpoint(udsPath);
 
         if (!mConnection->connect(endpoint)) {
@@ -25,8 +19,8 @@ namespace SmartHomeMediator {
         return handshake();
     }
 
-    bool ApiClient::connectToServer(const std::string_view ipAddress, const int port) {
-        mConnection.emplace(*mpIoContext, si::SocketConnection::Type::TCP, mpLogger);
+    bool SocketClient::connectToServer(const std::string_view ipAddress, const int port) {
+        mConnection.emplace(*mpIoContext, SocketConnection::Type::TCP, mpLogger);
         const auto endpoint = bai::tcp::endpoint(bai::make_address(ipAddress), port);
 
         if (!mConnection->connect(endpoint)) {
@@ -36,34 +30,34 @@ namespace SmartHomeMediator {
         return handshake();
     }
 
-    void ApiClient::initialize(const std::function<void(const std::string &message)> &messageHandler) {
+    void SocketClient::initialize(const std::function<void(const std::string &message)> &messageHandler) {
         mMessageHandler = messageHandler;
 
         startReceiving();
     }
 
-    void ApiClient::handleOutgoing(SmartHome::connectionId_t connectionId, std::string &&message) {
+    void SocketClient::handleOutgoing(connectionId_t connectionId, std::string &&message) {
         send(message);
     }
 
-    void ApiClient::handleIncoming(SmartHome::connectionId_t connectionId, std::string &&message) {
+    void SocketClient::handleIncoming(connectionId_t connectionId, std::string &&message) {
         mMessageHandler(message);
     }
 
-    bool ApiClient::handshake() {
+    bool SocketClient::handshake() {
         // Build handshake request
         SmartHome::API::ApiRequest request;
         nlohmann::json jsonParams;
         request.method = msSET_METHOD_STRING;
         jsonParams[sj::ParamsKeys::TARGET] = msCORE_TARGET_STRING;
-        jsonParams[sj::ParamsKeys::METHOD_PARAMS] = {msCONNECTION_TYPE_STRING, msMEDIATOR_TARGET_STRING};
+        jsonParams[sj::ParamsKeys::METHOD_PARAMS] = {msCONNECTION_TYPE_STRING, mTargetTypeOfClient};
         request.params.emplace(jsonParams);
         request.id = 1;
 
         ba::steady_timer timer(*mpIoContext, 3s);
 
         // Start timeout timer
-        timer.async_wait([this](const bs::error_code &ec){
+        timer.async_wait([this](const bs::error_code &ec) {
             if (!ec) {
                 mpLogger->error("[API_CLIENT] Handshake timeout");
                 mConnection->close();
@@ -75,8 +69,7 @@ namespace SmartHomeMediator {
         try {
             mConnection->write(request.to_string());
             response = mConnection->read();
-        }
-        catch (const std::exception &e) {
+        } catch (const std::exception &e) {
             mpLogger->errorf("[API_CLIENT] Error while handshaking connection: %s", e.what());
             return false;
         }
@@ -88,8 +81,7 @@ namespace SmartHomeMediator {
         try {
             mpLogger->debugf("[API_CLIENT] Handshake response: %s", response.c_str());
             apiResponse(std::string_view(response));
-        }
-        catch (const std::exception &e) {
+        } catch (const std::exception &e) {
             mpLogger->errorf("[API_CLIENT] Error while parsing handshake response: %s", e.what());
             return false;
         }
@@ -99,14 +91,15 @@ namespace SmartHomeMediator {
             return false;
         }
 
-        if (apiResponse.result.has_value() && apiResponse.result.value() == jsonParams[sj::ParamsKeys::METHOD_PARAMS].dump()) {
+        if (apiResponse.result.has_value() &&
+            apiResponse.result.value() == jsonParams[sj::ParamsKeys::METHOD_PARAMS].dump()) {
             return true;
         }
 
         return false;
     }
 
-    void ApiClient::startReceiving() {
+    void SocketClient::startReceiving() {
         if (!mConnection || !mConnection->isOpen()) {
             mpLogger->error("[API_CLIENT] Error while listening: no connection");
             return;
@@ -126,7 +119,7 @@ namespace SmartHomeMediator {
         mConnection->readAsync(onRead);
     }
 
-    void ApiClient::send(const std::string_view message) {
+    void SocketClient::send(std::string_view message) {
         if (message.empty()) {
             mpLogger->error("[API_CLIENT] Error while sending: empty message");
             return;

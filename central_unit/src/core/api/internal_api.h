@@ -26,6 +26,7 @@ namespace SmartHome::API {
             SET,
             NOTIFY,
             EXECUTE,
+            DELETE,
             //Debug actions
             ECHO_REQUEST,
             PING_REQUEST
@@ -98,6 +99,7 @@ namespace SmartHome::API {
             static constexpr std::string_view msSET_STRING = "set";
             static constexpr std::string_view msNOTIFY_STRING = "notify";
             static constexpr std::string_view msEXECUTE_STRING = "execute";
+            static constexpr std::string_view msDELETE_STRING = "delete";
             static constexpr std::string_view msECHO_STRING = "echo";
             static constexpr std::string_view msPING_STRING = "ping";
             static constexpr std::string_view msUNKNOWN_STRING = "unknown";

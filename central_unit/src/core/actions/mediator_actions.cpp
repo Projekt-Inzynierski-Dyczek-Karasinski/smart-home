@@ -1,10 +1,14 @@
 #include "mediator_actions.h"
+#include "database_actions.h"
 
 namespace SmartHome {
     using ai = API::InternalApi;
+    namespace jp = JsonRpcStrings::ParamsKeys;
+    namespace jmmp = JsonRpcStrings::MediatorMethodParams;
+    namespace jmik = JsonRpcStrings::ModuleInfoKeys;
+    namespace jr = JsonRpcStrings::ResponseKeys;
 
-    ba::awaitable<std::optional<API::ApiResponse> > MediatorActions::mediatorGetHandler(
-        const cmdMetaPtr &commandMetadata) {
+    awaitOptApiResponse MediatorActions::mediatorGetHandler(const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[MEDIATOR_ACTIONS] [GET] called");
         const auto &command = commandMetadata->command;
 
@@ -15,43 +19,55 @@ namespace SmartHome {
         error.code = API::ErrorCodes::INVALID_PARAMS;
         error.message = API::errorCodeToString(error.code);
 
-        constexpr uint minNumOfParams = 2;
+        API::ApiRequest requestToMediator;
+        auto &rtmParams = prepareRequestToMediator(requestToMediator, command);
 
-        if (!areParamsValid(error, command, minNumOfParams)) {
-            error.data += "Mediator get command expects params of following format: "
-                    "{(optional){'module_id': <uint>}, target_value_key<string>, (optional)optional_arguments<any>}";
+        const auto &params = command.params.value();
+
+        auto parsedParams = parseMediatorParams(params, rtmParams);
+
+        if (parsedParams.moduleId.has_value() && !co_await getModuleAddressingInfo(
+                rtmParams, parsedParams.moduleId.value(), error.data)) {
+            error.code = API::ErrorCodes::INTERNAL_ERROR;
+            error.message = API::errorCodeToString(error.code);
             commandResult.error = error;
             co_return commandResult;
         }
 
-        const auto &params = command.params.value();
-
-        API::ApiRequest requestToMediator;
-        auto &rtmParams = prepareRequestToMediator(requestToMediator, command);
-
-
-        if (params[0].is_object() && params[0].contains("module_id")) {
-            // TODO fetch module info from storage - temporary hardcoded values for testing
-            rtmParams[JsonRpcStrings::ParamsKeys::MODULE_INFO] = nlohmann::json::object({
-                {"logic_address", 2},
-                {"rf_channel", 2}
-            });
-            rtmParams[JsonRpcStrings::ParamsKeys::METHOD_PARAMS] = nlohmann::json::array_t(
-                params.begin() + 1, params.end());
-        } else {
-            rtmParams[JsonRpcStrings::ParamsKeys::METHOD_PARAMS] =
-                    nlohmann::json::array_t(params.begin(), params.end());
-        }
-
-        // TODO Check short term memory for cached result
         commandResult = co_await sendRequestToMediator(std::move(requestToMediator), commandMetadata);
-        // TODO Save to short/long term memory
+
+        // Send to db
+        if (parsedParams.moduleId.has_value()) {
+            static const std::set<std::string_view> sensorReadApplicableGetTypes = {
+                "sensor_value", "force_read_sensor_value", "actuator_value"
+            };
+
+            if (commandResult.result.has_value()) {
+                DatabaseActions::updateModuleLastOnline(parsedParams.moduleId.value());
+
+                nlohmann::json result;
+                try {
+                    result = nlohmann::json::parse(commandResult.result.value());
+                } catch (const std::exception &e) {
+                    Core::Instance().mpLogger->errorf("[MEDIATOR_ACTIONS] [GET] Failed to parse result as JSON: %s",
+                                                      e.what());
+                    error.code = API::ErrorCodes::INTERNAL_ERROR;
+                    error.message = API::errorCodeToString(error.code);
+                    error.data = e.what();
+                    commandResult.result.reset();
+                    commandResult.error = error;
+                    co_return commandResult;
+                }
+                postSensorReadingIfApplicable(parsedParams, result, sensorReadApplicableGetTypes);
+            } else {
+                postErrorLog(parsedParams.moduleId.value(), commandResult);
+            }
+        }
 
         co_return commandResult;
     }
 
-    ba::awaitable<std::optional<API::ApiResponse> > MediatorActions::mediatorSetHandler(
-        const cmdMetaPtr &commandMetadata) {
+    awaitOptApiResponse MediatorActions::mediatorSetHandler(const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[MEDIATOR_ACTIONS] [SET] called");
         const auto &command = commandMetadata->command;
 
@@ -62,41 +78,56 @@ namespace SmartHome {
         error.code = API::ErrorCodes::INVALID_PARAMS;
         error.message = API::errorCodeToString(error.code);
 
-        constexpr uint minNumOfParams = 3;
+        API::ApiRequest requestToMediator;
+        auto &rtmParams = prepareRequestToMediator(requestToMediator, command);
 
-        if (!areParamsValid(error, command, minNumOfParams)) {
-            error.data += "Mediator set command expects params of following format: "
-                    "{(optional){'module_id': <uint>}, target_value_key<string>, target_new_value<any>}";
+        const auto &params = command.params.value();
+
+        auto parsedParams = parseMediatorParams(params, rtmParams);
+
+        if (parsedParams.moduleId.has_value() && !co_await getModuleAddressingInfo(
+                rtmParams, parsedParams.moduleId.value(), error.data)) {
+            error.code = API::ErrorCodes::INTERNAL_ERROR;
+            error.message = API::errorCodeToString(error.code);
             commandResult.error = error;
             co_return commandResult;
         }
 
-        const auto &params = command.params.value();
-
-        API::ApiRequest requestToMediator;
-        auto &rtmParams = prepareRequestToMediator(requestToMediator, command);
-
-        if (params[0].is_object() && params[0].contains("module_id")) {
-            // TODO fetch module info from storage - temporary hardcoded values for testing
-            rtmParams[JsonRpcStrings::ParamsKeys::MODULE_INFO] = nlohmann::json::object({
-                {"logic_address", 2},
-                {"rf_channel", 2}
-            });
-            rtmParams[JsonRpcStrings::ParamsKeys::METHOD_PARAMS] = nlohmann::json::array_t(
-                params.begin() + 1, params.end());
-        } else {
-            rtmParams[JsonRpcStrings::ParamsKeys::METHOD_PARAMS] =
-                    nlohmann::json::array_t(params.begin(), params.end());
-        }
-
-        // TODO consider if set values should be stored in short/long term memory
         commandResult = co_await sendRequestToMediator(std::move(requestToMediator), commandMetadata);
+
+        // Send to db
+        if (parsedParams.moduleId.has_value()) {
+            static const std::set<std::string_view> sensorReadApplicableSetTypes = {
+                "toggle_actuator", "set_actuator_value",
+            };
+
+            if (commandResult.result.has_value()) {
+                DatabaseActions::updateModuleLastOnline(parsedParams.moduleId.value());
+
+                nlohmann::json result;
+                try {
+                    result = nlohmann::json::parse(commandResult.result.value());
+                } catch (const std::exception &e) {
+                    Core::Instance().mpLogger->errorf("[MEDIATOR_ACTIONS] [SET] Failed to parse result as JSON: %s",
+                                                      e.what());
+                    error.code = API::ErrorCodes::INTERNAL_ERROR;
+                    error.message = API::errorCodeToString(error.code);
+                    error.data = e.what();
+                    commandResult.result.reset();
+                    commandResult.error = error;
+                    co_return commandResult;
+                }
+                postSensorReadingIfApplicable(parsedParams, result, sensorReadApplicableSetTypes);
+            } else {
+                postErrorLog(parsedParams.moduleId.value(), commandResult);
+            }
+        }
 
         co_return commandResult;
     }
 
-    ba::awaitable<std::optional<API::ApiResponse> > MediatorActions::mediatorExecuteHandler(
-        const cmdMetaPtr &commandMetadata) {
+
+    awaitOptApiResponse MediatorActions::mediatorExecuteHandler(const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[MEDIATOR_ACTIONS] [EXECUTE] called");
         const auto &command = commandMetadata->command;
 
@@ -107,42 +138,53 @@ namespace SmartHome {
         error.code = API::ErrorCodes::INVALID_PARAMS;
         error.message = API::errorCodeToString(error.code);
 
-        constexpr uint minNumOfParams = 1;
+        API::ApiRequest requestToMediator;
+        auto &rtmParams = prepareRequestToMediator(requestToMediator, command);
 
-        if (!areParamsValid(error, command, minNumOfParams)) {
-            error.data += "Mediator execute command expects params of following format: "
-                    "{(optional){'module_id': <uint>}, action<string>, (optional)action_argument<any>}";
+        const auto &params = command.params.value();
+
+        auto parsedParams = parseMediatorParams(params, rtmParams);
+
+        if (parsedParams.moduleId.has_value() && !co_await getModuleAddressingInfo(
+                rtmParams, parsedParams.moduleId.value(), error.data)) {
+            error.code = API::ErrorCodes::INTERNAL_ERROR;
+            error.message = API::errorCodeToString(error.code);
             commandResult.error = error;
             co_return commandResult;
         }
 
-        const auto &params = command.params.value();
-
-        API::ApiRequest requestToMediator;
-        auto &rtmParams = prepareRequestToMediator(requestToMediator, command);
-
-        // Check if execute is targeted at module or mediator and handle accordingly
-        if (params[0].is_object() && params[0].contains("module_id")) {
-            // TODO fetch module info from storage - temporary hardcoded values for testing
-            rtmParams[JsonRpcStrings::ParamsKeys::MODULE_INFO] = nlohmann::json::object({
-                {"logic_address", 2},
-                {"rf_channel", 2}
-            });
-            rtmParams[JsonRpcStrings::ParamsKeys::METHOD_PARAMS] = nlohmann::json::array_t(
-                params.begin() + 1, params.end());
-        } else {
-            rtmParams[JsonRpcStrings::ParamsKeys::METHOD_PARAMS] =
-                    nlohmann::json::array_t(params.begin(), params.end());
-        }
-
-        // TODO consider if executed actions should be stored in short/long term memory
         commandResult = co_await sendRequestToMediator(std::move(requestToMediator), commandMetadata);
+
+        // Send to db
+        if (parsedParams.moduleId.has_value()) {
+            if (commandResult.result.has_value()) {
+                DatabaseActions::updateModuleLastOnline(parsedParams.moduleId.value());
+
+                char buffer[1024];
+
+                std::string action = "<none>";
+                std::string actionArgument = "<none>";
+                if (parsedParams.type.has_value()) {
+                    action = parsedParams.type.value();
+                }
+                if (parsedParams.args.has_value()) {
+                    actionArgument = parsedParams.args.value().dump();
+                }
+
+                snprintf(buffer, sizeof(buffer), "Action '%s' with args '%s' executed, with result: %s",
+                         action.c_str(), actionArgument.c_str(), commandResult.result.value().c_str());
+
+
+                DatabaseActions::postLog(parsedParams.moduleId.value(), "info", buffer);
+            } else {
+                postErrorLog(parsedParams.moduleId.value(), commandResult);
+            }
+        }
 
         co_return commandResult;
     }
 
-    ba::awaitable<std::optional<API::ApiResponse> > MediatorActions::mediatorPingHandler(
-        const cmdMetaPtr &commandMetadata) {
+    awaitOptApiResponse MediatorActions::mediatorPingHandler(const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[MEDIATOR_ACTIONS] [PING] called");
         const auto &command = commandMetadata->command;
 
@@ -153,39 +195,40 @@ namespace SmartHome {
         error.code = API::ErrorCodes::INVALID_PARAMS;
         error.message = API::errorCodeToString(error.code);
 
-        constexpr uint minNumOfParams = 1;
+        API::ApiRequest requestToMediator;
+        auto &rtmParams = prepareRequestToMediator(requestToMediator, command);
 
-        if (!areParamsValid(error, command, minNumOfParams)) {
-            error.data += "Mediator ping command expects params of following format: "
-                    "{{'module_id': <uint>}}";
+        const auto &params = command.params.value();
+
+        std::optional<uint> moduleId;
+        if (params.contains(jmmp::MODULE_ID) && params.at(jmmp::MODULE_ID).is_number())
+            moduleId = params.at(jmmp::MODULE_ID);
+
+        if (moduleId.has_value() && !co_await getModuleAddressingInfo(rtmParams, moduleId.value(), error.data)) {
+            error.code = API::ErrorCodes::INTERNAL_ERROR;
+            error.message = API::errorCodeToString(error.code);
             commandResult.error = error;
             co_return commandResult;
         }
 
-        const auto &params = command.params.value();
-
-        API::ApiRequest requestToMediator;
-        auto &rtmParams = prepareRequestToMediator(requestToMediator, command);
-
-        if (params[0].is_object() && params[0].contains("module_id")) {
-            // TODO fetch module info from storage - temporary hardcoded values for testing
-            rtmParams[JsonRpcStrings::ParamsKeys::MODULE_INFO] = nlohmann::json::object({
-                {"logic_address", 2},
-                {"rf_channel", 2}
-            });
-            rtmParams[JsonRpcStrings::ParamsKeys::METHOD_PARAMS] = nlohmann::json::array_t(
-                params.begin() + 1, params.end());
-        } else {
-            error.data = "Mediator ping command requires parameter with object containing module id."
-                    "Expected format: {{'module_id': <uint>}}";
-        }
-
         const auto requestSendTimestamp = std::chrono::system_clock::now();
+
         commandResult = co_await sendRequestToMediator(std::move(requestToMediator), commandMetadata);
+
         const auto requestDuration = std::chrono::system_clock::now() - requestSendTimestamp;
+
+        // Return ping time in ms on received result
         if (!commandResult.error.has_value()) {
             commandResult.result.emplace(
                 std::to_string(std::chrono::duration_cast<std::chrono::milliseconds>(requestDuration).count()) + "ms");
+        }
+
+        if (moduleId.has_value()) {
+            if (commandResult.result.has_value()) {
+                DatabaseActions::updateModuleLastOnline(moduleId.value());
+            } else {
+                DatabaseActions::postLog(moduleId.value(), "error", "module ping timeout");
+            }
         }
 
         co_return commandResult;
@@ -250,21 +293,27 @@ namespace SmartHome {
         co_return requestResult;
     }
 
-    bool MediatorActions::areParamsValid(API::ApiError &error, const API::InternalApi::Command &command,
-                                         const uint numOfExpectedParams) {
-        if (!command.params.has_value()) {
-            error.data = "Expected at least " + std::to_string(numOfExpectedParams) + " parameters, none received. ";
-            return false;
+    MediatorActions::MediatorRequestParams MediatorActions::parseMediatorParams(const nlohmann::json &incomingParams,
+        nlohmann::json &rtmParams) {
+        MediatorRequestParams requestParams;
+
+        if (incomingParams.contains(jmmp::MODULE_ID) && incomingParams.at(jmmp::MODULE_ID).is_number()) {
+            requestParams.moduleId = incomingParams.at(jmmp::MODULE_ID);
         }
 
-        const auto &params = command.params.value();
-        const auto paramsSize = params.size();
-        if (!params.is_array() && paramsSize >= numOfExpectedParams) {
-            error.data = "Expected at least " + std::to_string(numOfExpectedParams) + " parameters, " +
-                         std::to_string(numOfExpectedParams) + " received. ";
-            return false;
+        if (incomingParams.contains(jmmp::TYPE) && incomingParams.at(jmmp::TYPE).is_string()) {
+            requestParams.type = incomingParams.at(jmmp::TYPE);
+            rtmParams[jp::METHOD_PARAMS][jmmp::TYPE] = incomingParams.at(jmmp::TYPE);
         }
-        return true;
+
+        if (incomingParams.contains(jmmp::ARGS) && incomingParams.at(jmmp::ARGS).is_array() && !incomingParams.
+            at(jmmp::ARGS).
+            empty()) {
+            requestParams.args = incomingParams.at(jmmp::ARGS);
+            rtmParams[jp::METHOD_PARAMS][jmmp::ARGS] = incomingParams.at(jmmp::ARGS);
+        }
+
+        return requestParams;
     }
 
     nlohmann::json &MediatorActions::prepareRequestToMediator(API::ApiRequest &request,
@@ -272,9 +321,50 @@ namespace SmartHome {
         request.id = command.commandId;
         request.method = command.method.to_string();
         request.params.emplace(nlohmann::json());
-        request.params.value()[JsonRpcStrings::ParamsKeys::TARGET] = ai::Target(ai::TargetTypes::MODULE_MEDIATOR).
+        request.params.value()[jp::TARGET] = ai::Target(ai::TargetTypes::MODULE_MEDIATOR).
                 to_string();
 
         return request.params.value();
+    }
+
+    ba::awaitable<bool> MediatorActions::getModuleAddressingInfo(nlohmann::json &preparedParams,
+                                                                 uint moduleId,
+                                                                 std::string &error) {
+        const auto moduleInfo = co_await DatabaseActions::getModuleAddressingInfo(moduleId);
+
+        if (!moduleInfo.contains(jmik::LOGIC_ADDRESS) || !moduleInfo.contains(jmik::RF_CHANNEL)) {
+            if (moduleInfo.contains(jr::ERROR)) error = moduleInfo[jr::ERROR];
+            else error = "Failed to fetch module info from database: unknown error";
+            co_return false;
+        }
+
+        preparedParams[jp::MODULE_INFO] = nlohmann::json::object({
+            {jmik::LOGIC_ADDRESS, moduleInfo.at(jmik::LOGIC_ADDRESS)},
+            {jmik::RF_CHANNEL, moduleInfo.at(jmik::RF_CHANNEL)},
+        });
+
+        co_return true;
+    }
+
+    void MediatorActions::postSensorReadingIfApplicable(const MediatorRequestParams &parsedParams,
+                                                        const nlohmann::json &result,
+                                                        const std::set<std::string_view> &applicableTypes) {
+        if (!parsedParams.moduleId.has_value()) return;
+        if (!parsedParams.type.has_value() || !applicableTypes.contains(parsedParams.type.value())) return;
+        if (!parsedParams.args.has_value()) return;
+        if (!parsedParams.args.value().empty()) return;
+
+
+        DatabaseActions::postSensorReading(parsedParams.moduleId.value(),
+                                           parsedParams.args.value().front(),
+                                           result,
+                                           {{jmmp::TYPE, parsedParams.type.value()}});
+    }
+
+    void MediatorActions::postErrorLog(const uint moduleId, const API::ApiResponse &result) {
+        std::string errStr;
+        if (result.error.has_value()) errStr = result.error.value().data;
+        else errStr = "Invalid response: no result or error";
+        DatabaseActions::postLog(moduleId, "error", errStr);
     }
 }

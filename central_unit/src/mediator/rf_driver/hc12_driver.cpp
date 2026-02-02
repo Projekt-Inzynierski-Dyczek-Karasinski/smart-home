@@ -1,9 +1,9 @@
 #include "hc12_driver.h"
+#include "../rf_api/rf_types.h"
 
 #include <algorithm>
 #include <boost/algorithm/string/find.hpp>
 
-#include "../rf_types.h"
 
 namespace SmartHomeMediator {
     HC12Driver::HC12Driver(ba::io_context &ioContext,
