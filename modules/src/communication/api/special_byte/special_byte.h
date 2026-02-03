@@ -7,7 +7,7 @@ namespace Comms::API {
     public:
         /**
          * @brief Construct directly from an encoded special byte.
-         * 
+         *
          * @param specialByte Raw packed byte.
          */
         explicit SpecialByte(uint8_t specialByte);

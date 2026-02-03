@@ -37,10 +37,12 @@ namespace UniversalModuleSystem {
 
         /**
          * @brief Puts the ESP32 into sleep mode for a specified duration.
+         * @details Always enables waking up module by pressing PairingButton.
          *
          * @param milliSeconds Duration to sleep in milliseconds.
          * @param enableWakeUpWithRfModule Enables wake-up through RF module.
-         * @note Always enables waking up module by pressing PairingButton.
+         *
+         * @note This function does not return.
          */
         void enterSleep(uint32_t milliSeconds, bool enableWakeUpWithRfModule) override __attribute__((noreturn));
 
@@ -50,6 +52,8 @@ namespace UniversalModuleSystem {
          *          to ensure nothing critical is interrupted.
          *
          * @param source String describing the source of the restart (for log).
+         *
+         * @note This function does not return.
          */
         void safeRestart(const char *source) const override __attribute__((noreturn));
 

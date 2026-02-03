@@ -3,7 +3,7 @@
 namespace UniversalModuleSystem::Transducers {
     LightSensor::LightSensor(const std::shared_ptr<ul::Logger> &logger) : Sensor(logger) {}
 
-    void LightSensor::waitUntilReadingEnds() {
+    void LightSensor::waitUntilReadEnds() {
         xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
         xSemaphoreGive(mReadingCompleteSemaphore);
         // if reading was newer started
@@ -15,7 +15,7 @@ namespace UniversalModuleSystem::Transducers {
     }
 
     std::vector<API::APIParameterVariant> LightSensor::getApiFormattedReading() {
-        waitUntilReadingEnds();
+        waitUntilReadEnds();
 
         return std::vector<API::APIParameterVariant> {API::APIParameter((uint8_t)mLightPercentage.load())};
     }

@@ -171,7 +171,7 @@ namespace UniversalModuleSystem::Transducers {
 
         // wait until reading ends before powering off sensors
         for (const auto &sensor : mSensors) {
-            sensor->waitUntilReadingEnds();
+            sensor->waitUntilReadEnds();
         }
         digitalWrite(mSensorsPowerPin, LOW);
 

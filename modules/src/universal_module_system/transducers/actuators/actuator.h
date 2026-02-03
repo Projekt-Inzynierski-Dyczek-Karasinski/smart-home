@@ -102,7 +102,7 @@ namespace UniversalModuleSystem::Transducers {
          * @param jsonData JSON object containing actuator configuration.
          * @return True on success, otherwise false.
          *
-         * @warning Do not take actuator data mutex in this method, because is already taken in loadData().
+         * @warning Do not take actuator data mutex in this method, because it is already taken in loadData().
          * This method should be called only inside loadData().
          */
         virtual bool loadAdditionalData(const nl::json &jsonData);

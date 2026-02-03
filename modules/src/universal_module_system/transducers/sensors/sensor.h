@@ -45,7 +45,7 @@ namespace UniversalModuleSystem::Transducers {
          *
          * @note This method must be implemented by a derived class.
          */
-        virtual void waitUntilReadingEnds() = 0;
+        virtual void waitUntilReadEnds() = 0;
 
         /**
          * @brief Get formatted reading (APIParameterVariant).

@@ -19,7 +19,7 @@ namespace UniversalModuleSystem::Transducers {
          * @details It is used when only waiting for the reading to finish is needed, but not the reading result.
          * <code>getApiFormattedReading</code> automatically waits for the reading to finish before returning the result.
          */
-        void waitUntilReadingEnds() override;
+        void waitUntilReadEnds() override;
 
         /**
          * @brief Get the sensor reading.
@@ -32,7 +32,8 @@ namespace UniversalModuleSystem::Transducers {
         /**
          * @brief Begin an asynchronous measurement of the sensor.
          * @details Creates a FreeRTOS task to perform multiple ADC samples and stores the calculated voltage.
-         * This task deletes itself after the measurement ends.
+         *
+         * @note This task self-deletes after the readings are complete.
          */
         void startReading() override;
 
@@ -50,7 +51,7 @@ namespace UniversalModuleSystem::Transducers {
         *
         * @param parameters FreeRTOS task parameters.
         *
-        * @note Deletes itself after end of reading.
+        * @note The task self-deletes after the readings are complete.
         */
         static void lightReadTask(void *parameters);
 

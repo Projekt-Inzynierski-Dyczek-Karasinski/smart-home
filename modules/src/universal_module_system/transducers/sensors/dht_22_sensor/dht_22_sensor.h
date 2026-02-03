@@ -19,7 +19,7 @@ namespace UniversalModuleSystem::Transducers {
          * @details It is used when only waiting for the reading to finish is needed, but not the reading result.
          * <code>getApiFormattedReading</code> automatically waits for the reading to finish before returning the result.
          */
-        void waitUntilReadingEnds() override;
+        void waitUntilReadEnds() override;
 
         /**
          * @brief Get humidity and temperature reading.
@@ -32,11 +32,19 @@ namespace UniversalModuleSystem::Transducers {
         /**
          * @brief Begin an asynchronous measurement of the DHT22 Sensor.
          * @details Creates a FreeRTOS task to perform reading values from the sensor.
-         * This task deletes itself after the measurement ends.
+         *
+         * @note This task self-deletes after the reading is complete.
          */
         void startReading() override;
 
     private:
+        /**
+        * @brief FreeRTOS task function to perform asynchronous sensor reading.
+        *
+        * @param parameters FreeRTOS task parameters.
+        *
+        * @note The task self-deletes after the reading is complete.
+        */
         static void dht22ReadTask(void *parameters);
 
         std::atomic<float> mHumidity{0};

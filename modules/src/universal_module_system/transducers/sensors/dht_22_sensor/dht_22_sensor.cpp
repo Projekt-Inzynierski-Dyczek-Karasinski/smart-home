@@ -5,7 +5,7 @@
 namespace UniversalModuleSystem::Transducers {
     Dht22Sensor::Dht22Sensor(const std::shared_ptr<ul::Logger> &logger) : Sensor(logger) {}
 
-    void Dht22Sensor::waitUntilReadingEnds() {
+    void Dht22Sensor::waitUntilReadEnds() {
         xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
         xSemaphoreGive(mReadingCompleteSemaphore);
 
@@ -18,7 +18,7 @@ namespace UniversalModuleSystem::Transducers {
     }
 
     std::vector<API::APIParameterVariant> Dht22Sensor::getApiFormattedReading() {
-        waitUntilReadingEnds();
+        waitUntilReadEnds();
 
         mpLogger->debugv("Dht22Sensor reading", "Humidity (%): ", mHumidity.load());
         mpLogger->debugv("Dht22Sensor reading", "Temperature (C): ", mTemperature.load());

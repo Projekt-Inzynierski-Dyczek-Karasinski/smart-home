@@ -9,7 +9,7 @@
 namespace UniversalModuleSystem::Transducers {
     BME280::BME280(const std::shared_ptr<ul::Logger> &logger) : Sensor(logger) {}
 
-    void BME280::waitUntilReadingEnds() {
+    void BME280::waitUntilReadEnds() {
         xSemaphoreTake(mReadingCompleteSemaphore, portMAX_DELAY);
         xSemaphoreGive(mReadingCompleteSemaphore);
 
@@ -22,7 +22,7 @@ namespace UniversalModuleSystem::Transducers {
     }
 
     std::vector<API::APIParameterVariant> BME280::getApiFormattedReading() {
-        waitUntilReadingEnds();
+        waitUntilReadEnds();
 
         // if sensor is not responding
         if (mHumidity.load() == FLT_MAX && mTemperature.load() == 0 && mPressure.load() == 0) {

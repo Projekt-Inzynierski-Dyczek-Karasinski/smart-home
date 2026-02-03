@@ -125,6 +125,13 @@ namespace Comms {
          */
         ~Connection();
 
+        /**
+         * @brief Create a response message containing an error.
+         *
+         * @param responseCommand Command to (re)initialize and fill.
+         * @param errorType Error code to return.
+         * @param uid Optional request UID to include.
+         */
         void responseWithError(std::optional<API::CommandHandler>& responseCommand, API::errorTypes errorType, std::optional<uint32_t> uid) const;
 
         /**

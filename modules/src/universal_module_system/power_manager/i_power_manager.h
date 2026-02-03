@@ -27,6 +27,8 @@ namespace UniversalModuleSystem {
          * @brief Ensures that features do <b>not</b> enter a critical state and restarts the module.
          *
          * @param source String describing the source of the restart (for log).
+         *
+         * @note This function does not return.
          */
         virtual void safeRestart(const char *source) const  __attribute__((noreturn)) = 0;
 

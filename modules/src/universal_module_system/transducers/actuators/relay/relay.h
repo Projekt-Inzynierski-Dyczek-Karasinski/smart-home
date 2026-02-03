@@ -50,8 +50,8 @@ namespace UniversalModuleSystem::Transducers {
 
         /**
          * @brief Boot-time handler for relay.
-         * @details Ensures the relay is off after restart - restart not wake up from deep sleep
-         * (For some reason, a software restart does not reset the pin logic on its own).
+         * @details Ensures the relay is off after restart - restart, not wake up from deep sleep.
+         * A software restart does not reset the pin logic on its own.
          *
          * @param jsonData JSON configuration used to initialize the relay.
          */
