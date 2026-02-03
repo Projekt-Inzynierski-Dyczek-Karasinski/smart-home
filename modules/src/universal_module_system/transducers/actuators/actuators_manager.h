@@ -126,7 +126,7 @@ namespace UniversalModuleSystem::Transducers {
         /**
          * @brief Find JSON configuration entry for a given actuator ID.
          * @param actuatorId Numeric actuator identifier (from config).
-         * @return Actuator JSON entry when found, otherwise optional with no value.
+         * @return Actuator JSON entry when found, otherwise std::nullopt.
          */
         [[nodiscard]] std::optional<nl::json> getActuatorJsonData(uint8_t actuatorId) const;
 

@@ -54,7 +54,7 @@ namespace UniversalModuleSystem::Transducers {
         nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
         nl::json &actuatorsData = jsonData[ms_ALL_ACTUATORS_DATA];
 
-        for (auto &actuatorData : actuatorsData[ms_ACTUATORS_ARRAY]) {
+        for (const auto &actuatorData : actuatorsData[ms_ACTUATORS_ARRAY]) {
             if (
                 std::unique_ptr<Actuator> actuator = createActuator(actuatorData[ms_ACTUATOR_TYPE].get<std::string>().c_str());
                 actuator != nullptr
@@ -98,11 +98,11 @@ namespace UniversalModuleSystem::Transducers {
         nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
         nl::json &actuatorsData = jsonData[ms_ALL_ACTUATORS_DATA];
 
-        for (auto &actuator : actuatorsData[ms_ACTUATORS_ARRAY]) {
+        for (const auto &actuator : actuatorsData[ms_ACTUATORS_ARRAY]) {
             if (actuator[ms_ACTUATOR_DATA][ms_ACTUATOR_ID] == actuatorId) return actuator;
         }
 
-        return std::optional<nl::json>{};
+        return std::nullopt;
     }
 
     std::unique_ptr<Actuator> ActuatorsManager::createActuator(const char *actuatorName) {
