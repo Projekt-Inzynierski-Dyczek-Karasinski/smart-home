@@ -1,0 +1,60 @@
+#pragma once
+
+#include "universal_module_system/transducers/sensors/sensor.h"
+
+namespace UniversalModuleSystem::Transducers {
+    /**
+     * @brief Light sensor class for measuring light percentage.
+     */
+    class LightSensor final : public Sensor  {
+    public:
+        /**
+         * @brief Construct the LightSensor object.
+         * @param logger Shared pointer to logger.
+         */
+        explicit LightSensor(const std::shared_ptr<ul::Logger> &logger);
+
+        /**
+         * @brief Waits until the sensor reading completes.
+         * @details It is used when only waiting for the reading to finish is needed, but not the reading result.
+         * <code>getApiFormattedReading</code> automatically waits for the reading to finish before returning the result.
+         */
+        void waitUntilReadEnds() override;
+
+        /**
+         * @brief Get the sensor reading.
+         * @return Sensor reading.
+         *
+         * @note Thread-safe.
+         */
+        std::vector<API::APIParameterVariant> getApiFormattedReading() override;
+
+        /**
+         * @brief Begin an asynchronous measurement of the sensor.
+         * @details Creates a FreeRTOS task to perform multiple ADC samples and stores the calculated voltage.
+         *
+         * @note This task self-deletes after the readings are complete.
+         */
+        void startReading() override;
+
+    private:
+        /**
+         * @brief Calculates the light percentage, based on analog reading.
+         * @param rawReading Raw analog reading of light sensor.
+         * @return The light percentage.
+         */
+        int8_t calculateLightPercentage(uint16_t rawReading);
+
+        /**
+        * @brief FreeRTOS task function to perform photoresistor ADC readings.
+        * @details Takes multiple readings, averages them, and converts raw ADC to the voltage output from photoresistor.
+        *
+        * @param parameters FreeRTOS task parameters.
+        *
+        * @note The task self-deletes after the readings are complete.
+        */
+        static void lightReadTask(void *parameters);
+
+        std::atomic<int8_t> mLightPercentage{-1};
+    };
+}

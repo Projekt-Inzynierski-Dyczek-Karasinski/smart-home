@@ -6,8 +6,10 @@
 
 #include "utils/logger.h"
 #include "sensor.h"
+#include "communication/api/api_parameter.h"
 
 namespace ul = Utils::Logging;
+namespace API = Comms::API;
 
 namespace UniversalModuleSystem::Transducers {
     /**
@@ -22,32 +24,58 @@ namespace UniversalModuleSystem::Transducers {
          * @brief Gets the singleton instance of SensorsManager.
          *
          * @param logger Shared pointer to the logger instance, default: nullptr.
-         * @return Reference to the SensorClientCode instance.
+         * @return Reference to the SensorsManager instance.
          *
          * @warning First call must pass a pointer to a logger.
          */
-        static SensorsManager& getInstance(const std::shared_ptr<ul::Logger> &logger);
+        static SensorsManager& getInstance(const std::shared_ptr<ul::Logger> &logger = nullptr);
 
         // Delete copy constructor and assignment operator
         SensorsManager(const SensorsManager&) = delete;
         SensorsManager& operator = (const SensorsManager&) = delete;
 
         /**
-         * @brief Get a report of all sensors.
-         * @details Separately initialise and gets reading for better handling asynchronous readings.
-         * @return String containing the API formatted report of all sensors.
+         * @brief Get a reading of sensor. Automatically handles new reading if needed.
+         * @param sensorId Sensor ID.
+         * @return Reading of the sensor.
          */
-        String getAllSensorsReport();
+        std::vector<API::APIParameterVariant> getSensorReading(uint8_t sensorId);
 
         /**
-         * @brief Get a report of one sensor.
-         *
-         * @param sensorId Sensor ID.
-         * @return String containing the API formatted report of one sensor.
+         * @brief Clears cached readings (if caching is disabled, does nothing).
+         * @note Thread-safe.
          */
-        String getSensorReport(uint8_t sensorId);
+        void clearCachedReadings();
+
+        /**
+         * @brief Get sensors IDs.
+         * @return Sensors IDs.
+         */
+        [[nodiscard]] std::vector<API::APIParameterVariant> getSensorsIds() const;
 
     private:
+        /**
+         * @brief Get a reading of sensor.
+         * @details It is used when sensors readings caching is disabled.
+         * @param sensorId Sensor ID.
+         * @return Reading of the sensor.
+         */
+        std::vector<API::APIParameterVariant> getSensorCurrentReading(uint8_t sensorId);
+
+        /**
+         * @brief Get a reading of sensor.
+         * @details Used when sensor reading caching is disabled.
+         * @param sensorId Sensor ID.
+         * @return Reading of the sensor.
+         */
+        std::vector<API::APIParameterVariant> getSensorCachedReading(uint8_t sensorId);
+
+        /**
+         * @brief Create sensor instances, start their readings, and start mSensorTimeoutTimer.
+         * @warning <b>Not thread-safe</b>. Must be protected externally with <code>mSensorMutex</code> before calling.
+         */
+        void readAllSensors();
+
         /**
          * @brief Factory method to create a sensor instance from its type name.
          * @details When adding new sensor derived class, add here case for it.
@@ -66,6 +94,8 @@ namespace UniversalModuleSystem::Transducers {
             enum class SensorTypeEnum : uint8_t {
                 BATTERY,
                 LIGHT,
+                DHT22,
+                BME280,
                 UNKNOWN
             };
 
@@ -81,11 +111,15 @@ namespace UniversalModuleSystem::Transducers {
             // sensor types
             static constexpr char s_BATTERY_SENSOR[] = "batterySensor";
             static constexpr char s_LIGHT_SENSOR[] = "lightSensor";
+            static constexpr char s_DHT22_SENSOR[] = "DHT22";
+            static constexpr char s_BME280_SENSOR[] = "BME280";
 
             // Lookup table mapping sensor type strings to internal enumerator values.
             inline static const std::map<const char*, SensorTypeEnum, Comparator> sensorMap {
                 {s_BATTERY_SENSOR, SensorTypeEnum::BATTERY},
                 {s_LIGHT_SENSOR, SensorTypeEnum::LIGHT},
+                {s_DHT22_SENSOR, SensorTypeEnum::DHT22},
+                {s_BME280_SENSOR, SensorTypeEnum::BME280},
             };
         };
 
@@ -97,16 +131,35 @@ namespace UniversalModuleSystem::Transducers {
         explicit SensorsManager(const std::shared_ptr<ul::Logger> &logger);
 
         /**
-         * @brief Private destructor for singleton pattern
+         * @brief Private destructor for singleton pattern.
          */
-        ~SensorsManager() = default;
+        ~SensorsManager();
+
+        /**
+         * @brief Clears readings of sensors.
+         * @param xTimer Handle to the expired FreeRTOS timer.
+         * @note Thread-safe.
+         */
+        static void sensorTimeoutTimerCallback(TimerHandle_t xTimer);
+
+        std::vector<std::unique_ptr<Sensor>> mSensors;
 
         std::shared_ptr<ul::Logger> mpLogger;
+
+        SemaphoreHandle_t mSensorMutex = nullptr;
+        TimerHandle_t mSensorTimeoutTimer = nullptr;
+
+        uint8_t mSensorsPowerPin;
+
+        static constexpr uint16_t ms_DELAY_AFTER_POWERING_ON_SENSORS = 100; // ms
 
         // JSON keys
         static constexpr char ms_SENSORS_ARRAY[] = "sensors";
         static constexpr char ms_SENSOR_TYPE[] = "type";
-        static constexpr char ms_SENSOR_DATA[] = "sensorData";
+        static constexpr char ms_ALL_SENSORS_DATA[] = "sensorsData";
+        static constexpr char ms_POWER_PIN[] = "powerPin";
+        static constexpr char ms_SENSOR_DATA[] = "data";
         static constexpr char ms_SENSOR_ID[] = "id";
+        static constexpr char ms_SENSORS_READINGS_TIMEOUT[] = "readingsTimeout";
     };
 }

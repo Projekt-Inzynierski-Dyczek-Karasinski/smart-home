@@ -7,3 +7,5 @@
 .vscode
 old
 README
+/test
+.env

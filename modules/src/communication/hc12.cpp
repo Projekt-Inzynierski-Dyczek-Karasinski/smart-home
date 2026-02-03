@@ -1,33 +1,35 @@
 #include "hc12.h"
 
 #include "communication/communication.h"
+#include "universal_module_system/data_manager.h"
 
 namespace uah = Utils::ArrayHandlers;
+namespace ums = UniversalModuleSystem;
 
 namespace Comms {
     // ============================ Public ============================
-    HC12::HC12(Communication *communication, const std::shared_ptr<ul::Logger> &logger) {
-        mpCommunication = communication;
-        mpLogger = logger;
-
-        pinMode(SET_PIN, OUTPUT);
-        digitalWrite(SET_PIN, HIGH);
+    HC12::HC12(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
+        : mpCommunication(communication),
+        mpLogger(logger),
+        m_HC12_DATA(ums::DataManager::getInstance().loadJson(ums::DataManager::getInstance().s_BASE_CONFIG_PATH)[ms_HC12_DATA]) {
+        pinMode(m_HC12_DATA.setPin, OUTPUT);
+        digitalWrite(m_HC12_DATA.setPin, HIGH);
         vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_HIGH));
 
         mSendingDataMutex = xSemaphoreCreateMutex();
         mFirstSetupSemaphore = xSemaphoreCreateBinary();
+        mSetupWorkingSemaphore = xSemaphoreCreateBinary();
         xSemaphoreGive(mFirstSetupSemaphore);
 
         createQueues();
 
-        mBaudRate = (unsigned long)BAUD_RATE;
         mpSerial = new HardwareSerial(HARDWARE_SERIAL_UART_NR);
-        mpSerial->begin(mBaudRate, SERIAL_8N1, RX_PIN, TX_PIN);
+        mpSerial->begin(m_HC12_DATA.baudrate, SERIAL_8N1, m_HC12_DATA.rxPin, m_HC12_DATA.txPin);
 
+        createSetupHC12Queues();
+        createSetupHC12Task();
         createTransmitTask();
         createHC12MainTask();
-
-        // TODO !mm add check if is proper rf channel set
 
         mpLogger->verbose("HC12 Class", "HC12 initialized.");
     }
@@ -42,8 +44,9 @@ namespace Comms {
 
         vSemaphoreDelete(mSendingDataMutex);
         vSemaphoreDelete(mFirstSetupSemaphore);
+        vSemaphoreDelete(mSetupWorkingSemaphore);
 
-        digitalWrite(SET_PIN, LOW);
+        digitalWrite(m_HC12_DATA.setPin, LOW);
 
         delete mpSerial;
     }
@@ -53,11 +56,10 @@ namespace Comms {
         vTaskResume(mTransmitTaskHandle);
     }
 
-    void HC12::setupHC12(const uint8_t *commands) {
+    void HC12::setupHC12(const uint8_t *commands) const {
         if (!(commands[0] == 'H' && commands[1] == 'C')) {
             mpLogger->error("HC12 Method", "HC12 commands passed in setupHC12() must start with 'H', 'C'");
         } else {
-            createSetupHC12Queues();
 
             // split multiple command in COMMANDS array
             uint8_t commandStartIndex = 0;
@@ -65,13 +67,14 @@ namespace Comms {
             uint8_t commandBuffer[SETUP_COMMAND_SIZE];
             uint8_t commandCounter = 0;
             while (commands[commandEndIndex] != 0) {
-                if (commands[commandEndIndex] == (uint8_t)'|') {
+                if (commands[commandEndIndex] == (uint8_t) '|') {
                     commandCounter++;
                     if (commandCounter > SETUP_MAX_NUM_OF_COMMANDS) {
                         mpLogger->error("HC12 Method", "Passed too many commands in setupHC12().");
                         break;
                     }
-                    uah::prepareBuffer(commandBuffer, &commands[commandStartIndex], (commandEndIndex - commandStartIndex), SETUP_COMMAND_SIZE);
+                    uah::prepareBuffer(commandBuffer, &commands[commandStartIndex],
+                                       (commandEndIndex - commandStartIndex), SETUP_COMMAND_SIZE);
 
                     xQueueSend(mSetupHC12CommandsQueue, commandBuffer, portMAX_DELAY);
                     commandStartIndex = commandEndIndex + 1;
@@ -80,27 +83,28 @@ namespace Comms {
                 commandEndIndex++;
             }
 
-            if (commands[commandEndIndex - 1] != (uint8_t)'|') {
+            if (commands[commandEndIndex - 1] != (uint8_t) '|') {
                 commandCounter++;
                 if (commandCounter > SETUP_MAX_NUM_OF_COMMANDS) {
                     mpLogger->error("HC12 Method", "Passed too many commands in setupHC12().");
                 } else {
-                    uah::prepareBuffer(commandBuffer, &commands[commandStartIndex], (commandEndIndex - commandStartIndex), SETUP_COMMAND_SIZE);
+                    uah::prepareBuffer(
+                        commandBuffer,
+                        &commands[commandStartIndex],
+                        (commandEndIndex - commandStartIndex),
+                        SETUP_COMMAND_SIZE
+                    );
                     xQueueSend(mSetupHC12CommandsQueue, commandBuffer, portMAX_DELAY);
                 }
             }
-            constexpr uint8_t notificationValue = CREATE_SETUP_HC12_TASK_NOTIF;
-            xQueueSend(mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
         }
     }
 
-    void HC12::firstChangeRFChannel(uint8_t channel) {
+    void HC12::firstChangeRFChannel(uint8_t channel) const {
         if (channel < DEFAULT_CHANNEL || channel > MAX_CHANNEL) {
             mpLogger->errorv("HC12 Method", "RF channel on HC12 module must be set between 1 - 127, but got:", channel);
             channel = DEFAULT_CHANNEL;
         }
-
-        xSemaphoreTake(mFirstSetupSemaphore, portMAX_DELAY);
 
         uint8_t commandBuffer[8];
         char messageBuffer[8];
@@ -113,8 +117,8 @@ namespace Comms {
         xSemaphoreTake(mSendingDataMutex, pdMS_TO_TICKS(POWER_MANAGEMENT_SEMAPHORE_TIMEOUT));
     }
 
-    void HC12::sleep() {
-        setupHC12((uint8_t*)"HC+SLEEP");
+    void HC12::sleep() const {
+        setupHC12((uint8_t *) "HC+SLEEP");
     }
 
     // ============================ Queues ============================
@@ -159,11 +163,11 @@ namespace Comms {
     }
 
     // ========================== HC12 Main ===========================
-    void HC12::hc12OutputDecider(const uint8_t *hc12Output, const bool *isSetupHC12Working, bool *isWaitingForSendConfirmation) const {
+    void HC12::hc12OutputDecider(const uint8_t *hc12Output, bool *isWaitingForSendConfirmation) const {
         if (*isWaitingForSendConfirmation) {
             *isWaitingForSendConfirmation = false;
             xTaskNotify(mTransmitTaskHandle, (uint32_t)*hc12Output, eSetValueWithOverwrite);
-        } else if (*isSetupHC12Working) {
+        } else if (uxSemaphoreGetCount(mSetupWorkingSemaphore) > 0) {
             xQueueSend(mSetupHC12ReceiveQueue, hc12Output, portMAX_DELAY);
         } else {
             mpCommunication->addByteToDecode(*hc12Output);
@@ -171,10 +175,9 @@ namespace Comms {
     }
 
     void HC12::HC12MainTask(void *parameters) {
-        auto& hc12 = *static_cast<HC12*>(parameters);
+        const auto &hc12 = *static_cast<HC12 *>(parameters);
 
         uint8_t status = DEFAULT_STATUS_NOTIF;
-        bool isSetupHC12Working = false;
         bool isWaitingForSendConfirmation = false;
 
         // clear random hc12 output after powering on
@@ -182,6 +185,8 @@ namespace Comms {
         while (hc12.mpSerial->available() > 0) {
             hc12.mpSerial->read();
         }
+
+        hc12.firstChangeRFChannel(hc12.mpCommunication->getDefaultRfChannel());
 
         for (;;) {
             // change status
@@ -195,7 +200,7 @@ namespace Comms {
                 case DEFAULT_STATUS_NOTIF:
                     if (hc12.mpSerial->available() > 0) {
                         hc12Output = hc12.mpSerial->read();
-                        hc12.hc12OutputDecider(&hc12Output, &isSetupHC12Working, &isWaitingForSendConfirmation);
+                        hc12.hc12OutputDecider(&hc12Output, &isWaitingForSendConfirmation);
                     } else {
                         // delay for watchdog
                         vTaskDelay(pdMS_TO_TICKS(1));
@@ -220,18 +225,6 @@ namespace Comms {
                     vTaskSuspend(hc12.mTransmitTaskHandle);
                     break;
 
-                case CREATE_SETUP_HC12_TASK_NOTIF:
-                    hc12.mpLogger->debug("HC12 Main", "CREATE_SETUP_HC12_TASK_NOTIF");
-                    isSetupHC12Working = true;
-                    hc12.createSetupHC12Task();
-                    break;
-
-                case DELETE_SETUP_HC12_TASK_NOTIF:
-                    hc12.mpLogger->debug("HC12 Main", "DELETE_SETUP_HC12_TASK_NOTIF");
-                    hc12.deleteSetupHC12Task();
-                    isSetupHC12Working = false;
-                    break;
-
                 default:
                     hc12.mpLogger->errorv("HC12 Main", "Got unknow status. Received Status: ", status);
                     break;
@@ -253,6 +246,7 @@ namespace Comms {
             mpLogger->warning("HC12 FreeRTOS", "Can't create HC12 Main task, because task already exists");
         }
     }
+
     void HC12::deleteHC12MainTask() {
         if (mHC12MainTaskHandle != nullptr) {
             vTaskDelete(mHC12MainTaskHandle);
@@ -262,7 +256,7 @@ namespace Comms {
 
     // ========================== Send Task ===========================
     void HC12::transmitTask(void *parameters) {
-        const auto& hc12 = *static_cast<HC12*>(parameters);
+        const auto &hc12 = *static_cast<HC12 *>(parameters);
 
         uint8_t transmitBuffer[PROTOCOL_SIZE];
 
@@ -333,7 +327,7 @@ namespace Comms {
 
     // ========================== Setup HC12 ==========================
     void HC12::setupHC12Task(void *parameters) {
-        const auto& hc12 = *static_cast<HC12*>(parameters);
+        const auto &hc12 = *static_cast<HC12 *>(parameters);
 
         // prepare commandBuffer
         uint8_t commandBuffer[SETUP_COMMAND_SIZE];
@@ -342,16 +336,21 @@ namespace Comms {
         }
 
         for (;;) {
-            if (xQueueReceive(hc12.mSetupHC12CommandsQueue, commandBuffer, 0) == pdTRUE) {
-                hc12.mpLogger->infoa("HC12 Setup", "Received command: ", commandBuffer, SETUP_COMMAND_SIZE);
+            if (xQueueReceive(hc12.mSetupHC12CommandsQueue, commandBuffer, portMAX_DELAY) == pdTRUE) {
+                xSemaphoreTake(hc12.mSendingDataMutex, portMAX_DELAY);
+                xSemaphoreGive(hc12.mSetupWorkingSemaphore);
+                digitalWrite(hc12.m_HC12_DATA.setPin, LOW);
+                vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_LOW*2));
 
-                // TODO !o add better protection against bad commands
-                if (!(commandBuffer[0] == (uint8_t)'H' && commandBuffer[1] == (uint8_t)'C')) {
+
+                hc12.mpLogger->verbosea("HC12 Setup", "Received command: ", commandBuffer, SETUP_COMMAND_SIZE);
+
+                if (!(commandBuffer[0] == (uint8_t) 'H' && commandBuffer[1] == (uint8_t) 'C')) {
                     hc12.mpLogger->error("HC12 Setup", "Received array is not hc12 command.");
                 } else {
                     const uint8_t lenOfCommand = uah::calcLenOfDataInArray(commandBuffer, SETUP_COMMAND_SIZE);
-                    commandBuffer[0] = (uint8_t)'A';
-                    commandBuffer[1] = (uint8_t)'T';
+                    commandBuffer[0] = (uint8_t) 'A';
+                    commandBuffer[1] = (uint8_t) 'T';
 
                     hc12.mpSerial->write(commandBuffer, lenOfCommand);
 
@@ -369,23 +368,20 @@ namespace Comms {
                         hc12.mpLogger->infoa("HC12 Setup", "HC12 response: ", hc12Response, SETUP_MAX_LEN_OF_RESPONSE);
                     }
                 }
-            } else {
-                constexpr uint8_t notificationValue = DELETE_SETUP_HC12_TASK_NOTIF;
-                xQueueSend(hc12.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
-                for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
+
+                digitalWrite(hc12.m_HC12_DATA.setPin, HIGH);
+                vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_HIGH));
+                // clear random hc12 output after changing state of SET_PIN
+                while (hc12.mpSerial->available() > 0) {
+                    hc12.mpSerial->read();
+                }
+                xSemaphoreTake(hc12.mSetupWorkingSemaphore, 0);
+                xSemaphoreGive(hc12.mSendingDataMutex);
             }
         }
     }
 
     void HC12::createSetupHC12Task() {
-        xSemaphoreTake(mSendingDataMutex, portMAX_DELAY);
-
-        // signalize that setup has started working (if setup isn't forced to be done first, it will do nothing)
-        xSemaphoreGive(mFirstSetupSemaphore);
-
-        digitalWrite(SET_PIN, LOW);
-        vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_LOW*2));
-
         if (mSetupHC12TaskHandle == nullptr) {
             xTaskCreate(
                 setupHC12Task,
@@ -407,13 +403,11 @@ namespace Comms {
         }
 
         deleteSetupHC12Queues();
-
-        digitalWrite(SET_PIN, HIGH);
-        vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_HIGH));
-        // clear random hc12 output after changing state of SET_PIN
-        while (mpSerial->available() > 0) {
-            mpSerial->read();
-        }
-        xSemaphoreGive(mSendingDataMutex);
     }
+
+    HC12::HC12Data::HC12Data(const nl::json &data) :
+        txPin(data[ms_TX_PIN]),
+        rxPin(data[ms_RX_PIN]),
+        setPin(data[ms_SET_PIN]),
+        baudrate(data[ms_BAUDRATE]) {}
 }

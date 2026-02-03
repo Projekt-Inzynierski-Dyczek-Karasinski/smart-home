@@ -13,7 +13,6 @@ namespace Comms {
             esp_read_mac(mMACAddress, ESP_MAC_WIFI_STA);
             esp_read_mac(mProtocolMACAddress, ESP_MAC_WIFI_STA);
         #else
-            // TODO !o add function to get MAC address on different boards
             #error "MAC address not implemented!"
         #endif
         mpLogger = logger;

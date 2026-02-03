@@ -1,30 +1,54 @@
 {
-  "sensors": [
-    {
-      "type": "batterySensor",
-      "sensorData": {
-        "id": 1,
-        "readPin": 16,
-        "powerPin": 0,
-        "canAwake": false,
-        "additional": {
-          "rVCC": 50000,
-          "rGND": 50000
+  "sensorsData": {
+    "powerPin": 13,
+    "readingsTimeout": 60000,
+    "sensors": [
+      {
+        "type": "batterySensor",
+        "data": {
+          "id": 1,
+          "readPin": 16,
+          "canAwake": false,
+          "additional": {
+            "rVCC": 94000,
+            "rGND": 97000,
+            "Vmin": 4350,
+            "Vmax": 4800
+          }
+        }
+      },
+      {
+        "type": "lightSensor",
+        "data": {
+          "id": 2,
+          "readPin": 17,
+          "canAwake": false,
+          "additional": {
+          }
+        }
+      },
+      {
+        "type": "DHT22",
+        "data": {
+          "id": 3,
+          "readPin": 12,
+          "canAwake": false,
+          "additional": {
+          }
+        }
+      },
+      {
+        "type": "BME280",
+        "data": {
+          "id": 4,
+          "readPin": 9,
+          "canAwake": false,
+          "additional": {
+            "readPin2": 8,
+            "I2CAddress": 118
+          }
         }
       }
-    },
-    {
-      "type": "batterySensor",
-      "sensorData": {
-        "id": 1,
-        "readPin": 12,
-        "powerPin": 0,
-        "canAwake": false,
-        "additional": {
-          "rVCC": 50000,
-          "rGND": 50000
-        }
-      }
-    }
-  ]
+    ]
+  }
 }

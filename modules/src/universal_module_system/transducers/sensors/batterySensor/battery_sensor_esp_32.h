@@ -8,7 +8,6 @@
 
 #include "universal_module_system/transducers/sensors/sensor.h"
 
-
 namespace UniversalModuleSystem::Transducers {
     /**
      * @brief Battery sensor class for measuring battery voltage on ESP32.
@@ -22,17 +21,25 @@ namespace UniversalModuleSystem::Transducers {
         explicit BatterySensorESP32(const std::shared_ptr<ul::Logger> &logger);
 
         /**
-         * @brief Get the latest measured battery voltage reading in millivolts (mV).
-         * @return Battery voltage in mV.
+         * @brief Waits until the sensor reading completes.
+         * @details It is used when only waiting for the reading to finish is needed, but not the reading result.
+         * <code>getApiFormattedReading</code> automatically waits for the reading to finish before returning the result.
+         */
+        void waitUntilReadEnds() override;
+
+        /**
+         * @brief Get battery percentage reading.
+         * @return Battery voltage.
          *
          * @note Thread-safe.
          */
-        uint32_t getReading() override;
+        std::vector<API::APIParameterVariant> getApiFormattedReading() override;
 
         /**
          * @brief Begin an asynchronous measurement of the battery voltage.
          * @details Creates a FreeRTOS task to perform multiple ADC samples and stores the calculated voltage.
-         * This task deletes itself after end measurement.
+         *
+         * @note This task self-deletes after the readings are complete.
          */
         void startReading() override;
 
@@ -53,7 +60,7 @@ namespace UniversalModuleSystem::Transducers {
          *
          * @param parameters FreeRTOS task parameters.
          *
-         * @note Deletes itself after end of reading.
+         * @note The task self-deletes after the readings are complete.
          */
         static void batteryReadTask(void *parameters);
 
@@ -65,6 +72,13 @@ namespace UniversalModuleSystem::Transducers {
          * @return Calculated battery voltage in mV.
          */
         uint16_t calculateVoltage(uint16_t rawAnalogRead) const;
+
+        /**
+         * @brief Calculates the battery charge percentage, based on output voltage.
+         * @param outputVoltage Battery output voltage in mV.
+         * @return The battery charge percentage.
+         */
+        int8_t calculateBatteryChargePercentage(uint16_t outputVoltage) const;
 
         /**
          * @brief Structure holding specific data to BatterySensorESP32.
@@ -80,6 +94,8 @@ namespace UniversalModuleSystem::Transducers {
             // BatterySensorESP32 specific parameters
             uint32_t vccResistor = 0;
             uint32_t gndResistor = 0;
+            uint32_t minVoltage = 0; ///< in mV
+            uint32_t maxVoltage = 0; ///< in mV
             bool isLoaded = false;
 
         private:
@@ -87,9 +103,11 @@ namespace UniversalModuleSystem::Transducers {
             static constexpr char ms_DATA[] = "additional";
             static constexpr char ms_VCC_RESISTOR_DATA[] = "rVCC";
             static constexpr char ms_GND_RESISTOR_DATA[] = "rGND";
+            static constexpr char ms_V_MIN_DATA[] = "Vmin";
+            static constexpr char ms_V_MAX_DATA[] = "Vmax";
         };
 
         AdditionalData mAdditionalData{};
-        std::atomic<uint32_t> mBatteryRead{0};
+        std::atomic<int8_t> mBatteryReadPercentage{-1};
     };
 }

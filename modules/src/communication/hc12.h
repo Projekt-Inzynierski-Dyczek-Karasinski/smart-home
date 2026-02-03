@@ -3,9 +3,12 @@
 #include <HardwareSerial.h>
 #include <memory>
 
+#include <nlohmann/json.hpp>
+
 #include "utils/logger.h"
 
 namespace ul = Utils::Logging;
+namespace nl = nlohmann;
 
 namespace Comms {
     class Communication;
@@ -55,14 +58,14 @@ namespace Comms {
          * - "HC+DEFAULT" - reset HC12 module to default settings
          * - "HC+SLEEP" - put HC12 module in sleep mode
          */
-        void setupHC12(const uint8_t *commands);
+        void setupHC12(const uint8_t *commands) const;
 
         /**
          * @brief Shortcut method for changing RF channel on HC12.
          * @param channel Channel to change (<b>1 - 127</b>).
          * @note Ensures that after calling this method, the RF channel will be changed first, and only then will messages be transmitted.
          */
-        void firstChangeRFChannel(uint8_t channel);
+        void firstChangeRFChannel(uint8_t channel) const;
 
         /**
          * @brief Waits for ongoing HC12 transmission to complete and disables transmission to HC12 module.
@@ -72,9 +75,28 @@ namespace Comms {
         /**
          * @brief Sends a command to the HC12 to put the RF module to sleep.
          */
-        void sleep();
+        void sleep() const;
 
     private:
+        /**
+         * @brief Struct handling unpacking json hc12 data.
+         */
+        struct HC12Data {
+            explicit HC12Data(const nl::json &data);
+
+            const uint8_t txPin;
+            const uint8_t rxPin;
+            const uint8_t setPin;
+            const uint32_t baudrate;
+
+        private:
+            // JSON keys
+            static constexpr char ms_TX_PIN[] = "tx";
+            static constexpr char ms_RX_PIN[] = "rx";
+            static constexpr char ms_SET_PIN[] = "set";
+            static constexpr char ms_BAUDRATE[] = "baudrate";
+        };
+
         /**
          * @brief Create a FreeRTOS Queues used in HC12 class.
          */
@@ -96,10 +118,9 @@ namespace Comms {
         /**
          * @brief Decides what to do with output from HC12 module.
          * @param hc12Output Pointer to variable storing output from HC12 module.
-         * @param isSetupHC12Working Pointer to if the setup task is sending commands to HC12.
          * @param isWaitingForSendConfirmation Pointer to variable if is being waited for confirmation from HC12.
          */
-        void hc12OutputDecider(const uint8_t *hc12Output, const bool *isSetupHC12Working, bool *isWaitingForSendConfirmation) const;
+        void hc12OutputDecider(const uint8_t *hc12Output, bool *isWaitingForSendConfirmation) const;
         /**
          * @brief Main HC12 FreeRTOS task. Reads all output from HC12 module and passes it to Communication class.
          * This task is responsible for suspending/deleting resuming/creating other HC12 tasks.
@@ -150,7 +171,6 @@ namespace Comms {
 
         Communication *mpCommunication; // pointer to instance of Communication class
         HardwareSerial *mpSerial; // pointer to HardwareSerial
-        unsigned long mBaudRate; // TODO remove?
 
         // Notifications for Main HC12 task
         typedef enum : uint8_t {
@@ -166,6 +186,7 @@ namespace Comms {
 
         SemaphoreHandle_t mSendingDataMutex = nullptr; ///< Handle to FreeRTOS mutex protecting access to UART transmission to HC12 module.
         SemaphoreHandle_t mFirstSetupSemaphore = nullptr; ///< Handle to FreeRTOS binary semaphore indicating that setup should be done first.
+        SemaphoreHandle_t mSetupWorkingSemaphore = nullptr; ///< Handle to FreeRTOS binary semaphore indicating that setup is in progres.
 
         QueueHandle_t mMainNotificationsQueue = nullptr; ///< Handle to FreeRTOS queue for notifications for the Main task, queue length: 5 bytes (uint8_t).
         QueueHandle_t mTransmitQueue = nullptr; ///< Handle to FreeRTOS queue for (encoded) messages to transmit, queue length: 11x16 bytes (uint8_t).
@@ -177,5 +198,9 @@ namespace Comms {
         TaskHandle_t mSetupHC12TaskHandle = nullptr; ///< Handle to FreeRTOS setup task.
 
         std::shared_ptr<ul::Logger> mpLogger;
+        const HC12Data m_HC12_DATA;
+
+        // JSON key
+        static constexpr char ms_HC12_DATA[] = "hc12";
     };
 }

@@ -1,12 +1,17 @@
 #pragma once
 
+#include <Arduino.h>
 #include <memory>
+#include <vector>
+
 #include <nlohmann/json.hpp>
 
 #include "utils/logger.h"
+#include "communication/api/api_parameter.h"
 
 namespace nl = nlohmann;
 namespace ul = Utils::Logging;
+namespace API = Comms::API;
 
 namespace UniversalModuleSystem::Transducers {
     /**
@@ -27,19 +32,27 @@ namespace UniversalModuleSystem::Transducers {
         virtual ~Sensor();
 
         /**
-         * @brief Getter for reading from the sensor.
-         * @return Sensor reading.
-         *
-         * @note This method must be implemented by derived class.
-         */
-        virtual uint32_t getReading() = 0;
-
-        /**
          * @brief Start acquiring data from the sensor.
          *
-         * @note This method must be implemented by derived class.
+         * @note This method must be implemented by a derived class.
          */
         virtual void startReading() = 0;
+
+        /**
+         * @brief Waits until the sensor reading completes.
+         * @details It is used when only waiting for the reading to finish is needed, but not the reading result.
+         * <code>getApiFormattedReading</code> automatically waits for the reading to finish before returning the result.
+         *
+         * @note This method must be implemented by a derived class.
+         */
+        virtual void waitUntilReadEnds() = 0;
+
+        /**
+         * @brief Get formatted reading (APIParameterVariant).
+         * @return Vector of readings in API format.
+         * @note This method must be implemented by a derived class.
+         */
+        virtual std::vector<API::APIParameterVariant> getApiFormattedReading() = 0;
 
         /**
          * @brief Get the sensor ID (loaded from JSON config file).
@@ -56,24 +69,18 @@ namespace UniversalModuleSystem::Transducers {
          */
         bool init(const nl::json &jsonData);
 
-        /**
-         * @brief Get formatted reading ("id:value").
-         * @return Reading in API format.
-         */
-        String getApiFormattedReading();
-
     protected:
         /**
-         * @brief Load sensor-specific configuration from JSON.
+         * @brief Load sensor-specific configuration from JSON. By default, does nothing and returns true.
          *
          * @param jsonData JSON object containing sensor data.
          * @return True if loading succeeds, false otherwise.
          *
-         * @note This method must be implemented by derived class.
+         * @note This method must be implemented by a derived class if additional data is needed.
          * @warning Do <b>not</b> take <code>mSensorDataMutex</code> inside this method.
          * This method is called in <code>loadData()</code>, where this mutex is already taken.
          */
-        virtual bool loadAdditionalData(const nl::json& jsonData) = 0;
+        virtual bool loadAdditionalData(const nl::json &jsonData);
 
         /**
          * @brief Load common sensor parameters from JSON.
@@ -93,7 +100,7 @@ namespace UniversalModuleSystem::Transducers {
              * @brief Construct CommonSensorData from JSON parameters.
              * @param json JSON object with sensor data.
              */
-            explicit CommonSensorData(const nl::json& json);
+            explicit CommonSensorData(const nl::json &json);
 
             CommonSensorData() = default;
 
@@ -108,7 +115,6 @@ namespace UniversalModuleSystem::Transducers {
              *      "pin": 12
              *  }
              */
-            uint8_t powerPin = 0;
             bool canAwake = false;
             bool isLoaded = false;
 
@@ -116,7 +122,6 @@ namespace UniversalModuleSystem::Transducers {
             // JSON keys
             static constexpr char ms_ID[] = "id";
             static constexpr char ms_READ_PIN[] = "readPin";
-            static constexpr char ms_POWER_PIN[] = "powerPin";
             static constexpr char ms_CAN_AWAKE[] = "canAwake";
         };
 

@@ -27,13 +27,26 @@ namespace UniversalModuleSystem {
          * @brief Ensures that features do <b>not</b> enter a critical state and restarts the module.
          *
          * @param source String describing the source of the restart (for log).
+         *
+         * @note This function does not return.
          */
-        virtual void safeRestart(const char *source) const = 0;
+        virtual void safeRestart(const char *source) const  __attribute__((noreturn)) = 0;
 
         /**
          * @brief Disables the automatic sleep (if enabled) after waking up the module by the rf module.
          */
         virtual void disableAutoSleep() = 0;
+
+        /**
+         * @brief Restarts idle timer, if the idle timer is enabled.
+         */
+        virtual void restartIdleTimer() = 0;
+
+        /**
+         * @brief Checks whether the module booted after a reset or after waking from deep sleep.
+         * @return True if the module booted after a reset, false if it booted after waking from deep sleep.
+         */
+        virtual bool wasModuleRestarted() const = 0;
 
     protected:
         /**

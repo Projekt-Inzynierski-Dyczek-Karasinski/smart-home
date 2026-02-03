@@ -15,8 +15,8 @@ namespace Utils::Logging {
     xSemaphoreHandle Logger::smSerialMutex = xSemaphoreCreateMutex();
     bool Logger::smIsSerialEnabled = false;
 
-    Logger::Logger(Level level) {
-        mLogLevel.store(level);
+    Logger::Logger(const Level level) {
+        mLogLevel = level;
 
         #ifndef DEBUG_MODE
             if (msIsLoggingDisabled) {
@@ -35,7 +35,7 @@ namespace Utils::Logging {
     }
 
     Level Logger::getLogLevel() const {
-        return mLogLevel.load();
+        return mLogLevel;
     }
 
     void Logger::setLogLevel(const Level newLevel) {
@@ -48,7 +48,7 @@ namespace Utils::Logging {
             sprintf(messageBuffer, " Changing log level to: %s", logLevel);
             Serial.println(messageBuffer);
         }
-        mLogLevel.store(newLevel);
+        mLogLevel = newLevel;
         xSemaphoreGive(smSerialMutex);
     }
 

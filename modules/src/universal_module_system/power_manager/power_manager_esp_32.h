@@ -6,6 +6,7 @@
 
 #include "i_power_manager.h"
 
+#include <atomic>
 #include <memory>
 #include <nlohmann/json.hpp>
 
@@ -34,15 +35,16 @@ namespace UniversalModuleSystem {
         PowerManagerESP32(const PowerManagerESP32&) = delete;
         PowerManagerESP32& operator = (const PowerManagerESP32&) = delete;
 
-
         /**
          * @brief Puts the ESP32 into sleep mode for a specified duration.
+         * @details Always enables waking up module by pressing PairingButton.
          *
          * @param milliSeconds Duration to sleep in milliseconds.
          * @param enableWakeUpWithRfModule Enables wake-up through RF module.
-         * @note Always enables waking up module by pressing PairingButton.
+         *
+         * @note This function does not return.
          */
-        void enterSleep(uint32_t milliSeconds, bool enableWakeUpWithRfModule) override;
+        void enterSleep(uint32_t milliSeconds, bool enableWakeUpWithRfModule) override __attribute__((noreturn));
 
         /**
          * @brief Restarts the ESP32.
@@ -50,13 +52,26 @@ namespace UniversalModuleSystem {
          *          to ensure nothing critical is interrupted.
          *
          * @param source String describing the source of the restart (for log).
+         *
+         * @note This function does not return.
          */
-        void safeRestart(const char *source) const override;
+        void safeRestart(const char *source) const override __attribute__((noreturn));
 
         /**
          * @brief Disables the automatic sleep (if enabled) after waking up ESP by rf module.
          */
         void disableAutoSleep() override;
+
+        /**
+         * @brief Restarts idle timer, if the idle timer is enabled.
+         */
+        void restartIdleTimer() override;
+
+        /**
+         * @brief Checks whether the module booted after a reset or after waking from deep sleep.
+         * @return True if the module booted after a reset, false if it booted after waking from deep sleep.
+         */
+        [[nodiscard]] bool wasModuleRestarted() const override;
 
     private:
         /**
@@ -108,12 +123,34 @@ namespace UniversalModuleSystem {
          */
         uint32_t getCurrentTime() const;
 
+        /**
+         * @brief Creates idle timer, that automatically put ESP32 to sleep, if idle autosleep is enabled.
+         */
+        void createIdleTimer();
+
+        /**
+         * @brief Idle timer callback.
+         * @param xTimer Handle to the timer triggering auto-sleep (used for passing pointer to instance of PowerManagerESP32).
+         */
+        static void idleAutosleep(TimerHandle_t xTimer);
+
         std::shared_ptr<ul::Logger> mpLogger;
 
+        // TODO remove?
         TimerHandle_t mAutoSleepTimer = nullptr; ///< FreeRTOS timer handle for managing auto-sleep functionality.
+
+        TimerHandle_t mIdleTimer = nullptr; ///< FreeRTOS timer handle for managing idle auto-sleep functionality.
+
+        std::atomic<uint32_t> mIdleSleepTime{0};
 
         // auto sleep
         static uint32_t msSleepStart; ///< When sleep starts, variable saved in RTC memory.
         static int64_t msIntendedSleepTime; ///< How long sleep should last, variable saved in RTC memory.
+
+
+        // JSON keys
+        static constexpr char ms_IDLE_TIMER_DATA[] = "idleAutoSleep";
+        static constexpr char ms_IDLE_TIMER_TIMEOUT[] = "idleTimeout";
+        static constexpr char ms_IDLE_TIMER_SLEEP_TIME[] = "sleepTime";
     };
 }

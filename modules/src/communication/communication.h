@@ -8,7 +8,7 @@
 #ifdef HC12_MODULE
     #include "communication/hc12.h"
 #endif
-#ifdef CENTRAL_UNIT 
+#ifdef CENTRAL_UNIT
     #include "communication/addressing/central_unit_addressing.h"
 #else
     #include "communication/addressing/module_addressing.h"
@@ -34,7 +34,10 @@ namespace Comms {
          * @param logger Shared pointer to the Logger instance.
          * @return Reference to the singleton Communication instance.
          */
-        static Communication& getInstance(const std::shared_ptr<ums::DebugLED> &debugLED, const std::shared_ptr<ul::Logger> &logger);
+        static Communication& getInstance(
+            const std::shared_ptr<ums::DebugLED> &debugLED = nullptr,
+            const std::shared_ptr<ul::Logger> &logger = nullptr
+        );
 
         // Delete copy constructor and assignment operator
         Communication(const Communication&) = delete;
@@ -59,11 +62,6 @@ namespace Comms {
          * @brief Signals the main task to delete and recreate encode task (used after getting new IP address).
          */
         void resetEncodeMessageTask();
-
-        /**
-         * @brief Signals the main task to start pinging process.
-         */
-        void startPinging() const;
 
         /**
          * @brief Add a single byte to the byte queue for decoding.
@@ -109,6 +107,17 @@ namespace Comms {
          * @details Calls rf module's <code>sleep()</code> method.
          */
         void putRfModuleToSleep() const;
+
+        /**
+         * @brief Sends "end" message and ends connection.
+         */
+        void endConnection() const;
+
+        /**
+         * @brief Gets default RF channel.
+         * @return Default RF channel.
+         */
+        uint8_t getDefaultRfChannel() const;
 
     private:
         /**
@@ -245,15 +254,6 @@ namespace Comms {
          */
         void deleteCommunicationTimers();
 
-        /**
-         * @brief Transmit a "ping" message.
-         */
-        void transmitPing() const;
-        /**
-         * @brief Transmit a "reping" message, as a reply to a received "ping" message.
-         */
-        void replyToPing() const;
-
         std::shared_ptr<ums::DebugLED> mpDebugLED; ///< Pointer to debugLED class instance.
         std::shared_ptr<ul::Logger> mpLogger;
         Connection *mpConnection; ///< Pointer to Connection class instance.
@@ -278,11 +278,6 @@ namespace Comms {
             // suspending notifications
             SUSPEND_DECODE_MESSAGE_TASK_NOTIF,
             SUSPEND_ENCODE_MESSAGE_TASK_NOTIF,
-            // SUSPEND_CONNECTION_TASK_NOTIF,
-            // ping notifications
-            START_PINGING_NOTIF,
-            STOP_PINGING_NOTIF,
-            PING_TIMEOUT_NOTIF,
             // addressing notifications
             READ_RAW_MESSAGE_NOTIF,
             STOP_ADDRESSING_ALGORITHM_NOTIF,
@@ -302,6 +297,5 @@ namespace Comms {
 
         TimerHandle_t mReceiveMessageTimeoutTimer = nullptr; ///< Handle to FreeRTOS software timer indicating timeout of the message.
         TimerHandle_t mReceiveByteTimeoutTimer = nullptr; ///< Handle to FreeRTOS software timer indicating timeout of the receiving byte for decode task.
-        TimerHandle_t mPingTimeoutTimer = nullptr; ///< Handle to FreeRTOS software timer indicating timeout of "ping" message.
     };
 }

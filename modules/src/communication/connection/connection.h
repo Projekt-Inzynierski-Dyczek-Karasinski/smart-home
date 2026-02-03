@@ -8,6 +8,7 @@
 #include "../config/communication_config.h"
 
 #include "utils/uint8_array_handlers.h"
+#include "communication/api/command_handler.h"
 
 #ifdef CENTRAL_UNIT
     #include "communication/addressing/central_unit_addressing.h"
@@ -27,65 +28,6 @@ namespace Comms {
     #else
         #error "Not implemented"
     #endif
-
-    /**
-     * @brief Contains connection-related message definitions and utilities for them.
-     * @details Provides message code constants and convertion form strings to enum for switch statement.
-     */
-    struct ConnectionMessages {
-        // Enum for all connection messages.
-        enum class MessagesEnum : uint8_t {
-            END,
-            AFFIRM,
-            NEGATIVE,
-            REPEAT_MESSAGE,
-            TEST_EXECUTE,
-            TEST_GET,
-            RE_TEST_GET,
-            GO_TO_NORMAL_SLEEP,
-            GO_TO_DEEP_SLEEP,
-            RE_GO_TO_SLEEP,
-            CHANGE_CHANNEL,
-            UNKNOWN
-        };
-
-        /**
-         * @brief Functor for comparing C-string message identifiers in std::map.
-         */
-        struct Comparator {
-            bool operator()(const char* a, const char* b) const {
-                return strncmp(a, b, strlen(a)) < 0;
-            }
-        };
-
-        // connection messages
-        static constexpr char s_CONNECTION_END[] = "COend";
-        static constexpr char s_CONNECTION_AFFIRM[] = "COok";
-        static constexpr char s_CONNECTION_NEGATIVE[] = "COneg";
-        static constexpr char s_CONNECTION_REPEAT_MESSAGE[] = "COrepe";
-        static constexpr char s_CONNECTION_TEST_EXECUTE[] = "COexe";
-        static constexpr char s_CONNECTION_TEST_GET[] = "COtest";
-        static constexpr char s_CONNECTION_RE_TEST_GET[] = "COsending_some_data_123...";
-        static constexpr char s_CONNECTION_GO_TO_NORMAL_SLEEP[] = "COnsleep";
-        static constexpr char s_CONNECTION_GO_TO_DEEP_SLEEP[] = "COdsleep";
-        static constexpr char s_CONNECTION_RE_GO_TO_SLEEP[] = "COoksleep";
-        static constexpr char s_CONNECTION_CHANGE_CHANNEL[] = "COrfc";
-
-        // Lookup table mapping message strings to internal enumerator values.
-        inline static const std::map<const char*, MessagesEnum, Comparator> messagesMap {
-        {s_CONNECTION_END, MessagesEnum::END},
-        {s_CONNECTION_AFFIRM, MessagesEnum::AFFIRM},
-        {s_CONNECTION_AFFIRM, MessagesEnum::NEGATIVE},
-        {s_CONNECTION_REPEAT_MESSAGE, MessagesEnum::REPEAT_MESSAGE},
-        {s_CONNECTION_TEST_EXECUTE, MessagesEnum::TEST_EXECUTE},
-        {s_CONNECTION_TEST_GET, MessagesEnum::TEST_GET},
-        {s_CONNECTION_RE_TEST_GET, MessagesEnum::RE_TEST_GET},
-        {s_CONNECTION_GO_TO_NORMAL_SLEEP, MessagesEnum::GO_TO_NORMAL_SLEEP},
-        {s_CONNECTION_GO_TO_DEEP_SLEEP, MessagesEnum::GO_TO_DEEP_SLEEP},
-        {s_CONNECTION_RE_GO_TO_SLEEP, MessagesEnum::RE_GO_TO_SLEEP},
-        {s_CONNECTION_CHANGE_CHANNEL, MessagesEnum::CHANGE_CHANNEL},
-        };
-    };
 
     /**
      * @brief Thread-safe Meyers Singleton for managing RF communication connections.
@@ -182,6 +124,15 @@ namespace Comms {
          * @warning Destructor of this class exists only for programming principles. This class should never be deleted.
          */
         ~Connection();
+
+        /**
+         * @brief Create a response message containing an error.
+         *
+         * @param responseCommand Command to (re)initialize and fill.
+         * @param errorType Error code to return.
+         * @param uid Optional request UID to include.
+         */
+        void responseWithError(std::optional<API::CommandHandler>& responseCommand, API::errorTypes errorType, std::optional<uint32_t> uid) const;
 
         /**
          * @brief Static callback function for FreeRTOS timer.

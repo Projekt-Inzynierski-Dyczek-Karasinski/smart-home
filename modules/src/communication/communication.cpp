@@ -2,9 +2,11 @@
 
 #include <optional>
 
+#include "../config/logger_config.h"
 #include "utils/uint8_array_handlers.h"
 #include "universal_module_system/power_manager/power_manager.h"
 #include "universal_module_system/data_manager.h"
+#include "api/command_handler.h"
 
 namespace uah = Utils::ArrayHandlers;
 
@@ -36,18 +38,13 @@ namespace Comms {
         taskEXIT_CRITICAL(&mCriticalSectionMutex);
     }
 
-    void Communication::startPinging() const {
-        constexpr uint8_t notificationValue = START_PINGING_NOTIF;
-        xQueueSend(mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
-    }
-
     void Communication::addByteToDecode(const uint8_t data) const {
         xQueueSend(mReceiveByteQueue, &data, portMAX_DELAY);
         vTaskResume(mDecodeMessageTaskHandle);
     }
 
     void Communication::sendMessage(const uint8_t message[MESSAGE_SIZE]) const {
-        xQueueSend(mEncodeMessagesQueue, message , portMAX_DELAY);
+        xQueueSend(mEncodeMessagesQueue, message, portMAX_DELAY);
         vTaskResume(mEncodeMessageTaskHandle);
     }
 
@@ -60,7 +57,7 @@ namespace Comms {
         xQueueSend(mReceiveMessageQueue, message, portMAX_DELAY);
     }
 
-    void Communication::changeRFChannel(uint8_t channel) const {
+    void Communication::changeRFChannel(const uint8_t channel) const {
         mpRfModule->firstChangeRFChannel(channel);
     }
 
@@ -72,21 +69,41 @@ namespace Comms {
         mpRfModule->sleep();
     }
 
+    void Communication::endConnection() const {
+        uint8_t sendBuffer[MESSAGE_SIZE] = {};
+        API::CommandHandler ch(API::commandTypes::END);
+        ch.generateMessage(sendBuffer);
+        sendMessage(sendBuffer);
+        mpConnection->endConnection();
+    }
+
+    uint8_t Communication::getDefaultRfChannel() const {
+        return mpAddressing->getDefaultRFChannel();
+    }
+
     // ================== Constructor and Destructor ==================
     Communication::Communication(const std::shared_ptr<ums::DebugLED> &debugLED, const std::shared_ptr<ul::Logger> &logger) :
         mpDebugLED(debugLED),
         mpLogger(logger),
+        #ifdef CENTRAL_UNIT
+            mpAddressing(new CentralUnitAddressing(this, logger)),
+        #else
+            mpAddressing(new ModuleAddressing(this, logger)),
+        #endif
         #ifdef HC12_MODULE
-            mpRfModule(new HC12(this, logger)),
+            mpRfModule(new HC12(this, logger))
         #else
             #error "Not implemented"
         #endif
-        #ifdef CENTRAL_UNIT
-            mpAddressing(new CentralUnitAddressing(this, logger))
-        #else
-            mpAddressing(new ModuleAddressing(this, logger))
-        #endif
     {
+        if (mpLogger == nullptr) {
+            mpLogger = std::make_shared<ul::Logger>(static_cast<ul::Level>(LOGGING_LEVEL));
+            mpLogger->error("Communication Class", "Constructor of Connection class got nullptr as logger.");
+        }
+        if (mpDebugLED == nullptr) {
+            mpDebugLED = std::make_shared<ums::DebugLED>(mpLogger);
+            mpLogger->error("Communication Class", "Constructor of Connection class got nullptr as DebugLED.");
+        }
         mpConnection = &Connection::getInstance(this, mpAddressing, mpRfModule, logger);
 
         createCommunicationQueues();
@@ -149,25 +166,10 @@ namespace Comms {
     void Communication::receivedMessageDecider(bool *isReadingRawMessage) {
         uint8_t buffer[MESSAGE_SIZE];
 
-        // TODO consider changing if else statements to switch case
         if (xQueueReceive(mReceiveMessageQueue, buffer, 0) == pdTRUE) {
-            // if it is connection message
-            if (buffer[0] == (uint8_t)'C' && buffer[1] == (uint8_t)'O') {
-                mpConnection->messageDecider(buffer);
-            }
-            // if it is "ping", reply to ping
-            else if (uah::areArraysEqual(buffer, PING_MESSAGE)) {
-                replyToPing();
-            }
-            // if it is "reping", reply to ping
-            else if (uah::areArraysEqual(buffer, RE_PING_MESSAGE)) {
-                xTimerStop(mPingTimeoutTimer, portMAX_DELAY);
-                mpLogger->info("Communication Main", "Ping Success");
-                mpConnection->endConnection();
-            }
-            // TODO !mm consider change isReadingRawMessage flag to mpAddressing->getIsAddressingInProgress()
+            // TODO !mm change/remove addressing algorithm
             // if it is addressing message
-            else if ((buffer[0] == (uint8_t)'A' && buffer[1] == (uint8_t)'D') || *isReadingRawMessage) {
+            if ((buffer[0] == (uint8_t)'A' && buffer[1] == (uint8_t)'D') || *isReadingRawMessage) {
                 *isReadingRawMessage = false;
                 mpAddressing->addMessage(buffer);
             }
@@ -178,12 +180,7 @@ namespace Comms {
                 }
             #endif
             else {
-                mpLogger->warninga(
-                    "Communication Main",
-                    "Received custom message.\nIgnored message: ",
-                    buffer,
-                    MESSAGE_SIZE
-                );
+                mpConnection->messageDecider(buffer);
             }
             *isReadingRawMessage = false;
         }
@@ -240,21 +237,6 @@ namespace Comms {
                 case SUSPEND_ENCODE_MESSAGE_TASK_NOTIF:
                     com.mpLogger->debug("Communication Main", "vTaskSuspend(com.mEncodeMessageTaskHandle);");
                     vTaskSuspend(com.mEncodeMessageTaskHandle);
-                    break;
-
-                case START_PINGING_NOTIF:
-                    com.transmitPing();
-                    xTimerStart(com.mPingTimeoutTimer, portMAX_DELAY);
-                    break;
-
-                case STOP_PINGING_NOTIF:
-                    com.mpConnection->endConnection();
-                    xTimerStop(com.mPingTimeoutTimer, portMAX_DELAY);
-                    break;
-
-                case PING_TIMEOUT_NOTIF:
-                    com.mpLogger->info("Communication Main", "Ping Timeout");
-                    com.transmitPing();
                     break;
 
                 case READ_RAW_MESSAGE_NOTIF:
@@ -374,7 +356,6 @@ namespace Comms {
 
         // task loop
         for (;;) {
-            // TODO consider adding method for handling notifications (it require to change lambda functions to class methods)
             // notifications handling
             if (xTaskNotifyWait(0, ULONG_MAX, &timeoutStatus, 0) == pdTRUE) {
                 if (timeoutStatus == READ_RAW_MESSAGE_NOTIF) {
@@ -462,10 +443,10 @@ namespace Comms {
                         // send decoded message to queue
                         if (isRawMessage) {
                             isRawMessage = false;
-                            com.mpLogger->infoa("Communication Decode", "Received raw message: ", protocolBuffer[0], PROTOCOL_SIZE, false);
+                            com.mpLogger->debuga("Communication Decode", "Received raw message: ", protocolBuffer[0], PROTOCOL_SIZE, false);
                             xQueueSend(com.mReceiveMessageQueue, protocolBuffer[0], portMAX_DELAY);
                         } else {
-                            com.mpLogger->infoa("Communication Decode", "Received message: ", messageBuffer, MESSAGE_SIZE);
+                            com.mpLogger->debuga("Communication Decode", "Received message: ", messageBuffer, MESSAGE_SIZE);
                             xQueueSend(com.mReceiveMessageQueue, messageBuffer, portMAX_DELAY);
                         }
 
@@ -511,8 +492,8 @@ namespace Comms {
 
         #ifdef TEST_CHECKSUM
             // force bad checksum
-            pinMode(12, INPUT_PULLUP);
-            if (digitalRead(12) == LOW) {
+            pinMode(18, INPUT_PULLUP);
+            if (digitalRead(18) == LOW) {
                 checkSum++;
             }
         #endif
@@ -558,8 +539,13 @@ namespace Comms {
 
                 int8_t messagesQuantity = 0;
                 uint8_t messageIndex = 0;
+
                 // calc messageQuantity
-                const uint8_t messageLen = uah::calcLenOfDataInArray(messageBuffer, MESSAGE_SIZE);
+                uint8_t messageLen = MESSAGE_SIZE - 1;
+                while (messageBuffer[messageLen] == '\0') {
+                    messageLen--;
+                }
+                messageLen++;
                 messagesQuantity = messageLen / PROTOCOL_MESSAGE_LENGTH;
                 if (messageLen % PROTOCOL_MESSAGE_LENGTH == 0) {
                     messagesQuantity--;
@@ -640,13 +626,7 @@ namespace Comms {
                     com.mpLogger->infoa("Communication Input", "Input: ", buffer, MESSAGE_SIZE);
 
                     // special debug commands
-                    if (uah::areArraysEqual(buffer, "startping")) {
-                        constexpr uint8_t notificationValue = START_PINGING_NOTIF;
-                        xQueueSend(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
-                    } else if (uah::areArraysEqual(buffer, "stopping")) {
-                        constexpr uint8_t notificationValue = STOP_PINGING_NOTIF;
-                        xQueueSend(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
-                    } else if (uah::areArraysEqual(buffer, "readraw")) {
+                    if (uah::areArraysEqual(buffer, "readraw")) {
                         constexpr uint8_t notificationValue = READ_RAW_MESSAGE_NOTIF;
                         xQueueSendToFront(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
                     }
@@ -677,11 +657,148 @@ namespace Comms {
                         } else {
                             com.mpLogger->error("Communication Input", "Bad IP");
                         }
-                    } else if (uah::areArraysEqual(buffer, ConnectionMessages::s_CONNECTION_END)) {
-                        uint8_t sendBuffer[MESSAGE_SIZE];
-                        uah::prepareBuffer(sendBuffer, ConnectionMessages::s_CONNECTION_END, MESSAGE_SIZE);
-                        com.sendMessage(sendBuffer);
-                        com.mpConnection->endConnection();
+                    } else if (uah::areArraysEqual(buffer, "end")) {
+                        com.endConnection();
+                    }
+                    // get test
+                    else if (uah::areArraysEqual(buffer, "get")) {
+                        API::CommandHandler ch(API::commandTypes::GET);
+                        std::optional<uint8_t> getType;
+                        try {
+                            getType = std::stoi((char*)&buffer[3]);
+                        } catch (...) {
+                            com.mpLogger->error("Communication Input", "Bad getType");
+                        }
+
+                        if (getType.has_value()) {
+                            constexpr uint32_t TEST_UID = 88888;
+                            API::APIParameter uid(TEST_UID);
+                            API::APIParameter getTypeParam(getType.value());
+                            ch.addParameter(uid);
+                            ch.addParameter(getTypeParam);
+                            if (getType.value() == (uint8_t)API::getTypes::BATTERY_STATE) {
+                                constexpr uint8_t BATTERY_ID = 1;
+                                ch.addParameter(API::APIParameter(BATTERY_ID));
+                            } else if (
+                                getType.value() == (uint8_t)API::getTypes::SENSOR_VALUE ||
+                                getType.value() == (uint8_t)API::getTypes::SENSOR_VALUE_WITH_FORCE_NEW_READING ||
+                                getType.value() == (uint8_t)API::getTypes::ACTUATOR_STATE
+                            ) {
+                                std::optional<uint8_t> sensorId;
+                                try {
+                                    sensorId = std::stoi((char*)&buffer[5]);
+                                } catch (...) {
+                                    com.mpLogger->error("Communication Input", "Bad sensorId/actuatorId.");
+                                }
+                                if (sensorId.has_value()) {
+                                    ch.addParameter(API::APIParameter(sensorId.value()));
+                                }
+                            }
+
+                            uint8_t message[MESSAGE_SIZE] = {};
+                            ch.generateMessage(message);
+                            xQueueSend(com.mEncodeMessagesQueue, &message, portMAX_DELAY);
+                        }
+                    }
+                    // sleep command
+                    else if (uah::areArraysEqual(buffer, "sl")) {
+                        std::optional<uint32_t> sleepTime;
+                        try {
+                            sleepTime = std::stoi((char*)&buffer[2]);
+                            com.mpLogger->errorv("Communication Input", "good sleep time:", sleepTime.value());
+                        } catch (...) {
+                            com.mpLogger->error("Communication Input", "Bad sleep time.");
+                        }
+
+                        if (sleepTime.has_value()) {
+                            API::CommandHandler ch(API::commandTypes::SLEEP);
+                            ch.addParameter(API::APIParameter<uint32_t>(88888));
+                            ch.addParameter(API::APIParameter(sleepTime.value()));
+                            uint8_t message[MESSAGE_SIZE] = {};
+                            ch.generateMessage(message);
+                            com.sendMessage(message);
+                        }
+                    }
+                    // deep sleep command
+                    else if (uah::areArraysEqual(buffer, "dsl")) {
+                        std::optional<uint32_t> sleepTime;
+                        try {
+                            sleepTime = std::stoi((char*)&buffer[3]);
+                        } catch (...) {
+                            com.mpLogger->error("Communication Input", "Bad sleep time.");
+                        }
+
+                        if (sleepTime.has_value()) {
+                            API::CommandHandler ch(API::commandTypes::DEEP_SLEEP);
+                            ch.addParameter(API::APIParameter<uint32_t>(88888));
+                            ch.addParameter(API::APIParameter(sleepTime.value()));
+                            uint8_t message[MESSAGE_SIZE] = {};
+                            ch.generateMessage(message);
+                            com.sendMessage(message);
+                        }
+                    }
+                    // notif test
+                    else if (uah::areArraysEqual(buffer, "notif")) {
+                        API::CommandHandler ch(API::commandTypes::NOTIFY);
+                        ch.addParameter(API::APIParameter(static_cast<uint8_t>(API::notifyTypes::SENSOR_ALERT)));
+
+                        uint8_t message[MESSAGE_SIZE] = {};
+                        ch.generateMessage(message);
+                        com.sendMessage(message);
+                    } else if (uah::areArraysEqual(buffer, "ping")) {
+                        API::CommandHandler ch(API::commandTypes::PING);
+                        ch.addParameter(API::APIParameter((uint8_t)12));
+                        ch.addParameter(API::APIParameter((uint8_t)128));
+                        ch.addParameter(API::APIParameter(3.4f));
+                        ch.addParameter(API::APIParameter(-456));
+                        char charArray[] = "abcdef";
+                        ch.addParameter(API::APIParameter(charArray, strlen(charArray)));
+                        uint8_t rawArray[] = {1,2,3,4,5};
+                        ch.addParameter(API::APIParameter(rawArray, sizeof(rawArray)));
+
+                        uint8_t message[MESSAGE_SIZE] = {};
+                        ch.generateMessage(message);
+
+                        com.sendMessage(message);
+                    }
+                    // ascii test
+                    else if (uah::areArraysEqual(buffer, "ascii")) {
+                        API::CommandHandler ch(API::commandTypes::RESPONSE);
+                        char text[] = "abcdefg";
+                        ch.addParameter(API::APIParameter(text, strlen(text)));
+                        uint8_t message[MESSAGE_SIZE] = {};
+                        ch.generateMessage(message);
+                        com.sendMessage(message);
+                    }
+                    // set test
+                    else if (uah::areArraysEqual(buffer, "set")) {
+                        API::CommandHandler ch(API::commandTypes::SET);
+                        ch.addParameter(API::APIParameter(static_cast<uint8_t>(84))); // uid
+                        std::optional<uint8_t> setType;
+                        std::optional<uint8_t> actuatorId;
+                        try {
+                            setType = std::stoi((char*)&buffer[3]);
+                            actuatorId = std::stoi((char*)&buffer[5]);
+                        } catch (...) {
+                            com.mpLogger->error("Communication Input", "Bad setType or actuatorId.");
+                        }
+                        if (setType.has_value() && actuatorId.has_value()) {
+                            ch.addParameter(API::APIParameter(setType.value()));
+                            ch.addParameter(API::APIParameter(actuatorId.value()));
+                            if (setType.value() == static_cast<uint8_t>(API::setTypes::ACTUATOR_OPERATION)) {
+                                std::optional<uint8_t> operation;
+                                try {
+                                    operation = std::stoi((char*)&buffer[7]);
+                                } catch (...) {
+                                    com.mpLogger->error("Communication Input", "Bad operation.");
+                                }
+                                if (operation.has_value()) ch.addParameter(API::APIParameter(operation.value()));
+                            }
+
+                            uint8_t message[MESSAGE_SIZE] = {};
+                            ch.generateMessage(message);
+                            xQueueSend(com.mEncodeMessagesQueue, &message, portMAX_DELAY);
+                        }
                     }
                     // rest
                     else {
@@ -748,10 +865,6 @@ namespace Comms {
             com.mpLogger->debug("Communication Timers", "Byte timeout.");
             constexpr uint8_t notificationValue = BYTE_TIMEOUT_NOTIF;
             xQueueSend(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
-        } else if (xTimer == com.mPingTimeoutTimer) {
-            com.mpLogger->debug("Communication Timers", "Ping timeout.");
-            constexpr uint8_t notificationValue = PING_TIMEOUT_NOTIF;
-            xQueueSend(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
         }
     }
 
@@ -774,22 +887,9 @@ namespace Comms {
                 communicationTimersCallbacks
             );
         }
-        if (mPingTimeoutTimer == nullptr) {
-            mPingTimeoutTimer = xTimerCreate(
-                "Ping Timeout",
-                pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT),
-                pdTRUE,
-                this,
-                communicationTimersCallbacks
-            );
-        }
     }
 
     void Communication::deleteCommunicationTimers() {
-        if (mPingTimeoutTimer != nullptr) {
-            xTimerDelete(mPingTimeoutTimer, portMAX_DELAY);
-            mPingTimeoutTimer = nullptr;
-        }
         if (mReceiveByteTimeoutTimer != nullptr) {
             xTimerDelete(mReceiveByteTimeoutTimer, portMAX_DELAY);
             mReceiveByteTimeoutTimer = nullptr;
@@ -798,19 +898,5 @@ namespace Comms {
             xTimerDelete(mReceiveMessageTimeoutTimer, portMAX_DELAY);
             mReceiveMessageTimeoutTimer = nullptr;
         }
-    }
-
-    // ============================ Other =============================
-    // FIXME getting no reply to ping cause connection timeout and strange behaviour
-    void Communication::transmitPing() const {
-        uint8_t buffer[MESSAGE_SIZE];
-        uah::prepareBuffer(buffer, PING_MESSAGE, MESSAGE_SIZE);
-        sendMessage(buffer);
-    }
-
-    void Communication::replyToPing() const {
-        uint8_t buffer[MESSAGE_SIZE];
-        uah::prepareBuffer(buffer, RE_PING_MESSAGE, MESSAGE_SIZE);
-        sendMessage(buffer);
     }
 }

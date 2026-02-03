@@ -2,19 +2,12 @@
 
 #include "common/smart_home_config.h"
 
-// TODO assign final value
 #define ADDRESSING_ABSOLUTE_TIMEOUT 60000 // 60s
-// TODO assign final value
 #define ADDRESSING_ABSOLUTE_MAX_ATTEMPTS 3
-// TODO assign final value
 #define ADDRESSING_MESSAGE_TIMEOUT 5000 // 5s
-// TODO assign final value
 #define ADDRESSING_MAX_ATTEMPTS 5
-// TODO assign final value
 #define ADDRESSING_NUM_OF_ABORT_MESSAGES 3
-// TODO assign final value
 #define ADDRESSING_DELAY_BETWEEN_ABORT_MESSAGES 200 // 0.2s
-// TODO assign final value
 #define ADDRESSING_DELAY_BETWEEN_ATTEMPTS 1000 // 1s
 
 #define NULL_IP 0
@@ -29,7 +22,7 @@
 #define ADDRESSING_DATA_PATH "/root/addressing"
 
 // ===================== Addressing API Calls =====================
-// TODO change API Calls to numeric values
+// TODO !mm remove
 #define ADDRESSING_ABORT "ADabor"
 #define ADDRESSING_RESTART "ADrest"
 #define ADDRESSING_NC_REAL_MAC_RF_CHANNELS "ADncry"

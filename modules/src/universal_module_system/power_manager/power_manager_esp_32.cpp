@@ -1,14 +1,17 @@
 #include "power_manager_esp_32.h"
 
 #include <driver/rtc_io.h>
-#include <WiFi.h>
-#include <esp_wifi.h>
+// TODO !mm uncomment
+// #include <WiFi.h>
+// #include <esp_wifi.h>
 
 #include "../../../config/universal_module_system_config.h"
 #include "universal_module_system/data_manager.h"
 #include "communication/communication.h"
+#include "communication/api/command_handler.h"
 
 namespace nl = nlohmann;
+namespace API = Comms::API;
 
 namespace UniversalModuleSystem {
     #ifdef AUTO_SLEEP
@@ -24,16 +27,17 @@ namespace UniversalModuleSystem {
     void PowerManagerESP32::safeRestart(const char *source) const {
         mpLogger->warning(source, "Safe Rebooting...");
         waitAndDisableCriticalFeatures();
-        ESP.restart();
+        esp_restart();
     }
 
     void PowerManagerESP32::enterSleep(const uint32_t milliSeconds, const bool enableWakeUpWithRfModule) {
         constexpr uint16_t US_TO_MILLISECONDS_FACTOR = 1000;
 
         // disable WiFi
-        WiFi.disconnect(true);
-        WiFi.mode(WIFI_OFF);
-        esp_wifi_stop();
+        // TODO !mm uncomment
+        // WiFi.disconnect(true);
+        // WiFi.mode(WIFI_OFF);
+        // esp_wifi_stop();
 
         // button wake up
         rtc_gpio_pulldown_dis(BUTTON_PIN_AS_GPIO);
@@ -57,7 +61,7 @@ namespace UniversalModuleSystem {
         }
 
         // timer wake up
-        esp_sleep_enable_timer_wakeup(milliSeconds * US_TO_MILLISECONDS_FACTOR);
+        esp_sleep_enable_timer_wakeup((uint64_t)milliSeconds * US_TO_MILLISECONDS_FACTOR);
 
         mpLogger->infov("PowerManagerESP32", "Going to sleep for (ms): ", milliSeconds);
 
@@ -82,12 +86,34 @@ namespace UniversalModuleSystem {
         #endif
     }
 
+    void PowerManagerESP32::restartIdleTimer() {
+        if (mIdleTimer != nullptr) {
+            xTimerStart(mIdleTimer, portMAX_DELAY);
+        }
+    }
+
+    bool PowerManagerESP32::wasModuleRestarted() const {
+        switch (esp_sleep_get_wakeup_cause()) {
+            // add here more wake up reasons if needed
+            case ESP_SLEEP_WAKEUP_EXT1:
+            case ESP_SLEEP_WAKEUP_TIMER:
+            case ESP_SLEEP_WAKEUP_EXT0:
+                return false;
+            default:
+                return true;
+        }
+    }
+
     PowerManagerESP32::PowerManagerESP32(const std::shared_ptr<ul::Logger> &logger) : mpLogger(logger) {
         handleWakeUpReason();
+        createIdleTimer();
     }
 
     PowerManagerESP32::~PowerManagerESP32() {
-        xTimerDelete(mAutoSleepTimer, portMAX_DELAY);
+        if (mAutoSleepTimer != nullptr)
+            xTimerDelete(mAutoSleepTimer, portMAX_DELAY);
+        if (mIdleTimer != nullptr)
+            xTimerDelete(mIdleTimer, portMAX_DELAY);
     }
 
     void PowerManagerESP32::waitAndDisableCriticalFeatures() const {
@@ -101,22 +127,66 @@ namespace UniversalModuleSystem {
 
     void PowerManagerESP32::handleWakeUpReason() {
         switch (esp_sleep_get_wakeup_cause()) {
-            case ESP_SLEEP_WAKEUP_EXT0:
-                mpLogger->verbose("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
-                disableAutoSleep();
-                break;
             case ESP_SLEEP_WAKEUP_EXT1:
-                mpLogger->verbose("PowerManagerESP32 Class", "Module was wake up by rf module.");
+                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by rf module.");
                 enableAutoSleep();
                 break;
+
             case ESP_SLEEP_WAKEUP_TIMER:
-                mpLogger->verbose("PowerManagerESP32 Class", "Module was wake up by timer.");
+                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by timer.");
                 disableAutoSleep();
                 break;
+
+// macro disabling wake up rf notifications that are annoying during software development
+#ifdef DISABLE_WAKE_UP_RF_NOTIFICATION
+#warning "Wake up rf notifications are disabled"
+            case ESP_SLEEP_WAKEUP_EXT0:
+                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
+                disableAutoSleep();
+                break;
+
             default:
-                mpLogger->verbose("PowerManagerESP32 Class", "Module had power loss.");
+                mpLogger->info("PowerManagerESP32 Class", "Module had power loss.");
                 disableAutoSleep();
                 break;
+
+#else
+            case ESP_SLEEP_WAKEUP_EXT0:
+                try {
+                    API::CommandHandler commandHandler(API::commandTypes::NOTIFY);
+                    API::APIParameter notify(static_cast<uint8_t>(API::notifyTypes::MANUAL_WAKE_UP));
+                    commandHandler.addParameter(notify);
+
+                    uint8_t message[MESSAGE_SIZE] = {};
+                    commandHandler.generateMessage(message);
+                    const auto &communication = Comms::Communication::getInstance();
+                    communication.sendMessage(message);
+                } catch (std::exception &e) {
+                    mpLogger->error("PowerManagerESP32 handleWakeUpReason", "Failed to create notification in case ESP_SLEEP_WAKEUP_EXT0.");
+                    mpLogger->error("PowerManagerESP32 handleWakeUpReason", e.what());
+                }
+                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
+                disableAutoSleep();
+                break;
+
+            default:
+                try {
+                    API::CommandHandler commandHandler(API::commandTypes::NOTIFY);
+                    API::APIParameter notify(static_cast<uint8_t>(API::notifyTypes::POWER_LOSS));
+                    commandHandler.addParameter(notify);
+
+                    uint8_t message[MESSAGE_SIZE] = {};
+                    commandHandler.generateMessage(message);
+                    const auto &communication = Comms::Communication::getInstance();
+                    communication.sendMessage(message);
+                } catch (std::exception &e) {
+                    mpLogger->error("PowerManagerESP32 handleWakeUpReason", "Failed to create notification in default case.");
+                    mpLogger->error("PowerManagerESP32 handleWakeUpReason", e.what());
+                }
+                mpLogger->info("PowerManagerESP32 Class", "Module had power loss.");
+                disableAutoSleep();
+                break;
+#endif
         }
     }
 
@@ -131,7 +201,7 @@ namespace UniversalModuleSystem {
                     pdMS_TO_TICKS(AUTO_SLEEP_WAIT_TIME),
                     pdFALSE,
                     this,
-                    goToAutoSleep
+                    timerTriggeredSleep
                 );
                 xTimerStart(mAutoSleepTimer, portMAX_DELAY);
             }
@@ -148,7 +218,34 @@ namespace UniversalModuleSystem {
     uint32_t PowerManagerESP32::getCurrentTime() const {
         struct timeval timeStruct{};
         gettimeofday(&timeStruct, nullptr);
-        // TODO consider making this more accurate
         return timeStruct.tv_sec * 1000;
+    }
+
+    void PowerManagerESP32::createIdleTimer() {
+#ifndef CENTRAL_UNIT
+        const auto &dm = DataManager::getInstance();
+        nl::json jsonData = dm.loadJson(dm.s_BASE_CONFIG_PATH);
+        nl::json &idleTimerData = jsonData[ms_IDLE_TIMER_DATA];
+        const uint32_t sleepTime = idleTimerData[ms_IDLE_TIMER_SLEEP_TIME].get<uint32_t>();
+        const uint32_t timeout = idleTimerData[ms_IDLE_TIMER_TIMEOUT].get<uint32_t>();
+
+        if (sleepTime != 0 && timeout != 0) {
+            mIdleSleepTime.store(sleepTime);
+            mIdleTimer = xTimerCreate(
+                "Idle Timer",
+                pdMS_TO_TICKS(timeout),
+                pdFALSE,
+                this,
+                idleAutosleep
+            );
+            xTimerStart(mIdleTimer, portMAX_DELAY);
+        }
+#endif
+    }
+
+    void PowerManagerESP32::idleAutosleep(TimerHandle_t xTimer) {
+        auto &pm = *static_cast<PowerManagerESP32 *>(pvTimerGetTimerID(xTimer));
+        if (const uint32_t sleepTime = pm.mIdleSleepTime.load(); sleepTime != 0)
+            pm.enterSleep(sleepTime, true);
     }
 }
