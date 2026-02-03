@@ -29,19 +29,19 @@ namespace Comms::API {
     String CommandHandler::getCommandTypeString() const {
         using CT = commandTypes;
         switch (getCommandType()) {
-            case CT::ACKNOWLEDGE:          return "ACKNOWLEDGE";
-            case commandTypes::NEGATIVE:   return "NEGATIVE";
-            case commandTypes::REPEAT:     return "REPEAT";
-            case commandTypes::END:        return "END";
-            case commandTypes::PING:       return "PING";
-            case commandTypes::REPING:     return "REPING";
-            case commandTypes::SLEEP:      return "SLEEP";
-            case commandTypes::DEEP_SLEEP: return "DEEP_SLEEP";
-            case commandTypes::GET:        return "GET";
-            case commandTypes::SET:        return "SET";
-            case commandTypes::RESPONSE:   return "RESPONSE";
-            case commandTypes::NOTIFY:     return "NOTIFY";
-            default:                       return "UNKNOWN";
+            case CT::ACKNOWLEDGE: return "ACKNOWLEDGE";
+            case CT::NEGATIVE:    return "NEGATIVE";
+            case CT::REPEAT:      return "REPEAT";
+            case CT::END:         return "END";
+            case CT::PING:        return "PING";
+            case CT::REPING:      return "REPING";
+            case CT::SLEEP:       return "SLEEP";
+            case CT::DEEP_SLEEP:  return "DEEP_SLEEP";
+            case CT::GET:         return "GET";
+            case CT::SET:         return "SET";
+            case CT::RESPONSE:    return "RESPONSE";
+            case CT::NOTIFY:      return "NOTIFY";
+            default:              return "UNKNOWN";
         }
     }
 

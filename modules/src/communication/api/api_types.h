@@ -4,7 +4,7 @@
 #include <string_view>
 
 namespace Comms::API {
-    /// @brief High-level command identifiers used in the communication protocol (control, GET/SET, etc.).
+    /// @brief Low-level (1-4) and high-level (5-12) command identifiers used in the communication protocol.
     enum class commandTypes : uint8_t {
         UNKNOWN = 0,
         ACKNOWLEDGE = 1,
@@ -46,9 +46,10 @@ namespace Comms::API {
     /// @brief SET request subtypes that specify what action the module should perform.
     enum class setTypes : uint8_t {
         UNKNOWN = 0,
-        ACTUATOR_OPERATION = 1,
-        ACTUATOR_TOGGLE = 2,
-        OTA = 3
+        CHANGE_CONFIG = 1,
+        ACTUATOR_OPERATION = 2,
+        ACTUATOR_TOGGLE = 3,
+        OTA = 4
     };
 
     /// @brief Notification event types to report important events.
@@ -56,7 +57,8 @@ namespace Comms::API {
         UNKNOWN = 0,
         MANUAL_WAKE_UP = 1,
         POWER_LOSS = 2,
-        SENSOR_ALERT = 3
+        SENSOR_ALERT = 3,
+        MODULE_WAKE_UP = 4
     };
 
     /// @brief Parameter types used to describe the format of a transmitted value.

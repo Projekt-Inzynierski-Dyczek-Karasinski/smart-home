@@ -2,11 +2,7 @@
 
 namespace Comms::API {
     SpecialByteParameter::SpecialByteParameter(const uint8_t specialByte)
-    : mSpecialByte(specialByte) {}
-
-    uint8_t SpecialByteParameter::getSpecialByte() const {
-        return mSpecialByte;
-    }
+    : SpecialByte(specialByte) {}
 
     uint8_t SpecialByteParameter::getType() const {
         return (mSpecialByte & ms_TYPE_PART) >> ms_BITS_PER_PART;

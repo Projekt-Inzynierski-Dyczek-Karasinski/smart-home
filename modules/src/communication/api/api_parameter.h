@@ -23,7 +23,7 @@ namespace Comms::API {
 
          /**
           * @brief Construct from a byte buffer.
-          * @details Expects <code>parameter[0]</code> to contain the special byte and the next
+          * @details Expects \p parameter[0] to contain the special byte and the next
           * bytes containing the value in big-endian order.
           *
           * @param parameter Pointer to serialized representation.
@@ -123,7 +123,7 @@ namespace Comms::API {
         void getBytesRepresentation(uint8_t *outputArray);
 
         /**
-         * @brief Get the .SpecialByteParameter
+         * @brief Get the SpecialByteParameter.
          * @return SpecialByteParameter.
          */
         [[nodiscard]] SpecialByteParameter getSpecialByte() const;

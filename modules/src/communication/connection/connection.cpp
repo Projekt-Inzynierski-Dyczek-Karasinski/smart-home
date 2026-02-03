@@ -433,6 +433,12 @@ namespace Comms {
                 using ST = API::setTypes;
                 auto &actuatorManager = ums::Transducers::ActuatorsManager::getInstance(mpLogger);
                 switch (setType.value()) {
+                    case static_cast<uint8_t>(ST::CHANGE_CONFIG): {
+                        mpLogger->verbose("MessageDecider CT::SET", "ST::CHANGE_CONFIG");
+                        responseWithError(sendCommand, ET::NOT_IMPLEMENTED, uid);
+                        break;
+                    }
+
                     case static_cast<uint8_t>(ST::ACTUATOR_OPERATION): {
                         std::optional<uint8_t> actuatorId;
                         std::optional<API::APIParameterVariant> operation;

@@ -28,7 +28,7 @@ namespace Comms::API {
 
         /**
          * @brief Construct a CommandHandler for creating a new message.
-         * Initializes the command special byte with the provided command type.
+         * @details Initializes the command special byte with the provided command type.
          *
          * @param commandType Command identifier to use in the generated message.
          */
