@@ -58,14 +58,14 @@ namespace Comms {
          * - "HC+DEFAULT" - reset HC12 module to default settings
          * - "HC+SLEEP" - put HC12 module in sleep mode
          */
-        void setupHC12(const uint8_t *commands);
+        void setupHC12(const uint8_t *commands) const;
 
         /**
          * @brief Shortcut method for changing RF channel on HC12.
          * @param channel Channel to change (<b>1 - 127</b>).
          * @note Ensures that after calling this method, the RF channel will be changed first, and only then will messages be transmitted.
          */
-        void firstChangeRFChannel(uint8_t channel);
+        void firstChangeRFChannel(uint8_t channel) const;
 
         /**
          * @brief Waits for ongoing HC12 transmission to complete and disables transmission to HC12 module.
@@ -75,7 +75,7 @@ namespace Comms {
         /**
          * @brief Sends a command to the HC12 to put the RF module to sleep.
          */
-        void sleep();
+        void sleep() const;
 
     private:
         /**
@@ -201,6 +201,6 @@ namespace Comms {
         const HC12Data m_HC12_DATA;
 
         // JSON key
-        static constexpr char s_HC12_DATA[] = "hc12";
+        static constexpr char ms_HC12_DATA[] = "hc12";
     };
 }

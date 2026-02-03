@@ -1,5 +1,4 @@
 #include "hc12.h"
-#include "hc12.h"
 
 #include "communication/communication.h"
 #include "universal_module_system/data_manager.h"
@@ -12,7 +11,7 @@ namespace Comms {
     HC12::HC12(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
         : mpCommunication(communication),
         mpLogger(logger),
-        m_HC12_DATA(ums::DataManager::getInstance().loadJson(ums::DataManager::getInstance().s_BASE_CONFIG_PATH)[s_HC12_DATA]) {
+        m_HC12_DATA(ums::DataManager::getInstance().loadJson(ums::DataManager::getInstance().s_BASE_CONFIG_PATH)[ms_HC12_DATA]) {
         pinMode(m_HC12_DATA.setPin, OUTPUT);
         digitalWrite(m_HC12_DATA.setPin, HIGH);
         vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_HIGH));
@@ -57,11 +56,10 @@ namespace Comms {
         vTaskResume(mTransmitTaskHandle);
     }
 
-    void HC12::setupHC12(const uint8_t *commands) {
+    void HC12::setupHC12(const uint8_t *commands) const {
         if (!(commands[0] == 'H' && commands[1] == 'C')) {
             mpLogger->error("HC12 Method", "HC12 commands passed in setupHC12() must start with 'H', 'C'");
         } else {
-            // createSetupHC12Queues();
 
             // split multiple command in COMMANDS array
             uint8_t commandStartIndex = 0;
@@ -99,18 +97,14 @@ namespace Comms {
                     xQueueSend(mSetupHC12CommandsQueue, commandBuffer, portMAX_DELAY);
                 }
             }
-            // constexpr uint8_t notificationValue = CREATE_SETUP_HC12_TASK_NOTIF;
-            // xQueueSend(mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
         }
     }
 
-    void HC12::firstChangeRFChannel(uint8_t channel) {
+    void HC12::firstChangeRFChannel(uint8_t channel) const {
         if (channel < DEFAULT_CHANNEL || channel > MAX_CHANNEL) {
             mpLogger->errorv("HC12 Method", "RF channel on HC12 module must be set between 1 - 127, but got:", channel);
             channel = DEFAULT_CHANNEL;
         }
-
-        // xSemaphoreTake(mFirstSetupSemaphore, portMAX_DELAY);
 
         uint8_t commandBuffer[8];
         char messageBuffer[8];
@@ -123,7 +117,7 @@ namespace Comms {
         xSemaphoreTake(mSendingDataMutex, pdMS_TO_TICKS(POWER_MANAGEMENT_SEMAPHORE_TIMEOUT));
     }
 
-    void HC12::sleep() {
+    void HC12::sleep() const {
         setupHC12((uint8_t *) "HC+SLEEP");
     }
 
@@ -181,10 +175,9 @@ namespace Comms {
     }
 
     void HC12::HC12MainTask(void *parameters) {
-        auto &hc12 = *static_cast<HC12 *>(parameters);
+        const auto &hc12 = *static_cast<HC12 *>(parameters);
 
         uint8_t status = DEFAULT_STATUS_NOTIF;
-        // bool isSetupHC12Working = false;
         bool isWaitingForSendConfirmation = false;
 
         // clear random hc12 output after powering on
