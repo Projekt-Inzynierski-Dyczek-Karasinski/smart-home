@@ -121,12 +121,12 @@ namespace SmartHomeDB {
                                                 SmartHome::API::ApiId apiId);
 
         /**
-                * @brief Convert pqxx::field to JSON value.
-                *
-                * @param field Database field to convert.
-                *
-                * @return JSON representation of the field value.
-                */
+          * @brief Convert pqxx::field to JSON value.
+          *
+          * @param field Database field to convert.
+          *
+          * @return JSON representation of the field value.
+          */
         static nlohmann::json fieldValueToJson(const pqxx::field &field);
 
         /**
