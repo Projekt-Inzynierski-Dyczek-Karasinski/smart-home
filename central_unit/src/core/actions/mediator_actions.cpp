@@ -352,7 +352,7 @@ namespace SmartHome {
         if (!parsedParams.moduleId.has_value()) return;
         if (!parsedParams.type.has_value() || !applicableTypes.contains(parsedParams.type.value())) return;
         if (!parsedParams.args.has_value()) return;
-        if (!parsedParams.args.value().empty()) return;
+        if (parsedParams.args.value().empty()) return;
 
 
         DatabaseActions::postSensorReading(parsedParams.moduleId.value(),
