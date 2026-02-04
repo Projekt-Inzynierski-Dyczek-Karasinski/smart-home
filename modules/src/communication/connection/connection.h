@@ -223,7 +223,6 @@ namespace Comms {
         SemaphoreHandle_t mConnectionDataMutex = nullptr; ///< FreeRTOS mutex protecting Connection class variables.
         TimerHandle_t mConnectionTimeoutTimer = nullptr; ///< FreeRTOS software timer for connection timeout management.
 
-        // TODO consider better handling that
         uint32_t mSleepTime = 0;
         bool mIsDeepSleep = false;
         std::optional<uint8_t> mTmpChannel{};

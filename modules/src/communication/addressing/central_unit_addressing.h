@@ -109,7 +109,7 @@ namespace Comms {
             uint8_t macAddress[MAC_ADDRESS_LENGTH] = {0, 0, 0, 0, 0, 0}; ///< Module's MAC address.
 
         private:
-            //json keys
+            // JSON keys
             static constexpr char ms_JK_IP[] = "ip";
             static constexpr char ms_JK_RF_CHANNEL[] = "rfChannel";
             static constexpr char ms_JK_MAC_ADDRESS[] = "mac";
@@ -245,7 +245,7 @@ namespace Comms {
 
         SemaphoreHandle_t mModulesAddressingDataMutex = nullptr; ///< Handle to mutex protecting access to modules addressing data.
 
-        //json keys
+        // JSON keys
         static constexpr char ms_JK_MODULES[] = "mod";
         static constexpr char ms_JK_NUM_OF_MODULES_ON_RF_CHANNEL[] = "num";
     };

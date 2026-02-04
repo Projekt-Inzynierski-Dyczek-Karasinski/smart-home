@@ -532,9 +532,10 @@ namespace Comms {
             sendCommand->generateMessage(sendBuffer);
             mpCommunication->sendMessage(sendBuffer);
 
-            // TODO !mm add #ifdef CENTRAL_UNIT
+#ifdef CENTRAL_UNIT
             if (sendCommand->getCommandType() == CT::END)
                 endConnection();
+#endif
         }
     }
 
@@ -569,9 +570,6 @@ namespace Comms {
         createConnectionTimer();
         xTimerStart(mConnectionTimeoutTimer, portMAX_DELAY);
         if (!mIsConnected) {
-            auto &powerManager = ums::PowerManager::getInstance(mpLogger);
-            powerManager.disableAutoSleep();
-
             mpLogger->debug("Connection Class", "Connection start.");
             mIsConnected = true;
             mpAddressing->setProtocolIPAddress(ip); // do anything only for Central Unit

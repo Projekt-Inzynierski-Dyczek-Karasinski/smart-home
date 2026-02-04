@@ -58,11 +58,6 @@ namespace UniversalModuleSystem {
         void safeRestart(const char *source) const override __attribute__((noreturn));
 
         /**
-         * @brief Disables the automatic sleep (if enabled) after waking up ESP by rf module.
-         */
-        void disableAutoSleep() override;
-
-        /**
          * @brief Restarts idle timer, if the idle timer is enabled.
          */
         void restartIdleTimer() override;
@@ -103,19 +98,7 @@ namespace UniversalModuleSystem {
         /**
          * @brief Logs wake-up reason and, if caused by RF module, starts auto-sleep feature (if enabled).
          */
-        void handleWakeUpReason();
-
-        /**
-         * @brief Enables the automatic sleep functionality.
-         * @note Works only if <code>AUTO_SLEEP</code> is defined in the config.
-         */
-        void enableAutoSleep();
-
-        /**
-        * @brief FreeRTOS timer callback to automatically put ESP in sleep.
-        * @param xTimer Handle to the timer triggering auto-sleep (used for passing pointer to instance of PowerManagerESP32).
-        */
-        static void goToAutoSleep(TimerHandle_t xTimer);
+        void handleWakeUpReason() const;
 
         /**
          * @brief Returns the time passed from powering on ESP.
@@ -136,9 +119,6 @@ namespace UniversalModuleSystem {
 
         std::shared_ptr<ul::Logger> mpLogger;
 
-        // TODO remove?
-        TimerHandle_t mAutoSleepTimer = nullptr; ///< FreeRTOS timer handle for managing auto-sleep functionality.
-
         TimerHandle_t mIdleTimer = nullptr; ///< FreeRTOS timer handle for managing idle auto-sleep functionality.
 
         std::atomic<uint32_t> mIdleSleepTime{0};
@@ -146,7 +126,6 @@ namespace UniversalModuleSystem {
         // auto sleep
         static uint32_t msSleepStart; ///< When sleep starts, variable saved in RTC memory.
         static int64_t msIntendedSleepTime; ///< How long sleep should last, variable saved in RTC memory.
-
 
         // JSON keys
         static constexpr char ms_IDLE_TIMER_DATA[] = "idleAutoSleep";

@@ -13,5 +13,4 @@
 #define BUTTON_REBOOT_DELAY 1000
 
 // PowerManager
-#define AUTO_SLEEP_WAIT_TIME 60000 // 60s
 #define POWER_DATA_PATH "/root/power"

@@ -14,11 +14,6 @@ namespace nl = nlohmann;
 namespace API = Comms::API;
 
 namespace UniversalModuleSystem {
-    #ifdef AUTO_SLEEP
-        RTC_DATA_ATTR uint32_t PowerManagerESP32::msSleepStart = 0;
-        RTC_DATA_ATTR int64_t PowerManagerESP32::msIntendedSleepTime = 0;
-    #endif
-
     PowerManagerESP32& PowerManagerESP32::getInstance(const std::shared_ptr<ul::Logger> &logger) {
         static PowerManagerESP32 instance(logger);
         return instance;
@@ -67,23 +62,7 @@ namespace UniversalModuleSystem {
 
         waitAndDisableCriticalFeatures();
 
-        #ifdef AUTO_SLEEP
-            msIntendedSleepTime = milliSeconds;
-            msSleepStart = getCurrentTime();
-        #endif
-
         esp_deep_sleep_start();
-    }
-
-    void PowerManagerESP32::disableAutoSleep() {
-        #ifdef AUTO_SLEEP
-            if (mAutoSleepTimer != nullptr) {
-                xTimerDelete(mAutoSleepTimer, portMAX_DELAY);
-                mAutoSleepTimer = nullptr;
-            }
-            msIntendedSleepTime = 0;
-            msSleepStart = 0;
-        #endif
     }
 
     void PowerManagerESP32::restartIdleTimer() {
@@ -110,8 +89,6 @@ namespace UniversalModuleSystem {
     }
 
     PowerManagerESP32::~PowerManagerESP32() {
-        if (mAutoSleepTimer != nullptr)
-            xTimerDelete(mAutoSleepTimer, portMAX_DELAY);
         if (mIdleTimer != nullptr)
             xTimerDelete(mIdleTimer, portMAX_DELAY);
     }
@@ -125,16 +102,14 @@ namespace UniversalModuleSystem {
         mpLogger->waitAndDisable();
     }
 
-    void PowerManagerESP32::handleWakeUpReason() {
+    void PowerManagerESP32::handleWakeUpReason() const {
         switch (esp_sleep_get_wakeup_cause()) {
             case ESP_SLEEP_WAKEUP_EXT1:
                 mpLogger->info("PowerManagerESP32 Class", "Module was wake up by rf module.");
-                enableAutoSleep();
                 break;
 
             case ESP_SLEEP_WAKEUP_TIMER:
                 mpLogger->info("PowerManagerESP32 Class", "Module was wake up by timer.");
-                disableAutoSleep();
                 break;
 
 // macro disabling wake up rf notifications that are annoying during software development
@@ -142,12 +117,10 @@ namespace UniversalModuleSystem {
 #warning "Wake up rf notifications are disabled"
             case ESP_SLEEP_WAKEUP_EXT0:
                 mpLogger->info("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
-                disableAutoSleep();
                 break;
 
             default:
                 mpLogger->info("PowerManagerESP32 Class", "Module had power loss.");
-                disableAutoSleep();
                 break;
 
 #else
@@ -166,7 +139,6 @@ namespace UniversalModuleSystem {
                     mpLogger->error("PowerManagerESP32 handleWakeUpReason", e.what());
                 }
                 mpLogger->info("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
-                disableAutoSleep();
                 break;
 
             default:
@@ -184,35 +156,9 @@ namespace UniversalModuleSystem {
                     mpLogger->error("PowerManagerESP32 handleWakeUpReason", e.what());
                 }
                 mpLogger->info("PowerManagerESP32 Class", "Module had power loss.");
-                disableAutoSleep();
                 break;
 #endif
         }
-    }
-
-    void PowerManagerESP32::enableAutoSleep() {
-        #ifdef AUTO_SLEEP
-            // constexpr uint16_t US_TO_MILLISECONDS_FACTOR = 1000;
-            const uint32_t sleepTime = getCurrentTime() - msSleepStart;
-            msIntendedSleepTime -= (sleepTime + (AUTO_SLEEP_WAIT_TIME));
-            if (msIntendedSleepTime > 0) {
-                mAutoSleepTimer = xTimerCreate(
-                    "Auto Sleep Timer",
-                    pdMS_TO_TICKS(AUTO_SLEEP_WAIT_TIME),
-                    pdFALSE,
-                    this,
-                    timerTriggeredSleep
-                );
-                xTimerStart(mAutoSleepTimer, portMAX_DELAY);
-            }
-        #endif
-    }
-
-    void PowerManagerESP32::goToAutoSleep(TimerHandle_t xTimer) {
-        #ifdef AUTO_SLEEP
-            auto &pm = *static_cast<PowerManagerESP32 *>(pvTimerGetTimerID(xTimer));
-            pm.enterSleep(msIntendedSleepTime , true);
-        #endif
     }
 
     uint32_t PowerManagerESP32::getCurrentTime() const {

@@ -184,11 +184,6 @@ namespace Comms {
          */
         bool isAddressingFailed(const uint8_t *receiveBuffer);
 
-        // TODO add led blinking indicating restart, success and failure of addressing
-        // void restartLedBlink();
-        // void successLedBlink();
-        // void abortLedBlink();
-
         Communication *mpCommunication; ///< Pointer to the Communication class instance (owner class).
 
         // WARNING: mIPAddress must be protected by mutex, not std::atomic
