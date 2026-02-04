@@ -181,7 +181,7 @@ namespace SmartHomeDB {
                 try {
                     requestApi(item);
                 } catch (const std::exception &e) {
-                    pLogger->errorf("[DB_API] Failed to parse batch JSON request into API request: %s]", e.what());
+                    pLogger->errorf("[DB_API] Failed to parse batch JSON request into API request: %s", e.what());
                     errorApi.data = "Failed to parse batch JSON request into API request: "s + e.what();
                     break;
                 }
@@ -231,7 +231,11 @@ namespace SmartHomeDB {
                     callbackResponseApi.error = callbackErrorApi;
 
                     for (const auto id: apiIds) {
-                        if (!id.hasValue()) continue;
+                        if (!id.hasValue()) {
+                            pLogger->debug("[DB_API] Skipping response for request with null ID in batch");
+                            pLogger->debugf("[DB_API] Skipped response: %s", (callbackResponseApi.to_string().c_str()));
+                            continue;
+                        }
                         callbackResponseApi.id = id;
                         resultJsonArray.push_back(callbackResponseApi.to_json());
                     }
@@ -307,10 +311,15 @@ namespace SmartHomeDB {
 
         mpDatabaseClient->handleQuery(
             query, [this, connectionId, apiId, pLogger](DatabaseClient::DbQueryResult &&result) {
-                if (!apiId.hasValue()) return;
                 const auto responseJson = dbResultToApiJson(std::move(result), apiId);
                 if (responseJson.empty()) {
                     pLogger->debug("[DB_API] Ignoring empty response");
+                    return;
+                }
+
+                if (!apiId.hasValue()) {
+                    pLogger->debug("[DB_API] Skipping response for request with null ID");
+                    pLogger->debugf("[DB_API] Skipped response: %s", to_string(responseJson).c_str());
                     return;
                 }
                 handleOutgoing(connectionId, std::move(to_string(responseJson)));
@@ -665,7 +674,7 @@ namespace SmartHomeDB {
             params.append(value.get<double>());
         } else if (value.is_boolean()) {
             params.append(value.get<bool>());
-        } else if (value.is_object()) {
+        } else if (value.is_object() || value.is_array()) {
             params.append(value.dump());
         } else {
             throw std::runtime_error("Unsupported value type");
