@@ -167,10 +167,5 @@ namespace SmartHomeMediator {
 
         std::shared_ptr<RfClient> mpRfClient;
         std::function<void(const std::string &message)> mMessageHandler;
-
-        /// Maximum number of parameters allowed in a single command
-        static constexpr auto msMAX_PARAMETERS = 16;
-        /// Maximum number of commands in a batch
-        static constexpr auto msMAX_COMMANDS = msMAX_PARAMETERS;
     };
 }
