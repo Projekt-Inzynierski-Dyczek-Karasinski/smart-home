@@ -48,11 +48,10 @@ namespace SmartHome::IPC {
         // Build handshake request
         SmartHome::API::ApiRequest request;
         nlohmann::json jsonParams;
-        request.method = msSET_METHOD_STRING;
-        jsonParams[sj::ParamsKeys::TARGET] = msCORE_TARGET_STRING;
-        jsonParams[sj::ParamsKeys::METHOD_PARAMS] = {msCONNECTION_TYPE_STRING, mTargetTypeOfClient};
+        request.method = API::getTargetMethodString(msCORE_TARGET_STRING, msSET_METHOD_STRING);
+        jsonParams[msCONNECTION_TYPE_STRING] = mTargetTypeOfClient;
         request.params.emplace(jsonParams);
-        request.id = 1;
+        request.id = API::getNextApiId();
 
         ba::steady_timer timer(*mpIoContext, 3s);
 
@@ -92,7 +91,7 @@ namespace SmartHome::IPC {
         }
 
         if (apiResponse.result.has_value() &&
-            apiResponse.result.value() == jsonParams[sj::ParamsKeys::METHOD_PARAMS].dump()) {
+            apiResponse.result.value() == jsonParams.dump()) {
             return true;
         }
 
@@ -119,7 +118,7 @@ namespace SmartHome::IPC {
         mConnection->readAsync(onRead);
     }
 
-    void SocketClient::send(std::string_view message) {
+    void SocketClient::send(const std::string_view message) {
         if (message.empty()) {
             mpLogger->error("[API_CLIENT] Error while sending: empty message");
             return;

@@ -323,8 +323,7 @@ namespace SmartHome {
     }
 
     apiId_t Actions::getNextId() {
-        static std::atomic<apiId_t> id{0};
-        return id.fetch_add(1, std::memory_order::seq_cst) + 1;
+        return API::getNextApiId();
     }
 
 
@@ -357,11 +356,17 @@ namespace SmartHome {
             if (command.params.has_value() &&
                 command.target == sai::TargetTypes::UNKNOWN &&
                 command.method == sai::MethodTypes::UNKNOWN) {
-                try {
-                    error = API::ApiError(command.params.value());
-                } catch (const std::exception &e) {
-                    error.code = API::ErrorCodes::INTERNAL_ERROR;
-                    error.data = "Unexpected error while parsing error: " + std::string(e.what());
+                const auto &paramsJson = command.params.value();
+                const bool isInApiErrorFormat = paramsJson.is_object() &&
+                                                paramsJson.contains(JsonRpcStrings::ErrorKeys::CODE) &&
+                                                paramsJson.contains(JsonRpcStrings::ErrorKeys::MESSAGE);
+                if (isInApiErrorFormat) {
+                    try {
+                        error = API::ApiError(paramsJson);
+                    } catch (const std::exception &e) {
+                        error.code = API::ErrorCodes::INTERNAL_ERROR;
+                        error.data = "Unexpected error while parsing error: " + std::string(e.what());
+                    }
                 }
             }
 

@@ -169,9 +169,9 @@ namespace SmartHome::API {
          */
         struct Command {
             std::optional<nlohmann::json> params; ///< Optional command parameters
-            ApiId commandId;   ///< Command identifier used for result response.
-            Method method;  ///< Command method to execute
-            Target target;  ///< Target component for command
+            ApiId commandId; ///< Command identifier used for result response.
+            Method method{}; ///< Command method to execute
+            Target target{}; ///< Target component for command
             bool isNotification = false; ///< Helper flag signaling notification command
 
             /**
@@ -179,13 +179,14 @@ namespace SmartHome::API {
              *
              * @param value ApiRequest to parse.
              *
-             * @throws std::invalid_argument If params missing or target not specified.
+             * @throws std::invalid_argument When ApiRequest method string is invalid or
+             *         \c ApiRequest.params is not an JSON object.
              *
-             * @note ApiRequest must contain params with \b target key and value corresponding to one of the values
-             *       in \c SmartHome::API::TargetTypes enum.\n
-             *       Any additional parameters must be assigned to a list under \b method_params key.
-             *       Parameters stored in \b method_params list can be of basic format or an object with key=value format.
-             *       Without additional parameters \b method_params may be omitted.
+             * @note ApiRequest must contain method in the format \b "target.method".
+             *       Parameters are stored under \b params as a JSON object.
+             *       Key/value pairs are mapped directly to object keys.
+             *       Positional parameters (without key) are stored in \b params.args as an array.
+             *       When params are missing, an empty object is created.
              */
             explicit Command(const ApiRequest &value);
 

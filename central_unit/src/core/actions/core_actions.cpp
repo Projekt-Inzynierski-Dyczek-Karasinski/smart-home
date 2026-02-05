@@ -27,6 +27,7 @@ namespace SmartHome {
         API::ApiResponse commandResult;
         commandResult.id = command.commandId;
 
+        // TODO rework core get handler to use database and cached values
 
         // TODO implement core cached data object with getter methods
         // TODO remove - temporary code for API testing
@@ -121,8 +122,30 @@ namespace SmartHome {
         }
 
         const auto &params = command.params.value();
-        if (!(params.is_array() && params.size() == 2)) {
-            error.data = "Core set requires an array with 2 positional parameters {key, value}";
+        if (!params.is_object()) {
+            error.data = "Core set requires params object";
+            commandResult.error = error;
+            co_return commandResult;
+        }
+
+        std::optional<std::string> keyStr;
+        std::optional<std::string> valueStr;
+
+        for (const auto &[key, value]: params.items()) {
+            if (key == JsonRpcStrings::ParamsKeys::ARGS) continue;
+            if (value.is_string()) {
+                if (keyStr.has_value()) {
+                    error.data = "Core set requires exactly one key=value pair";
+                    commandResult.error = error;
+                    co_return commandResult;
+                }
+                keyStr = key;
+                valueStr = value.get<std::string>();
+            }
+        }
+
+        if (!keyStr.has_value() || !valueStr.has_value()) {
+            error.data = "Core set requires single key=value pair in params";
             commandResult.error = error;
             co_return commandResult;
         }
@@ -131,8 +154,8 @@ namespace SmartHome {
         std::string value;
 
         try {
-            key = stringToSetKey(params[0].get<std::string>());
-            value = params[1].get<std::string>();
+            key = stringToSetKey(keyStr.value());
+            value = valueStr.value();
         } catch (const std::exception &e) {
             error.data = e.what();
             commandResult.error = error;
@@ -154,7 +177,7 @@ namespace SmartHome {
                 co_return commandResult;
         }
 
-        commandResult.result = nlohmann::json::array({CoreActions::setKeyToString(key), value}).dump();
+        commandResult.result = nlohmann::json::object({{setKeyToString(key), value}}).dump();
 
         co_return commandResult;
     }

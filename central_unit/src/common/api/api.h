@@ -5,6 +5,7 @@
 #include <optional>
 #include <string_view>
 #include <string>
+#include <atomic>
 
 #include <nlohmann/json.hpp>
 
@@ -27,19 +28,12 @@ namespace SmartHome::JsonRpcStrings {
         inline constexpr std::string_view PARAMS = "params";
     }
 
-    // TODO consider moving target to method value (eg. "core.get", "module_mediator.set"), for params object simplification
     /// Custom parameter keys for SmartHome API
     namespace ParamsKeys {
-        inline constexpr std::string_view TARGET = "target";
         inline constexpr std::string_view MODULE_INFO = "module_info";
-        inline constexpr std::string_view METHOD_PARAMS = "method_params";
-    }
-
-    namespace MediatorMethodParams {
         inline constexpr std::string_view MODULE_ID = "module_id";
         inline constexpr std::string_view TYPE = "type";
         inline constexpr std::string_view ARGS = "args";
-
     }
 
     namespace ModuleInfoKeys {
@@ -372,6 +366,26 @@ namespace SmartHome::API {
         virtual void handleOutgoing(connectionId_t connectionId, std::string &&message) = 0;
     };
 
+    /**
+     * @brief Get "target.method" formatted string.
+     *
+     * @param target String_view with target name.
+     * @param method String_view with method name.
+     *
+     * @return String in "target.method" format.
+     */
+    std::string getTargetMethodString(std::string_view target, std::string_view method);
+
+    /**
+     * @brief Parse "target.method" formatted string.
+     *
+     * @param targetMethodStr String in "target.method" format.
+     *
+     * @return A pair where first element is target and second is method.
+     *
+     * @throws std::invalid_argument When targetMethodStr is not in "target.method" format.
+     */
+    std::pair<std::string, std::string> parseTargetMethodString(std::string_view targetMethodStr);
 
     /**
      * @brief Get string representation of API error codes.
@@ -409,6 +423,13 @@ namespace SmartHome::API {
      * @param parameter Parameter string to parse and add.
      */
     void emplaceParameter(nlohmann::json &params, std::string_view parameter);
+
+    /**
+     * @brief Get next unique API identifier.
+     *
+     * @return Next unique API identifier.
+     */
+    apiId_t getNextApiId();
 
     /// Buffer size for error message formatting
     inline constexpr uint16_t ERROR_MESSAGE_BUFFER_SIZE = 1024;

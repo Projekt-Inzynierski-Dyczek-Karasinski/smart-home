@@ -168,6 +168,8 @@ namespace SmartHome {
          * @brief Generate unique request ID.
          *
          * @return Next sequential ID value.
+         *
+         * @note Uses \c API::getNextApiId atomic counter.
          */
         static apiId_t getNextId();
 

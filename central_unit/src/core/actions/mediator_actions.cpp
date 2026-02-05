@@ -4,7 +4,6 @@
 namespace SmartHome {
     using ai = API::InternalApi;
     namespace jp = JsonRpcStrings::ParamsKeys;
-    namespace jmmp = JsonRpcStrings::MediatorMethodParams;
     namespace jmik = JsonRpcStrings::ModuleInfoKeys;
     namespace jr = JsonRpcStrings::ResponseKeys;
 
@@ -201,8 +200,8 @@ namespace SmartHome {
         const auto &params = command.params.value();
 
         std::optional<uint> moduleId;
-        if (params.contains(jmmp::MODULE_ID) && params.at(jmmp::MODULE_ID).is_number())
-            moduleId = params.at(jmmp::MODULE_ID);
+        if (params.contains(jp::MODULE_ID) && params.at(jp::MODULE_ID).is_number())
+            moduleId = params.at(jp::MODULE_ID);
 
         if (moduleId.has_value() && !co_await getModuleAddressingInfo(rtmParams, moduleId.value(), error.data)) {
             error.code = API::ErrorCodes::INTERNAL_ERROR;
@@ -297,20 +296,20 @@ namespace SmartHome {
         nlohmann::json &rtmParams) {
         MediatorRequestParams requestParams;
 
-        if (incomingParams.contains(jmmp::MODULE_ID) && incomingParams.at(jmmp::MODULE_ID).is_number()) {
-            requestParams.moduleId = incomingParams.at(jmmp::MODULE_ID);
+        if (incomingParams.contains(jp::MODULE_ID) && incomingParams.at(jp::MODULE_ID).is_number()) {
+            requestParams.moduleId = incomingParams.at(jp::MODULE_ID);
         }
 
-        if (incomingParams.contains(jmmp::TYPE) && incomingParams.at(jmmp::TYPE).is_string()) {
-            requestParams.type = incomingParams.at(jmmp::TYPE);
-            rtmParams[jp::METHOD_PARAMS][jmmp::TYPE] = incomingParams.at(jmmp::TYPE);
+        if (incomingParams.contains(jp::TYPE) && incomingParams.at(jp::TYPE).is_string()) {
+            requestParams.type = incomingParams.at(jp::TYPE);
+            rtmParams[jp::TYPE] = incomingParams.at(jp::TYPE);
         }
 
-        if (incomingParams.contains(jmmp::ARGS) && incomingParams.at(jmmp::ARGS).is_array() && !incomingParams.
-            at(jmmp::ARGS).
+        if (incomingParams.contains(jp::ARGS) && incomingParams.at(jp::ARGS).is_array() && !incomingParams.
+            at(jp::ARGS).
             empty()) {
-            requestParams.args = incomingParams.at(jmmp::ARGS);
-            rtmParams[jp::METHOD_PARAMS][jmmp::ARGS] = incomingParams.at(jmmp::ARGS);
+            requestParams.args = incomingParams.at(jp::ARGS);
+            rtmParams[jp::ARGS] = incomingParams.at(jp::ARGS);
         }
 
         return requestParams;
@@ -319,10 +318,10 @@ namespace SmartHome {
     nlohmann::json &MediatorActions::prepareRequestToMediator(API::ApiRequest &request,
                                                               const API::InternalApi::Command &command) {
         request.id = command.commandId;
-        request.method = command.method.to_string();
-        request.params.emplace(nlohmann::json());
-        request.params.value()[jp::TARGET] = ai::Target(ai::TargetTypes::MODULE_MEDIATOR).
-                to_string();
+        request.method = API::getTargetMethodString(ai::Target(ai::TargetTypes::MODULE_MEDIATOR).to_string(),
+                                                    command.method.to_string());
+
+        request.params.emplace(nlohmann::json::object());
 
         return request.params.value();
     }
@@ -358,7 +357,7 @@ namespace SmartHome {
         DatabaseActions::postSensorReading(parsedParams.moduleId.value(),
                                            parsedParams.args.value().front(),
                                            result,
-                                           {{jmmp::TYPE, parsedParams.type.value()}});
+                                           {{jp::TYPE, parsedParams.type.value()}});
     }
 
     void MediatorActions::postErrorLog(const uint moduleId, const API::ApiResponse &result) {
