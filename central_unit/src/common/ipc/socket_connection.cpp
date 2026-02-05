@@ -31,8 +31,6 @@ namespace SmartHome::IPC {
         return true;
     }
 
-    const boost::regex SocketConnection::ms_DELIMITER_REGEX(ms_MESSAGE_DELIMITER.data());
-
     std::string SocketConnection::read() {
         if (isOpen()) {
             size_t bytesTransferred = 0;
@@ -66,7 +64,6 @@ namespace SmartHome::IPC {
         }, mSocket);
     }
 
-
     void SocketConnection::write(const std::string &message) {
         if (!isOpen()) return;
 
@@ -78,6 +75,7 @@ namespace SmartHome::IPC {
             handleError(e.code());
         }
     }
+
 
     void SocketConnection::writeAsync(const std::string &message, const std::function<void()> &onWriteCompletion) {
         if (!isOpen()) return;
@@ -96,7 +94,6 @@ namespace SmartHome::IPC {
             ba::async_write(socket, ba::buffer(message + ms_MESSAGE_DELIMITER.data()), strandWrapper);
         }, mSocket);
     }
-
 
     void SocketConnection::close() {
         bool expected = false;
@@ -121,6 +118,7 @@ namespace SmartHome::IPC {
         // TODO consider implementing on close callback
     }
 
+
     void SocketConnection::shutdownSocket(ba::socket_base::shutdown_type mode) {
         std::visit([mode](auto &socket) {
             socket.shutdown(mode);
@@ -132,6 +130,8 @@ namespace SmartHome::IPC {
         const bool isSocketOpen = std::visit([](const auto &socket) { return socket.is_open(); }, mSocket);
         return !mIsClosing && isSocketOpen;
     }
+
+    const boost::regex SocketConnection::ms_DELIMITER_REGEX(ms_MESSAGE_DELIMITER.data());
 
     std::variant<bai::tcp::socket, bal::stream_protocol::socket> SocketConnection::createSocket(
         ba::io_context &ioContext, const Type socketType) {

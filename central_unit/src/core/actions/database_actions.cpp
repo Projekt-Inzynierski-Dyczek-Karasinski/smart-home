@@ -183,7 +183,7 @@ namespace SmartHome {
         {
             std::scoped_lock lock(Actions::msConnectionTypeMapLock);
 
-            auto iter = Actions::msConnectionTypeMap.find(sai::TargetTypes::DATABASE);
+            const auto iter = Actions::msConnectionTypeMap.find(sai::TargetTypes::DATABASE);
             if (iter != Actions::msConnectionTypeMap.end() && !iter->second.empty()) {
                 dbServiceConnectionId = *iter->second.begin();
                 foundDbServiceConnection = true;

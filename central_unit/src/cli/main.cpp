@@ -148,7 +148,7 @@ int main(const int argc, char *argv[]) {
         int tcpEndpointPort = 0;
 
         try {
-            std::string tcpEndpointAddressFull = vm["tcp"].as<std::string>();
+            auto tcpEndpointAddressFull = vm["tcp"].as<std::string>();
             std::vector<std::string> tmp = {};
             boost::split(tmp, tcpEndpointAddressFull, boost::is_any_of(":"));
             if (tmp.size() == 2) {

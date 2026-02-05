@@ -1,5 +1,6 @@
 #include "api.h"
 
+#include <atomic>
 #include <iostream>
 
 #include <boost/algorithm/string/split.hpp>
@@ -82,7 +83,7 @@ namespace SmartHome::API {
         data = newData;
     }
 
-    nlohmann::json ApiError::to_json() {
+    nlohmann::json ApiError::to_json() const {
         nlohmann::json json;
 
         json[JsonRpcStrings::ErrorKeys::CODE] = code;
@@ -92,7 +93,7 @@ namespace SmartHome::API {
         return json;
     }
 
-    std::string ApiError::to_string() {
+    std::string ApiError::to_string() const {
         return nlohmann::to_string(to_json());
     }
 

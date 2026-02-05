@@ -6,7 +6,6 @@
 #include <unordered_set>
 
 #include <boost/asio.hpp>
-#include <boost/algorithm/string/case_conv.hpp>
 
 namespace ba = boost::asio;
 using sai = SmartHome::API::InternalApi;

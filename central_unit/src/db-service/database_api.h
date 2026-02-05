@@ -98,7 +98,7 @@ namespace SmartHomeDB {
          * @param pDbClient Shared pointer to DatabaseClient used to execute queries.
          */
         explicit DatabaseApi(const std::shared_ptr<DatabaseClient> &pDbClient) : mpDatabaseClient(pDbClient) {
-        };
+        }
 
         /**
          * @brief Set outgoing message callback.

@@ -142,10 +142,10 @@ namespace SmartHome {
 
         const auto &params = command.params.value();
 
-        auto parsedParams = parseMediatorParams(params, rtmParams);
+        auto [moduleId, type, args] = parseMediatorParams(params, rtmParams);
 
-        if (parsedParams.moduleId.has_value() && !co_await getModuleAddressingInfo(
-                rtmParams, parsedParams.moduleId.value(), error.data)) {
+        if (moduleId.has_value() && !co_await getModuleAddressingInfo(
+                rtmParams, moduleId.value(), error.data)) {
             error.code = API::ErrorCodes::INTERNAL_ERROR;
             error.message = API::errorCodeToString(error.code);
             commandResult.error = error;
@@ -155,28 +155,28 @@ namespace SmartHome {
         commandResult = co_await sendRequestToMediator(std::move(requestToMediator), commandMetadata);
 
         // Send to db
-        if (parsedParams.moduleId.has_value()) {
+        if (moduleId.has_value()) {
             if (commandResult.result.has_value()) {
-                DatabaseActions::updateModuleLastOnline(parsedParams.moduleId.value());
+                DatabaseActions::updateModuleLastOnline(moduleId.value());
 
                 char buffer[1024];
 
                 std::string action = "<none>";
                 std::string actionArgument = "<none>";
-                if (parsedParams.type.has_value()) {
-                    action = parsedParams.type.value();
+                if (type.has_value()) {
+                    action = type.value();
                 }
-                if (parsedParams.args.has_value()) {
-                    actionArgument = parsedParams.args.value().dump();
+                if (args.has_value()) {
+                    actionArgument = args.value().dump();
                 }
 
                 snprintf(buffer, sizeof(buffer), "Action '%s' with args '%s' executed, with result: %s",
                          action.c_str(), actionArgument.c_str(), commandResult.result.value().c_str());
 
 
-                DatabaseActions::postLog(parsedParams.moduleId.value(), "info", buffer);
+                DatabaseActions::postLog(moduleId.value(), "info", buffer);
             } else {
-                postErrorLog(parsedParams.moduleId.value(), commandResult);
+                postErrorLog(moduleId.value(), commandResult);
             }
         }
 
@@ -241,8 +241,7 @@ namespace SmartHome {
         API::ApiResponse requestResult;
         requestResult.id = commandMetadata->command.commandId;
 
-        connectionId_t mediatorConnectionId;
-        bool foundMediatorConnectionId = false;
+        std::optional<connectionId_t> mediatorConnectionId;
 
         // Find mediator connection
         {
@@ -251,11 +250,10 @@ namespace SmartHome {
             auto iter = Actions::msConnectionTypeMap.find(sai::TargetTypes::MODULE_MEDIATOR);
             if (iter != Actions::msConnectionTypeMap.end() && !iter->second.empty()) {
                 mediatorConnectionId = *iter->second.begin();
-                foundMediatorConnectionId = true;
             }
         }
 
-        if (!foundMediatorConnectionId) {
+        if (!mediatorConnectionId.has_value()) {
             requestResult.error = API::ApiError(
                 API::ErrorCodes::INTERNAL_ERROR,
                 API::errorCodeToString(API::ErrorCodes::INTERNAL_ERROR),
@@ -263,11 +261,13 @@ namespace SmartHome {
             co_return requestResult;
         }
 
+        const auto mediatorId = mediatorConnectionId.value();
+
         ba::post(Core::Instance().getCoreWorkerIoContext(),
-                 [promise, request, commandMetadata, mediatorConnectionId]()mutable {
+                 [promise, request, commandMetadata, mediatorId]() mutable {
                      Actions::startCommandTimeoutTimer(commandMetadata);
 
-                     Actions::handleOutgoingRequest(mediatorConnectionId, std::move(request), promise);
+                     Actions::handleOutgoingRequest(mediatorId, std::move(request), promise);
                  });
 
         while (commandMetadata->isPending() && future.wait_for(0ms) != std::future_status::ready) {
@@ -290,6 +290,17 @@ namespace SmartHome {
         }
 
         co_return requestResult;
+    }
+
+    nlohmann::json &MediatorActions::prepareRequestToMediator(API::ApiRequest &request,
+                                                              const API::InternalApi::Command &command) {
+        request.id = command.commandId;
+        request.method = API::getTargetMethodString(ai::Target(ai::TargetTypes::MODULE_MEDIATOR).to_string(),
+                                                    command.method.to_string());
+
+        request.params.emplace(nlohmann::json::object());
+
+        return request.params.value();
     }
 
     MediatorActions::MediatorRequestParams MediatorActions::parseMediatorParams(const nlohmann::json &incomingParams,
@@ -315,19 +326,8 @@ namespace SmartHome {
         return requestParams;
     }
 
-    nlohmann::json &MediatorActions::prepareRequestToMediator(API::ApiRequest &request,
-                                                              const API::InternalApi::Command &command) {
-        request.id = command.commandId;
-        request.method = API::getTargetMethodString(ai::Target(ai::TargetTypes::MODULE_MEDIATOR).to_string(),
-                                                    command.method.to_string());
-
-        request.params.emplace(nlohmann::json::object());
-
-        return request.params.value();
-    }
-
     ba::awaitable<bool> MediatorActions::getModuleAddressingInfo(nlohmann::json &preparedParams,
-                                                                 uint moduleId,
+                                                                 const uint moduleId,
                                                                  std::string &error) {
         const auto moduleInfo = co_await DatabaseActions::getModuleAddressingInfo(moduleId);
 

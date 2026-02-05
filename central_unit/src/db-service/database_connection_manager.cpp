@@ -54,7 +54,7 @@ namespace SmartHomeDB {
         std::unique_lock lock(mConnectionsMutex);
 
         // Await for connection if none are available in pool
-        mConnectionsCond.wait(lock, [this]() { return !mConnections.empty(); });
+        mConnectionsCond.wait(lock, [this] { return !mConnections.empty(); });
 
         auto connection = std::move(mConnections.front());
         mConnections.pop();

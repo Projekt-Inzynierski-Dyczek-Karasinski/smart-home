@@ -16,7 +16,6 @@ namespace ba = boost::asio;
 namespace bai = boost::asio::ip;
 
 namespace SmartHome::IPC {
-
     /**
      * @brief Multi-protocol socket server for Smart Home IPC.
      *

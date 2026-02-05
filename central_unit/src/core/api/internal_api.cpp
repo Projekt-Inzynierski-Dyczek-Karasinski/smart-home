@@ -53,7 +53,7 @@ namespace SmartHome::API {
         };
 
         const auto iter = strToActMap.find(boost::algorithm::to_lower_copy(std::string(value)));
-        type = (iter != strToActMap.end()) ? iter->second : MethodTypes::UNKNOWN;
+        type = iter != strToActMap.end() ? iter->second : MethodTypes::UNKNOWN;
     }
 
     InternalApi::Method InternalApi::Method::operator()(const std::string_view value) {
@@ -110,7 +110,7 @@ namespace SmartHome::API {
         };
 
         const auto iter = strToTargMap.find(boost::algorithm::to_lower_copy(std::string(value)));
-        type = (iter != strToTargMap.end()) ? iter->second : TargetTypes::UNKNOWN;
+        type = iter != strToTargMap.end() ? iter->second : TargetTypes::UNKNOWN;
     }
 
     InternalApi::Target InternalApi::Target::operator()(const std::string_view value) {

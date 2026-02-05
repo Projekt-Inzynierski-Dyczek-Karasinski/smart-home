@@ -50,7 +50,7 @@ namespace SmartHomeMediator {
          */
         HC12Driver(ba::io_context &ioContext,
                    const std::shared_ptr<su::Logger> &logger,
-                   Config config);
+                   const Config &config);
 
         ~HC12Driver() override;
 
@@ -166,8 +166,9 @@ namespace SmartHomeMediator {
          *
          * @throws std::exception propagates exceptions from UART port operations.
          */
-        ba::awaitable<std::vector<uint8_t> > sendAtCommand(std::vector<uint8_t> command,
-                                                           std::chrono::milliseconds timeout = 400ms) const;
+        [[nodiscard]] ba::awaitable<std::vector<uint8_t> > sendAtCommand(std::vector<uint8_t> command,
+                                                                         std::chrono::milliseconds timeout = 400ms)
+        const;
 
         /**
          * @brief Convert string to internal option enum.
@@ -248,16 +249,15 @@ namespace SmartHomeMediator {
         //Options valid values
         /// Power level to db array, with value from HC-12 user spreadsheet.
         static constexpr std::array<std::string_view, 8> msDBM_ARRAY = {"1", "2", "5", "8", "11", "14", "17", "20"};
-        static inline const std::set msVALID_BAUDRATE = {1200, 2400, 4800, 9600, 19200, 38400,  57600, 115200};
+        static inline const std::set msVALID_BAUDRATE = {1200, 2400, 4800, 9600, 19200, 38400, 57600, 115200};
         static constexpr auto msMIN_CHANNEL = 1;
         static constexpr auto msMAX_CHANNEL = 127;
-        static inline const std::set msVALID_FU_MODE = {1,2,3,4};
-        static inline const std::set ms_VALID_POWER = {1,2,3,4,5,6,7,8};
+        static inline const std::set msVALID_FU_MODE = {1, 2, 3, 4};
+        static inline const std::set ms_VALID_POWER = {1, 2, 3, 4, 5, 6, 7, 8};
 
         // Default for FU1, FU3, or unknown. 80ms is the most reliable value (lower values caused data loss)
         static constexpr auto msLOW_WRITE_DELAY = 80ms;
         // Default for FU2, FU4. 2000ms is value recommended by HC-12 user spreadsheet.
         static constexpr auto msHIGH_WRITE_DELAY = 2000ms;
-
     };
 }

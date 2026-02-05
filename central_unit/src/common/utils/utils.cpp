@@ -4,7 +4,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <signal.h>
+#include <csignal>
 #include <utility>
 
 #include <sys/file.h>
@@ -70,14 +70,6 @@ namespace SmartHome::Utils {
         }
     }
 
-    bool FileLock::writePidToFile() const {
-        if (ftruncate(mLockFd, 0) != 0) {
-            return false;
-        }
-        const std::string pidStr = std::to_string(getpid()) + "\n";
-        return write(mLockFd, pidStr.c_str(), pidStr.length()) == pidStr.length();
-    }
-
     std::optional<pid_t> FileLock::readPidFromFile(const std::string_view lockFilePath) {
         std::ifstream file(lockFilePath.data());
         pid_t pid;
@@ -89,5 +81,13 @@ namespace SmartHome::Utils {
 
     bool FileLock::isProcessRunning(const pid_t &pid) {
         return kill(pid, 0) == 0 || errno == EPERM;
+    }
+
+    bool FileLock::writePidToFile() const {
+        if (ftruncate(mLockFd, 0) != 0) {
+            return false;
+        }
+        const std::string pidStr = std::to_string(getpid()) + "\n";
+        return write(mLockFd, pidStr.c_str(), pidStr.length()) == pidStr.length();
     }
 }

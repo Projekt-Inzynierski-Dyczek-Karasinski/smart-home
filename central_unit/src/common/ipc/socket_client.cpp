@@ -46,7 +46,7 @@ namespace SmartHome::IPC {
 
     bool SocketClient::handshake() {
         // Build handshake request
-        SmartHome::API::ApiRequest request;
+        API::ApiRequest request;
         nlohmann::json jsonParams;
         request.method = API::getTargetMethodString(msCORE_TARGET_STRING, msSET_METHOD_STRING);
         jsonParams[msCONNECTION_TYPE_STRING] = mTargetTypeOfClient;
@@ -76,7 +76,7 @@ namespace SmartHome::IPC {
 
         if (response.empty()) return false;
 
-        SmartHome::API::ApiResponse apiResponse;
+        API::ApiResponse apiResponse;
         try {
             mpLogger->debugf("[API_CLIENT] Handshake response: %s", response.c_str());
             apiResponse(std::string_view(response));
@@ -105,7 +105,7 @@ namespace SmartHome::IPC {
         }
 
         auto onRead = [this](const std::string &message) {
-            constexpr SmartHome::connectionId_t nullConnectionId = 0;
+            constexpr connectionId_t nullConnectionId = 0;
             handleIncoming(nullConnectionId, message.data());
 
             if (mConnection && mConnection->isOpen()) {

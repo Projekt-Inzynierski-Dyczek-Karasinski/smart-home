@@ -34,7 +34,7 @@ namespace SmartHomeDB {
             // DB credentials
             std::string dbName = "smart_home";
             std::string dbUser = "smart_home_admin";
-            std::string dbPassword = ""; // No default password
+            std::string dbPassword; // No default password
 
             // Additional connection options
             std::string serviceName = "smarthome-database";

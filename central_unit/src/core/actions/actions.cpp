@@ -7,6 +7,30 @@
 
 
 namespace SmartHome {
+    Actions::CommandMetadata::CommandMetadata(API::InternalApi::Command command,
+                                              std::shared_ptr<ba::steady_timer> commandTimeoutTimer,
+                                              const apiId_t requestId)
+        : command(std::move(command)),
+          commandTimeoutTimer(std::move(commandTimeoutTimer)),
+          requestId(requestId) {
+        isNotification = this->command.isNotification;
+    }
+
+    bool Actions::CommandMetadata::cancel() {
+        if (const auto timer = commandTimeoutTimer.exchange(nullptr)) timer->cancel();
+        auto expected = State::PENDING;
+        if (state.compare_exchange_strong(expected, State::CANCELLED)) return true;
+        return false;
+    }
+
+    bool Actions::CommandMetadata::isPending() const {
+        if (state.load(std::memory_order::relaxed) == State::PENDING) {
+            return true;
+        }
+        return false;
+    }
+
+
     void Actions::handleIncomingRequest(const API::InternalApi::Request &request, const RequestCallback &callback) {
         Core::Instance().mpLogger->debug("[ACTIONS] [HANDLE_INCOMING_REQUEST] called");
         if (!Core::Instance().isRunning()) return;
@@ -82,7 +106,7 @@ namespace SmartHome {
                 // Request mutex block, returns from callback if request is already completed or does not exist
                 {
                     std::scoped_lock lock(msActiveRequestsLock);
-                    auto iter = msActiveRequests.find(requestId);
+                    const auto iter = msActiveRequests.find(requestId);
                     if (iter == msActiveRequests.end() || iter->second.pendingCommands == 0) return;
                 }
                 if (!ec) handleRequestTimeout(requestId);
@@ -93,481 +117,6 @@ namespace SmartHome {
             const CommandHandler handler = resolveCommand(command);
             executeCommandAsync(handler, command, requestId);
         }
-    }
-
-    void Actions::handleIncomingResponse(const connectionId_t connectionId, const API::ApiResponse &response) {
-        Core::Instance().mpLogger->debug("[ACTIONS] [HANDLE_INCOMING_RESPONSE] called");
-        if (!response.id.hasValue()) {
-            Core::Instance().mpLogger->warningf(
-                "[ACTIONS] [HANDLE_INCOMING_RESPONSE] Ignored incoming response for connection [%d] - response id is missing",
-                connectionId);
-            return;
-        }
-
-        std::scoped_lock lock(msOutgoingRequestsLock);
-
-        if (!msOutgoingRequests.contains(connectionId)) {
-            Core::Instance().mpLogger->warningf(
-                "[ACTIONS] [HANDLE_INCOMING_RESPONSE] Ignored incoming response for connection [%d] - no pending request",
-                connectionId);
-            return;
-        }
-
-        auto &pendingRequest = msOutgoingRequests.at(connectionId);
-        std::scoped_lock lockRequestMetadata(pendingRequest->metadataMutex);
-
-        const auto &responseId = response.id.value();
-
-        if (!pendingRequest->requestsPromises.contains(responseId)) {
-            Core::Instance().mpLogger->warningf(
-                "[ACTIONS] [HANDLE_INCOMING_RESPONSE] Ignored incoming response for connection [%d] - no pending request with response ID [%d]",
-                connectionId,
-                responseId);
-            return;
-        }
-
-        pendingRequest->requestsPromises.at(responseId)->set_value(response);
-        pendingRequest->requestsPromises.erase(responseId);
-
-        if (pendingRequest->requestsPromises.empty()) {
-            pendingRequest->timeoutTimer->cancel();
-        }
-    }
-
-    void Actions::handleOutgoingRequest(const connectionId_t connectionId,
-                                        API::ApiRequest &&apiRequest,
-                                        const std::shared_ptr<std::promise<API::ApiResponse> > &pResponsePromise) {
-        Core::Instance().mpLogger->debug("[ACTIONS] [HANDLE_OUTGOING_REQUEST] called");
-        std::scoped_lock lockRequestMap(msOutgoingRequestsLock);
-
-        if (!msOutgoingRequests.contains(connectionId)) {
-            msOutgoingRequests[connectionId] = std::make_shared<OutgoingRequestMetadata>();
-        }
-        auto &outgoingRequest = msOutgoingRequests.at(connectionId);
-        std::scoped_lock lockRequestMetadata(outgoingRequest->metadataMutex);
-
-        outgoingRequest->sendTimer->cancel();
-
-
-        outgoingRequest->requestsToSend.push_back(apiRequest);
-        if (apiRequest.id.hasValue()) {
-            if (!outgoingRequest->requestsPromises.contains(apiRequest.id.value()))
-                outgoingRequest->requestsPromises[apiRequest.id.value()] = pResponsePromise;
-            else
-                Core::Instance().mpLogger->warning(
-                    "[ACTIONS] [HANDLE_OUTGOING_REQUEST] ApiRequest with duplicate id ignored");
-        }
-
-        const auto timeoutHandler = [outgoingRequest, connectionId](const bs::error_code &timeOutEc) {
-            if (!timeOutEc) {
-                std::scoped_lock timeoutLock(outgoingRequest->metadataMutex, msOutgoingRequestsLock);
-                for (const auto &promise: outgoingRequest->requestsPromises | std::views::values) {
-                    promise->set_exception(std::make_exception_ptr(std::runtime_error("Request timeout")));
-                }
-
-                if (outgoingRequest->requestsToSend.empty()) {
-                    msOutgoingRequests.erase(connectionId);
-                }
-            }
-        };
-
-        const auto sendTimerHandler = [outgoingRequest, connectionId, timeoutHandler](const bs::error_code &sendEc) {
-            if (!sendEc) {
-                std::scoped_lock sendLock(outgoingRequest->metadataMutex, msOutgoingRequestsLock);
-                auto &requests = outgoingRequest->requestsToSend;
-
-                std::string messageToSend;
-
-                if (requests.size() == 1) {
-                    messageToSend = requests.front().to_string();
-                } else {
-                    auto messageJsonArray = nlohmann::json::array();
-                    for (const auto &request: requests) {
-                        messageJsonArray.push_back(request.to_json());
-                    }
-                    messageToSend = to_string(messageJsonArray);
-                }
-                API::InternalApi().handleOutgoing(connectionId, std::move(messageToSend));
-                requests.clear();
-
-                outgoingRequest->timeoutTimer->expires_after(msREQUEST_TIMEOUT);
-                outgoingRequest->timeoutTimer->async_wait(timeoutHandler);
-            }
-        };
-
-        // Aggregate outgoing requests
-        outgoingRequest->sendTimer->expires_after(msAGGREGATE_OUTGOING_TIMEOUT);
-        outgoingRequest->sendTimer->async_wait(sendTimerHandler);
-    }
-
-
-    std::optional<API::InternalApi::Request> Actions::getRequest(const apiId_t requestId) {
-        std::scoped_lock lock(msActiveRequestsLock);
-
-        const auto iter = msActiveRequests.find(requestId);
-
-        return iter == msActiveRequests.end() ? std::nullopt : std::optional(iter->second.request);
-    }
-
-    void Actions::onCoreShutdown() {
-        auto cleanupTimeout = std::make_shared<ba::steady_timer>(Core::Instance().getCoreUtilityIoContext(),
-                                                                 msCLEANUP_TIMEOUT);
-        std::atomic_bool cleanupTimeoutCalled = false;
-        auto cleanup = [&cleanupTimeout, &cleanupTimeoutCalled]() {
-            auto expected = false;
-            if (cleanupTimeoutCalled.compare_exchange_strong(expected, true)) return;
-            cleanupTimeout->cancel();
-            std::scoped_lock lock(msActiveRequestsLock, msResponsesLock);
-            msActiveRequests.clear();
-            msResponses.clear();
-        };
-
-        cleanupTimeout->async_wait([cleanup](const bs::error_code &ec) {
-            if (!ec) {
-                cleanup();
-            }
-        });
-
-        // Requests mutex block, cancel active request and add command cancelled error result to responses
-        {
-            std::scoped_lock lock(msActiveRequestsLock);
-            for (auto &request: msActiveRequests | std::views::values) {
-                if (cleanupTimeoutCalled) break;
-                request.cancel();
-
-                for (auto &commandMD: request.commands) {
-                    constexpr bool lockMutex = false;
-                    if (cleanupTimeoutCalled) break;
-                    if (commandMD && commandMD->state == CommandMetadata::State::CANCELLED
-                        && commandMD->command.commandId.hasValue()) {
-                        API::ApiResponse timeoutResult;
-                        timeoutResult.id = commandMD->command.commandId;
-
-                        API::ApiError error;
-                        error.code = API::ErrorCodes::INTERNAL_ERROR;
-                        error.message = API::errorCodeToString(error.code);
-                        error.data = "Command cancelled: Core shutdown cancelled request";
-
-                        timeoutResult.error = error;
-
-                        addCommandResultToResponse(commandMD, std::move(timeoutResult));
-                    }
-                    updateRequestStatus(commandMD->requestId, lockMutex);
-                }
-            }
-        }
-    }
-
-    Actions::CommandKey::CommandKey(const sai::TargetTypes newTarget, const sai::MethodTypes newAction) {
-        target = newTarget;
-        action = newAction;
-    }
-
-    Actions::CommandKey::CommandKey(const API::InternalApi::Command &command) {
-        target = command.target.type;
-        action = command.method.type;
-    }
-
-    bool Actions::CommandKey::operator==(const CommandKey &other) const {
-        return target == other.target && action == other.action;
-    }
-
-
-    std::size_t Actions::CommandKeyHash::operator()(const CommandKey &key) const {
-        return static_cast<size_t>(key.target) << 8 | static_cast<size_t>(key.action);
-    }
-
-    Actions::CommandMetadata::CommandMetadata(API::InternalApi::Command command,
-                                              std::shared_ptr<ba::steady_timer> commandTimeoutTimer,
-                                              const apiId_t requestId)
-        : command(std::move(command)),
-          commandTimeoutTimer(std::move(commandTimeoutTimer)),
-          requestId(requestId) {
-        isNotification = this->command.isNotification;
-    }
-
-    bool Actions::CommandMetadata::cancel() {
-        if (auto timer = commandTimeoutTimer.exchange(nullptr)) timer->cancel();
-        auto expected = State::PENDING;
-        if (state.compare_exchange_strong(expected, State::CANCELLED)) return true;
-        return false;
-    }
-
-
-    bool Actions::CommandMetadata::isPending() const {
-        if (state.load(std::memory_order::relaxed) == State::PENDING) {
-            return true;
-        }
-        return false;
-    }
-
-
-    Actions::RequestMetadata::RequestMetadata(API::InternalApi::Request request,
-                                              std::shared_ptr<ba::steady_timer> requestTimeoutTimer,
-                                              const size_t pendingCommands,
-                                              RequestCallback onComplete)
-        : request(std::move(request)),
-          requestTimeoutTimer(std::move(requestTimeoutTimer)),
-          pendingCommands(pendingCommands),
-          onComplete(std::move(onComplete)) {
-    }
-
-    void Actions::RequestMetadata::cancel() {
-        if (pendingCommands == 0) return;
-
-        if (auto reqTimer = requestTimeoutTimer.exchange(nullptr)) reqTimer->cancel();
-
-        for (auto &command: commands) {
-            command->cancel();
-        }
-    }
-
-    apiId_t Actions::getNextId() {
-        return API::getNextApiId();
-    }
-
-
-    Actions::CommandHandler Actions::resolveCommand(const API::InternalApi::Command &command) {
-        const auto iter = msCommandsRegistry.find(CommandKey(command));
-        return iter != msCommandsRegistry.end() ? iter->second : nullptr;
-    }
-
-    void Actions::executeCommandAsync(const CommandHandler &handler,
-                                      const API::InternalApi::Command &newCommand,
-                                      apiId_t requestId) {
-        auto commandMetadata = std::make_shared<CommandMetadata>(
-            newCommand,
-            std::make_shared<ba::steady_timer>(Core::Instance().getCoreUtilityIoContext()),
-            requestId
-        );
-
-        // Request mutex block, add command metadata to request metadata
-        {
-            std::scoped_lock lock(msActiveRequestsLock);
-            msActiveRequests.at(requestId).commands.push_back(commandMetadata);
-        }
-
-
-        if (!handler) {
-            API::ApiError error;
-            auto &&command = commandMetadata->command;
-
-            // Handle parse error signaled by ApiError struct in command.params with UNKNOWN Target and Method
-            if (command.params.has_value() &&
-                command.target == sai::TargetTypes::UNKNOWN &&
-                command.method == sai::MethodTypes::UNKNOWN) {
-                const auto &paramsJson = command.params.value();
-                const bool isInApiErrorFormat = paramsJson.is_object() &&
-                                                paramsJson.contains(JsonRpcStrings::ErrorKeys::CODE) &&
-                                                paramsJson.contains(JsonRpcStrings::ErrorKeys::MESSAGE);
-                if (isInApiErrorFormat) {
-                    try {
-                        error = API::ApiError(paramsJson);
-                    } catch (const std::exception &e) {
-                        error.code = API::ErrorCodes::INTERNAL_ERROR;
-                        error.data = "Unexpected error while parsing error: " + std::string(e.what());
-                    }
-                }
-            }
-
-            if (error.code == API::ErrorCodes::NO_ERROR) {
-                if (command.target == sai::TargetTypes::UNKNOWN) {
-                    error.code = API::ErrorCodes::INVALID_PARAMS;
-                    error.data = "Unknown target - target key value missing or invalid";
-                } else if (command.method == sai::MethodTypes::UNKNOWN) {
-                    error.code = API::ErrorCodes::METHOD_NOT_FOUND;
-                    error.data = "Unknown method - method key value missing or invalid ";
-                } else {
-                    error.code = API::ErrorCodes::INTERNAL_ERROR;
-                    error.data = "Undefined command";
-                }
-            }
-
-            error.message = errorCodeToString(error.code);
-
-            API::ApiResponse response;
-            response.error = error;
-            response.id = commandMetadata->command.commandId;
-
-            handleCommandResult(commandMetadata, std::move(response));
-
-            return;
-        }
-
-        ba::co_spawn(Core::Instance().getCoreIoContext(),
-                     processCommand(commandMetadata, handler),
-                     ba::detached);
-    }
-
-
-    ba::awaitable<void> Actions::processCommand(const cmdMetaPtr commandMetadata,
-                                                const CommandHandler handler) {
-        if (!commandMetadata->isPending()) co_return; // Skip handling stale commands
-        std::optional<API::ApiResponse> response;
-
-        try {
-            response = co_await handler(commandMetadata);
-        } catch (std::exception &exception) {
-            API::ApiError error;
-            error.code = API::ErrorCodes::INTERNAL_ERROR;
-            error.message = API::errorCodeToString(error.code);
-            error.data = exception.what();
-
-            response.emplace(API::ApiResponse());
-            response->error = error;
-            response->id = commandMetadata->command.commandId;
-        }
-
-        if (auto timer = commandMetadata->commandTimeoutTimer.exchange(nullptr)) timer->cancel();
-
-        if (!commandMetadata->isPending()) co_return;
-
-        if (response.has_value()) handleCommandResult(commandMetadata, std::move(response.value()));
-
-        else updateRequestStatus(commandMetadata->requestId, true);
-        co_return;
-    }
-
-    void Actions::startCommandTimeoutTimer(const cmdMetaPtr &commandMetadata) {
-        // Notifications do not require timeout
-        if (commandMetadata->isNotification) {
-            return;
-        }
-
-        if (auto timer = commandMetadata->commandTimeoutTimer.load()) {
-            timer->expires_after(msCOMMAND_TIMEOUT);
-            timer->async_wait([commandMetadata](const bs::error_code &ec) {
-                if (!ec) {
-                    handleCommandTimeout(commandMetadata);
-                } else {
-                    commandMetadata->cancel();
-                }
-            });
-        }
-    }
-
-
-    void Actions::handleCommandResult(const cmdMetaPtr &commandMetadata,
-                                      API::ApiResponse &&commandResult) {
-        if (auto timer = commandMetadata->commandTimeoutTimer.exchange(nullptr)) timer->cancel();
-
-        auto expected = CommandMetadata::State::PENDING;
-        if (!commandMetadata->state.compare_exchange_strong(expected, CommandMetadata::State::COMPLETED)) {
-            return;
-        }
-
-        // As defined in JSON-RPC docs request w/o ID is a notification — response must not be sent in return
-        if (!commandMetadata->command.isNotification) {
-            addCommandResultToResponse(commandMetadata, std::move(commandResult));
-        }
-        updateRequestStatus(commandMetadata->requestId);
-    }
-
-    void Actions::handleCommandTimeout(const cmdMetaPtr &commandMetadata) {
-        if (auto timer = commandMetadata->commandTimeoutTimer.exchange(nullptr)) timer->cancel();
-
-        auto expected = CommandMetadata::State::PENDING;
-        if (!commandMetadata->state.compare_exchange_strong(expected, CommandMetadata::State::TIMED_OUT)) return;
-
-        if (commandMetadata->command.commandId.hasValue()) {
-            API::ApiResponse timeoutResponse;
-            timeoutResponse.id = commandMetadata->command.commandId;
-
-            API::ApiError error;
-            error.code = API::ErrorCodes::INTERNAL_ERROR;
-            error.message = API::errorCodeToString(error.code);
-            error.data = "Command timeout: exceeded " + std::to_string(msCOMMAND_TIMEOUT.count()) + "ms timeout";
-
-            timeoutResponse.error = error;
-
-            addCommandResultToResponse(commandMetadata, std::move(timeoutResponse));
-        }
-        updateRequestStatus(commandMetadata->requestId);
-
-
-        Core::Instance().mpLogger->errorf(
-            "[ACTIONS] [HANDLE_COMMAND_TIMEOUT] Command timeout - request ID: %d command ID: %s",
-            commandMetadata->requestId,
-            commandMetadata->command.commandId.hasValue()
-                ? std::to_string(commandMetadata->command.commandId.value()).c_str()
-                : "null");
-    }
-
-    void Actions::addCommandResultToResponse(const cmdMetaPtr &commandMetadata,
-                                             API::ApiResponse &&apiResponse) {
-        std::scoped_lock lock(msResponsesLock);
-        auto iter = msResponses.find(commandMetadata->requestId);
-        if (iter != msResponses.end()) {
-            iter->second.apiResponses.push_back(std::move(apiResponse));
-        }
-    }
-
-    void Actions::updateRequestStatus(const apiId_t requestId, const bool lockMutex) {
-        if (lockMutex) std::scoped_lock lock(msActiveRequestsLock);
-        auto iter = msActiveRequests.find(requestId);
-        if (iter != msActiveRequests.end()) {
-            auto &request = iter->second;
-            if (request.pendingCommands.fetch_sub(1) == 1) {
-                if (auto reqTimer = request.requestTimeoutTimer.load()) reqTimer->cancel();
-                ba::post(Core::Instance().getCoreIoContext(), [requestId] {
-                    handleOutgoingResponse(requestId);
-                    cleanupRequest(requestId);
-                });
-            }
-        }
-    }
-
-    void Actions::handleRequestTimeout(const apiId_t requestId) {
-        Core::Instance().mpLogger->errorf("[ACTIONS] [HANDLE_REQUEST_TIMEOUT] Request timeout - request ID: %d",
-                                          requestId);
-
-        std::vector<cmdMetaPtr> commandsMD;
-
-        // Request mutex block, cancel request and copy commandPtr vector
-        {
-            std::scoped_lock lock(msActiveRequestsLock);
-            auto iter = msActiveRequests.find(requestId);
-            if (iter == msActiveRequests.end()) return;
-
-            iter->second.cancel();
-            commandsMD = iter->second.commands;
-        }
-
-        for (auto &commandMD: commandsMD) {
-            if (commandMD && commandMD->state == CommandMetadata::State::CANCELLED
-                && commandMD->command.commandId.hasValue()) {
-                API::ApiResponse timeoutResult;
-                timeoutResult.id = commandMD->command.commandId;
-
-                API::ApiError error;
-                error.code = API::ErrorCodes::INTERNAL_ERROR;
-                error.message = API::errorCodeToString(error.code);
-                error.data = "Command cancelled: request exceeded " + std::to_string(msREQUEST_TIMEOUT.count()) +
-                             "ms timeout";
-
-                timeoutResult.error = error;
-
-                addCommandResultToResponse(commandMD, std::move(timeoutResult));
-                updateRequestStatus(commandMD->requestId);
-            }
-        }
-    }
-
-    void Actions::cleanupRequest(const apiId_t requestId) {
-        std::scoped_lock lock(msActiveRequestsLock, msResponsesLock);
-
-        auto iter = msActiveRequests.find(requestId);
-        if (iter != msActiveRequests.end()) {
-            if (auto reqTimer = iter->second.requestTimeoutTimer.load()) reqTimer->cancel();
-            for (auto &command: iter->second.commands) {
-                if (command == nullptr || command->commandTimeoutTimer.load() == nullptr) continue;
-                command->commandTimeoutTimer.load()->cancel();
-            }
-        }
-
-        msActiveRequests.erase(requestId);
-        msResponses.erase(requestId);
-        Core::Instance().mpLogger->debugf("[ACTIONS] [CLEANUP_REQUEST] Request deleted - request ID: %d", requestId);
     }
 
     void Actions::handleOutgoingResponse(const apiId_t responseId) {
@@ -657,6 +206,457 @@ namespace SmartHome {
         requestCallback(id, std::move(responseString));
     }
 
+    void Actions::handleIncomingResponse(const connectionId_t connectionId, const API::ApiResponse &response) {
+        Core::Instance().mpLogger->debug("[ACTIONS] [HANDLE_INCOMING_RESPONSE] called");
+        if (!response.id.hasValue()) {
+            Core::Instance().mpLogger->warningf(
+                "[ACTIONS] [HANDLE_INCOMING_RESPONSE] Ignored incoming response for connection [%d] - response id is missing",
+                connectionId);
+            return;
+        }
+
+        std::scoped_lock lock(msOutgoingRequestsLock);
+
+        if (!msOutgoingRequests.contains(connectionId)) {
+            Core::Instance().mpLogger->warningf(
+                "[ACTIONS] [HANDLE_INCOMING_RESPONSE] Ignored incoming response for connection [%d] - no pending request",
+                connectionId);
+            return;
+        }
+
+        const auto &pendingRequest = msOutgoingRequests.at(connectionId);
+        std::scoped_lock lockRequestMetadata(pendingRequest->metadataMutex);
+
+        const auto &responseId = response.id.value();
+
+        if (!pendingRequest->requestsPromises.contains(responseId)) {
+            Core::Instance().mpLogger->warningf(
+                "[ACTIONS] [HANDLE_INCOMING_RESPONSE] Ignored incoming response for connection [%d] - no pending request with response ID [%d]",
+                connectionId,
+                responseId);
+            return;
+        }
+
+        pendingRequest->requestsPromises.at(responseId)->set_value(response);
+        pendingRequest->requestsPromises.erase(responseId);
+
+        if (pendingRequest->requestsPromises.empty()) {
+            pendingRequest->timeoutTimer->cancel();
+        }
+    }
+
+    void Actions::handleOutgoingRequest(const connectionId_t connectionId,
+                                        API::ApiRequest &&apiRequest,
+                                        const std::shared_ptr<std::promise<API::ApiResponse> > &pResponsePromise) {
+        Core::Instance().mpLogger->debug("[ACTIONS] [HANDLE_OUTGOING_REQUEST] called");
+        std::scoped_lock lockRequestMap(msOutgoingRequestsLock);
+
+        if (!msOutgoingRequests.contains(connectionId)) {
+            msOutgoingRequests[connectionId] = std::make_shared<OutgoingRequestMetadata>();
+        }
+        auto &outgoingRequest = msOutgoingRequests.at(connectionId);
+        std::scoped_lock lockRequestMetadata(outgoingRequest->metadataMutex);
+
+        outgoingRequest->sendTimer->cancel();
+
+
+        outgoingRequest->requestsToSend.push_back(apiRequest);
+        if (apiRequest.id.hasValue()) {
+            if (!outgoingRequest->requestsPromises.contains(apiRequest.id.value()))
+                outgoingRequest->requestsPromises[apiRequest.id.value()] = pResponsePromise;
+            else
+                Core::Instance().mpLogger->warning(
+                    "[ACTIONS] [HANDLE_OUTGOING_REQUEST] ApiRequest with duplicate id ignored");
+        }
+
+        const auto timeoutHandler = [outgoingRequest, connectionId](const bs::error_code &timeOutEc) {
+            if (!timeOutEc) {
+                std::scoped_lock timeoutLock(outgoingRequest->metadataMutex, msOutgoingRequestsLock);
+                for (const auto &promise: outgoingRequest->requestsPromises | std::views::values) {
+                    promise->set_exception(std::make_exception_ptr(std::runtime_error("Request timeout")));
+                }
+
+                if (outgoingRequest->requestsToSend.empty()) {
+                    msOutgoingRequests.erase(connectionId);
+                }
+            }
+        };
+
+        const auto sendTimerHandler = [outgoingRequest, connectionId, timeoutHandler](const bs::error_code &sendEc) {
+            if (!sendEc) {
+                std::scoped_lock sendLock(outgoingRequest->metadataMutex, msOutgoingRequestsLock);
+                auto &requests = outgoingRequest->requestsToSend;
+
+                std::string messageToSend;
+
+                if (requests.size() == 1) {
+                    messageToSend = requests.front().to_string();
+                } else {
+                    auto messageJsonArray = nlohmann::json::array();
+                    for (const auto &request: requests) {
+                        messageJsonArray.push_back(request.to_json());
+                    }
+                    messageToSend = to_string(messageJsonArray);
+                }
+                API::InternalApi().handleOutgoing(connectionId, std::move(messageToSend));
+                requests.clear();
+
+                outgoingRequest->timeoutTimer->expires_after(msREQUEST_TIMEOUT);
+                outgoingRequest->timeoutTimer->async_wait(timeoutHandler);
+            }
+        };
+
+        // Aggregate outgoing requests
+        outgoingRequest->sendTimer->expires_after(msAGGREGATE_OUTGOING_TIMEOUT);
+        outgoingRequest->sendTimer->async_wait(sendTimerHandler);
+    }
+
+    std::optional<API::InternalApi::Request> Actions::getRequest(const apiId_t requestId) {
+        std::scoped_lock lock(msActiveRequestsLock);
+
+        const auto iter = msActiveRequests.find(requestId);
+
+        return iter == msActiveRequests.end() ? std::nullopt : std::optional(iter->second.request);
+    }
+
+
+    apiId_t Actions::getNextId() {
+        return API::getNextApiId();
+    }
+
+    void Actions::startCommandTimeoutTimer(const cmdMetaPtr &commandMetadata) {
+        // Notifications do not require timeout
+        if (commandMetadata->isNotification) {
+            return;
+        }
+
+        if (const auto timer = commandMetadata->commandTimeoutTimer.load()) {
+            timer->expires_after(msCOMMAND_TIMEOUT);
+            timer->async_wait([commandMetadata](const bs::error_code &ec) {
+                if (!ec) {
+                    handleCommandTimeout(commandMetadata);
+                } else {
+                    commandMetadata->cancel();
+                }
+            });
+        }
+    }
+
+    void Actions::onCoreShutdown() {
+        auto cleanupTimeout = std::make_shared<ba::steady_timer>(Core::Instance().getCoreUtilityIoContext(),
+                                                                 msCLEANUP_TIMEOUT);
+        std::atomic_bool cleanupTimeoutCalled = false;
+        auto cleanup = [&cleanupTimeout, &cleanupTimeoutCalled] {
+            auto expected = false;
+            if (cleanupTimeoutCalled.compare_exchange_strong(expected, true)) return;
+            cleanupTimeout->cancel();
+            std::scoped_lock lock(msActiveRequestsLock, msResponsesLock);
+            msActiveRequests.clear();
+            msResponses.clear();
+        };
+
+        cleanupTimeout->async_wait([cleanup](const bs::error_code &ec) {
+            if (!ec) {
+                cleanup();
+            }
+        });
+
+        // Requests mutex block, cancel active request and add command cancelled error result to responses
+        {
+            std::scoped_lock lock(msActiveRequestsLock);
+            for (auto &request: msActiveRequests | std::views::values) {
+                if (cleanupTimeoutCalled) break;
+                request.cancel();
+
+                for (auto &commandMD: request.commands) {
+                    constexpr bool lockMutex = false;
+                    if (cleanupTimeoutCalled) break;
+                    if (commandMD && commandMD->state == CommandMetadata::State::CANCELLED
+                        && commandMD->command.commandId.hasValue()) {
+                        API::ApiResponse timeoutResult;
+                        timeoutResult.id = commandMD->command.commandId;
+
+                        API::ApiError error;
+                        error.code = API::ErrorCodes::INTERNAL_ERROR;
+                        error.message = API::errorCodeToString(error.code);
+                        error.data = "Command cancelled: Core shutdown cancelled request";
+
+                        timeoutResult.error = error;
+
+                        addCommandResultToResponse(commandMD, std::move(timeoutResult));
+                    }
+                    updateRequestStatus(commandMD->requestId, lockMutex);
+                }
+            }
+        }
+    }
+
+
+    Actions::CommandKey::CommandKey(const sai::TargetTypes newTarget, const sai::MethodTypes newAction) {
+        target = newTarget;
+        action = newAction;
+    }
+
+
+    Actions::CommandKey::CommandKey(const API::InternalApi::Command &command) {
+        target = command.target.type;
+        action = command.method.type;
+    }
+
+    bool Actions::CommandKey::operator==(const CommandKey &other) const {
+        return target == other.target && action == other.action;
+    }
+
+    std::size_t Actions::CommandKeyHash::operator()(const CommandKey &key) const {
+        return static_cast<size_t>(key.target) << 8 | static_cast<size_t>(key.action);
+    }
+
+
+    Actions::RequestMetadata::RequestMetadata(API::InternalApi::Request request,
+                                              std::shared_ptr<ba::steady_timer> requestTimeoutTimer,
+                                              const size_t pendingCommands,
+                                              RequestCallback onComplete)
+        : request(std::move(request)),
+          requestTimeoutTimer(std::move(requestTimeoutTimer)),
+          pendingCommands(pendingCommands),
+          onComplete(std::move(onComplete)) {
+    }
+
+    void Actions::RequestMetadata::cancel() {
+        if (pendingCommands == 0) return;
+
+        if (const auto reqTimer = requestTimeoutTimer.exchange(nullptr)) reqTimer->cancel();
+
+        for (const auto &command: commands) {
+            command->cancel();
+        }
+    }
+
+
+    Actions::CommandHandler Actions::resolveCommand(const API::InternalApi::Command &command) {
+        const auto iter = msCommandsRegistry.find(CommandKey(command));
+        return iter != msCommandsRegistry.end() ? iter->second : nullptr;
+    }
+
+    void Actions::executeCommandAsync(const CommandHandler &handler,
+                                      const API::InternalApi::Command &newCommand,
+                                      apiId_t requestId) {
+        const auto commandMetadata = std::make_shared<CommandMetadata>(
+            newCommand,
+            std::make_shared<ba::steady_timer>(Core::Instance().getCoreUtilityIoContext()),
+            requestId
+        );
+
+        // Request mutex block, add command metadata to request metadata
+        {
+            std::scoped_lock lock(msActiveRequestsLock);
+            msActiveRequests.at(requestId).commands.push_back(commandMetadata);
+        }
+
+
+        if (!handler) {
+            API::ApiError error;
+            auto &&command = commandMetadata->command;
+
+            // Handle parse error signaled by ApiError struct in command.params with UNKNOWN Target and Method
+            if (command.params.has_value() &&
+                command.target == sai::TargetTypes::UNKNOWN &&
+                command.method == sai::MethodTypes::UNKNOWN) {
+                const auto &paramsJson = command.params.value();
+                const bool isInApiErrorFormat = paramsJson.is_object() &&
+                                                paramsJson.contains(JsonRpcStrings::ErrorKeys::CODE) &&
+                                                paramsJson.contains(JsonRpcStrings::ErrorKeys::MESSAGE);
+                if (isInApiErrorFormat) {
+                    try {
+                        error = API::ApiError(paramsJson);
+                    } catch (const std::exception &e) {
+                        error.code = API::ErrorCodes::INTERNAL_ERROR;
+                        error.data = "Unexpected error while parsing error: " + std::string(e.what());
+                    }
+                }
+            }
+
+            if (error.code == API::ErrorCodes::NO_ERROR) {
+                if (command.target == sai::TargetTypes::UNKNOWN) {
+                    error.code = API::ErrorCodes::INVALID_PARAMS;
+                    error.data = "Unknown target - target key value missing or invalid";
+                } else if (command.method == sai::MethodTypes::UNKNOWN) {
+                    error.code = API::ErrorCodes::METHOD_NOT_FOUND;
+                    error.data = "Unknown method - method key value missing or invalid ";
+                } else {
+                    error.code = API::ErrorCodes::INTERNAL_ERROR;
+                    error.data = "Undefined command";
+                }
+            }
+
+            error.message = errorCodeToString(error.code);
+
+            API::ApiResponse response;
+            response.error = error;
+            response.id = commandMetadata->command.commandId;
+
+            handleCommandResult(commandMetadata, std::move(response));
+
+            return;
+        }
+
+        ba::co_spawn(Core::Instance().getCoreIoContext(),
+                     processCommand(commandMetadata, handler),
+                     ba::detached);
+    }
+
+
+    ba::awaitable<void> Actions::processCommand(const cmdMetaPtr commandMetadata,
+                                                const CommandHandler handler) {
+        if (!commandMetadata->isPending()) co_return; // Skip handling stale commands
+        std::optional<API::ApiResponse> response;
+
+        try {
+            response = co_await handler(commandMetadata);
+        } catch (std::exception &exception) {
+            API::ApiError error;
+            error.code = API::ErrorCodes::INTERNAL_ERROR;
+            error.message = API::errorCodeToString(error.code);
+            error.data = exception.what();
+
+            response.emplace(API::ApiResponse());
+            response->error = error;
+            response->id = commandMetadata->command.commandId;
+        }
+
+        if (const auto timer = commandMetadata->commandTimeoutTimer.exchange(nullptr)) timer->cancel();
+
+        if (!commandMetadata->isPending()) co_return;
+
+        if (response.has_value()) handleCommandResult(commandMetadata, std::move(response.value()));
+
+        else updateRequestStatus(commandMetadata->requestId, true);
+        co_return;
+    }
+
+    void Actions::handleCommandResult(const cmdMetaPtr &commandMetadata,
+                                      API::ApiResponse &&commandResult) {
+        if (const auto timer = commandMetadata->commandTimeoutTimer.exchange(nullptr)) timer->cancel();
+
+        auto expected = CommandMetadata::State::PENDING;
+        if (!commandMetadata->state.compare_exchange_strong(expected, CommandMetadata::State::COMPLETED)) {
+            return;
+        }
+
+        // As defined in JSON-RPC docs request w/o ID is a notification — response must not be sent in return
+        if (!commandMetadata->command.isNotification) {
+            addCommandResultToResponse(commandMetadata, std::move(commandResult));
+        }
+        updateRequestStatus(commandMetadata->requestId);
+    }
+
+    void Actions::handleCommandTimeout(const cmdMetaPtr &commandMetadata) {
+        if (const auto timer = commandMetadata->commandTimeoutTimer.exchange(nullptr)) timer->cancel();
+
+        auto expected = CommandMetadata::State::PENDING;
+        if (!commandMetadata->state.compare_exchange_strong(expected, CommandMetadata::State::TIMED_OUT)) return;
+
+        if (commandMetadata->command.commandId.hasValue()) {
+            API::ApiResponse timeoutResponse;
+            timeoutResponse.id = commandMetadata->command.commandId;
+
+            API::ApiError error;
+            error.code = API::ErrorCodes::INTERNAL_ERROR;
+            error.message = API::errorCodeToString(error.code);
+            error.data = "Command timeout: exceeded " + std::to_string(msCOMMAND_TIMEOUT.count()) + "ms timeout";
+
+            timeoutResponse.error = error;
+
+            addCommandResultToResponse(commandMetadata, std::move(timeoutResponse));
+        }
+        updateRequestStatus(commandMetadata->requestId);
+
+
+        Core::Instance().mpLogger->errorf(
+            "[ACTIONS] [HANDLE_COMMAND_TIMEOUT] Command timeout - request ID: %d command ID: %s",
+            commandMetadata->requestId,
+            commandMetadata->command.commandId.hasValue()
+                ? std::to_string(commandMetadata->command.commandId.value()).c_str()
+                : "null");
+    }
+
+    void Actions::addCommandResultToResponse(const cmdMetaPtr &commandMetadata,
+                                             API::ApiResponse &&apiResponse) {
+        std::scoped_lock lock(msResponsesLock);
+        const auto iter = msResponses.find(commandMetadata->requestId);
+        if (iter != msResponses.end()) {
+            iter->second.apiResponses.push_back(std::move(apiResponse));
+        }
+    }
+
+    void Actions::updateRequestStatus(const apiId_t requestId, const bool lockMutex) {
+        if (lockMutex) std::scoped_lock lock(msActiveRequestsLock);
+        const auto iter = msActiveRequests.find(requestId);
+        if (iter != msActiveRequests.end()) {
+            auto &request = iter->second;
+            if (request.pendingCommands.fetch_sub(1) == 1) {
+                if (const auto reqTimer = request.requestTimeoutTimer.load()) reqTimer->cancel();
+                ba::post(Core::Instance().getCoreIoContext(), [requestId] {
+                    handleOutgoingResponse(requestId);
+                    cleanupRequest(requestId);
+                });
+            }
+        }
+    }
+
+    void Actions::handleRequestTimeout(const apiId_t requestId) {
+        Core::Instance().mpLogger->errorf("[ACTIONS] [HANDLE_REQUEST_TIMEOUT] Request timeout - request ID: %d",
+                                          requestId);
+
+        std::vector<cmdMetaPtr> commandsMD;
+
+        // Request mutex block, cancel request and copy commandPtr vector
+        {
+            std::scoped_lock lock(msActiveRequestsLock);
+            const auto iter = msActiveRequests.find(requestId);
+            if (iter == msActiveRequests.end()) return;
+
+            iter->second.cancel();
+            commandsMD = iter->second.commands;
+        }
+
+        for (auto &commandMD: commandsMD) {
+            if (commandMD && commandMD->state == CommandMetadata::State::CANCELLED
+                && commandMD->command.commandId.hasValue()) {
+                API::ApiResponse timeoutResult;
+                timeoutResult.id = commandMD->command.commandId;
+
+                API::ApiError error;
+                error.code = API::ErrorCodes::INTERNAL_ERROR;
+                error.message = API::errorCodeToString(error.code);
+                error.data = "Command cancelled: request exceeded " + std::to_string(msREQUEST_TIMEOUT.count()) +
+                             "ms timeout";
+
+                timeoutResult.error = error;
+
+                addCommandResultToResponse(commandMD, std::move(timeoutResult));
+                updateRequestStatus(commandMD->requestId);
+            }
+        }
+    }
+
+    void Actions::cleanupRequest(const apiId_t requestId) {
+        std::scoped_lock lock(msActiveRequestsLock, msResponsesLock);
+
+        const auto iter = msActiveRequests.find(requestId);
+        if (iter != msActiveRequests.end()) {
+            if (const auto reqTimer = iter->second.requestTimeoutTimer.load()) reqTimer->cancel();
+            for (auto &command: iter->second.commands) {
+                if (command == nullptr || command->commandTimeoutTimer.load() == nullptr) continue;
+                command->commandTimeoutTimer.load()->cancel();
+            }
+        }
+
+        msActiveRequests.erase(requestId);
+        msResponses.erase(requestId);
+        Core::Instance().mpLogger->debugf("[ACTIONS] [CLEANUP_REQUEST] Request deleted - request ID: %d", requestId);
+    }
+
 
     std::unordered_map<Actions::CommandKey, Actions::CommandHandler, Actions::CommandKeyHash>
     Actions::msCommandsRegistry =
@@ -742,7 +742,7 @@ namespace SmartHome {
         auto future = promise->get_future();
 
         // Be sure to implement timeouts and periodic isPending checks to avoid infinitely running operations.
-        ba::post(Core::Instance().getCoreWorkerIoContext(), [promise, commandMetadata, operationDuration]() {
+        ba::post(Core::Instance().getCoreWorkerIoContext(), [promise, commandMetadata, operationDuration] {
             // This example simulates chain of operations with periodic checking for cancellation and command timeout.
             // While command timeout is not needed as request timeout exists, it is advised to use it especially for
             // longer operations in batch requests.

@@ -5,7 +5,6 @@
 #include <optional>
 #include <string_view>
 #include <string>
-#include <atomic>
 
 #include <nlohmann/json.hpp>
 
@@ -94,21 +93,21 @@ namespace SmartHome::API {
          *
          * @return true if ID is undefined, false otherwise.
          */
-        bool isUndefined() const;
+        [[nodiscard]] bool isUndefined() const;
 
         /**
          * @brief Check if ID is null.
          *
          * @return true if ID has null value, false otherwise.
          */
-        bool isNull() const;
+        [[nodiscard]] bool isNull() const;
 
         /**
          * @brief Check if ID has numeric value.
          *
          * @return true if ID has numeric value, false otherwise.
          */
-        bool hasValue() const;
+        [[nodiscard]] bool hasValue() const;
 
         /**
          * @brief Get numeric value of ID.
@@ -116,7 +115,7 @@ namespace SmartHome::API {
          * @return Stored ID value.
          * @throws std::runtime_error If ID has no value.
          */
-        apiId_t value() const;
+        [[nodiscard]] apiId_t value() const;
 
         /**
          * @brief Convert ID to JSON object.
@@ -124,7 +123,7 @@ namespace SmartHome::API {
          * @return JSON object with id field.
          * @throws std::runtime_error If ID is undefined.
          */
-        nlohmann::json toJson() const;
+        [[nodiscard]] nlohmann::json toJson() const;
 
         /**
          * @brief Parse ID from JSON object.
@@ -204,14 +203,14 @@ namespace SmartHome::API {
          *
          * @return JSON object representation of error.
          */
-        nlohmann::json to_json();
+        [[nodiscard]] nlohmann::json to_json() const;
 
         /**
          * @brief Convert error to JSON string.
          *
          * @return JSON string representation of error.
          */
-        std::string to_string();
+        [[nodiscard]] std::string to_string() const;
 
     private:
         /**
@@ -259,9 +258,9 @@ namespace SmartHome::API {
          */
         explicit ApiRequest(std::string_view value);
 
-        nlohmann::json to_json() const;
+        [[nodiscard]] nlohmann::json to_json() const;
 
-        std::string to_string() const;
+        [[nodiscard]] std::string to_string() const;
 
         /// Update request from JSON object.
         ApiRequest operator()(const nlohmann::json &value);
@@ -315,7 +314,7 @@ namespace SmartHome::API {
          * @return JSON object representation of response.
          * @throws std::invalid_argument If neither result nor error is set.
          */
-        nlohmann::json to_json();
+        [[nodiscard]] nlohmann::json to_json();
 
         /**
          * @brief Convert response to JSON string.
@@ -323,7 +322,7 @@ namespace SmartHome::API {
          * @return JSON string representation of response.
          * @throws std::invalid_argument If neither result nor error is set.
          */
-        std::string to_string();
+        [[nodiscard]] std::string to_string();
 
         /// Update response from JSON object.
         ApiResponse operator()(const nlohmann::json &value);

@@ -543,13 +543,23 @@ namespace SmartHomeDB {
                             throw std::runtime_error("Only '!=' operator allowed with NULL");
                         }
                     } else {
-                        std::string placeholder = addParam(val, params, paramIndex);
-                        conditions.push_back(column + " " + op + " " + placeholder);
+                        const std::string placeholder = addParam(val, params, paramIndex);
+                        std::string condition = column;
+                        condition += " ";
+                        condition += op;
+                        condition += " ";
+                        condition += placeholder;
+                        conditions.push_back(std::move(condition));
                     }
                 }
             } else {
-                std::string placeholder = addParam(value, params, paramIndex);
-                conditions.push_back(column + " " + sk::EQUAL_STR.data() + " " + placeholder);
+                const std::string placeholder = addParam(value, params, paramIndex);
+                std::string condition = column;
+                condition += " ";
+                condition += sk::EQUAL_STR.data();
+                condition += " ";
+                condition += placeholder;
+                conditions.push_back(std::move(condition));
             }
         }
 
@@ -622,7 +632,7 @@ namespace SmartHomeDB {
                 throw std::runtime_error("'order_by' items must have 'column' field");
             }
 
-            std::string column = sqlIdentifier(item[ak::COLUMN_STR].get<std::string>());
+            const std::string column = sqlIdentifier(item[ak::COLUMN_STR].get<std::string>());
             std::string order = toUpper(sk::ASC_STR); // default ascending
 
             if (item.contains(ak::ORDER_STR)) {
@@ -635,7 +645,10 @@ namespace SmartHomeDB {
                 }
             }
 
-            parts.push_back(column + " " + order);
+            std::string part = column;
+            part += " ";
+            part += order;
+            parts.push_back(std::move(part));
         }
 
         return joinStrings(parts, ", ");

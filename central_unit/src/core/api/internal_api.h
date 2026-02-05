@@ -74,7 +74,7 @@ namespace SmartHome::API {
              *
              * @return String view of method name.
              */
-            std::string_view to_string() const;
+            [[nodiscard]] std::string_view to_string() const;
 
             /**
              * @brief Parse string to method type.
@@ -130,7 +130,7 @@ namespace SmartHome::API {
              *
              * @return String view of target name.
              */
-            std::string_view to_string() const;
+            [[nodiscard]] std::string_view to_string() const;
 
             /**
              * @brief Parse string to target type.

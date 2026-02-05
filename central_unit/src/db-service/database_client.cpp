@@ -84,7 +84,7 @@ namespace SmartHomeDB {
             for (const auto &[sql, params]: queries) {
                 if (isCancelled->load(std::memory_order_acquire)) {
                     return; // Cancel without committing, transaction will be rolled back
-                };
+                }
                 try {
                     result = txn.exec(sql, params);
                 } catch (const pqxx::sql_error &e) {
