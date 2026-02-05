@@ -48,8 +48,8 @@ namespace SmartHome::API {
         } else if (iter->is_number() && iter.value() != nullptr) {
             mValue = json[JsonRpcStrings::Keys::ID];
             mState = State::HAS_VALUE;
-        } else if (iter->is_string() && iter.value() == JsonRpcStrings::Constants::NULL_VALUE || iter.value() ==
-                   nullptr) {
+        } else if (iter->is_string() && iter.value() == JsonRpcStrings::Constants::NULL_VALUE ||
+                   iter.value() == nullptr) {
             mState = State::NULL_VALUE;
         } else {
             throw std::runtime_error("Cannot cast json to ApiId - Invalid ID value");
