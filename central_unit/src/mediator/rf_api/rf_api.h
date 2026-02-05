@@ -45,18 +45,19 @@ namespace SmartHomeMediator {
          * @param connectionId Connection identifier for response routing.
          * @param message JSON-RPC formatted message string.
          *
-         * @note Message must contain `params` field formatted as:
+         * @note Message must contain method in the format \b "target.method" and
+         *       params as a JSON object. Example:
          *       \code{.json}
          *       {
-         *         "target": "module_mediator",
-         *         "module_info": {
-         *           "logic_address": <uint>,
-         *           "rf_channel": <uint>
-         *         },
-         *         "method_params": {
-         *           "type": <string> // Method type / execute action
-                     "args": [] // Array of positional parameters for the specific method and type
-                    }
+         *         "method": "module_mediator.[set/get/execute/ping]",
+         *         "params": {
+         *           "module_info": {
+         *             "logic_address": <uint>,
+         *             "rf_channel": <uint>
+         *           },
+         *           "type": <string>,
+         *           "args": []
+         *         }
          *       }
          *       \endcode
          */
@@ -110,7 +111,7 @@ namespace SmartHomeMediator {
         static std::unique_ptr<RfTypes::MediatorConfigCommand> toConfigCommand(
             const SmartHome::API::ApiRequest &apiRequest,
             std::string_view method,
-            const std::unique_ptr<nlohmann::json> &pMethodParams);
+            const nlohmann::json *pMethodParams);
 
         /**
           * @brief Parse API request into RF command structure.
@@ -119,7 +120,7 @@ namespace SmartHomeMediator {
           *
           * @param pCommand Pointer to RF command to populate.
           * @param method API method name.
-          * @param pMethodParams Pointer to method parameters JSON array.
+          * @param pMethodParams Pointer to method parameters JSON object.
           *
           * @throws std::exception via throwParseError on validation failures.
           */
@@ -132,7 +133,7 @@ namespace SmartHomeMediator {
          *
          * @param pCommand Pointer to RF command to populate.
          * @param method API method name.
-         * @param pMethodParams Pointer to method parameters JSON array.
+         * @param pMethodParams Pointer to method parameters JSON object.
          *
          * @throws std::exception via throwParseError on validation failures.
          */

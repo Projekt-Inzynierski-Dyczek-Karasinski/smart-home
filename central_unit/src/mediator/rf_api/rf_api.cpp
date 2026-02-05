@@ -173,17 +173,13 @@ namespace SmartHomeMediator {
                 throw std::invalid_argument("RfCommand of notify type does not have NotificationType set");
             }
             SmartHome::API::ApiRequest notify;
-            notify.params.emplace();
+            notify.params.emplace(nlohmann::json::object());
             auto &params = notify.params.value();
 
-            notify.method = RfTypes::NOTIFY_STRING;
-
-            params[sj::ParamsKeys::TARGET] = RfTypes::CORE_STRING;
+            notify.method = SmartHome::API::getTargetMethodString(RfTypes::CORE_STRING, RfTypes::NOTIFY_STRING);
 
             auto notificationType = std::get<RfTypes::NotificationType>(rfCommand.requestType.value());
-            auto methodParams = nlohmann::json::array();
-            methodParams.push_back(notificationTypeToString(notificationType));
-            params[sj::ParamsKeys::METHOD_PARAMS] = methodParams;
+            params[sj::ParamsKeys::TYPE] = notificationTypeToString(notificationType);
 
             return notify.to_string();
         }
@@ -197,31 +193,38 @@ namespace SmartHomeMediator {
             throw std::invalid_argument("No parameters specified");
         }
         const auto &params = apiRequest.params.value();
-        if (!(params.contains(sj::ParamsKeys::TARGET) && params.at(sj::ParamsKeys::TARGET) ==
-              RfTypes::MEDIATOR_STRING)) {
+        if (!params.is_object()) {
+            throw std::invalid_argument("Parameters must be an object");
+        }
+
+        auto [targetStr, methodStr] = SmartHome::API::parseTargetMethodString(apiRequest.method);
+
+        const auto targetLower = boost::algorithm::to_lower_copy(std::string(targetStr));
+        const auto methodLower = boost::algorithm::to_lower_copy(std::string(methodStr));
+
+        if (targetLower != RfTypes::MEDIATOR_STRING) {
             throw std::invalid_argument("Missing or invalid target parameter");
         }
 
         std::unique_ptr<nlohmann::json> pMethodParams;
-        if (params.contains(sj::ParamsKeys::METHOD_PARAMS)) {
-            pMethodParams = make_unique<nlohmann::json>(params[sj::ParamsKeys::METHOD_PARAMS]);
-        } else if (apiRequest.method != RfTypes::PING_STRING) {
+        if (!params.empty()) {
+            pMethodParams = std::make_unique<nlohmann::json>(params);
+        } else if (methodLower != RfTypes::PING_STRING) {
             throw std::invalid_argument("Missing method params");
         }
 
         auto pRfCommand = std::make_unique<RfTypes::RfCommand>();
-        const auto method = boost::algorithm::to_lower_copy(apiRequest.method);
 
-        if (isConfigCommand) return toConfigCommand(apiRequest, method, pMethodParams);
+        if (isConfigCommand) return toConfigCommand(apiRequest, methodLower, pMethodParams.get());
 
         if (apiRequest.id.hasValue()) {
-            parseRequest(pRfCommand.get(), method, pMethodParams.get());
+            parseRequest(pRfCommand.get(), methodLower, pMethodParams.get());
             pRfCommand->requestId = apiRequest.id.value();
             return pRfCommand;
         }
 
         if (apiRequest.id.isUndefined()) {
-            parseNotification(pRfCommand.get(), method, pMethodParams.get());
+            parseNotification(pRfCommand.get(), methodLower, pMethodParams.get());
             return pRfCommand;
         }
 
@@ -231,20 +234,19 @@ namespace SmartHomeMediator {
     std::unique_ptr<RfTypes::MediatorConfigCommand> RfApi::toConfigCommand(
         const SmartHome::API::ApiRequest &apiRequest,
         const std::string_view method,
-        const std::unique_ptr<nlohmann::json> &pMethodParams) {
+        const nlohmann::json *pMethodParams) {
         if (!pMethodParams || pMethodParams->empty()) {
             throw std::invalid_argument(
                 "Missing method params: method params are required for mediator config command");
         }
 
-        char buffer[1024];
         auto pConfigCommand = std::make_unique<RfTypes::MediatorConfigCommand>();
 
         if (apiRequest.id.hasValue()) {
             pConfigCommand->requestId = apiRequest.id.value();
         }
 
-        size_t argsRequired = false;
+        bool argsRequired = false;
 
         if (method == RfTypes::GET_STRING) {
             pConfigCommand->configCommandType = RfTypes::MediatorConfigCommandType::GET;
@@ -258,23 +260,23 @@ namespace SmartHomeMediator {
             throw std::invalid_argument("Invalid method for mediator config command: "s + method.data());
         }
 
-        if (!pMethodParams->contains(sj::MediatorMethodParams::TYPE) ||
-            !pMethodParams->at(sj::MediatorMethodParams::TYPE).is_string()) {
+        if (!pMethodParams->contains(sj::ParamsKeys::TYPE) ||
+            !pMethodParams->at(sj::ParamsKeys::TYPE).is_string()) {
             throw std::invalid_argument("Invalid method params: 'type' field is required and must be a string");
         }
 
-        pConfigCommand->commandKey = pMethodParams->at(sj::MediatorMethodParams::TYPE).get<std::string>();
+        pConfigCommand->commandKey = pMethodParams->at(sj::ParamsKeys::TYPE).get<std::string>();
 
         if (argsRequired) {
-            if (!pMethodParams->contains(sj::MediatorMethodParams::ARGS) ||
-                !pMethodParams->at(sj::MediatorMethodParams::ARGS).is_array()) {
-                throw std::invalid_argument("Invalid method params: 'args' field is required and must be an array");
+            if (!pMethodParams->contains(sj::ParamsKeys::ARGS) ||
+                !pMethodParams->at(sj::ParamsKeys::ARGS).is_array() ||
+                pMethodParams->at(sj::ParamsKeys::ARGS).empty()) {
+                throw std::invalid_argument(
+                    "Invalid method params: 'args' field is required and must be a non empty array");
             }
 
-            pConfigCommand->commandValue =
-                    pMethodParams->at(sj::MediatorMethodParams::ARGS).front().is_string()
-                        ? pMethodParams->at(sj::MediatorMethodParams::ARGS).front().get<std::string>()
-                        : to_string(pMethodParams->at(sj::MediatorMethodParams::ARGS).front());
+            const auto &firstArg = pMethodParams->at(sj::ParamsKeys::ARGS).front();
+            pConfigCommand->commandValue = firstArg.is_string() ? firstArg.get<std::string>() : to_string(firstArg);
         }
 
         return pConfigCommand;
@@ -289,12 +291,10 @@ namespace SmartHomeMediator {
         }
 
         if (!(pMethodParams &&
-              pMethodParams->contains(sj::MediatorMethodParams::TYPE) &&
-              pMethodParams->at(sj::MediatorMethodParams::TYPE).is_string())) {
+              pMethodParams->contains(sj::ParamsKeys::TYPE) &&
+              pMethodParams->at(sj::ParamsKeys::TYPE).is_string())) {
             throw std::invalid_argument("Invalid method specified");
         }
-
-        int paramOffset = 1;
 
         if (method == RfTypes::SET_STRING) {
             // Handle set command
@@ -302,7 +302,7 @@ namespace SmartHomeMediator {
             // Read set type from 'type' field
             try {
                 pCommand->requestType.emplace(
-                    RfTypes::setTypeFromString(pMethodParams->at(sj::MediatorMethodParams::TYPE).get<std::string>()));
+                    RfTypes::setTypeFromString(pMethodParams->at(sj::ParamsKeys::TYPE).get<std::string>()));
             } catch (const std::exception &e) {
                 throwParseError("set", e.what(), pMethodParams->dump());
             }
@@ -312,7 +312,7 @@ namespace SmartHomeMediator {
             // Read get type from 'type' field
             try {
                 pCommand->requestType.emplace(
-                    RfTypes::getTypeFromString(pMethodParams->at(sj::MediatorMethodParams::TYPE).get<std::string>()));
+                    RfTypes::getTypeFromString(pMethodParams->at(sj::ParamsKeys::TYPE).get<std::string>()));
             } catch (const std::exception &e) {
                 throwParseError("get", e.what(), pMethodParams->dump());
             }
@@ -320,7 +320,7 @@ namespace SmartHomeMediator {
             // Handle execute command
             std::string action;
             try {
-                action = pMethodParams->at(sj::MediatorMethodParams::TYPE).get<std::string>();
+                action = pMethodParams->at(sj::ParamsKeys::TYPE).get<std::string>();
             } catch (const std::exception &e) {
                 throwParseError("execute", e.what(), pMethodParams->dump());
             }
@@ -333,20 +333,22 @@ namespace SmartHomeMediator {
             else {
                 throw std::invalid_argument("Invalid action parameter specified");
             }
+        } else {
+            throw std::invalid_argument("API method not supported: "s + method.data());
         }
 
 
         // Pass args to rfCommand parameter vector
-        if (pMethodParams->contains(sj::MediatorMethodParams::ARGS) &&
-            pMethodParams->at(sj::MediatorMethodParams::ARGS).is_array()) {
-            for (const auto &arg: pMethodParams->at(sj::MediatorMethodParams::ARGS)) {
+        if (pMethodParams->contains(sj::ParamsKeys::ARGS) &&
+            pMethodParams->at(sj::ParamsKeys::ARGS).is_array()) {
+            for (const auto &arg: pMethodParams->at(sj::ParamsKeys::ARGS)) {
                 pCommand->parameters.push_back(RfTypes::Parameter::parameterFromJson(arg));
             }
         }
     }
 
     void RfApi::parseNotification(RfTypes::RfCommand *pCommand,
-                                  std::string_view method,
+                                  const std::string_view method,
                                   nlohmann::json *pMethodParams) {
         if (method != RfTypes::NOTIFY_STRING) {
             throw std::invalid_argument("API notification is not of notify method");
@@ -356,7 +358,7 @@ namespace SmartHomeMediator {
         // Read notify type from 'type' field
         try {
             pCommand->requestType.emplace(RfTypes::notificationTypeFromString(
-                pMethodParams->at(sj::MediatorMethodParams::TYPE).get<std::string>()));
+                pMethodParams->at(sj::ParamsKeys::TYPE).get<std::string>()));
         } catch (const std::exception &e) {
             throwParseError("notify", e.what(), pMethodParams->dump());
         }
@@ -367,7 +369,7 @@ namespace SmartHomeMediator {
                                 const std::string_view paramsJson) {
         char buffer[1024];
         snprintf(buffer, sizeof(buffer),
-                 "Missing or invalid action type inside method_params for %s: %s,\ncurrent method_params: %s",
+                 "Missing or invalid action type inside params for %s: %s,\ncurrent params: %s",
                  commandType.data(),
                  error.data(),
                  paramsJson.data());
