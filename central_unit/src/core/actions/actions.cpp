@@ -24,10 +24,7 @@ namespace SmartHome {
     }
 
     bool Actions::CommandMetadata::isPending() const {
-        if (state.load(std::memory_order::relaxed) == State::PENDING) {
-            return true;
-        }
-        return false;
+        return state.load(std::memory_order::relaxed) == State::PENDING;
     }
 
 
@@ -158,6 +155,7 @@ namespace SmartHome {
         }
 
         if (isStructured) {
+            // Structured response: JSON-RPC object or array.
             nlohmann::json json;
             API::ApiResponse errorResponse;
             errorResponse.id = nullptr;
@@ -167,6 +165,7 @@ namespace SmartHome {
             error.message = API::errorCodeToString(error.code);
 
             if (responsesVector.size() > 1) {
+                // Multiple responses: build JSON array.
                 json = nlohmann::json::array();
                 for (auto &response: responsesVector) {
                     try {
@@ -178,6 +177,7 @@ namespace SmartHome {
                     }
                 }
             } else {
+                // Single response: serialize directly.
                 try {
                     json = responsesVector[0].to_json();
                 } catch (std::exception &e) {
@@ -188,8 +188,10 @@ namespace SmartHome {
             }
             responseString = json.dump();
         } else {
+            // Unstructured response: concatenate plain-text results/errors.
             std::string appendToResponse;
             for (auto &response: responsesVector) {
+                // Append either result or error message, append Internal error if both are missing
                 if (response.result.has_value()) {
                     appendToResponse = response.result.value();
                 } else if (response.error.has_value()) {
