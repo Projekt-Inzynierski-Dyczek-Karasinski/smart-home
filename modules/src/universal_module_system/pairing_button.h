@@ -31,6 +31,10 @@ namespace UniversalModuleSystem {
         PairingButton(const PairingButton&) = delete;
         PairingButton& operator=(const PairingButton&) = delete;
 
+        // TODO !pr add comment
+
+        static bool isButtonPressed();
+
     private:
         /**
          * @brief Constructor of PairingButton class. Sets BUTTON_PIN to INPUT_PULLUP and attaches interrupt to it.

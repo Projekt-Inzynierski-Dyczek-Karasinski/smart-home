@@ -1,9 +1,8 @@
 #include "power_manager_esp_32.h"
 
 #include <driver/rtc_io.h>
-// TODO !mm uncomment
-// #include <WiFi.h>
-// #include <esp_wifi.h>
+
+#include "universal_module_system/ota/ota.h"
 
 #include "../../../config/universal_module_system_config.h"
 #include "universal_module_system/data_manager.h"
@@ -28,11 +27,9 @@ namespace UniversalModuleSystem {
     void PowerManagerESP32::enterSleep(const uint32_t milliSeconds, const bool enableWakeUpWithRfModule) {
         constexpr uint16_t US_TO_MILLISECONDS_FACTOR = 1000;
 
-        // disable WiFi
-        // TODO !mm uncomment
-        // WiFi.disconnect(true);
-        // WiFi.mode(WIFI_OFF);
-        // esp_wifi_stop();
+        // disable WiFi and ota
+        auto &ota = Ota::getInstance();
+        ota.endOta();
 
         // button wake up
         rtc_gpio_pulldown_dis(BUTTON_PIN_AS_GPIO);

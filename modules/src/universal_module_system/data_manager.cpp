@@ -125,9 +125,6 @@ namespace UniversalModuleSystem {
         if (overrideExistingFiles || !SPIFFS.exists(ADDRESSING_DATA_PATH)) {
             saveJson(ADDRESSING_DATA_PATH, baseConfig["addressing"]);
         }
-        if (overrideExistingFiles || !SPIFFS.exists(WIFI_DATA_PATH)) {
-            saveJson(WIFI_DATA_PATH, baseConfig["wifi"]);
-        }
     }
 
     void DataManager::waitAndDisable() const {

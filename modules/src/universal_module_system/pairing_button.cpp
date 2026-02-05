@@ -27,6 +27,11 @@ namespace UniversalModuleSystem {
         deleteButtonPressTimer();
     }
 
+    bool PairingButton::isButtonPressed() {
+        pinMode(BUTTON_PIN, INPUT_PULLUP);
+        return !digitalRead(BUTTON_PIN);
+    }
+
     void IRAM_ATTR PairingButton::buttonISR() {
         const auto pb = &getInstance(nullptr, nullptr, nullptr);
         detachInterrupt(digitalPinToInterrupt(BUTTON_PIN));

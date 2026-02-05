@@ -9,20 +9,20 @@
 #include "universal_module_system/transducers/actuators/actuators_manager.h"
 #include "communication/communication.h"
 #include "utils/logger.h"
-// #include "universal_module_system/ota/ota.h"
+#include "universal_module_system/ota/ota.h"
 
 namespace ul = Utils::Logging;
 namespace ums = UniversalModuleSystem;
 
 void setup() {
-    const auto logger = std::make_shared<ul::Logger>();
+    // TODO !pr remove VERBOSE
+    const auto logger = std::make_shared<ul::Logger>(ul::Level::VERBOSE);
 
     auto &dataManager = ums::DataManager::getInstance(logger);
 
-    // FIXME !mm ota
-    // start Ota if CONFIG_VERSION and "version" in /data/base_config.json do not match.
-    // ums::Ota ota(logger);
-    // ota.autoEnableOta();
+    // start Ota if OTA_CHECK and "version" in /data/base_config.json do not match.
+    auto &ota = ums::Ota::getInstance(logger);
+    ota.autoBeginOta();
 
     const auto debugLed = std::make_shared<ums::DebugLED>(logger);
     auto &communication = Comms::Communication::getInstance(debugLed, logger);

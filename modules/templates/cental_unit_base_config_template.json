@@ -85,28 +85,11 @@
           "additional": {
           }
         }
-      },
-      {
-        "type": "BME280",
-        "data": {
-          "id": 4,
-          "readPin": 9,
-          "canAwake": false,
-          "additional": {
-            "readPin2": 8,
-            "I2CAddress": 118
-          }
-        }
       }
     ]
   },
   "ota": {
-    "version": 1,
-    "ota_pin": 3
-  },
-  "wifi": {
-    "ssid": "wifi ssid",
-    "password": "wifi password"
+    "version": 1
   },
   "hc12": {
     "rx": 6,
