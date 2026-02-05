@@ -148,6 +148,43 @@ namespace SmartHomeDB {
          *
          * @param connectionId Source connection identifier.
          * @param message Message payload as JSON string.
+         *
+         * @note Example request formats:
+         *       \code{.json}
+         *       {
+         *         "jsonrpc": "2.0",
+         *         "method": "database.get",
+         *         "params": {
+         *           "table": "modules",
+         *           "columns": ["logic_address", "config"],
+         *           "where": {"id": 1}
+         *         },
+         *         "id": 42
+         *       }
+         *       \endcode
+         *       \code{.json}
+         *       {
+         *         "jsonrpc": "2.0",
+         *         "method": "database.set",
+         *         "params": {
+         *           "table": "modules",
+         *           "values": {"last_online": "2026-02-05T12:00:00Z"},
+         *           "where": {"id": 1}
+         *         },
+         *         "id": 43
+         *       }
+         *       \endcode
+         *       \code{.json}
+         *       {
+         *         "jsonrpc": "2.0",
+         *         "method": "database.delete",
+         *         "params": {
+         *           "table": "logs",
+         *           "where": {"id": 10}
+         *         },
+         *         "id": 44
+         *       }
+         *       \endcode
          */
         void handleIncoming(SmartHome::connectionId_t connectionId, std::string &&message) override;
 
