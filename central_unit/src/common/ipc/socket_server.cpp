@@ -1,7 +1,6 @@
 #include "socket_server.h"
 
 #include <filesystem>
-#include <iostream>
 #include <ranges>
 
 namespace bs = boost::system;
@@ -11,14 +10,6 @@ namespace SmartHome::IPC {
     SocketServer &SocketServer::Instance() {
         static SocketServer ServerInstance;
         return ServerInstance;
-    }
-
-    SocketServer::SocketServer() = default;
-
-    SocketServer::~SocketServer() {
-        if (mIsSocketServerRunning) {
-            stopSocketServer();
-        }
     }
 
     bool SocketServer::initializeSocketServer(ba::io_context *ioContext,
@@ -74,110 +65,6 @@ namespace SmartHome::IPC {
 
         mIsSocketServerInitialized.store(isIpcLaunchSuccessful);
         return isIpcLaunchSuccessful;
-    }
-
-    void SocketServer::onAcceptError(const bs::error_code &ec) const {
-        // TODO more cases or if?
-        switch (ec.value()) {
-            case ba::error::operation_aborted:
-                mpLogger->info("[SOCKET_SERVER] IPC accept connection aborted");
-                break;
-            default:
-                mpLogger->errorf("[SOCKET_SERVER] IPC accept failed: %s", ec.message().c_str());
-        }
-    }
-
-    void SocketServer::acceptorHandler(const std::shared_ptr<SocketServerConnection> &connection,
-                                       const bs::error_code &ec,
-                                       const SocketConnection::Type type) {
-        if (!ec && mIsSocketServerRunning.load() && mIsAcceptingNewConnections.load()) {
-            onAccept(connection);
-            if (type == SocketConnection::Type::TCP) {
-                startTcpAcceptor();
-            } else {
-                startUdsAcceptor();
-            }
-        } else if (ec) {
-            onAcceptError(ec);
-        }
-    }
-
-
-    void SocketServer::startTcpAcceptor() {
-        auto newTcpConnection = std::make_shared<SocketServerConnection>(
-            *mpIoContext, SocketServerConnection::Type::TCP, mpLogger);
-        auto &socket = std::get<bai::tcp::socket>(newTcpConnection->mSocket);
-
-        mIsAcceptingNewConnections.store(true);
-        mpTcpAcceptor->async_accept(socket, [this, newTcpConnection](const bs::error_code ec) {
-            acceptorHandler(newTcpConnection, ec, SocketConnection::Type::TCP);
-        });
-    }
-
-    void SocketServer::startUdsAcceptor() {
-        auto newUdsConnection = std::make_shared<SocketServerConnection>(
-            *mpIoContext, SocketServerConnection::Type::UDS, mpLogger);
-        auto &socket = std::get<bal::stream_protocol::socket>(newUdsConnection->mSocket);
-
-        mIsAcceptingNewConnections.store(true);
-        mpUdsAcceptor->async_accept(socket, [this, newUdsConnection](const bs::error_code ec) {
-            acceptorHandler(newUdsConnection, ec, SocketConnection::Type::UDS);
-        });
-    }
-
-    void SocketServer::onAccept(const std::shared_ptr<SocketServerConnection> &connection) {
-        // Try fetching unused connection id
-        connectionId_t connectionId;
-        try {
-            connectionId = getNextConnectionId();
-        } catch (std::exception &e) {
-            mpLogger->errorf("[SOCKET_SERVER] Socket server accept failed: %s", e.what());
-            connection->close();
-            // Retry after dealy
-            std::this_thread::sleep_for(1s);
-            return;
-        }
-
-        // TODO add active connections limit
-        // New connection setup
-        connection->setId(connectionId);
-        connection->setCloseCallback([this](const connectionId_t id) {
-            removeActiveConnection(id);
-        });
-
-        // Save new connection to active connections map
-        {
-            std::lock_guard lock(mActiveConnectionsMutex);
-            mActiveConnections[connectionId] = connection;
-        }
-
-        std::visit([connectionId, this](auto &socket) {
-            mpLogger->debugf("[SOCKET_SERVER] Connection accepted (ID:%d)", connectionId);
-        }, connection->mSocket);
-
-        // Start reading incoming messages
-        connection->asyncReadLoop([this, connectionId](const std::string &message) {
-            mpLogger->debugf("[SOCKET_SERVER] Message received: %s", message.c_str());
-            mpApi->handleIncoming(connectionId, message.data());
-        });
-    }
-
-    connectionId_t SocketServer::getNextConnectionId() {
-        std::lock_guard lock(mActiveConnectionsMutex);
-
-        // TODO consider using another method then iteration from 1
-        for (connectionId_t id = 1; id < std::numeric_limits<decltype(id)>::max(); ++id) {
-            if (!mActiveConnections.contains(id)) {
-                return id;
-            }
-        }
-
-        throw std::runtime_error("Could not find free connection id");
-    }
-
-    void SocketServer::removeActiveConnection(const connectionId_t connectionId) {
-        std::lock_guard lock(mActiveConnectionsMutex);
-        mActiveConnections.erase(connectionId);
     }
 
     void SocketServer::runSocketServer() {
@@ -256,12 +143,13 @@ namespace SmartHome::IPC {
     void SocketServer::stopIncomingTraffic() {
         std::scoped_lock lock(mActiveConnectionsMutex);
         for (auto &weakConnection: mActiveConnections | std::views::values) {
-            if (auto connection = weakConnection.lock()) {
+            if (const auto connection = weakConnection.lock()) {
                 connection->shutdownSocket(ba::socket_base::shutdown_receive);
                 //TODO Sockets do not close for incoming traffic consistently - more testing needed
             }
         }
     }
+
 
     bool SocketServer::isRunning() const {
         return mIsSocketServerRunning.load();
@@ -269,7 +157,7 @@ namespace SmartHome::IPC {
 
     std::shared_ptr<SocketServerConnection> SocketServer::getConnection(const connectionId_t connectionId) {
         std::scoped_lock lock(mActiveConnectionsMutex);
-        auto iter = mActiveConnections.find(connectionId);
+        const auto iter = mActiveConnections.find(connectionId);
         if (iter == mActiveConnections.end()) {
             return nullptr;
         }
@@ -287,5 +175,116 @@ namespace SmartHome::IPC {
 
     ba::io_context *SocketServer::getIoContext() const {
         return mpIoContext;
+    }
+
+    SocketServer::SocketServer() = default;
+
+    SocketServer::~SocketServer() {
+        if (mIsSocketServerRunning) {
+            stopSocketServer();
+        }
+    }
+
+    void SocketServer::onAcceptError(const bs::error_code &ec) const {
+        // TODO more cases or if?
+        switch (ec.value()) {
+            case ba::error::operation_aborted:
+                mpLogger->info("[SOCKET_SERVER] IPC accept connection aborted");
+                break;
+            default:
+                mpLogger->errorf("[SOCKET_SERVER] IPC accept failed: %s", ec.message().c_str());
+        }
+    }
+
+    void SocketServer::acceptorHandler(const std::shared_ptr<SocketServerConnection> &connection,
+                                       const bs::error_code &ec,
+                                       const SocketConnection::Type type) {
+        if (!ec && mIsSocketServerRunning.load() && mIsAcceptingNewConnections.load()) {
+            onAccept(connection);
+            if (type == SocketConnection::Type::TCP) {
+                startTcpAcceptor();
+            } else {
+                startUdsAcceptor();
+            }
+        } else if (ec) {
+            onAcceptError(ec);
+        }
+    }
+
+    void SocketServer::startTcpAcceptor() {
+        auto newTcpConnection = std::make_shared<SocketServerConnection>(
+            *mpIoContext, SocketServerConnection::Type::TCP, mpLogger);
+        auto &socket = std::get<bai::tcp::socket>(newTcpConnection->mSocket);
+
+        mIsAcceptingNewConnections.store(true);
+        mpTcpAcceptor->async_accept(socket, [this, newTcpConnection](const bs::error_code ec) {
+            acceptorHandler(newTcpConnection, ec, SocketConnection::Type::TCP);
+        });
+    }
+
+    void SocketServer::startUdsAcceptor() {
+        auto newUdsConnection = std::make_shared<SocketServerConnection>(
+            *mpIoContext, SocketServerConnection::Type::UDS, mpLogger);
+        auto &socket = std::get<bal::stream_protocol::socket>(newUdsConnection->mSocket);
+
+        mIsAcceptingNewConnections.store(true);
+        mpUdsAcceptor->async_accept(socket, [this, newUdsConnection](const bs::error_code ec) {
+            acceptorHandler(newUdsConnection, ec, SocketConnection::Type::UDS);
+        });
+    }
+
+    void SocketServer::onAccept(const std::shared_ptr<SocketServerConnection> &connection) {
+        // Try fetching unused connection id
+        connectionId_t connectionId;
+        try {
+            connectionId = getNextConnectionId();
+        } catch (std::exception &e) {
+            mpLogger->errorf("[SOCKET_SERVER] Socket server accept failed: %s", e.what());
+            connection->close();
+            // Retry after dealy
+            std::this_thread::sleep_for(1s);
+            return;
+        }
+
+        // TODO add active connections limit
+        // New connection setup
+        connection->setId(connectionId);
+        connection->setCloseCallback([this](const connectionId_t id) {
+            removeActiveConnection(id);
+        });
+
+        // Save new connection to active connections map
+        {
+            std::lock_guard lock(mActiveConnectionsMutex);
+            mActiveConnections[connectionId] = connection;
+        }
+
+        std::visit([connectionId, this](auto &socket) {
+            mpLogger->debugf("[SOCKET_SERVER] Connection accepted (ID:%d)", connectionId);
+        }, connection->mSocket);
+
+        // Start reading incoming messages
+        connection->asyncReadLoop([this, connectionId](const std::string &message) {
+            mpLogger->debugf("[SOCKET_SERVER] Message received: %s", message.c_str());
+            mpApi->handleIncoming(connectionId, message.data());
+        });
+    }
+
+    connectionId_t SocketServer::getNextConnectionId() {
+        std::lock_guard lock(mActiveConnectionsMutex);
+
+        // TODO consider using another method then iteration from 1
+        for (connectionId_t id = 1; id < std::numeric_limits<decltype(id)>::max(); ++id) {
+            if (!mActiveConnections.contains(id)) {
+                return id;
+            }
+        }
+
+        throw std::runtime_error("Could not find free connection id");
+    }
+
+    void SocketServer::removeActiveConnection(const connectionId_t connectionId) {
+        std::lock_guard lock(mActiveConnectionsMutex);
+        mActiveConnections.erase(connectionId);
     }
 }

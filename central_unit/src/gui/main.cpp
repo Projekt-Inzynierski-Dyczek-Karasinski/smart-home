@@ -24,7 +24,7 @@ namespace SmartHomeGUI {
     }
 
     void loadGuiYamlConfig(su::ConfigManager &configManager, GuiConfig &config) {
-        std::string root = "core.ipc.uds";
+        const std::string root = "core.ipc.uds";
 
         configManager.getValue(root + ".enabled", config.udsEnabled);
         configManager.getValue(root + ".socket_path", config.udsPath);
@@ -51,11 +51,11 @@ namespace SmartHomeGUI {
 
 int main(int argc, char *argv[]) {
     qputenv("QT_QPA_PLATFORM", "wayland;xcb");
-    QGuiApplication app(argc, argv);
+    const QGuiApplication app(argc, argv);
     QQmlApplicationEngine engine;
 
     // TODO consider adding program options beside Qt options
-    auto logger = std::make_shared<su::Logger>();
+    const auto logger = std::make_shared<su::Logger>();
     SmartHomeGUI::GuiConfig guiConfig;
 
     SmartHomeGUI::loadConfigs(logger, guiConfig);
@@ -78,12 +78,12 @@ int main(int argc, char *argv[]) {
 
     QObject::connect(
         &engine, &QQmlApplicationEngine::objectCreationFailed,
-        &app, []() { QCoreApplication::exit(-1); },
+        &app, [] { QCoreApplication::exit(-1); },
         Qt::QueuedConnection
     );
 
     engine.load(url);
 
     logger->info("[MAIN] Launching Qt app");
-    return app.exec();
+    return QGuiApplication::exec();
 }

@@ -88,6 +88,8 @@ namespace SmartHomeMediator {
          * @brief Change baud rate.
          *
          * @param baudRate New baud rate.
+         *
+         * @throws bs::system_error when baud rate change fails.
          */
         void setBaudRate(uint baudRate);
 
@@ -96,7 +98,7 @@ namespace SmartHomeMediator {
          *
          * @return Current baud rate.
          */
-        uint getBaudRate() const;
+        [[nodiscard]] uint getBaudRate() const;
 
         /**
          * @brief Cancel all pending operations on port.

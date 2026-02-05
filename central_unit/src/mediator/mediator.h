@@ -100,7 +100,7 @@ namespace SmartHomeMediator {
          *
          * @return true if Mediator is running, false otherwise.
          */
-        bool isRunning() const;
+        [[nodiscard]] bool isRunning() const;
 
         /**
          * @brief Main IO context getter.

@@ -31,7 +31,7 @@ namespace SmartHome::Exceptions {
          *
          * @return Exception code.
          */
-        ExceptionCodes getCode() const {
+        [[nodiscard]] ExceptionCodes getCode() const {
             return mCode;
         }
 
@@ -40,7 +40,7 @@ namespace SmartHome::Exceptions {
          *
          * @return Exception message.
          */
-        const char *what() const noexcept override {
+        [[nodiscard]] const char *what() const noexcept override {
             return mMessage.c_str();
         }
     };

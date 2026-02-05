@@ -8,7 +8,7 @@
 namespace SmartHomeMediator {
     HC12Driver::HC12Driver(ba::io_context &ioContext,
                            const std::shared_ptr<su::Logger> &logger,
-                           Config config)
+                           const Config &config)
         : mpLogger(logger),
           mIoContext(ioContext),
           mOriginalBaudRate(config.uartBaudrate),
@@ -74,7 +74,7 @@ namespace SmartHomeMediator {
     }
 
     ba::awaitable<std::vector<uint8_t> > HC12Driver::read() {
-        co_return co_await mpUart->readAsync();;
+        co_return co_await mpUart->readAsync();
     }
 
     ba::awaitable<bool> HC12Driver::setOption(std::string option,
@@ -129,7 +129,7 @@ namespace SmartHomeMediator {
             throw;
         }
 
-        int currentBaudRate = -1; // Default to negative number (invalid baud rate)
+        long currentBaudRate = -1; // Default to negative number (invalid baud rate)
         if (parsedOption == Hc12Option::BAUDRATE) {
             currentBaudRate = mpUart->getBaudRate();
             mpLogger->debugf("[HC12_DRIVER] [SET_OPTION] current baudrate %d", currentBaudRate);
@@ -146,6 +146,7 @@ namespace SmartHomeMediator {
                 try {
                     co_await exitConfigMode();
                 } catch (const std::exception &e) {
+                    mpLogger->errorf("[HC12_DRIVER] [SET_OPTION] exitConfig error after baudrate change: %s", e.what());
                     throw;
                 }
 
@@ -159,6 +160,8 @@ namespace SmartHomeMediator {
                 try {
                     co_await enterConfigMode();
                 } catch (const std::exception &e) {
+                    mpLogger->errorf("[HC12_DRIVER] [SET_OPTION] enterConfig error after baudrate change: %s",
+                                     e.what());
                     throw;
                 }
 
@@ -351,8 +354,8 @@ namespace SmartHomeMediator {
 
         auto response = co_await mpUart->readUntil(timeout);
 
-        std::string commandStr = {command.begin(), command.end()};
-        std::string responseStr = {response.begin(), response.end()};
+        const std::string commandStr = {command.begin(), command.end()};
+        const std::string responseStr = {response.begin(), response.end()};
 
         mpLogger->debugf("[HC12_DRIVER] AT command: %s -> %s", commandStr.c_str(), responseStr.c_str());
 

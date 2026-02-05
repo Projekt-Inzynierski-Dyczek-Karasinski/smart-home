@@ -22,13 +22,9 @@ namespace SmartHome {
             co_return commandResult;
         }
 
-
-        const auto &params = command.params.value();
         API::ApiRequest requestToDatabase;
 
-        auto &databaseRequestParams = prepareRequestToDatabase(requestToDatabase, command);
-        databaseRequestParams[JsonRpcStrings::ParamsKeys::METHOD_PARAMS] = params; // Copy original params
-
+        prepareRequestToDatabase(requestToDatabase, command);
 
         commandResult = co_await sendRequestToDbService(std::move(requestToDatabase), commandMetadata);
 
@@ -45,17 +41,12 @@ namespace SmartHome {
         };
 
         const API::InternalApi::Method method(API::InternalApi::MethodTypes::GET);
-        request.method = method.to_string();
+
+        request.method = API::getTargetMethodString(ai::Target(ai::TargetTypes::DATABASE).to_string(),
+                                                    method.to_string());
         request.id = Actions::getNextId();
 
-
-        const API::InternalApi::Target target(API::InternalApi::TargetTypes::DATABASE);
-
-        request.params = nlohmann::json::object({
-            {JsonRpcStrings::ParamsKeys::TARGET, target.to_string()},
-            {JsonRpcStrings::ParamsKeys::METHOD_PARAMS, dbQuery}
-        });
-
+        request.params = dbQuery;
 
         API::InternalApi::Command command(request);
         auto pCmdMeta = std::make_shared<Actions::CommandMetadata>(
@@ -125,14 +116,10 @@ namespace SmartHome {
         };
 
         const API::InternalApi::Method method(API::InternalApi::MethodTypes::SET);
-        notification.method = method.to_string();
+        notification.method = API::getTargetMethodString(ai::Target(ai::TargetTypes::DATABASE).to_string(),
+                                                         method.to_string());
 
-        const API::InternalApi::Target target(API::InternalApi::TargetTypes::DATABASE);
-
-        notification.params = nlohmann::json::object({
-            {JsonRpcStrings::ParamsKeys::TARGET, target.to_string()},
-            {JsonRpcStrings::ParamsKeys::METHOD_PARAMS, dbQuery}
-        });
+        notification.params = dbQuery;
 
         sendNotificationToDbService(std::move(notification));
     }
@@ -153,14 +140,10 @@ namespace SmartHome {
         };
 
         const API::InternalApi::Method method(API::InternalApi::MethodTypes::SET);
-        notification.method = method.to_string();
+        notification.method = API::getTargetMethodString(ai::Target(ai::TargetTypes::DATABASE).to_string(),
+                                                         method.to_string());
 
-        const API::InternalApi::Target target(API::InternalApi::TargetTypes::DATABASE);
-
-        notification.params = nlohmann::json::object({
-            {JsonRpcStrings::ParamsKeys::TARGET, target.to_string()},
-            {JsonRpcStrings::ParamsKeys::METHOD_PARAMS, dbQuery}
-        });
+        notification.params = dbQuery;
 
         sendNotificationToDbService(std::move(notification));
     }
@@ -184,14 +167,10 @@ namespace SmartHome {
         };
 
         const API::InternalApi::Method method(API::InternalApi::MethodTypes::SET);
-        notification.method = method.to_string();
+        notification.method = API::getTargetMethodString(ai::Target(ai::TargetTypes::DATABASE).to_string(),
+                                                         method.to_string());
 
-        const API::InternalApi::Target target(API::InternalApi::TargetTypes::DATABASE);
-
-        notification.params = nlohmann::json::object({
-            {JsonRpcStrings::ParamsKeys::TARGET, target.to_string()},
-            {JsonRpcStrings::ParamsKeys::METHOD_PARAMS, dbQuery}
-        });
+        notification.params = dbQuery;
 
         sendNotificationToDbService(std::move(notification));
     }
@@ -204,7 +183,7 @@ namespace SmartHome {
         {
             std::scoped_lock lock(Actions::msConnectionTypeMapLock);
 
-            auto iter = Actions::msConnectionTypeMap.find(sai::TargetTypes::DATABASE);
+            const auto iter = Actions::msConnectionTypeMap.find(sai::TargetTypes::DATABASE);
             if (iter != Actions::msConnectionTypeMap.end() && !iter->second.empty()) {
                 dbServiceConnectionId = *iter->second.begin();
                 foundDbServiceConnection = true;
@@ -296,13 +275,12 @@ namespace SmartHome {
         return true;
     }
 
-    nlohmann::json &DatabaseActions::prepareRequestToDatabase(API::ApiRequest &request,
-                                                              const API::InternalApi::Command &command) {
+    void DatabaseActions::prepareRequestToDatabase(API::ApiRequest &request,
+                                                   const API::InternalApi::Command &command) {
         request.id = command.commandId;
-        request.method = command.method.to_string();
-        request.params.emplace(nlohmann::json());
-        request.params.value()[JsonRpcStrings::ParamsKeys::TARGET] = ai::Target(ai::TargetTypes::DATABASE).to_string();
+        request.method = API::getTargetMethodString(ai::Target(ai::TargetTypes::DATABASE).to_string(),
+                                                    command.method.to_string());
 
-        return request.params.value();
+        request.params = command.params;
     }
 }

@@ -5,9 +5,8 @@
 #include <yaml-cpp/yaml.h>
 
 namespace SmartHome::Utils {
-
-    ConfigManager::ConfigManager(const std::shared_ptr<Logger> &logger): mpLogger(logger) {
-    } ;
+    ConfigManager::ConfigManager(const std::shared_ptr<Logger> &logger) : mpLogger(logger) {
+    }
 
     bool ConfigManager::loadConfig(const std::string &configPath) {
         try {

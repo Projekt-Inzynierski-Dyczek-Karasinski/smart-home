@@ -98,7 +98,7 @@ namespace SmartHome::Utils {
     }
 
     void Logger::setupNewLogFile() {
-        auto parentPath = std::filesystem::path(mFilePath).parent_path();
+        const auto parentPath = std::filesystem::path(mFilePath).parent_path();
         if (std::filesystem::exists(parentPath)) {
             // Clear existing file or create new file
             std::ofstream(mFilePath, std::ios::trunc);

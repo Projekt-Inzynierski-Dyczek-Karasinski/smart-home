@@ -111,7 +111,7 @@ namespace SmartHomeDB {
          *
          * @return true if DatabaseService is running, false otherwise.
          */
-        bool isRunning() const;
+        [[nodiscard]] bool isRunning() const;
 
         /**
          * @brief Utility IO context getter.

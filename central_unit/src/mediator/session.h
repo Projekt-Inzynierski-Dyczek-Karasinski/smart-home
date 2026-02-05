@@ -140,7 +140,7 @@ namespace SmartHomeMediator {
          *
          * @return Awaitable with JSON-RPC response string.
          */
-        ba::awaitable<std::string> handleMediatorConfigSession() const;
+        [[nodiscard]] ba::awaitable<std::string> handleMediatorConfigSession() const;
 
         /**
          * @brief Process current state in session state machine.
@@ -154,7 +154,7 @@ namespace SmartHomeMediator {
          *
          * @param message Binary message to transmit.
          */
-        ba::awaitable<void> send(const std::vector<uint8_t> &message) const;
+        [[nodiscard]] ba::awaitable<void> send(const std::vector<uint8_t> &message) const;
 
         /**
          * @brief Receive message from packet buffer.
@@ -172,7 +172,7 @@ namespace SmartHomeMediator {
          *
          * @return Awaitable with true on success, false on failure.
          */
-        ba::awaitable<bool> changeChannel(uint8_t channel) const;
+        [[nodiscard]] ba::awaitable<bool> changeChannel(uint8_t channel) const;
 
         /**
          * @brief Acquire exclusive connection to target module.

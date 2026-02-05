@@ -18,15 +18,6 @@ namespace SmartHome {
         return CoreInstance;
     }
 
-    Core::Core() = default;
-
-    Core::~Core() {
-        // FIXME rework shutdown - implement shutdown from db-service
-        if (mIsRunning.load()) {
-            shutdown();
-        }
-    }
-
     bool Core::initialize(const Config &configStruct, const std::shared_ptr<Utils::Logger> &logger) {
         if (mIsInitialized.load()) {
             logger->error("[CORE] Core already initialized");
@@ -226,13 +217,22 @@ namespace SmartHome {
         return mCoreUtilityIoContext;
     }
 
-
     ba::io_context &Core::getCoreWorkerIoContext() {
         return mCoreWorkerIoContext;
     }
 
     ba::io_context &Core::getCoreIoContext() {
         return mCoreIoContext;
+    }
+
+
+    Core::Core() = default;
+
+    Core::~Core() {
+        // FIXME rework shutdown - implement shutdown from db-service
+        if (mIsRunning.load()) {
+            shutdown();
+        }
     }
 
     void Core::signalHandler(const boost::system::error_code &ec, const int signal) {

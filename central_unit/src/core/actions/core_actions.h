@@ -40,6 +40,7 @@ namespace SmartHome {
          */
         static awaitOptApiResponse coreEchoHandler(const cmdMetaPtr &commandMetadata);
 
+        // FIXME Rewrite needed
         /**
          * @brief Handle GET command for core data retrieval.
          *
@@ -65,7 +66,7 @@ namespace SmartHome {
          *
          * @return API response with confirmation or error.
          *
-         * @note Expected params format: [key<string>, value<string>]
+         * @note Expected params format: {key: value}
          */
         static awaitOptApiResponse coreSetHandler(const cmdMetaPtr &commandMetadata);
 

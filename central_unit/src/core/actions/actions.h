@@ -6,7 +6,6 @@
 #include <unordered_set>
 
 #include <boost/asio.hpp>
-#include <boost/algorithm/string/case_conv.hpp>
 
 namespace ba = boost::asio;
 using sai = SmartHome::API::InternalApi;
@@ -168,6 +167,8 @@ namespace SmartHome {
          * @brief Generate unique request ID.
          *
          * @return Next sequential ID value.
+         *
+         * @note Uses \c API::getNextApiId atomic counter.
          */
         static apiId_t getNextId();
 

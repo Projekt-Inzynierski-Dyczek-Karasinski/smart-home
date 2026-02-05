@@ -47,7 +47,7 @@ namespace SmartHomeMediator {
          *
          * @throws std::runtime_error on failure.
          */
-        int read() const;
+        [[nodiscard]] int read() const;
 
     private:
         gpiod::chip mChip;

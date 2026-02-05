@@ -1,11 +1,14 @@
 #include "api.h"
 
+#include <atomic>
 #include <iostream>
 
 #include <boost/algorithm/string/split.hpp>
 #include <boost/algorithm/string/classification.hpp>
 
 namespace SmartHome::API {
+    using namespace std::string_literals;
+
     ApiId::ApiId(const apiId_t value) : mState(State::HAS_VALUE), mValue(value) {
     }
 
@@ -45,7 +48,8 @@ namespace SmartHome::API {
         } else if (iter->is_number() && iter.value() != nullptr) {
             mValue = json[JsonRpcStrings::Keys::ID];
             mState = State::HAS_VALUE;
-        } else if (iter->is_string() && iter.value() == JsonRpcStrings::Constants::NULL_VALUE || iter.value() == nullptr) {
+        } else if (iter->is_string() && iter.value() == JsonRpcStrings::Constants::NULL_VALUE ||
+                   iter.value() == nullptr) {
             mState = State::NULL_VALUE;
         } else {
             throw std::runtime_error("Cannot cast json to ApiId - Invalid ID value");
@@ -79,7 +83,7 @@ namespace SmartHome::API {
         data = newData;
     }
 
-    nlohmann::json ApiError::to_json() {
+    nlohmann::json ApiError::to_json() const {
         nlohmann::json json;
 
         json[JsonRpcStrings::ErrorKeys::CODE] = code;
@@ -89,7 +93,7 @@ namespace SmartHome::API {
         return json;
     }
 
-    std::string ApiError::to_string() {
+    std::string ApiError::to_string() const {
         return nlohmann::to_string(to_json());
     }
 
@@ -135,20 +139,6 @@ namespace SmartHome::API {
         }
     }
 
-    ApiRequest ApiRequest::operator()(const nlohmann::json &value) {
-        setValues(value);
-        return *this;
-    }
-
-    ApiRequest ApiRequest::operator()(std::string_view value) {
-        if (nlohmann::json::accept(value)) {
-            setValues(nlohmann::json::parse(value));
-        } else {
-            setValues(value);
-        }
-        return *this;
-    }
-
     nlohmann::json ApiRequest::to_json() const {
         nlohmann::json json;
 
@@ -162,6 +152,20 @@ namespace SmartHome::API {
 
     std::string ApiRequest::to_string() const {
         return nlohmann::to_string(to_json());
+    }
+
+    ApiRequest ApiRequest::operator()(const nlohmann::json &value) {
+        setValues(value);
+        return *this;
+    }
+
+    ApiRequest ApiRequest::operator()(std::string_view value) {
+        if (nlohmann::json::accept(value)) {
+            setValues(nlohmann::json::parse(value));
+        } else {
+            setValues(value);
+        }
+        return *this;
     }
 
     void ApiRequest::setValues(const nlohmann::json &json) {
@@ -197,36 +201,38 @@ namespace SmartHome::API {
 
     void ApiRequest::setValues(const std::string_view string) {
         std::vector<std::string> splitRequest = {};
-        boost::split(splitRequest, string, boost::is_any_of(" "));
+        boost::split(splitRequest, string, boost::is_any_of(" "), boost::token_compress_on);
 
-        if (splitRequest.size() < 2) {
-            throw std::invalid_argument("Invalid raw string request: request must have at least target and method");
+        if (splitRequest.empty() || splitRequest[0].empty()) {
+            throw std::invalid_argument("Invalid raw string request: request must have target.method or target method");
         }
 
         jsonrpc = JsonRpcStrings::Constants::VERSION.data();
-        params.emplace(nlohmann::json());
+        params.emplace(nlohmann::json::object());
         auto &paramsJsonObject = params.value();
-        paramsJsonObject[JsonRpcStrings::ParamsKeys::TARGET] = splitRequest[0];
-        method = splitRequest[1];
-        id = static_cast<apiId_t>(0);
 
-        if (splitRequest.size() > 2) {
-            paramsJsonObject[JsonRpcStrings::ParamsKeys::METHOD_PARAMS] = nlohmann::json::array();
-            for (size_t i = 2; i < splitRequest.size(); i++) {
-                emplaceParameter(paramsJsonObject[JsonRpcStrings::ParamsKeys::METHOD_PARAMS], splitRequest[i]);
+        size_t paramsStartIndex = 0;
+        if (splitRequest[0].find('.') != std::string::npos) {
+            method = splitRequest[0];
+            paramsStartIndex = 1;
+        } else {
+            if (splitRequest.size() < 2) {
+                throw std::invalid_argument(
+                    "Invalid raw string request: request must have target.method or target method");
+            }
+            method = getTargetMethodString(splitRequest[0], splitRequest[1]);
+            paramsStartIndex = 2;
+        }
+
+        id = getNextApiId();
+
+        if (splitRequest.size() > paramsStartIndex) {
+            for (size_t i = paramsStartIndex; i < splitRequest.size(); i++) {
+                if (!splitRequest[i].empty()) {
+                    emplaceParameter(paramsJsonObject, splitRequest[i]);
+                }
             }
         }
-    }
-
-    ApiResponse ApiResponse::operator()(const nlohmann::json &value) {
-        setValues(value);
-        return *this;
-    }
-
-    ApiResponse ApiResponse::operator()(std::string_view value) {
-        const nlohmann::json json = nlohmann::json::parse(value);
-        setValues(json);
-        return *this;
     }
 
     ApiResponse::ApiResponse(const nlohmann::json &json) {
@@ -260,6 +266,17 @@ namespace SmartHome::API {
         return nlohmann::to_string(to_json());
     }
 
+    ApiResponse ApiResponse::operator()(const nlohmann::json &value) {
+        setValues(value);
+        return *this;
+    }
+
+    ApiResponse ApiResponse::operator()(std::string_view value) {
+        const nlohmann::json json = nlohmann::json::parse(value);
+        setValues(json);
+        return *this;
+    }
+
     void ApiResponse::setValues(const nlohmann::json &json) {
         if (!(json.contains(JsonRpcStrings::Keys::JSONRPC) &&
               json[JsonRpcStrings::Keys::JSONRPC].get<std::string>() == JsonRpcStrings::Constants::VERSION.data())) {
@@ -285,13 +302,35 @@ namespace SmartHome::API {
         else throw std::invalid_argument("Invalid JSON-RPC request: response must contain either result or error");
 
         jsonrpc = json[JsonRpcStrings::Keys::JSONRPC];
-        auto & idJson = json[JsonRpcStrings::Keys::ID];
+        auto &idJson = json[JsonRpcStrings::Keys::ID];
         if (idJson.is_number()) {
             id = idJson.get<int>();
-        }
-        else if (idJson == nullptr || idJson.is_null()) {
+        } else if (idJson == nullptr || idJson.is_null()) {
             id = nullptr;
         }
+    }
+
+    std::string getTargetMethodString(std::string_view target, std::string_view method) {
+        if (target.empty()) {
+            target = "<undefined>";
+        }
+        if (method.empty()) {
+            method = "<undefined>";
+        }
+        return std::string(target) + "." + std::string(method);
+    }
+
+    std::pair<std::string, std::string> parseTargetMethodString(std::string_view targetMethodStr) {
+        const auto dotPos = targetMethodStr.find('.');
+
+        if (dotPos == std::string_view::npos || dotPos == 0 || dotPos == targetMethodStr.size() - 1) {
+            throw std::invalid_argument("Invalid target.method string: "s + targetMethodStr.data());
+        }
+
+        const auto target = std::string(targetMethodStr.substr(0, dotPos));
+        const auto method = std::string(targetMethodStr.substr(dotPos + 1));
+
+        return {target, method};
     }
 
     std::string_view errorCodeToString(const ErrorCodes errorCode) {
@@ -324,20 +363,64 @@ namespace SmartHome::API {
     }
 
     nlohmann::json parseValue(std::string_view value) {
+        auto isDigitChar = [](const unsigned char character) {
+            return std::isdigit(character) != 0;
+        };
+
+        auto isInteger = [&](const std::string_view string) {
+            if (string.empty()) return false;
+
+            size_t iter = 0;
+            if (string[iter] == '-') {
+                if (string.size() == 1) return false;
+                iter = 1;
+            }
+
+            for (; iter < string.size(); ++iter) {
+                if (!isDigitChar(static_cast<unsigned char>(string[iter]))) return false;
+            }
+
+            return true;
+        };
+
+        auto isFloat = [&](const std::string_view string) {
+            if (string.empty()) return false;
+
+            size_t iter = 0;
+            if (string[iter] == '-') {
+                if (string.size() == 1) return false;
+                iter = 1;
+            }
+
+            bool hasDot = false;
+            bool hasDigit = false;
+
+            for (; iter < string.size(); ++iter) {
+                const auto character = static_cast<unsigned char>(string[iter]);
+                if (character == '.') {
+                    if (hasDot) return false; // Multiple dots not allowed
+                    hasDot = true;
+                    continue;
+                }
+                if (!isDigitChar(character)) return false;
+                hasDigit = true;
+            }
+            return hasDot && hasDigit;
+        };
+
         // Check int
-        if (std::ranges::all_of(value, isdigit)) {
+        if (isInteger(value)) {
             try {
-                long result = std::stoi(value.data());
-                return result;
+                return std::stoll(std::string(value));
             } catch (...) {
                 // Value is not a valid int, continuing parsing attempts
             }
         }
 
         // Check float
-        if (value.find('.') != std::string_view::npos) {
+        if (isFloat(value)) {
             try {
-                return std::stod(value.data());
+                return std::stod(std::string(value));
             } catch (...) {
                 // Value is not a valid float, continuing parsing attempts
             }
@@ -367,20 +450,26 @@ namespace SmartHome::API {
         const auto equalsPos = parameter.find('=');
 
         if (equalsPos == std::string_view::npos) {
-            params.emplace_back(parseValue(parameter));
+            if (!params.contains(JsonRpcStrings::ParamsKeys::ARGS) ||
+                !params[JsonRpcStrings::ParamsKeys::ARGS].is_array()) {
+                params[JsonRpcStrings::ParamsKeys::ARGS] = nlohmann::json::array();
+            }
+            params[JsonRpcStrings::ParamsKeys::ARGS].push_back(parseValue(parameter));
             return;
         }
 
-        std::string_view key = parameter.substr(0, equalsPos);
+        const std::string_view key = parameter.substr(0, equalsPos);
         std::string_view value = parameter.substr(equalsPos + 1);
 
-        nlohmann::json param;
+        if (key.empty()) {
+            throw std::invalid_argument("Invalid raw string request: empty key in key=value parameter");
+        }
 
         bool isJsonParseSuccessful = false;
         //Check for an JSON object
         if (nlohmann::json::accept(value)) {
             try {
-                param[key] = nlohmann::json::parse(value);
+                params[std::string(key)] = nlohmann::json::parse(value);
                 isJsonParseSuccessful = true;
             } catch (...) {
             }
@@ -389,10 +478,18 @@ namespace SmartHome::API {
         if (!isJsonParseSuccessful && value.find(',') != std::string_view::npos) {
             std::vector<std::string> values;
             boost::split(values, value, boost::is_any_of(","));
-            param[key] = parseVector(values);
-        } else {
-            param[key] = parseValue(value);
+            params[std::string(key)] = parseVector(values);
+        } else if (!isJsonParseSuccessful) {
+            params[std::string(key)] = parseValue(value);
         }
-        params.emplace_back(param);
+    }
+
+    apiId_t getNextApiId() {
+        static std::atomic<apiId_t> id = 0;
+        apiId_t expected = std::numeric_limits<apiId_t>::max(); // Wrap around check
+        if (id.compare_exchange_strong(expected, 0, std::memory_order::relaxed)) [[unlikely]] {
+            return expected; // Return max value before wrap around
+        }
+        return id.fetch_add(1, std::memory_order::relaxed);
     }
 }

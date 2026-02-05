@@ -98,7 +98,7 @@ namespace SmartHomeDB {
          * @param pDbClient Shared pointer to DatabaseClient used to execute queries.
          */
         explicit DatabaseApi(const std::shared_ptr<DatabaseClient> &pDbClient) : mpDatabaseClient(pDbClient) {
-        };
+        }
 
         /**
          * @brief Set outgoing message callback.
@@ -121,24 +121,23 @@ namespace SmartHomeDB {
                                                 SmartHome::API::ApiId apiId);
 
         /**
-                * @brief Convert pqxx::field to JSON value.
-                *
-                * @param field Database field to convert.
-                *
-                * @return JSON representation of the field value.
-                */
+         * @brief Convert pqxx::field to JSON value.
+         *
+         * @param field Database field to convert.
+         *
+         * @return JSON representation of the field value.
+         */
         static nlohmann::json fieldValueToJson(const pqxx::field &field);
 
         /**
-          * @brief Transform an API request into a database query.
-          *
-          * @param request ApiRequest containing request parameters.
-          *
-          * @return Prepared DatabaseClient::DbQuery ready for execution.
-          *
-          * @throws std::runtime_error If request is invalid or missing required fields.
-          *
-          */
+         * @brief Transform an API request into a database query.
+         *
+         * @param request ApiRequest containing request parameters.
+         *
+         * @return Prepared DatabaseClient::DbQuery ready for execution.
+         *
+         * @throws std::runtime_error If request is invalid or missing required fields.
+         */
         static DatabaseClient::DbQuery apiRequestToDbQuery(const SmartHome::API::ApiRequest &request);
 
         /**
@@ -148,6 +147,43 @@ namespace SmartHomeDB {
          *
          * @param connectionId Source connection identifier.
          * @param message Message payload as JSON string.
+         *
+         * @note Example request formats:
+         *       \code{.json}
+         *       {
+         *         "jsonrpc": "2.0",
+         *         "method": "database.get",
+         *         "params": {
+         *           "table": "modules",
+         *           "columns": ["logic_address", "config"],
+         *           "where": {"id": 1}
+         *         },
+         *         "id": 42
+         *       }
+         *       \endcode
+         *       \code{.json}
+         *       {
+         *         "jsonrpc": "2.0",
+         *         "method": "database.set",
+         *         "params": {
+         *           "table": "modules",
+         *           "values": {"last_online": "2026-02-05T12:00:00Z"},
+         *           "where": {"id": 1}
+         *         },
+         *         "id": 43
+         *       }
+         *       \endcode
+         *       \code{.json}
+         *       {
+         *         "jsonrpc": "2.0",
+         *         "method": "database.delete",
+         *         "params": {
+         *           "table": "logs",
+         *           "where": {"id": 10}
+         *         },
+         *         "id": 44
+         *       }
+         *       \endcode
          */
         void handleIncoming(SmartHome::connectionId_t connectionId, std::string &&message) override;
 

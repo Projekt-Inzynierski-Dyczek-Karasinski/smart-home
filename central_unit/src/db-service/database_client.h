@@ -68,7 +68,7 @@ namespace SmartHomeDB {
                                 const std::shared_ptr<DatabaseConnectionManager> &pDbConnManager)
             : mIoContext(ioContext),
               mpDbConnManager(pDbConnManager) {
-        };
+        }
 
         /**
         * @brief Execute a single database query asynchronously.

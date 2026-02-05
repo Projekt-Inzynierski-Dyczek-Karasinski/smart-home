@@ -184,28 +184,28 @@ namespace SmartHomeMediator::RfTypes {
          *
          * @return Span view of packet's 16 bytes.
          */
-        std::span<const uint8_t> as_bytes() const;
+        [[nodiscard]] std::span<const uint8_t> as_bytes() const;
 
         /**
          * @brief Serialize packet to byte vector.
          *
          * @return Vector with 16-byte packet representation.
          */
-        std::vector<uint8_t> to_vector() const;
+        [[nodiscard]] std::vector<uint8_t> to_vector() const;
 
         /**
          * @brief Validate packet checksum and end marker.
          *
          * @return true if packet passes validation, false otherwise.
          */
-        bool isValid() const;
+        [[nodiscard]] bool isValid() const;
 
         /**
          * @brief Check if this is the last packet in multi-packet message.
          *
          * @return true if packetsLeft == 0, false otherwise.
          */
-        bool isLastPacket() const;
+        [[nodiscard]] bool isLastPacket() const;
 
         /**
          * @brief Get maximum payload size in bytes.
@@ -337,7 +337,7 @@ namespace SmartHomeMediator::RfTypes {
          *
          * @return JSON object with singular value.
          */
-        nlohmann::json parameterToJson() const;
+        [[nodiscard]] nlohmann::json parameterToJson() const;
 
         /**
          * @brief Serialize parameter to binary format.
@@ -346,7 +346,7 @@ namespace SmartHomeMediator::RfTypes {
          *
          * @return Vector with binary representation.
          */
-        std::vector<uint8_t> to_vector() const;
+        [[nodiscard]] std::vector<uint8_t> to_vector() const;
     };
 
 
@@ -395,7 +395,7 @@ namespace SmartHomeMediator::RfTypes {
          *
          * @return Command type.
          */
-        CommandType getType() const;
+        [[nodiscard]] CommandType getType() const;
 
         std::optional<SmartHome::apiId_t> requestId;
     };
@@ -430,7 +430,7 @@ namespace SmartHomeMediator::RfTypes {
          *
          * @return Vector with binary representation for RF transmission.
          */
-        std::vector<uint8_t> to_vector() const;
+        [[nodiscard]] std::vector<uint8_t> to_vector() const;
     };
 
     /**

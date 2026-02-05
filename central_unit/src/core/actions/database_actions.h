@@ -115,16 +115,13 @@ namespace SmartHome {
         /**
          * @brief Prepare a request object to be sent to the database.
          *
-         * @details Initializes id, method and a params object and sets the internal
-         *          target to \c "database" so downstream code can append method-specific
-         *          payload into the returned params reference.
+         * @details Initializes id, method and a params object.
          *
          * @param request API request to populate.
          * @param command Command providing id and method values.
          *
-         * @return Reference to the newly created params JSON object within \p request.
          */
-        static nlohmann::json &prepareRequestToDatabase(API::ApiRequest &request,
-                                                        const API::InternalApi::Command &command);
+        static void prepareRequestToDatabase(API::ApiRequest &request,
+                                             const API::InternalApi::Command &command);
     };
 }

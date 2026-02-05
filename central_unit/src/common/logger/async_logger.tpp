@@ -7,7 +7,7 @@ namespace SmartHome::Utils {
 
         std::string message = AsyncLogger::formatMessage(format, args...);
 
-        ba::post(mIoStrand, [this, level, message]() {
+        ba::post(mIoStrand, [this, level, message] {
             writeLog(level, message);
         });
     }

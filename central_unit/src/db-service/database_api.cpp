@@ -107,40 +107,39 @@ namespace SmartHomeDB {
         }
 
         const auto &params = request.params.value();
-
-        if (!params.contains(sj::ParamsKeys::TARGET) || params[sj::ParamsKeys::TARGET] != msTARGET_STR) {
-            throw std::runtime_error("Missing or invalid 'target' field");
+        if (!params.is_object()) {
+            throw std::runtime_error("Parameters must be an object");
         }
 
-        if (!params.contains(sj::ParamsKeys::METHOD_PARAMS)) {
-            throw std::runtime_error("Missing 'method_params' field");
+        auto [targetStr, methodStr] = SmartHome::API::parseTargetMethodString(request.method);
+        if (toLower(targetStr) != "database") {
+            throw std::runtime_error("Invalid target - expected 'database'");
         }
 
-        const auto &methodParams = params[sj::ParamsKeys::METHOD_PARAMS];
+        const auto methodLower = toLower(methodStr);
 
-        if (!methodParams.contains(ak::TABLE_STR) || !methodParams[ak::TABLE_STR].is_string()) {
+        if (!params.contains(ak::TABLE_STR) || !params[ak::TABLE_STR].is_string()) {
             throw std::runtime_error("Missing or invalid 'table' field");
         }
 
-        const std::string table = methodParams[ak::TABLE_STR];
+        const std::string table = params[ak::TABLE_STR];
 
-
-        if (request.method == ak::GET_STR) {
-            return buildSelectQuery(table, methodParams);
+        if (methodLower == ak::GET_STR) {
+            return buildSelectQuery(table, params);
         }
-        if (request.method == ak::SET_STR) {
-            if (!methodParams.contains(sk::WHERE_STR) && !methodParams.contains(ak::VALUES_STR)) {
+        if (methodLower == ak::SET_STR) {
+            if (!params.contains(sk::WHERE_STR) && !params.contains(ak::VALUES_STR)) {
                 throw std::runtime_error("SET requires either 'where' (for UPDATE) or full 'values' (for INSERT)");
             }
 
-            if (methodParams.contains(sk::WHERE_STR)) {
-                return buildUpdateQuery(table, methodParams);
+            if (params.contains(sk::WHERE_STR)) {
+                return buildUpdateQuery(table, params);
             }
 
-            return buildInsertQuery(table, methodParams);
+            return buildInsertQuery(table, params);
         }
-        if (request.method == ak::DELETE_STR) {
-            return buildDeleteQuery(table, methodParams);
+        if (methodLower == ak::DELETE_STR) {
+            return buildDeleteQuery(table, params);
         }
 
 
@@ -181,7 +180,7 @@ namespace SmartHomeDB {
                 try {
                     requestApi(item);
                 } catch (const std::exception &e) {
-                    pLogger->errorf("[DB_API] Failed to parse batch JSON request into API request: %s]", e.what());
+                    pLogger->errorf("[DB_API] Failed to parse batch JSON request into API request: %s", e.what());
                     errorApi.data = "Failed to parse batch JSON request into API request: "s + e.what();
                     break;
                 }
@@ -231,7 +230,11 @@ namespace SmartHomeDB {
                     callbackResponseApi.error = callbackErrorApi;
 
                     for (const auto id: apiIds) {
-                        if (!id.hasValue()) continue;
+                        if (!id.hasValue()) {
+                            pLogger->debug("[DB_API] Skipping response for request with null ID in batch");
+                            pLogger->debugf("[DB_API] Skipped response: %s", (callbackResponseApi.to_string().c_str()));
+                            continue;
+                        }
                         callbackResponseApi.id = id;
                         resultJsonArray.push_back(callbackResponseApi.to_json());
                     }
@@ -307,10 +310,15 @@ namespace SmartHomeDB {
 
         mpDatabaseClient->handleQuery(
             query, [this, connectionId, apiId, pLogger](DatabaseClient::DbQueryResult &&result) {
-                if (!apiId.hasValue()) return;
                 const auto responseJson = dbResultToApiJson(std::move(result), apiId);
                 if (responseJson.empty()) {
                     pLogger->debug("[DB_API] Ignoring empty response");
+                    return;
+                }
+
+                if (!apiId.hasValue()) {
+                    pLogger->debug("[DB_API] Skipping response for request with null ID");
+                    pLogger->debugf("[DB_API] Skipped response: %s", to_string(responseJson).c_str());
                     return;
                 }
                 handleOutgoing(connectionId, std::move(to_string(responseJson)));
@@ -535,13 +543,23 @@ namespace SmartHomeDB {
                             throw std::runtime_error("Only '!=' operator allowed with NULL");
                         }
                     } else {
-                        std::string placeholder = addParam(val, params, paramIndex);
-                        conditions.push_back(column + " " + op + " " + placeholder);
+                        const std::string placeholder = addParam(val, params, paramIndex);
+                        std::string condition = column;
+                        condition += " ";
+                        condition += op;
+                        condition += " ";
+                        condition += placeholder;
+                        conditions.push_back(std::move(condition));
                     }
                 }
             } else {
-                std::string placeholder = addParam(value, params, paramIndex);
-                conditions.push_back(column + " " + sk::EQUAL_STR.data() + " " + placeholder);
+                const std::string placeholder = addParam(value, params, paramIndex);
+                std::string condition = column;
+                condition += " ";
+                condition += sk::EQUAL_STR.data();
+                condition += " ";
+                condition += placeholder;
+                conditions.push_back(std::move(condition));
             }
         }
 
@@ -614,7 +632,7 @@ namespace SmartHomeDB {
                 throw std::runtime_error("'order_by' items must have 'column' field");
             }
 
-            std::string column = sqlIdentifier(item[ak::COLUMN_STR].get<std::string>());
+            const std::string column = sqlIdentifier(item[ak::COLUMN_STR].get<std::string>());
             std::string order = toUpper(sk::ASC_STR); // default ascending
 
             if (item.contains(ak::ORDER_STR)) {
@@ -627,7 +645,10 @@ namespace SmartHomeDB {
                 }
             }
 
-            parts.push_back(column + " " + order);
+            std::string part = column;
+            part += " ";
+            part += order;
+            parts.push_back(std::move(part));
         }
 
         return joinStrings(parts, ", ");
@@ -665,7 +686,7 @@ namespace SmartHomeDB {
             params.append(value.get<double>());
         } else if (value.is_boolean()) {
             params.append(value.get<bool>());
-        } else if (value.is_object()) {
+        } else if (value.is_object() || value.is_array()) {
             params.append(value.dump());
         } else {
             throw std::runtime_error("Unsupported value type");

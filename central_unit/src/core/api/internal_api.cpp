@@ -15,21 +15,8 @@ namespace SmartHome::API {
         type = value;
     }
 
-    InternalApi::Method::Method(const std::string_view value) {
+    InternalApi::Method::Method(const std::string_view value) : type(MethodTypes::UNKNOWN) {
         to_action(value);
-    }
-
-    InternalApi::Method InternalApi::Method::operator()(const std::string_view value) {
-        to_action(value);
-        return *this;
-    }
-
-    bool InternalApi::Method::operator==(const Method &other) const {
-        return type == other.type;
-    }
-
-    bool InternalApi::Method::operator==(const MethodTypes other) const {
-        return type == other;
     }
 
     std::string_view InternalApi::Method::to_string() const {
@@ -66,7 +53,20 @@ namespace SmartHome::API {
         };
 
         const auto iter = strToActMap.find(boost::algorithm::to_lower_copy(std::string(value)));
-        type = (iter != strToActMap.end()) ? iter->second : MethodTypes::UNKNOWN;
+        type = iter != strToActMap.end() ? iter->second : MethodTypes::UNKNOWN;
+    }
+
+    InternalApi::Method InternalApi::Method::operator()(const std::string_view value) {
+        to_action(value);
+        return *this;
+    }
+
+    bool InternalApi::Method::operator==(const Method &other) const {
+        return type == other.type;
+    }
+
+    bool InternalApi::Method::operator==(const MethodTypes other) const {
+        return type == other;
     }
 
 
@@ -74,21 +74,8 @@ namespace SmartHome::API {
         type = value;
     }
 
-    InternalApi::Target::Target(const std::string_view value) {
+    InternalApi::Target::Target(const std::string_view value) : type(TargetTypes::UNKNOWN) {
         to_target(value);
-    }
-
-    InternalApi::Target InternalApi::Target::operator()(const std::string_view value) {
-        to_target(value);
-        return *this;
-    }
-
-    bool InternalApi::Target::operator==(const Target &other) const {
-        return type == other.type;
-    }
-
-    bool InternalApi::Target::operator==(const TargetTypes other) const {
-        return type == other;
     }
 
     std::string_view InternalApi::Target::to_string() const {
@@ -123,27 +110,37 @@ namespace SmartHome::API {
         };
 
         const auto iter = strToTargMap.find(boost::algorithm::to_lower_copy(std::string(value)));
-        type = (iter != strToTargMap.end()) ? iter->second : TargetTypes::UNKNOWN;
+        type = iter != strToTargMap.end() ? iter->second : TargetTypes::UNKNOWN;
+    }
+
+    InternalApi::Target InternalApi::Target::operator()(const std::string_view value) {
+        to_target(value);
+        return *this;
+    }
+
+    bool InternalApi::Target::operator==(const Target &other) const {
+        return type == other.type;
+    }
+
+    bool InternalApi::Target::operator==(const TargetTypes other) const {
+        return type == other;
     }
 
 
     InternalApi::Command::Command(const ApiRequest &value) {
-        if (!value.params.has_value()) {
-            throw std::invalid_argument("Command requires params");
+        // Throws if method string is invalid
+        auto [targetStr, methodStr] = parseTargetMethodString(value.method);
+
+        target(targetStr);
+        method(methodStr);
+
+        params = value.params.value_or(nlohmann::json::object());
+        if (!params->is_object()) {
+            throw std::invalid_argument("Invalid JSON-RPC request: params must be an object");
         }
-
-        if (!value.params->contains(JsonRpcStrings::ParamsKeys::TARGET)) {
-            throw std::invalid_argument("Command params must contain \"target\"");
-        }
-
-        target(value.params.value()[JsonRpcStrings::ParamsKeys::TARGET].get<std::string>());
-
-        if (value.params->contains(JsonRpcStrings::ParamsKeys::METHOD_PARAMS))
-            params = value.params.value()[JsonRpcStrings::ParamsKeys::METHOD_PARAMS].get<nlohmann::json>();
 
         commandId = value.id;
         isNotification = !value.id.hasValue();
-        method(value.method);
     }
 
     InternalApi::Command::Command(const nlohmann::json &params,
@@ -171,28 +168,42 @@ namespace SmartHome::API {
 
             // Check for incoming responses
             if (jsonMessage.is_array()) {
-                // Handle responses from JSON batch, leave potential requests in jsonMessage
-                for (int i = jsonMessage.size() - 1; i >= 0; --i) {
-                    try {
-                        ApiResponse response(jsonMessage[i]);
-                        ba::post(Core::Instance().getCoreIoContext(), [connectionId, response] {
-                            Actions::handleIncomingResponse(connectionId, response);
-                        });
-                        jsonMessage.erase(jsonMessage.begin() + i);
-                    } catch (const std::exception &e) {
-                        pLogger->debugf("[INTERNAL_API] [HANDLE_INCOMING] Parse to response failed: %s" , e.what());
+                // Handle responses from JSON batch, leave potential requests in jsonMessage to be processed below
+                for (auto i = std::ssize(jsonMessage) - 1; i >= 0; --i) {
+                    // Iterate backwards to allow erasing processed responses without affecting unprocessed items
+                    const auto &candidate = jsonMessage[i];
+                    const bool hasMethod = candidate.contains(JsonRpcStrings::RequestKeys::METHOD);
+                    const bool hasResult = candidate.contains(JsonRpcStrings::ResponseKeys::RESULT);
+                    const bool hasError = candidate.contains(JsonRpcStrings::ResponseKeys::ERROR);
+
+                    if (!hasMethod && (hasResult || hasError)) {
+                        try {
+                            ApiResponse response(candidate);
+                            ba::post(Core::Instance().getCoreIoContext(), [connectionId, response] {
+                                Actions::handleIncomingResponse(connectionId, response);
+                            });
+                            jsonMessage.erase(jsonMessage.begin() + i);
+                        } catch (const std::exception &e) {
+                            pLogger->debugf("[INTERNAL_API] [HANDLE_INCOMING] Parse to response failed: %s", e.what());
+                        }
                     }
                 }
                 if (jsonMessage.empty()) return;
             } else {
-                try {
-                    auto response = ApiResponse(jsonMessage);
-                    ba::post(Core::Instance().getCoreIoContext(), [connectionId, response] {
-                        Actions::handleIncomingResponse(connectionId, response);
-                    });
-                    return;
-                } catch (const std::exception &e) {
-                    pLogger->debugf("[INTERNAL_API] [HANDLE_INCOMING] Parse to response failed: %s" , e.what());
+                const bool hasMethod = jsonMessage.contains(JsonRpcStrings::RequestKeys::METHOD);
+                const bool hasResult = jsonMessage.contains(JsonRpcStrings::ResponseKeys::RESULT);
+                const bool hasError = jsonMessage.contains(JsonRpcStrings::ResponseKeys::ERROR);
+
+                if (!hasMethod && (hasResult || hasError)) {
+                    try {
+                        auto response = ApiResponse(jsonMessage);
+                        ba::post(Core::Instance().getCoreIoContext(), [connectionId, response] {
+                            Actions::handleIncomingResponse(connectionId, response);
+                        });
+                        return;
+                    } catch (const std::exception &e) {
+                        pLogger->debugf("[INTERNAL_API] [HANDLE_INCOMING] Parse to response failed: %s", e.what());
+                    }
                 }
             }
         }

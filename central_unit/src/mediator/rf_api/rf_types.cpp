@@ -207,9 +207,9 @@ namespace SmartHomeMediator::RfTypes {
                 specialByte = getSpecialByte(static_cast<uint8_t>(type), static_cast<uint8_t>(chunkSize - 1));
 
                 buffer.push_back(specialByte);
-                buffer.insert(buffer.end(),
-                              value.begin() + offset,
-                              value.begin() + offset + chunkSize);
+                const auto startIt = std::next(value.begin(), static_cast<std::ptrdiff_t>(offset));
+                const auto endIt = std::next(startIt, static_cast<std::ptrdiff_t>(chunkSize));
+                buffer.insert(buffer.end(), startIt, endIt);
             }
         } else {
             buffer.reserve(value.size() + 1);
@@ -228,7 +228,7 @@ namespace SmartHomeMediator::RfTypes {
 
     RfCommand::RfCommand(std::vector<uint8_t> rawData) : Command(CommandType::RF) {
         constexpr uint8_t paramIndexOffset = 1; // Param with index 0 is reserved for UID / Notification type
-        size_t rawDataOffset = 0;
+        long rawDataOffset = 0;
 
         // Helper lambda, throws error on insufficient byte amount
         const auto requireBytes = [&rawDataOffset, &rawData](const size_t n) {

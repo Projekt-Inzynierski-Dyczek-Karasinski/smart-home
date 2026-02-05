@@ -16,7 +16,7 @@ namespace SmartHomeMediator {
         // Make sure port is flushed
         const auto fd = mPort.native_handle();
         if (fd >= 0) {
-            ::tcflush(fd, TCIOFLUSH);
+            tcflush(fd, TCIOFLUSH);
         }
 #endif
     }
@@ -24,7 +24,7 @@ namespace SmartHomeMediator {
     UartPort::~UartPort() {
         bool expected = false;
         constexpr bool desired = true;
-        if (!mIsShuttingDown.compare_exchange_strong(expected,desired, std::memory_order::acq_rel)) return;
+        if (!mIsShuttingDown.compare_exchange_strong(expected, desired, std::memory_order::acq_rel)) return;
         cancel();
         mPort.close();
     }
@@ -57,7 +57,7 @@ namespace SmartHomeMediator {
 
         std::vector<uint8_t> result;
         try {
-            size_t bytesTransferred = co_await ba::async_read_until(
+            const size_t bytesTransferred = co_await ba::async_read_until(
                 mPort,
                 mBuffer,
                 msDELIMITER.data(),
@@ -78,10 +78,11 @@ namespace SmartHomeMediator {
 
             // Copy data without delimiter
             if (bytesTransferred >= msDELIMITER.size()) {
-                result.assign(
-                    ba::buffers_begin(buffer),
-                    ba::buffers_begin(buffer) + (bytesTransferred - msDELIMITER.size())
-                );
+                const auto begin = ba::buffers_begin(buffer);
+                auto end = begin;
+                const auto count = bytesTransferred - msDELIMITER.size();
+                std::advance(end, count);
+                result.assign(begin, end);
             }
 
             // Consume data including delimiter
@@ -131,7 +132,7 @@ namespace SmartHomeMediator {
             }
 
             // Check if new data arrived
-            size_t newSize = mBuffer.size();
+            const size_t newSize = mBuffer.size();
 
             if (newSize == currentSize) {
                 // No new data arrived for ms_READ_ASYNC_WAIT_TIMEOUT
@@ -179,8 +180,7 @@ namespace SmartHomeMediator {
     uint UartPort::getBaudRate() const {
         ba::serial_port::baud_rate baudRate;
         mPort.get_option(baudRate);
-        const int currentBaudRate = baudRate.value();
-        return currentBaudRate;
+        return baudRate.value();
     }
 
     void UartPort::cancel() {
