@@ -19,7 +19,19 @@ namespace UniversalModuleSystem {
         digitalWrite(LED_PIN, LOW);
     }
 
-    void DebugLED::blink(const uint32_t ledOnDuration, const uint32_t ledOffDuration) {
+    void DebugLED::wifiConnected() {
+        deleteBlinkTask();
+        deleteResetBlinkTask();
+        digitalWrite(LED_PIN, HIGH);
+    }
+
+    void DebugLED::wifiDisconnected() {
+        deleteBlinkTask();
+        deleteResetBlinkTask();
+        digitalWrite(LED_PIN, LOW);
+    }
+
+    void DebugLED::blink(const uint32_t ledOnDuration, const uint32_t ledOffDuration) const {
         digitalWrite(LED_PIN, HIGH);
         vTaskDelay(pdMS_TO_TICKS(ledOnDuration));
         digitalWrite(LED_PIN, LOW);

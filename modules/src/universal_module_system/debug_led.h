@@ -49,13 +49,19 @@ namespace UniversalModuleSystem {
          */
         void deleteResetBlinkTask();
 
+        // TODO !pr add comments
+
+        void wifiConnected();
+
+        void wifiDisconnected();
+
     private:
         /**
          * @brief Make LED blink for a given times.
          * @param ledOnDuration Time in milliseconds for which the LED will be on.
          * @param ledOffDuration Time in milliseconds for which the LED will be off.
          */
-        void blink(uint32_t ledOnDuration, uint32_t ledOffDuration);
+        void blink(uint32_t ledOnDuration, uint32_t ledOffDuration) const;
 
         /**
          * @brief FreeRTOS task that blinks LED signalizing pairing process.

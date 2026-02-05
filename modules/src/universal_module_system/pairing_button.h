@@ -70,7 +70,7 @@ namespace UniversalModuleSystem {
          * @brief Callback method that is called periodically by the Button Press Timer to handle button debouncing and logic.
          * @details This method:
          * - Increments press counter when button is held down.
-         * - Triggers pairing mode after 3 seconds of continuous press.
+         * - Toggles OTA after 3 seconds of continuous press.
          * - Triggers reset mode after 10 seconds of continuous press (clears data and reboots).
          * @param xTimer FreeRTOS software timer handle.
          * @note Pairing process starts only after releasing button, but LED starts blinking immediately after 3 seconds

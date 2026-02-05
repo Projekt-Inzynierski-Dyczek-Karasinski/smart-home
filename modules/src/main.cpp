@@ -16,15 +16,15 @@ namespace ums = UniversalModuleSystem;
 
 void setup() {
     // TODO !pr remove VERBOSE
-    const auto logger = std::make_shared<ul::Logger>(ul::Level::VERBOSE);
+    const auto logger = std::make_shared<ul::Logger>();
 
     auto &dataManager = ums::DataManager::getInstance(logger);
 
     // start Ota if OTA_CHECK and "version" in /data/base_config.json do not match.
-    auto &ota = ums::Ota::getInstance(logger);
+    const auto debugLed = std::make_shared<ums::DebugLED>(logger);
+    auto &ota = ums::Ota::getInstance(logger, debugLed);
     ota.autoBeginOta();
 
-    const auto debugLed = std::make_shared<ums::DebugLED>(logger);
     auto &communication = Comms::Communication::getInstance(debugLed, logger);
     auto &pairingButton = ums::PairingButton::getInstance(debugLed, &communication, logger);
 

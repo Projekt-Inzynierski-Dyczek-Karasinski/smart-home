@@ -1,23 +1,34 @@
 #include "ota_esp_32.h"
 
 #include <esp_wifi.h>
+#include <ArduinoOTA.h>
 
 #include "universal_module_system/data_manager.h"
 #include "universal_module_system/pairing_button.h"
 #include "universal_module_system/power_manager/power_manager.h"
 
 namespace UniversalModuleSystem {
-    OtaESP32 &OtaESP32::getInstance(const std::shared_ptr<ul::Logger> &logger) {
-        static OtaESP32 instance(logger);
+    OtaESP32 &OtaESP32::getInstance(
+        const std::shared_ptr<ul::Logger> &logger,
+        const std::shared_ptr<DebugLED> &debugLED
+    ) {
+        static OtaESP32 instance(logger, debugLED);
         return instance;
     }
     
-    OtaESP32::OtaESP32(const std::shared_ptr<ul::Logger> &logger) :
+    OtaESP32::OtaESP32(
+        const std::shared_ptr<ul::Logger> &logger,
+        const std::shared_ptr<DebugLED> &debugLED) :
         mOtaMutex(xSemaphoreCreateMutex()),
-        mpLogger(logger) {
+        mpLogger(logger),
+        mpDebugLED(debugLED) {
         if (logger == nullptr) {
             mpLogger = std::make_shared<ul::Logger>();
             mpLogger->error("OtaESP32", "OtaESP32's constructor didn't get pointer to logger instance.");
+        }
+        if (debugLED == nullptr) {
+            mpDebugLED = std::make_shared<DebugLED>(logger);
+            mpLogger->error("OtaESP32", "OtaESP32's constructor didn't get pointer to debugLED instance.");
         }
         mpLogger->verbose("OtaESP32", "OtaESP32 initialized.");
     }
@@ -111,6 +122,7 @@ namespace UniversalModuleSystem {
             vTaskDelay(pdMS_TO_TICKS(10));
         }
         mpLogger->info("OtaESP32 IP", WiFi.localIP().toString().c_str());
+        mpDebugLED->wifiConnected();
 
         IPAddress ip = WiFi.localIP();
         const std::array<uint8_t, s_IP_ADDRESS_LENGTH> result = { ip[0], ip[1], ip[2], ip[3] };
@@ -122,6 +134,7 @@ namespace UniversalModuleSystem {
         WiFi.disconnect(true);
         WiFi.mode(WIFI_OFF);
         esp_wifi_stop();
+        mpDebugLED->wifiDisconnected();
 
         xSemaphoreTake(mOtaMutex, portMAX_DELAY);
         ipAddress = std::array<uint8_t, s_IP_ADDRESS_LENGTH> {0, 0, 0, 0};

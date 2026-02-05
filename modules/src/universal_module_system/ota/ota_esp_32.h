@@ -4,22 +4,24 @@
     #error "OtaESP32 class is exclusively for ESP32"
 #endif
 
-#include <ArduinoOTA.h>
 #include <string_view>
 #include <WiFi.h>
-
 
 #include <nlohmann/json.hpp>
 
 #include "i_ota.h"
 #include "utils/logger.h"
+#include "universal_module_system/debug_led.h"
 
 namespace nl = nlohmann;
 
 namespace UniversalModuleSystem {
     class OtaESP32 final : public IOta {
     public:
-        static OtaESP32& getInstance(const std::shared_ptr<ul::Logger> &logger = nullptr);
+        static OtaESP32& getInstance(
+            const std::shared_ptr<ul::Logger> &logger = nullptr,
+            const std::shared_ptr<DebugLED> &debugLED = nullptr
+        );
 
         // Delete copy constructor and assignment operator
         OtaESP32(const OtaESP32&) = delete;
@@ -34,11 +36,14 @@ namespace UniversalModuleSystem {
         void autoBeginOta() override;
 
     private:
-        explicit OtaESP32(const std::shared_ptr<ul::Logger> &logger = nullptr);
+        explicit OtaESP32(
+            const std::shared_ptr<ul::Logger> &logger = nullptr,
+            const std::shared_ptr<DebugLED> &debugLED = nullptr
+        );
 
         ~OtaESP32() override;
 
-        std::array<uint8_t, s_IP_ADDRESS_LENGTH> connectToWifi() const;
+        [[nodiscard]] std::array<uint8_t, s_IP_ADDRESS_LENGTH> connectToWifi() const;
 
         void disconnectFromWifi();
 
@@ -50,6 +55,7 @@ namespace UniversalModuleSystem {
         SemaphoreHandle_t mOtaMutex = nullptr;
 
         std::shared_ptr<ul::Logger> mpLogger;
+        std::shared_ptr<DebugLED> mpDebugLED;
         std::array<uint8_t, 4> ipAddress{};
 
         // JSON keys

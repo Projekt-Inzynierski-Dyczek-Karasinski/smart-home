@@ -4,6 +4,7 @@
 
 #include "data_manager.h"
 #include "power_manager/power_manager.h"
+#include "universal_module_system/ota/ota.h"
 
 namespace UniversalModuleSystem {
     PairingButton &PairingButton::getInstance(const std::shared_ptr<DebugLED> &debugLED,
@@ -15,7 +16,8 @@ namespace UniversalModuleSystem {
 
     PairingButton::PairingButton(const std::shared_ptr<DebugLED> &debugLED, Comms::Communication *communication,
                                  const std::shared_ptr<ul::Logger> &logger)
-        : mpDebugLED(debugLED), mpCommunication(communication), mpLogger(logger) {
+        : mpDebugLED(debugLED), mpLogger(logger), mpCommunication(communication) {
+
         pinMode(BUTTON_PIN, INPUT_PULLUP);
 
         attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
@@ -35,7 +37,6 @@ namespace UniversalModuleSystem {
     void IRAM_ATTR PairingButton::buttonISR() {
         const auto pb = &getInstance(nullptr, nullptr, nullptr);
         detachInterrupt(digitalPinToInterrupt(BUTTON_PIN));
-        pb->mpLogger->debug("PairingButton ISR", "Button pressed.");
         pb->startButtonPressTimer();
 
         // Force context switch if higher priority task was woken
@@ -95,7 +96,8 @@ namespace UniversalModuleSystem {
             // if button will not be press for 3*DEBOUNCING_TIME (0.3 seconds) timer will stop
             if (pb.mButtonNotPressedCounter.load() <= 0) {
                 if (pb.mButtonMode.load() == ButtonModes::PAIR) {
-                    pb.mpCommunication->startAddressingAlgorithm();
+                    auto &ota = ums::Ota::getInstance();
+                    ota.toggleOta();
                     pb.mpLogger->debug("PairingButton Timer", "startAddressingAlgorithm()");
                 }
                 pb.deleteButtonPressTimer();
