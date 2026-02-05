@@ -121,24 +121,23 @@ namespace SmartHomeDB {
                                                 SmartHome::API::ApiId apiId);
 
         /**
-          * @brief Convert pqxx::field to JSON value.
-          *
-          * @param field Database field to convert.
-          *
-          * @return JSON representation of the field value.
-          */
+         * @brief Convert pqxx::field to JSON value.
+         *
+         * @param field Database field to convert.
+         *
+         * @return JSON representation of the field value.
+         */
         static nlohmann::json fieldValueToJson(const pqxx::field &field);
 
         /**
-          * @brief Transform an API request into a database query.
-          *
-          * @param request ApiRequest containing request parameters.
-          *
-          * @return Prepared DatabaseClient::DbQuery ready for execution.
-          *
-          * @throws std::runtime_error If request is invalid or missing required fields.
-          *
-          */
+         * @brief Transform an API request into a database query.
+         *
+         * @param request ApiRequest containing request parameters.
+         *
+         * @return Prepared DatabaseClient::DbQuery ready for execution.
+         *
+         * @throws std::runtime_error If request is invalid or missing required fields.
+         */
         static DatabaseClient::DbQuery apiRequestToDbQuery(const SmartHome::API::ApiRequest &request);
 
         /**
