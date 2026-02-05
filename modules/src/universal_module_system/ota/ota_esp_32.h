@@ -25,9 +25,11 @@ namespace UniversalModuleSystem {
         OtaESP32(const OtaESP32&) = delete;
         OtaESP32& operator = (const OtaESP32&) = delete;
 
-        std::array<uint8_t, 4> beginOta() override;
+        std::array<uint8_t, s_IP_ADDRESS_LENGTH> beginOta() override;
 
         void endOta() override;
+
+        void toggleOta() override;
 
         void autoBeginOta() override;
 
@@ -36,7 +38,7 @@ namespace UniversalModuleSystem {
 
         ~OtaESP32() override;
 
-        std::array<uint8_t, 4> connectToWifi() const;
+        std::array<uint8_t, s_IP_ADDRESS_LENGTH> connectToWifi() const;
 
         void disconnectFromWifi();
 

@@ -4,6 +4,7 @@
 
 #include "universal_module_system/data_manager.h"
 #include "universal_module_system/pairing_button.h"
+#include "universal_module_system/power_manager/power_manager.h"
 
 namespace UniversalModuleSystem {
     OtaESP32 &OtaESP32::getInstance(const std::shared_ptr<ul::Logger> &logger) {
@@ -28,20 +29,21 @@ namespace UniversalModuleSystem {
         }
     }
 
-    std::array<uint8_t, 4> OtaESP32::beginOta() {
+    std::array<uint8_t, IOta::s_IP_ADDRESS_LENGTH> OtaESP32::beginOta() {
         xSemaphoreTake(mOtaMutex, portMAX_DELAY);
-        if (
-            ipAddress[0] != 0 &&
-            ipAddress[1] != 0 &&
-            ipAddress[2] != 0 &&
-            ipAddress[3] != 0
-        ) {
-            const std::array<uint8_t, 4> result = ipAddress;
+        // if ota already begun (ip address is set) just return ip address
+        if (!(
+            ipAddress[0] == 0 &&
+            ipAddress[1] == 0 &&
+            ipAddress[2] == 0 &&
+            ipAddress[3] == 0
+        )) {
+            const std::array<uint8_t, s_IP_ADDRESS_LENGTH> result = ipAddress;
             xSemaphoreGive(mOtaMutex);
             return result;
         }
 
-        const std::array<uint8_t, 4> newIpAddress = connectToWifi();
+        const std::array<uint8_t, s_IP_ADDRESS_LENGTH> newIpAddress = connectToWifi();
         ipAddress = newIpAddress;
         xSemaphoreGive(mOtaMutex);
 
@@ -61,6 +63,26 @@ namespace UniversalModuleSystem {
     void OtaESP32::endOta() {
         deleteOtaTask();
         disconnectFromWifi();
+    }
+
+    void OtaESP32::toggleOta() {
+        bool isOtaBegan = true;
+        xSemaphoreTake(mOtaMutex, portMAX_DELAY);
+        if (
+            ipAddress[0] == 0 &&
+            ipAddress[1] == 0 &&
+            ipAddress[2] == 0 &&
+            ipAddress[3] == 0
+        ) {
+            isOtaBegan = false;
+        }
+        xSemaphoreGive(mOtaMutex);
+
+        if (isOtaBegan) {
+            endOta();
+        } else {
+            beginOta();
+        }
     }
 
     void OtaESP32::autoBeginOta() {
@@ -83,7 +105,7 @@ namespace UniversalModuleSystem {
         }
     }
 
-    std::array<uint8_t, 4> OtaESP32::connectToWifi() const {
+    std::array<uint8_t, IOta::s_IP_ADDRESS_LENGTH> OtaESP32::connectToWifi() const {
         WiFi.begin(WIFI_SSID, WIFI_PASS);
         while (WiFi.status() != WL_CONNECTED) {
             vTaskDelay(pdMS_TO_TICKS(10));
@@ -91,7 +113,7 @@ namespace UniversalModuleSystem {
         mpLogger->info("OtaESP32 IP", WiFi.localIP().toString().c_str());
 
         IPAddress ip = WiFi.localIP();
-        const std::array<uint8_t, 4> result = { ip[0], ip[1], ip[2], ip[3] };
+        const std::array<uint8_t, s_IP_ADDRESS_LENGTH> result = { ip[0], ip[1], ip[2], ip[3] };
 
         return result;
     }
@@ -102,7 +124,7 @@ namespace UniversalModuleSystem {
         esp_wifi_stop();
 
         xSemaphoreTake(mOtaMutex, portMAX_DELAY);
-        ipAddress = std::array<uint8_t, 4> {0, 0, 0, 0};
+        ipAddress = std::array<uint8_t, s_IP_ADDRESS_LENGTH> {0, 0, 0, 0};
         xSemaphoreGive(mOtaMutex);
     }
 
@@ -110,14 +132,17 @@ namespace UniversalModuleSystem {
         if (mOtaTaskHandle != nullptr) {
             vTaskDelete(mOtaTaskHandle);
             mOtaTaskHandle = nullptr;
+            ArduinoOTA.end();
         }
     }
 
     void OtaESP32::otaTask(void *parameters) {
         ArduinoOTA.begin();
+        auto &powerManager = PowerManager::getInstance();
 
         for (;;) {
             ArduinoOTA.handle();
+            powerManager.restartIdleTimer();
             vTaskDelay(pdMS_TO_TICKS(100));
         }
     }

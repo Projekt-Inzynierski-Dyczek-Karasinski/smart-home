@@ -4,10 +4,6 @@
     "mac": "80:B5:4E:C5:A5:C8",
     "rfChannel": 2
   },
-  "wifi": {
-    "ssid": "wifi ssid",
-    "password": "wifi password"
-  },
   "hc12": {
     "rx": 25,
     "tx": 33,
@@ -36,15 +32,6 @@
   },
   "actuatorsData": {
     "actuators": [
-      {
-        "type": "relay",
-        "data": {
-          "id": 1,
-          "logicPin": 10,
-          "additional": {
-          }
-        }
-      }
     ]
   },
   "ota": {
@@ -52,6 +39,6 @@
   },
   "idleAutoSleep": {
     "sleepTime": 86400000,
-    "idleTimeout": 300000
+    "idleTimeout": 60000
   }
 }

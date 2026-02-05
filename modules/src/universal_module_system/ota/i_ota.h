@@ -11,6 +11,11 @@ namespace ul = Utils::Logging;
 
 // TODO !pr add comments for OTA
 namespace UniversalModuleSystem {
+    enum class otaOperations : uint8_t {
+        END = 0,
+        BEGIN = 1
+    };
+
     class IOta {
     public:
         IOta() = default;
@@ -25,6 +30,10 @@ namespace UniversalModuleSystem {
 
         virtual void endOta() = 0;
 
+        virtual void toggleOta() = 0;
+
         virtual void autoBeginOta() = 0;
+
+        static constexpr uint8_t s_IP_ADDRESS_LENGTH = 4;
     };
 }

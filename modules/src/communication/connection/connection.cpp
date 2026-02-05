@@ -4,6 +4,7 @@
 #include "universal_module_system/power_manager/power_manager.h"
 #include "universal_module_system/transducers/sensors/sensors_manager.h"
 #include "universal_module_system/transducers/actuators/actuators_manager.h"
+#include "universal_module_system/ota/ota.h"
 
 namespace Comms {
     // ============================ Public ============================
@@ -77,6 +78,18 @@ namespace Comms {
                     char text[16] = {};
                     std::get<API::APIParameter<char *> >(receivedCommand->getParameter(0)).getValue(text);
                     mpLogger->infoa("MessageDecider TEST", "get char array: ", reinterpret_cast<uint8_t *>(text), strlen(text));
+                } catch (...) {
+                }
+
+                try {
+                    constexpr size_t TEXT_SIZE = 16;
+                    char text[TEXT_SIZE] = {};
+
+                    std::array<uint8_t, ums::Ota::s_IP_ADDRESS_LENGTH> ipAddress{};
+                    std::get<API::APIParameter<uint8_t *> >(receivedCommand->getParameter(1)).getValue(ipAddress.data());
+
+                    snprintf(text, TEXT_SIZE, "%i.%i.%i.%i", ipAddress[0], ipAddress[1], ipAddress[2], ipAddress[3]);
+                    mpLogger->infoa("MessageDecider TEST", "IP: ", reinterpret_cast<uint8_t *>(text), strlen(text));
                 } catch (...) {
                 }
 
@@ -472,6 +485,8 @@ namespace Comms {
                     }
 
                     case static_cast<uint8_t>(ST::OTA): {
+                        using OTAO = ums::otaOperations;
+
                         mpLogger->verbose("MessageDecider", "CT::OTA");
                         std::optional<uint8_t> operation;
                         try {
@@ -480,13 +495,16 @@ namespace Comms {
                             responseWithError(sendCommand, ET::BAD_ARGUMENT, uid);
                             break;
                         }
-                        // off
-                        if (operation.value() == 0) {
-                            responseWithError(sendCommand, ET::NOT_IMPLEMENTED, uid);
+
+                        auto &ota = ums::Ota::getInstance();
+                        if (operation.value() == static_cast<uint8_t>(OTAO::END)) {
+                            ota.endOta();
+                            sendCommand->addParameter(API::APIParameter(static_cast<uint8_t>(OTAO::END)));
                         }
                         // on
                         else {
-                            responseWithError(sendCommand, ET::NOT_IMPLEMENTED, uid);
+                            const std::array<uint8_t, ums::Ota::s_IP_ADDRESS_LENGTH> ipAddress = ota.beginOta();
+                            sendCommand->addParameter(API::APIParameter<uint8_t*>(ipAddress.data(),  ums::Ota::s_IP_ADDRESS_LENGTH));
                         }
                         break;
                     }

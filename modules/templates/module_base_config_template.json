@@ -4,10 +4,6 @@
     "mac": "80:B5:4E:C5:A5:C8",
     "rfChannel": 2
   },
-  "wifi": {
-    "ssid": "wifi ssid",
-    "password": "wifi password"
-  },
   "hc12": {
     "rx": 25,
     "tx": 33,
@@ -48,8 +44,7 @@
     ]
   },
   "ota": {
-    "version": 1,
-    "ota_pin": 3
+    "version": 1
   },
   "idleAutoSleep": {
     "sleepTime": 86400000,

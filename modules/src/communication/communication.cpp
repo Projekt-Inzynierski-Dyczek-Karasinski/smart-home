@@ -6,6 +6,7 @@
 #include "utils/uint8_array_handlers.h"
 #include "universal_module_system/power_manager/power_manager.h"
 #include "universal_module_system/data_manager.h"
+#include "universal_module_system/ota/ota.h"
 #include "api/command_handler.h"
 
 namespace uah = Utils::ArrayHandlers;
@@ -800,6 +801,27 @@ namespace Comms {
                             xQueueSend(com.mEncodeMessagesQueue, &message, portMAX_DELAY);
                         }
                     }
+                    // ota test
+                    else if (uah::areArraysEqual(buffer, "otaon")) {
+                        API::CommandHandler ch(API::commandTypes::SET);
+                        ch.addParameter(API::APIParameter(static_cast<uint8_t>(44))); // uid
+                        ch.addParameter(API::APIParameter(static_cast<uint8_t>(API::setTypes::OTA)));
+                        ch.addParameter(API::APIParameter(static_cast<uint8_t>(ums::otaOperations::BEGIN)));
+
+                        uint8_t message[MESSAGE_SIZE] = {};
+                        ch.generateMessage(message);
+                        xQueueSend(com.mEncodeMessagesQueue, &message, portMAX_DELAY);
+                    }
+                    else if (uah::areArraysEqual(buffer, "otaoff")) {
+                        API::CommandHandler ch(API::commandTypes::SET);
+                        ch.addParameter(API::APIParameter(static_cast<uint8_t>(45))); // uid
+                        ch.addParameter(API::APIParameter(static_cast<uint8_t>(API::setTypes::OTA)));
+                        ch.addParameter(API::APIParameter(static_cast<uint8_t>(ums::otaOperations::END)));
+
+                        uint8_t message[MESSAGE_SIZE] = {};
+                        ch.generateMessage(message);
+                        xQueueSend(com.mEncodeMessagesQueue, &message, portMAX_DELAY);
+                    }
                     // rest
                     else {
                         // check if is HC_12 command
@@ -809,7 +831,7 @@ namespace Comms {
                                 buffer[1] = 'C';
                                 xQueueSend(com.mReceiveMessageQueue, &buffer, portMAX_DELAY);
                             } else {
-                                xQueueSend(com.mEncodeMessagesQueue, &buffer, portMAX_DELAY);
+                                com.mpLogger->error("Communication Input", "Unknow command");
                             }
                         #else
                             #error "not implemented"

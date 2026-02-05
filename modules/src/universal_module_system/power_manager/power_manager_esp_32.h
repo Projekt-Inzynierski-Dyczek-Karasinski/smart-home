@@ -26,10 +26,12 @@ namespace UniversalModuleSystem {
         /**
          * @brief Gets the singleton instance of PowerManagerESP32.
          *
-         * @param logger Shared pointer to the logger instance.
+         * @param logger Shared pointer to the logger instance, default: nullptr.
          * @return Reference to the PowerManagerESP32 instance.
+         *
+         *  @warning First call have to pass pointer to logger.
          */
-        static PowerManagerESP32& getInstance(const std::shared_ptr<ul::Logger> &logger);
+        static PowerManagerESP32& getInstance(const std::shared_ptr<ul::Logger> &logger = nullptr);
 
         // Delete copy constructor and assignment operator
         PowerManagerESP32(const PowerManagerESP32&) = delete;
@@ -76,7 +78,7 @@ namespace UniversalModuleSystem {
          *
          * @param logger Shared pointer to the logger instance.
          */
-        explicit PowerManagerESP32(const std::shared_ptr<ul::Logger> &logger);
+        explicit PowerManagerESP32(const std::shared_ptr<ul::Logger> &logger = nullptr);
 
         /**
          * @brief Deletes FreeRTOS resources.

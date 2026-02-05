@@ -81,6 +81,10 @@ namespace UniversalModuleSystem {
     }
 
     PowerManagerESP32::PowerManagerESP32(const std::shared_ptr<ul::Logger> &logger) : mpLogger(logger) {
+        if (logger == nullptr) {
+            mpLogger = std::make_shared<ul::Logger>();
+            mpLogger->error("PowerManagerESP32", "PowerManagerESP32's constructor didn't get pointer to logger instance.");
+        }
         handleWakeUpReason();
         createIdleTimer();
     }
