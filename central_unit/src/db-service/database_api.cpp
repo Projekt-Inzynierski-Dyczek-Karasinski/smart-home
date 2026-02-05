@@ -107,40 +107,39 @@ namespace SmartHomeDB {
         }
 
         const auto &params = request.params.value();
-
-        if (!params.contains(sj::ParamsKeys::TARGET) || params[sj::ParamsKeys::TARGET] != msTARGET_STR) {
-            throw std::runtime_error("Missing or invalid 'target' field");
+        if (!params.is_object()) {
+            throw std::runtime_error("Parameters must be an object");
         }
 
-        if (!params.contains(sj::ParamsKeys::METHOD_PARAMS)) {
-            throw std::runtime_error("Missing 'method_params' field");
+        auto [targetStr, methodStr] = SmartHome::API::parseTargetMethodString(request.method);
+        if (toLower(targetStr) != "database") {
+            throw std::runtime_error("Invalid target - expected 'database'");
         }
 
-        const auto &methodParams = params[sj::ParamsKeys::METHOD_PARAMS];
+        const auto methodLower = toLower(methodStr);
 
-        if (!methodParams.contains(ak::TABLE_STR) || !methodParams[ak::TABLE_STR].is_string()) {
+        if (!params.contains(ak::TABLE_STR) || !params[ak::TABLE_STR].is_string()) {
             throw std::runtime_error("Missing or invalid 'table' field");
         }
 
-        const std::string table = methodParams[ak::TABLE_STR];
+        const std::string table = params[ak::TABLE_STR];
 
-
-        if (request.method == ak::GET_STR) {
-            return buildSelectQuery(table, methodParams);
+        if (methodLower == ak::GET_STR) {
+            return buildSelectQuery(table, params);
         }
-        if (request.method == ak::SET_STR) {
-            if (!methodParams.contains(sk::WHERE_STR) && !methodParams.contains(ak::VALUES_STR)) {
+        if (methodLower == ak::SET_STR) {
+            if (!params.contains(sk::WHERE_STR) && !params.contains(ak::VALUES_STR)) {
                 throw std::runtime_error("SET requires either 'where' (for UPDATE) or full 'values' (for INSERT)");
             }
 
-            if (methodParams.contains(sk::WHERE_STR)) {
-                return buildUpdateQuery(table, methodParams);
+            if (params.contains(sk::WHERE_STR)) {
+                return buildUpdateQuery(table, params);
             }
 
-            return buildInsertQuery(table, methodParams);
+            return buildInsertQuery(table, params);
         }
-        if (request.method == ak::DELETE_STR) {
-            return buildDeleteQuery(table, methodParams);
+        if (methodLower == ak::DELETE_STR) {
+            return buildDeleteQuery(table, params);
         }
 
 
