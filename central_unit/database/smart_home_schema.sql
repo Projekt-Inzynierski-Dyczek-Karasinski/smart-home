@@ -163,8 +163,8 @@ CREATE TRIGGER modules_notify
     AFTER INSERT OR
 DELETE
 OR
-UPDATE
-    ON public.modules
+UPDATE OF id,logic_address, name,config,created_at
+ON public.modules
     FOR EACH STATEMENT
     EXECUTE PROCEDURE public.notify_table_change();
 -- ddl-end --
