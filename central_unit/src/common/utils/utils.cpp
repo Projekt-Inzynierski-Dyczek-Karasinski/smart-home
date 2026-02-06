@@ -22,6 +22,35 @@ namespace SmartHome::Utils {
         return ServiceType::AUTO;
     }
 
+    std::chrono::system_clock::time_point parseTimestampTz(const std::string &timestamp) {
+        std::tm tm;
+        int tzOffsetHours = 0;
+
+        sscanf(timestamp.c_str(), "%d-%d-%d %d:%d:%d",
+               &tm.tm_year, &tm.tm_mon, &tm.tm_mday,
+               &tm.tm_hour, &tm.tm_min, &tm.tm_sec);
+
+        // Adjust tm structure for timegm
+        tm.tm_year -= 1900; // tm_year is years since 1900
+        tm.tm_mon -= 1; // tm_mon is 0-based
+
+        // Check for timezone offset in format ±HH at the end of the string
+        const auto pos = timestamp.find_last_of("+-");
+        // pos > 10 to ensure offset is after date and time
+        if (pos != std::string_view::npos && pos > 10) {
+            try {
+                tzOffsetHours = std::stoi(timestamp.substr(pos));
+            } catch (...) {
+                // If parsing fails, default to 0 offset
+            }
+        }
+
+        auto tp = std::chrono::system_clock::from_time_t(timegm(&tm));
+        tp -= std::chrono::hours(tzOffsetHours); // Adjust for timezone offset
+
+        return tp;
+    }
+
     FileLock::FileLock(const std::string &lockFilePath) {
         mLockFilePath = lockFilePath;
 

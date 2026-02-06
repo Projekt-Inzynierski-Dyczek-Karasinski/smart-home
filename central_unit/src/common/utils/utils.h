@@ -7,6 +7,7 @@
 #include <string>
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <memory>
 
 namespace SmartHome::Utils {
@@ -31,6 +32,18 @@ namespace SmartHome::Utils {
      * @return Corresponding ServiceType enum value, defaults to AUTO.
      */
     ServiceType resolveServiceType(const std::string &typeStr);
+
+    /**
+     * @brief Parse a timestamp with timezone information into a std::chrono::system_clock::time_point.
+     *
+     * @param timestamp Timestamp string in the format "YYYY-MM-DD HH:MM:SS±HH"
+     *                  where the last part is an optional timezone offset in hours.
+     *
+     * @return Parsed time point representing the given timestamp in UTC.
+     *
+     * @note Used for postgreSQL timestamptz, ignores microseconds.
+     */
+    std::chrono::system_clock::time_point parseTimestampTz(const std::string &timestamp);
 
     /**
      * @brief RAII wrapper for exclusive file locking.
