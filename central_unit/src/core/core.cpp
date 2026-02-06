@@ -213,6 +213,14 @@ namespace SmartHome {
         return mIsRunning.load();
     }
 
+    ConfigCache &Core::configCache() {
+        return mConfigCache;
+    }
+
+    ReadingsCache &Core::readingsCache() {
+        return mReadingsCache;
+    }
+
     ba::io_context &Core::coreUtilityIoContext() {
         return mCoreUtilityIoContext;
     }

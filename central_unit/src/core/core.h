@@ -3,6 +3,7 @@
 #include "socket_server.h"
 #include "service_manager/service_manager.h"
 #include "async_logger.h"
+#include "cache.h"
 #include "api/internal_api.h"
 
 #include <atomic>
@@ -121,6 +122,21 @@ namespace SmartHome {
          */
         bool isRunning() const;
 
+
+        /**
+         * @brief Configuration cache getter.
+         *
+         * @return Reference to configuration cache instance.
+         */
+        ConfigCache &configCache();
+
+        /**
+         * @brief Readings cache getter.
+         *
+         * @return Reference to readings cache instance.
+         */
+        ReadingsCache &readingsCache();
+
         /**
          * @brief Core utility IO context getter.
          *
@@ -189,6 +205,10 @@ namespace SmartHome {
 
         std::unique_ptr<Utils::ServiceManager> mpService;
         std::shared_ptr<API::InternalApi> mpApi;
+
+        // Cache
+        ConfigCache mConfigCache;
+        ReadingsCache mReadingsCache{mConfigCache};
 
         // Socket server resources
         ba::io_context mSocketServerIoContext;

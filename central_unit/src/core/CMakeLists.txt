@@ -17,6 +17,7 @@ endif ()
 add_executable(smarthomed
         main.cpp
         core.cpp
+        cache.cpp
         api/internal_api.cpp
         actions/actions.cpp
         actions/core_actions.cpp
