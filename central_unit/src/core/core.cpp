@@ -213,15 +213,15 @@ namespace SmartHome {
         return mIsRunning.load();
     }
 
-    ba::io_context &Core::getCoreUtilityIoContext() {
+    ba::io_context &Core::coreUtilityIoContext() {
         return mCoreUtilityIoContext;
     }
 
-    ba::io_context &Core::getCoreWorkerIoContext() {
+    ba::io_context &Core::coreWorkerIoContext() {
         return mCoreWorkerIoContext;
     }
 
-    ba::io_context &Core::getCoreIoContext() {
+    ba::io_context &Core::coreIoContext() {
         return mCoreIoContext;
     }
 

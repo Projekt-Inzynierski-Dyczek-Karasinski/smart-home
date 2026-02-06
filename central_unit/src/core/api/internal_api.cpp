@@ -179,7 +179,7 @@ namespace SmartHome::API {
                     if (!hasMethod && (hasResult || hasError)) {
                         try {
                             ApiResponse response(candidate);
-                            ba::post(Core::Instance().getCoreIoContext(), [connectionId, response] {
+                            ba::post(Core::Instance().coreIoContext(), [connectionId, response] {
                                 Actions::handleIncomingResponse(connectionId, response);
                             });
                             jsonMessage.erase(jsonMessage.begin() + i);
@@ -197,7 +197,7 @@ namespace SmartHome::API {
                 if (!hasMethod && (hasResult || hasError)) {
                     try {
                         auto response = ApiResponse(jsonMessage);
-                        ba::post(Core::Instance().getCoreIoContext(), [connectionId, response] {
+                        ba::post(Core::Instance().coreIoContext(), [connectionId, response] {
                             Actions::handleIncomingResponse(connectionId, response);
                         });
                         return;

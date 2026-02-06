@@ -98,10 +98,10 @@ namespace SmartHome {
             std::unordered_map<apiId_t, std::shared_ptr<std::promise<API::ApiResponse> > > requestsPromises;
             /// For aggregating request to send in batch
             std::shared_ptr<ba::steady_timer> sendTimer = std::make_shared<ba::steady_timer>(
-                Core::Instance().getCoreIoContext());
+                Core::Instance().coreIoContext());
             /// Request-level timeout timer
             std::shared_ptr<ba::steady_timer> timeoutTimer = std::make_shared<ba::steady_timer>(
-                Core::Instance().getCoreIoContext());
+                Core::Instance().coreIoContext());
         };
 
         /// Callback type for request completion notification

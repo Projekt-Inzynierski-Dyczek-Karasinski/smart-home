@@ -126,21 +126,21 @@ namespace SmartHome {
          *
          * @return Core utility IO context.
          */
-        ba::io_context &getCoreUtilityIoContext();
+        ba::io_context &coreUtilityIoContext();
 
         /**
          * @brief Core worker IO context getter.
          *
          * @return Core worker IO context.
          */
-        ba::io_context &getCoreWorkerIoContext();
+        ba::io_context &coreWorkerIoContext();
 
         /**
          * @brief Core IO context getter.
          *
          * @return Core IO context.
          */
-        ba::io_context &getCoreIoContext();
+        ba::io_context &coreIoContext();
 
         std::shared_ptr<Utils::AsyncLogger> mpLogger; ///< Logger instance
 

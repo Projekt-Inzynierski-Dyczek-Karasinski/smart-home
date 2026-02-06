@@ -263,7 +263,7 @@ namespace SmartHome {
 
         const auto mediatorId = mediatorConnectionId.value();
 
-        ba::post(Core::Instance().getCoreWorkerIoContext(),
+        ba::post(Core::Instance().coreWorkerIoContext(),
                  [promise, request, commandMetadata, mediatorId]() mutable {
                      Actions::startCommandTimeoutTimer(commandMetadata);
 

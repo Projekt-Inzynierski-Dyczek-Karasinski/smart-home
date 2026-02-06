@@ -51,7 +51,7 @@ namespace SmartHome {
         API::InternalApi::Command command(request);
         auto pCmdMeta = std::make_shared<Actions::CommandMetadata>(
             command,
-            std::make_shared<ba::steady_timer>(Core::Instance().getCoreUtilityIoContext()),
+            std::make_shared<ba::steady_timer>(Core::Instance().coreUtilityIoContext()),
             Actions::getNextId());
 
 
@@ -196,7 +196,7 @@ namespace SmartHome {
             return;
         }
 
-        ba::post(Core::Instance().getCoreWorkerIoContext(), [notification, dbServiceConnectionId]()mutable {
+        ba::post(Core::Instance().coreWorkerIoContext(), [notification, dbServiceConnectionId]()mutable {
             Actions::handleOutgoingRequest(dbServiceConnectionId, std::move(notification), nullptr);
         });
     }
@@ -233,7 +233,7 @@ namespace SmartHome {
             co_return requestResult;
         }
 
-        ba::post(Core::Instance().getCoreWorkerIoContext(),
+        ba::post(Core::Instance().coreWorkerIoContext(),
                  [promise, request, dbServiceConnectionId]()mutable {
                      Actions::handleOutgoingRequest(dbServiceConnectionId, std::move(request), promise);
                  });

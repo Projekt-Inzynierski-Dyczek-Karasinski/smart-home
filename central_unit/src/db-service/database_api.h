@@ -213,7 +213,7 @@ namespace SmartHomeDB {
          *        }
          *      }
          *      \endcode
-         *      
+         *
          * @param triggerName Name of the database trigger event.
          * @param triggerData Associated data payload (e.g. JSON string with details).
          */
