@@ -65,6 +65,10 @@ namespace SmartHome {
 
         [[nodiscard]] std::vector<int> getSensorIdsForModule(int moduleId) const;
 
+        void clearModules();
+
+        void clearSensors();
+
         void clear();
 
         [[nodiscard]] size_t modulesSize() const;

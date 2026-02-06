@@ -131,6 +131,18 @@ namespace SmartHome {
         return sensorIds;
     }
 
+    void ConfigCache::clearModules() {
+        std::unique_lock lock(mMutex);
+        mModules.clear();
+        mModulesIndex.clear();
+    }
+
+    void ConfigCache::clearSensors() {
+        std::unique_lock lock(mMutex);
+        mSensors.clear();
+        mSensorsIndex.clear();
+    }
+
     void ConfigCache::clear() {
         std::unique_lock lock(mMutex);
         mModules.clear();
