@@ -124,6 +124,12 @@ namespace SmartHomeDB {
             mpDatabaseApi->initialize([this](const std::string &message) {
                 mpSocketClient->handleOutgoing(nullConnection, message.data());
             });
+
+            auto triggerCallback = [this](const std::string &triggerName, const std::string &triggerData) {
+                mpDatabaseApi->handleIncomingDbTrigger(triggerName.data(), triggerData.data());
+            };
+
+            mpDatabaseClient->initialize(mConfig.dbTriggersToListen, triggerCallback);
         });
 
         mSocketClientIoContext.post([this] {
@@ -188,6 +194,10 @@ namespace SmartHomeDB {
             mpService->onStop();
         }
 
+        if (mpDatabaseClient) {
+            mpDatabaseClient->stop();
+        }
+
         // Start shutdown timeout timer
         const auto timeoutTimer = std::make_shared<ba::steady_timer>(mUtilityIoContext, msSHUTDOWN_TIMEOUT);
         timeoutTimer->async_wait([this, timeoutTimer](const bs::error_code &ec) {
@@ -211,6 +221,7 @@ namespace SmartHomeDB {
         mpDatabaseConnectionManager.reset();
         mpSocketClient.reset();
         mpService.reset();
+        mpDatabaseClient.reset();
 
 
         pLogger->debug("[DB_SERVICE] Shutdown complete - waiting for threads to join in run()");

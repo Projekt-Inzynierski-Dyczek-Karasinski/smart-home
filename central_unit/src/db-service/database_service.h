@@ -38,6 +38,8 @@ namespace SmartHomeDB {
 
             DatabaseConnectionManager::Config dbConnConfig{};
 
+            std::vector<std::string> dbTriggersToListen{};
+
             /// Default TCP config from socket server
             si::SocketServer::Config::Tcp tcp{
                 .isEnabled = true, .endpointAddress = "127.0.0.1", .endpointPort = 43321

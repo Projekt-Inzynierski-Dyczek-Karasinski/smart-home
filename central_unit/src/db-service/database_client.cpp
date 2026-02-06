@@ -4,6 +4,38 @@
 
 
 namespace SmartHomeDB {
+    DatabaseClient::~DatabaseClient() {
+        if (mIsRunning.load(std::memory_order::acquire)) {
+            stop();
+        }
+    }
+
+    void DatabaseClient::initialize(
+        const std::vector<std::string> &triggersToListen,
+        const std::function<void(const std::string &triggerName, const std::string &triggerData)> &callback) {
+        mCallback = callback;
+
+        mpTriggerTimer = std::make_unique<ba::steady_timer>(mIoContext);
+
+        auto *conn = mpDbConnManager->getTriggerListenerConnection();
+
+        // Listen to specified triggers
+        for (const auto &triggerName: triggersToListen) {
+            DatabaseService::Instance().pLogger->infof(
+                "[DB_CLIENT] Listening to database trigger: %s", triggerName.c_str());
+
+            conn->listen(triggerName, [this](const pqxx::notification &n) {
+                DatabaseService::Instance().pLogger->debug("[DB_CLIENT] Received database trigger notification");
+                if (mCallback) {
+                    mCallback(std::string{n.channel}, std::string{n.payload});
+                }
+            });
+        }
+
+        mIsRunning = true;
+        startPeriodicTriggerCheck();
+    }
+
     void DatabaseClient::handleQuery(const DbQuery &query,
                                      const std::function<void(DbQueryResult &&result)> &callback) const {
         auto isCancelled = std::make_shared<std::atomic_bool>(false);
@@ -115,6 +147,23 @@ namespace SmartHomeDB {
                 }
 
                 callback(std::move(queryResult));
+            }
+        });
+    }
+
+    void DatabaseClient::stop() {
+        mIsRunning = false;
+        if (mpTriggerTimer) {
+            mpTriggerTimer->cancel();
+        }
+    }
+
+    void DatabaseClient::startPeriodicTriggerCheck() {
+        mpTriggerTimer->expires_after(1s);
+        mpTriggerTimer->async_wait([this](const std::error_code &ec) {
+            if (!ec && mIsRunning.load(std::memory_order_acquire)) {
+                mpDbConnManager->getTriggerListenerConnection()->get_notifs();
+                startPeriodicTriggerCheck();
             }
         });
     }

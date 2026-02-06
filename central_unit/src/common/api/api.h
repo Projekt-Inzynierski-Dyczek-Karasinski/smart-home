@@ -33,6 +33,7 @@ namespace SmartHome::JsonRpcStrings {
         inline constexpr std::string_view MODULE_ID = "module_id";
         inline constexpr std::string_view TYPE = "type";
         inline constexpr std::string_view ARGS = "args";
+        inline constexpr std::string_view DATA = "data";
     }
 
     namespace ModuleInfoKeys {

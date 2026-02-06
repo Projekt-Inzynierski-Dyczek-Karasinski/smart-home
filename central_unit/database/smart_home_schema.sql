@@ -18,6 +18,11 @@ CREATE ROLE smart_home_admin WITH LOGIN PASSWORD 'insert_password';
 -- ddl-end --
 
 
+SET
+check_function_bodies = false;
+-- ddl-end --
+
+
 -- object: public.modules | type: TABLE --
 -- DROP TABLE IF EXISTS public.modules CASCADE;
 CREATE TABLE public.modules
@@ -124,6 +129,56 @@ CREATE INDEX idx_logs_timestamp ON public.logs
     "timestamp" DESC NULLS LAST
     )
     INCLUDE (type,content,module_id);
+-- ddl-end --
+
+-- object: public.notify_table_change | type: FUNCTION --
+-- DROP FUNCTION IF EXISTS public.notify_table_change() CASCADE;
+CREATE FUNCTION public.notify_table_change()
+    RETURNS trigger
+    LANGUAGE plpgsql
+	VOLATILE
+	CALLED ON NULL INPUT
+	SECURITY INVOKER
+	PARALLEL UNSAFE
+	COST 1
+	AS $$
+BEGIN
+    PERFORM
+pg_notify(
+        TG_TABLE_NAME || '_changed',
+        json_build_object(
+            'operation', TG_OP
+        )::text
+    );
+RETURN NULL;
+END;
+$$;
+-- ddl-end --
+ALTER FUNCTION public.notify_table_change() OWNER TO smart_home_admin;
+-- ddl-end --
+
+-- object: modules_notify | type: TRIGGER --
+-- DROP TRIGGER IF EXISTS modules_notify ON public.modules CASCADE;
+CREATE TRIGGER modules_notify
+    AFTER INSERT OR
+DELETE
+OR
+UPDATE
+    ON public.modules
+    FOR EACH STATEMENT
+    EXECUTE PROCEDURE public.notify_table_change();
+-- ddl-end --
+
+-- object: sensors_notify | type: TRIGGER --
+-- DROP TRIGGER IF EXISTS sensors_notify ON public.sensors CASCADE;
+CREATE TRIGGER sensors_notify
+    AFTER INSERT OR
+DELETE
+OR
+UPDATE
+    ON public.sensors
+    FOR EACH STATEMENT
+    EXECUTE PROCEDURE public.notify_table_change();
 -- ddl-end --
 
 -- object: fk_modules_id_sensors | type: CONSTRAINT --

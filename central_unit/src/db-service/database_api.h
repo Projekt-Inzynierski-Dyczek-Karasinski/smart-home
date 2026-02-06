@@ -188,14 +188,36 @@ namespace SmartHomeDB {
         void handleIncoming(SmartHome::connectionId_t connectionId, std::string &&message) override;
 
         /**
-        * @brief Handle outgoing API message.
-        *
-        * @details Forwards serialized message to previously configured callback.
-        *
-        * @param connectionId Destination connection identifier (unused in client).
-        * @param message Message payload to send.
-        */
+         * @brief Handle outgoing API message.
+         *
+         * @details Forwards serialized message to previously configured callback.
+         *
+         * @param connectionId Destination connection identifier (unused in client).
+         * @param message Message payload to send.
+         */
         void handleOutgoing(SmartHome::connectionId_t connectionId, std::string &&message) override;
+
+        /**
+         * @brief Handle incoming database trigger notification.
+         *
+         * @details Converts trigger information into API notification and sends it out.
+         *
+         * @note Notification format example:
+         *      \code{.json}
+         *      {
+         *        "jsonrpc": "2.0",
+         *        "method": "core.notify",
+         *        "params": {
+         *          "type": <triggerName>,
+         *          "data": <triggerData>
+         *        }
+         *      }
+         *      \endcode
+         *      
+         * @param triggerName Name of the database trigger event.
+         * @param triggerData Associated data payload (e.g. JSON string with details).
+         */
+        void handleIncomingDbTrigger(std::string &&triggerName, std::string &&triggerData);
 
     private:
         /**

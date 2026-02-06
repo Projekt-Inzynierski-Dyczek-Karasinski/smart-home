@@ -331,6 +331,30 @@ namespace SmartHomeDB {
         mCallback(message);
     }
 
+    void DatabaseApi::handleIncomingDbTrigger(std::string &&triggerName, std::string &&triggerData) {
+        const auto pLogger = DatabaseService::Instance().pLogger;
+        pLogger->debugf("[DB_API] [HANDLE_DB_TRIGGER] Message: %s", triggerName.c_str());
+
+        sa::ApiRequest notification;
+        notification.method = "core.notify";
+
+        auto &params = notification.params.emplace(nlohmann::json::object());
+        params[sj::ParamsKeys::TYPE] = triggerName;
+
+        // Try to parse trigger data as JSON
+        if (nlohmann::json::accept(triggerData)) {
+            try {
+                params[sj::ParamsKeys::DATA] = nlohmann::json::parse(triggerData);
+            } catch (const std::exception &e) {
+                pLogger->errorf("[DB_API] Failed to parse trigger data JSON: %s", e.what());
+            }
+        }
+        // Fallback to raw string data
+        if (!params.contains(sj::ParamsKeys::DATA)) params[sj::ParamsKeys::DATA] = triggerData;
+
+        handleOutgoing(0, notification.to_string());
+    }
+
     DatabaseClient::DbQuery DatabaseApi::buildSelectQuery(const std::string &table, const nlohmann::json &params) {
         DatabaseClient::DbQuery query;
 

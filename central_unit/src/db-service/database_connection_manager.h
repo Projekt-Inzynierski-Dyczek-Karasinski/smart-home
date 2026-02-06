@@ -14,6 +14,7 @@ namespace SmartHomeDB {
      * @brief Manager of a pool of PostgreSQL connections.
      *
      * @details Initializes a pool of `pqxx::connection` objects using the provided configuration.
+     *          Initializes a dedicated connection for listening to database triggers.
      *          Provides RAII-style acquisition via `DatabaseConnection`
      *          and returns connections to the pool when they are released.
      */
@@ -49,6 +50,7 @@ namespace SmartHomeDB {
          * @details Builds the connection string from \p config and attempts to create up
          *          to \c config.dbConnections connections which are stored in an internal
          *          queue for later acquisition.
+         *          A separate connection is initialized for trigger listening and is not part of the pool.
          *
          * @param pLogger Shared logger used by the manager for diagnostics and errors.
          * @param config Configuration describing connection parameters and pool size.
@@ -67,6 +69,13 @@ namespace SmartHomeDB {
          * @return A \c DatabaseConnection owning the acquired \c pqxx::connection.
          */
         DatabaseConnection acquireConnection();
+
+        /**
+         * @brief Get the dedicated trigger listener connection.
+         *
+         * @return  A pointer to the dedicated trigger listener connection.
+         */
+        pqxx::connection *getTriggerListenerConnection() const;
 
     private:
         friend class DatabaseConnection;
@@ -87,5 +96,8 @@ namespace SmartHomeDB {
         std::queue<std::unique_ptr<pqxx::connection> > mConnections; ///< Pool of available connections
         std::mutex mConnectionsMutex; ///< Protects \c mConnections
         std::condition_variable mConnectionsCond; ///< Signals availability of connections
+
+        /// Connection used for trigger listening
+        std::unique_ptr<pqxx::connection> mpTriggerListenerConnection;
     };
 }

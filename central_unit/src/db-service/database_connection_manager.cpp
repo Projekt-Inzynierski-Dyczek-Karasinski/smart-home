@@ -35,6 +35,7 @@ namespace SmartHomeDB {
 
         mpLogger->debugf("[DB_CONN_MANAGER] [CONSTRUCTOR] Attempting to connect with: %s", config.dbHost.c_str());
 
+        // Initialize connection pool
         for (auto i = 0; i < config.dbConnections; ++i) {
             try {
                 mConnections.push(std::make_unique<pqxx::connection>(mConnectionStr));
@@ -46,6 +47,16 @@ namespace SmartHomeDB {
         if (mConnections.empty()) {
             throw std::runtime_error("No connections available");
         }
+
+        // Initialize separate connection for trigger listener
+        try {
+            mpTriggerListenerConnection = std::make_unique<pqxx::connection>(mConnectionStr);
+        } catch (const std::exception &e) {
+            mpLogger->errorf("[DB_CONN_MANAGER] [CONSTRUCTOR] Failed to initialize trigger listener connection: %s",
+                             e.what());
+            throw std::runtime_error("Failed to initialize trigger listener connection");
+        }
+
         mpLogger->infof("[DB_CONN_MANAGER] [CONSTRUCTOR] Successfully initialized %d of %d connections",
                         mConnections.size(), config.dbConnections);
     }
@@ -60,6 +71,10 @@ namespace SmartHomeDB {
         mConnections.pop();
 
         return {*this, std::move(connection)};
+    }
+
+    pqxx::connection *DatabaseConnectionManager::getTriggerListenerConnection() const {
+        return mpTriggerListenerConnection.get();
     }
 
     void DatabaseConnectionManager::returnConnection(std::unique_ptr<pqxx::connection> connection) {

@@ -70,6 +70,26 @@ namespace SmartHomeDB {
               mpDbConnManager(pDbConnManager) {
         }
 
+
+        /**
+         * @brief Destructor for DatabaseClient, calls stop() to ensure proper cleanup of resources and timers.
+         */
+        ~DatabaseClient();
+
+        /**
+         * @brief Initialize the DatabaseClient.
+         *
+         * @details Sets up the client to listen for specified database triggers and
+         *          starts a periodic timer to check for trigger events.
+         *
+         * @param triggersToListen List of database trigger names to listen for.
+         *                         The client will periodically check for new trigger events matching these names.
+         * @param callback Callback function to invoke when a trigger event is detected.
+         */
+        void initialize(
+            const std::vector<std::string> &triggersToListen,
+            const std::function<void(const std::string &triggerName, const std::string &triggerData)> &callback);
+
         /**
         * @brief Execute a single database query asynchronously.
         *
@@ -96,10 +116,27 @@ namespace SmartHomeDB {
         void handleBatchQuery(const std::vector<DbQuery> &queries,
                               const std::function<void(DbBatchQueryResult &&batchResult)> &callback) const;
 
+
+        /**
+         *  @brief Stop the DatabaseClient, canceling active timers and preventing further trigger checks.
+         */
+        void stop();
+
     private:
+        /**
+         *  @brief Start a periodic timer to check for database trigger events.
+         */
+        void startPeriodicTriggerCheck();
+
         static constexpr auto msTRANSACTION_TIMEOUT = 5s;
 
         ba::io_context &mIoContext;
         std::shared_ptr<DatabaseConnectionManager> mpDbConnManager; ///< Connection manager for acquiring DB connections
+
+        std::unique_ptr<ba::steady_timer> mpTriggerTimer;
+        /// Received DB trigger callback to forward messages to API
+        std::function<void(const std::string &triggerName, const std::string &triggerData)> mCallback;
+
+        std::atomic_bool mIsRunning{false};
     };
 }

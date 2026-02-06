@@ -41,6 +41,7 @@ namespace SmartHomeDB {
         std::string root = "db_service";
         configManager.getValue(root + ".service_name", databaseServiceConfig.serviceName);
         configManager.getValue(root + ".service_name", databaseServiceConfig.dbConnConfig.serviceName);
+        configManager.getValue(root + ".db_triggers_to_listen", databaseServiceConfig.dbTriggersToListen);
 
         root = "db_service.db_server";
         configManager.getValue(root + ".connections", databaseServiceConfig.dbConnConfig.dbConnections);

@@ -9,6 +9,7 @@ preset_values:
 
 db_service:
   service_name: "smarthome-databased"
+  db_triggers_to_listen: [ "modules_changed", "sensors_changed" ]
   db_server:
     connections: 4
     host: "127.0.0.0" # Overwritten by env var "SH_DB_HOST"
