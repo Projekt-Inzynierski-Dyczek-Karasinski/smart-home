@@ -13,17 +13,17 @@ namespace SmartHome {
     using namespace std::chrono_literals;
 
     struct CachedModule {
-        int id;
-        int logicAddress;
+        uint id;
+        uint logicAddress;
         std::string name;
         nlohmann::json config;
-        std::chrono::steady_clock::time_point lastOnline;
+        std::chrono::system_clock::time_point lastOnline;
     };
 
     struct CachedSensor {
-        int id;
-        int logicId;
-        int moduleId;
+        uint id;
+        uint logicId;
+        uint moduleId;
         std::string name;
         std::string type;
         nlohmann::json config;
@@ -36,7 +36,7 @@ namespace SmartHome {
     struct CachedReading {
         int sensorId;
         nlohmann::json value;
-        std::chrono::steady_clock::time_point timestamp;
+        std::chrono::system_clock::time_point timestamp;
         bool stale = false;
     };
 
@@ -48,7 +48,7 @@ namespace SmartHome {
 
         void eraseModule(int moduleId);
 
-        void updateModuleLastOnline(int moduleId, std::chrono::steady_clock::time_point timestamp);
+        void updateModuleLastOnline(int moduleId, std::chrono::system_clock::time_point timestamp);
 
         void setSensor(const CachedSensor &sensor);
 

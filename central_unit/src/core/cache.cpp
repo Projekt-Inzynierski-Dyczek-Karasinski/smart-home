@@ -49,7 +49,7 @@ namespace SmartHome {
     }
 
     void ConfigCache::updateModuleLastOnline(const int moduleId,
-                                             const std::chrono::steady_clock::time_point timestamp) {
+                                             const std::chrono::system_clock::time_point timestamp) {
         std::unique_lock lock(mMutex);
         const auto iter = mModules.find(moduleId);
         if (iter == mModules.end()) return;
@@ -210,7 +210,7 @@ namespace SmartHome {
         CachedReading reading{
             .sensorId = sensorId,
             .value = value,
-            .timestamp = std::chrono::steady_clock::now(),
+            .timestamp = std::chrono::system_clock::now(),
             .stale = false
         };
         std::unique_lock lock(mMutex);
@@ -241,7 +241,7 @@ namespace SmartHome {
     }
 
     bool ReadingsCache::isFresh(const CachedReading &reading, const std::chrono::seconds ttl) {
-        const auto age = std::chrono::steady_clock::now() - reading.timestamp;
+        const auto age = std::chrono::system_clock::now() - reading.timestamp;
         return age <= ttl;
     }
 }
