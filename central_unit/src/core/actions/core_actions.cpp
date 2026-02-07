@@ -2,7 +2,11 @@
 
 #include <boost/algorithm/string/case_conv.hpp>
 
+#include "database_actions.h"
+
 namespace SmartHome {
+    namespace jp = JsonRpcStrings::ParamsKeys;
+
     awaitOptApiResponse CoreActions::coreEchoHandler(const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[CORE_ACTIONS] [ECHO] called");
         const auto &command = commandMetadata->command;
@@ -184,10 +188,40 @@ namespace SmartHome {
 
     awaitOptApiResponse CoreActions::coreNotifyHandler(const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[CORE_ACTIONS] [NOTIFY] called");
+        const auto &command = commandMetadata->command;
 
-        // TODO implement notify logic
 
-        co_return std::nullopt;
+        if (!command.params.has_value() ||
+            !command.params->contains(jp::TYPE) ||
+            !command.params->at(jp::TYPE).is_string()) {
+            Core::Instance().mpLogger->warning(
+                "[CORE_ACTIONS] [NOTIFY] Received notification with missing or invalid type parameter");
+            co_return std::nullopt;
+        }
+
+        const auto &typeParam = command.params->at(jp::TYPE);
+        // Handle default db trigger notification
+        if (typeParam == "modules_changed") {
+            co_await DatabaseActions::fetchModulesConfigs();
+            co_return std::nullopt;
+        }
+
+        if (typeParam == "sensors_changed") {
+            co_await DatabaseActions::fetchSensorsConfigs();
+            co_return std::nullopt;
+        }
+
+        // Module mediator notifications
+        if (typeParam == "manual_trigger") {
+            // Handle manually trigger notification from module
+        }
+
+
+        // TODO !pr finish, implement common constant strings
+
+        if (typeParam == "")
+
+            co_return std::nullopt;
     }
 
     std::string_view CoreActions::setKeyToString(const SetKeys setKey) {
@@ -256,5 +290,18 @@ namespace SmartHome {
             }
             Actions::msConnectionTypeMap[connectionType] = intersectionResult;
         }
+    }
+
+    std::optional<std::unordered_set<connectionId_t> > CoreActions::findConnections(
+        std::string_view connectionTypeString) {
+        std::shared_lock lock(Actions::msConnectionTypeMapLock);
+
+        const auto target = sai::Target(connectionTypeString.data());
+        const auto iter = Actions::msConnectionTypeMap.find(target.type);
+        if (iter != Actions::msConnectionTypeMap.end() && !iter->second.empty()) {
+            return iter->second;
+        }
+
+        return std::nullopt;
     }
 }

@@ -1,12 +1,15 @@
 #include "core.h"
 #include "config_manager/config_manager.h"
 #include "actions/actions.h"
+#include "actions/database_actions.h"
 
 #include <chrono>
 #include <cmath>
 #include <iostream>
 
 #include <boost/asio.hpp>
+
+#include "actions/core_actions.h"
 
 namespace ba = boost::asio;
 namespace bai = boost::asio::ip;
@@ -144,6 +147,26 @@ namespace SmartHome {
             return;
         }
         socketServer.runSocketServer();
+
+        // Fetch initial config from database to populate cache
+        ba::co_spawn(mCoreIoContext, [this]() -> ba::awaitable<void> {
+            const auto target = sai::Target(sai::TargetTypes::DATABASE);
+            ba::steady_timer retryTimer(co_await ba::this_coro::executor);
+
+            if (!CoreActions::findConnections(target.to_string()).has_value()) {
+                mpLogger->warning("[CORE] No database service connection found on startup, entering retry loop...");
+
+                while (mIsRunning && !CoreActions::findConnections(target.to_string()).has_value()) {
+                    mpLogger->debug(
+                        "[CORE] No database service connection found, retrying in 1 second...");
+                    retryTimer.expires_after(1s);
+                    co_await retryTimer.async_wait(ba::use_awaitable);
+                }
+            }
+
+            co_await DatabaseActions::fetchAllConfigs();
+            co_return;
+        }, ba::detached);
 
         //TODO implement watchdog working in CoreThread
         mCoreThreadPool->join();

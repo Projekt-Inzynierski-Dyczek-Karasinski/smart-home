@@ -73,6 +73,12 @@ namespace SmartHome {
          */
         static void updateModuleLastOnline(uint moduleId);
 
+        static ba::awaitable<void> fetchModulesConfigs();
+
+        static ba::awaitable<void> fetchSensorsConfigs();
+
+        static ba::awaitable<void> fetchAllConfigs();
+
     private:
         /**
          * @brief Send an asynchronous notification request to db-service.
@@ -98,6 +104,8 @@ namespace SmartHome {
          */
         static ba::awaitable<API::ApiResponse> sendRequestToDbService(API::ApiRequest &&request,
                                                                       cmdMetaPtr commandMetadata);
+
+        static ba::awaitable<API::ApiResponse> sendRequestToDbService(API::ApiRequest &&request);
 
         /**
          * @brief Validate incoming command parameters for database operations.

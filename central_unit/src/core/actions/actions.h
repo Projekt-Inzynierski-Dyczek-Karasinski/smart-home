@@ -370,10 +370,10 @@ namespace SmartHome {
         static std::mutex msResponsesLock;
 
         static std::unordered_map<connectionId_t, sai::TargetTypes> msConnectionsMap;
-        static std::mutex msConnectionsMapLock;
+        static std::shared_mutex msConnectionsMapLock;
 
         static std::unordered_map<sai::TargetTypes, std::unordered_set<connectionId_t> > msConnectionTypeMap;
-        static std::mutex msConnectionTypeMapLock;
+        static std::shared_mutex msConnectionTypeMapLock;
 
         /// After not adding new messages to send for timeout duration, send aggregated batch message.
         static constexpr auto msAGGREGATE_OUTGOING_TIMEOUT = 10ms;

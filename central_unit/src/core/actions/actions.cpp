@@ -709,11 +709,11 @@ namespace SmartHome {
 
     std::unordered_map<connectionId_t, sai::TargetTypes> Actions::msConnectionsMap;
 
-    std::mutex Actions::msConnectionsMapLock;
+    std::shared_mutex Actions::msConnectionsMapLock;
 
     std::unordered_map<sai::TargetTypes, std::unordered_set<connectionId_t> > Actions::msConnectionTypeMap;
 
-    std::mutex Actions::msConnectionTypeMapLock;
+    std::shared_mutex Actions::msConnectionTypeMapLock;
 
     // ======================================== CommandHandler functions ========================================
 

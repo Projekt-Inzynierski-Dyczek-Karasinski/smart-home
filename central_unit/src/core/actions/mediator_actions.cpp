@@ -329,7 +329,18 @@ namespace SmartHome {
     ba::awaitable<bool> MediatorActions::getModuleAddressingInfo(nlohmann::json &preparedParams,
                                                                  const uint moduleId,
                                                                  std::string &error) {
-        const auto moduleInfo = co_await DatabaseActions::getModuleAddressingInfo(moduleId);
+        nlohmann::json moduleInfo;
+        auto module = Core::Instance().configCache().getModule(moduleId);
+        if (module.has_value() && module->config.contains(jmik::RF_CHANNEL)) {
+            Core::Instance().mpLogger->debugf(
+                "[MEDIATOR_ACTIONS] [GET_MODULE_INFO] Fetched module info from cache for module %u",
+                moduleId);
+            moduleInfo[jmik::LOGIC_ADDRESS] = module->logicAddress;
+            moduleInfo[jmik::RF_CHANNEL] = module->config.at(jmik::RF_CHANNEL);
+        } else {
+            moduleInfo = co_await DatabaseActions::getModuleAddressingInfo(moduleId);
+        }
+
 
         if (!moduleInfo.contains(jmik::LOGIC_ADDRESS) || !moduleInfo.contains(jmik::RF_CHANNEL)) {
             if (moduleInfo.contains(jr::ERROR)) error = moduleInfo[jr::ERROR];
@@ -353,6 +364,19 @@ namespace SmartHome {
         if (!parsedParams.args.has_value()) return;
         if (parsedParams.args.value().empty()) return;
 
+        const auto sensorId = Core::Instance().configCache().findSensorId(parsedParams.moduleId.value(),
+                                                                          parsedParams.args.value().front());
+        if (sensorId.has_value()) {
+            Core::Instance().readingsCache().set(sensorId.value(), result);
+            Core::Instance().mpLogger->debugf(
+                "[MEDIATOR_ACTIONS] [POST_READING] Saved sensor reading to cache for sensor ID", sensorId.value());
+        } else {
+            Core::Instance().mpLogger->warningf(
+                "[MEDIATOR_ACTIONS] [POST_READING] Could not find sensor ID for module [%u] "
+                "and logic sensor ID [%u] in cache, skipping saving reading to cache",
+                parsedParams.moduleId.value(),
+                parsedParams.args.value().front().dump().c_str());
+        }
 
         DatabaseActions::postSensorReading(parsedParams.moduleId.value(),
                                            parsedParams.args.value().front(),
