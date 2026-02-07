@@ -13,6 +13,7 @@
 #include <vector>
 #include <set>
 
+// TODO Setting FU_MODE can change HC-12 baudrate, implement automatic baudrate change in UART port to handle this case
 
 namespace ba = boost::asio;
 
@@ -31,7 +32,7 @@ namespace SmartHomeMediator {
             BAUDRATE, // AT+B (1200/2400/.../115200)
             FU_MODE, // AT+FU (1-4)
             POWER, // AT+P (1-8)
-            DEFAULT // Reset to default
+            DEFAULT // Reset to default, requires value "all_options"
         };
 
         struct Config {

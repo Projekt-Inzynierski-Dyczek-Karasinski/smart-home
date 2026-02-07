@@ -184,7 +184,7 @@ namespace SmartHomeMediator {
 
             // Validate response, with spacial case for resetting to default
             if (value == responseValueStr ||
-                (parsedOption == Hc12Option::DEFAULT && responseStr == sc::Common::DEFAULT_UPPER)) {
+                (parsedOption == Hc12Option::DEFAULT && responseValueStr == sc::Common::DEFAULT_UPPER)) {
                 success = true;
                 mpLogger->debugf("[HC12_DRIVER] [SET_OPTION] option set: %s=%s",
                                  option.data(), responseValueStr.c_str());

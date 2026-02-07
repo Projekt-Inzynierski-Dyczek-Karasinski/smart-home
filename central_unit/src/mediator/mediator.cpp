@@ -88,6 +88,7 @@ namespace SmartHomeMediator {
                 mpLogger->debug("[MEDIATOR] RF initialized");
             } else {
                 mpLogger->errorf("[MEDIATOR] RF initialization failed");
+                // TODO consider implementing retry mechanism with resetting RF module to default
             }
             isRfClientInitialized = isSuccessful;
         });
