@@ -6,6 +6,7 @@
 #include "socket_client.h"
 #include "rf_api/rf_client.h"
 #include "rf_api/rf_api.h"
+#include "constants.h"
 
 #include <memory>
 
@@ -13,6 +14,7 @@
 namespace su = SmartHome::Utils;
 namespace si = SmartHome::IPC;
 namespace bs = boost::system;
+namespace sc = SmartHome::Constants;
 
 
 namespace SmartHomeMediator {
@@ -36,7 +38,7 @@ namespace SmartHomeMediator {
                 .isEnabled = true, .endpointAddress = "127.0.0.1", .endpointPort = 43321
             };
             /// Default UDS config from socket server
-            si::SocketServer::Config::Uds uds{.isEnabled = true, .endpointPath = "/var/run/smarthomed.sock"};
+            si::SocketServer::Config::Uds uds{.isEnabled = true, .endpointPath = sc::DefaultPaths::UDS.data()};
 
             RfClient::Config rfClient{};
         };
@@ -131,9 +133,6 @@ namespace SmartHomeMediator {
         static constexpr std::array msSIGNALS_TO_HANDLE = {SIGINT, SIGTERM, SIGHUP};
         /// Maximum time to wait for graceful shutdown
         static constexpr auto msSHUTDOWN_TIMEOUT = 2500ms;
-        /// Service name
-        static constexpr std::string_view msSERVICE_NAME = "smarthome-radiod";
-        static constexpr std::string_view msCLIENT_TARGET_TYPE = "module_mediator";
 
         Config mConfig;
 

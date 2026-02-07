@@ -1,4 +1,5 @@
 #include "main.h"
+#include "constants.h"
 
 #include <iostream>
 #include <string>
@@ -10,6 +11,7 @@
 namespace ba = boost::asio;
 namespace bai = boost::asio::ip;
 namespace bpo = boost::program_options;
+namespace sc = SmartHome::Constants;
 
 namespace SmartHomeDB {
     TerminalPasswordGuard::TerminalPasswordGuard() {
@@ -138,10 +140,10 @@ namespace SmartHomeDB {
         // Load YAML config
         auto configManager = su::ConfigManager(pLogger);
         su::Logger::Config loggerConfig;
-        loggerConfig.logFile.path = sDEFAULT_LOGFILE_PATH;
+        loggerConfig.logFile.path = sc::DefaultPaths::DB_SERVICE_LOGFILE;
         const std::string configPath = vm.contains("config")
                                            ? vm["config"].as<std::string>()
-                                           : sDEFAULT_CONFIG_PATH.data();
+                                           : sc::DefaultPaths::DB_SERVICE_CONFIG.data();
         if (configManager.loadConfig(configPath)) {
             pLogger->debug("[MAIN_DB-SERVICE] Loading YAML logger config");
             loadLoggerYamlConfig(configManager, loggerConfig);

@@ -128,10 +128,6 @@ namespace SmartHome::IPC {
  */
         void send(std::string_view message);
 
-        static constexpr std::string_view msSET_METHOD_STRING = "set";
-        static constexpr std::string_view msCORE_TARGET_STRING = "core";
-        static constexpr std::string_view msCONNECTION_TYPE_STRING = "connection_type";
-
         ba::io_context *mpIoContext;
         std::shared_ptr<su::Logger> mpLogger;
         std::optional<SocketConnection> mConnection;

@@ -93,16 +93,6 @@ namespace SmartHome::API {
 
             /// Compare with MethodTypes enum
             bool operator==(MethodTypes other) const;
-
-        private:
-            static constexpr std::string_view msGET_STRING = "get";
-            static constexpr std::string_view msSET_STRING = "set";
-            static constexpr std::string_view msNOTIFY_STRING = "notify";
-            static constexpr std::string_view msEXECUTE_STRING = "execute";
-            static constexpr std::string_view msDELETE_STRING = "delete";
-            static constexpr std::string_view msECHO_STRING = "echo";
-            static constexpr std::string_view msPING_STRING = "ping";
-            static constexpr std::string_view msUNKNOWN_STRING = "unknown";
         };
 
         /**
@@ -150,17 +140,6 @@ namespace SmartHome::API {
 
             /// Compare with TargetTypes enum
             bool operator==(TargetTypes other) const;
-
-        private:
-            static constexpr std::string_view msCLI_STRING = "cli";
-            static constexpr std::string_view msGUI_STRING = "gui";
-            static constexpr std::string_view msWEB_SERVER_STRING = "web_server";
-            static constexpr std::string_view msWEB_STRING = "web";
-            static constexpr std::string_view msCORE_STRING = "core";
-            static constexpr std::string_view msMODULE_MEDIATOR_STRING = "module_mediator";
-            static constexpr std::string_view msMEDIATOR_STRING = "mediator";
-            static constexpr std::string_view msDATABASE_STRING = "database";
-            static constexpr std::string_view msUNKNOWN_STRING = "unknown";
         };
 
 

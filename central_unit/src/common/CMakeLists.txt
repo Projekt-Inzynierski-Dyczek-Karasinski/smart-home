@@ -28,7 +28,6 @@ if (ENABLE_SYSTEMD)
 endif ()
 
 
-
 # SMARTHOME LOGGER
 add_library(smarthome_logger STATIC
         logger/logger.cpp
@@ -107,4 +106,12 @@ target_link_libraries(smarthome_utility
         yaml-cpp
         PUBLIC
         smarthome::logger
+)
+
+# SMARTHOME CONSTANTS
+add_library(smarthome_constants INTERFACE)
+add_library(smarthome::constants ALIAS smarthome_constants)
+
+target_include_directories(smarthome_constants INTERFACE
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/constants>
 )

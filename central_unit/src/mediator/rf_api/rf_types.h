@@ -9,7 +9,6 @@
 
 
 namespace SmartHomeMediator::RfTypes {
-
     /**
      * @brief Error codes returned in RF protocol error responses.
      */
@@ -583,41 +582,6 @@ namespace SmartHomeMediator::RfTypes {
      */
     template<typename T>
     void assignRawDataToParameter(Parameter &param, const std::span<uint8_t> &rawData);
-
-
-    // Target string
-    inline constexpr std::string_view MEDIATOR_STRING = "module_mediator";
-    inline constexpr std::string_view CORE_STRING = "core";
-
-    // Commands strings
-    inline constexpr std::string_view GET_STRING = "get";
-    inline constexpr std::string_view SET_STRING = "set";
-    inline constexpr std::string_view NOTIFY_STRING = "notify";
-    inline constexpr std::string_view EXECUTE_STRING = "execute";
-    inline constexpr std::string_view PING_STRING = "ping";
-
-    // Set/Get/Notify type strings
-    inline constexpr std::string_view CONFIG_OPTION_STRING = "config_option";
-    inline constexpr std::string_view TOGGLE_ACTUATOR_STRING = "toggle_actuator";
-    inline constexpr std::string_view SET_ACTUATOR_VALUE_STRING = "set_actuator_value";
-    inline constexpr std::string_view SENSOR_VALUE_STRING = "sensor_value";
-    inline constexpr std::string_view SENSOR_LIST_STRING = "sensor_list";
-    inline constexpr std::string_view LOGS_STRING = "logs";
-    inline constexpr std::string_view BATTERY_LEVEL_STRING = "battery_level";
-    inline constexpr std::string_view FORCE_READ_SENSOR_VALUE_STRING = "force_read_sensor_value";
-    inline constexpr std::string_view MANUAL_TRIGGER_STRING = "manual_trigger";
-    inline constexpr std::string_view POWER_LOSS_STRING = "power_loss";
-    inline constexpr std::string_view ALERT_STRING = "alert";
-    inline constexpr std::string_view WAKE_STRING = "wake";
-
-    // Action types strings
-    inline constexpr std::string_view SLEEP_STRING = "sleep";
-    inline constexpr std::string_view DEEP_SLEEP_STRING = "deep_sleep";
-
-    // Special strings
-    inline constexpr std::string_view ALL_OPTIONS_STRING = "all_options";
-    inline constexpr std::string_view DEFAULT_STRING = "DEFAULT";
-    inline constexpr std::string_view UNDEFINED_STRING = "undefined";
 }
 
 #include "rf_types.tpp"

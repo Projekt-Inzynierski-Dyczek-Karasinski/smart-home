@@ -1,4 +1,5 @@
 #include "api.h"
+#include "../constants/constants.h"
 
 #include <atomic>
 #include <iostream>
@@ -312,10 +313,10 @@ namespace SmartHome::API {
 
     std::string getTargetMethodString(std::string_view target, std::string_view method) {
         if (target.empty()) {
-            target = "<undefined>";
+            target = Constants::Common::UNDEFINED_BRACKETS;
         }
         if (method.empty()) {
-            method = "<undefined>";
+            method = Constants::Common::UNDEFINED_BRACKETS;
         }
         return std::string(target) + "." + std::string(method);
     }

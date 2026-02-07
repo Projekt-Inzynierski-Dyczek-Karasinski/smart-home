@@ -1,10 +1,13 @@
 #include "rf_client.h"
 #include "../mediator.h"
+#include "constants.h"
 
 #include <boost/format.hpp>
 #include <boost/algorithm/string/join.hpp>
 
 namespace SmartHomeMediator {
+    namespace sc = SmartHome::Constants;
+
     RfClient::RfClient(ba::io_context &ioContext,
                        const std::shared_ptr<su::Logger> &logger,
                        const Config &config)
@@ -28,7 +31,7 @@ namespace SmartHomeMediator {
         std::vector<std::string> hexBytes;
         hexBytes.reserve(mUniqueNetworkId.size());
 
-        for (const auto &byte : mUniqueNetworkId) {
+        for (const auto &byte: mUniqueNetworkId) {
             hexBytes.push_back((boost::format("%02X") % static_cast<int>(byte)).str());
         }
         const std::string macStr = boost::algorithm::join(hexBytes, ":");
@@ -69,7 +72,7 @@ namespace SmartHomeMediator {
 
             // Set channel to default
             try {
-                success = co_await mpDriver->setOption(RfDriver::msCHANNEL_OPTION_STRING.data(),
+                success = co_await mpDriver->setOption(sc::MediatorArgs::CHANNEL.data(),
                                                        std::to_string(mRfMainChannel));
             } catch (const std::exception &e) {
                 mpLogger->errorf("[RF_CLIENT] Initialization error: %s", e.what());

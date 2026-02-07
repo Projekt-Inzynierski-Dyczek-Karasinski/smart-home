@@ -2,7 +2,6 @@
 
 #include "rf_types.h"
 #include "api.h"
-#include "../../core/api/internal_api.h"
 
 
 namespace sa = SmartHome::API;

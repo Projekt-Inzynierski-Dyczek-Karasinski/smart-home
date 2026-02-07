@@ -1,11 +1,14 @@
 #include "hc12_driver.h"
 #include "../rf_api/rf_types.h"
+#include "constants.h"
 
 #include <algorithm>
 #include <boost/algorithm/string/find.hpp>
 
 
 namespace SmartHomeMediator {
+    namespace sc = SmartHome::Constants;
+
     HC12Driver::HC12Driver(ba::io_context &ioContext,
                            const std::shared_ptr<su::Logger> &logger,
                            const Config &config)
@@ -181,7 +184,7 @@ namespace SmartHomeMediator {
 
             // Validate response, with spacial case for resetting to default
             if (value == responseValueStr ||
-                (parsedOption == Hc12Option::DEFAULT && responseStr == RfTypes::DEFAULT_STRING)) {
+                (parsedOption == Hc12Option::DEFAULT && responseStr == sc::Common::DEFAULT_UPPER)) {
                 success = true;
                 mpLogger->debugf("[HC12_DRIVER] [SET_OPTION] option set: %s=%s",
                                  option.data(), responseValueStr.c_str());
@@ -400,7 +403,7 @@ namespace SmartHomeMediator {
                 commandStr = "AT+P" + std::string(value);
                 break;
             case Hc12Option::DEFAULT:
-                if (value != RfTypes::ALL_OPTIONS_STRING) break;
+                if (value != sc::MediatorArgs::ALL_OPTIONS) break;
                 commandStr = "AT+DEFAULT";
                 break;
             default:
@@ -480,7 +483,7 @@ namespace SmartHomeMediator {
         std::string valuePart(responseStr.substr(plusPos + 1));
 
         // Handle reset to default settings
-        if (valuePart == RfTypes::DEFAULT_STRING) {
+        if (valuePart == sc::Common::DEFAULT_UPPER) {
             return {valuePart.begin(), valuePart.end()};
         }
 

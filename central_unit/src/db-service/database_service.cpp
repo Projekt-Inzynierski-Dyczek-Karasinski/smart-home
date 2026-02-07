@@ -31,7 +31,7 @@ namespace SmartHomeDB {
 
         // Attempt establishing connection with SmartHome daemon
         mpSocketClient = std::make_unique<si::SocketClient>(&mSocketClientIoContext, pLogger,
-                                                            msCLIENT_TARGET_TYPE.data());
+                                                            sc::Targets::DATABASE.data());
         bool isConnectionEstablished = false;
         if (mConfig.uds.isEnabled) {
             isConnectionEstablished = mpSocketClient->connectToServer(mConfig.uds.endpointPath);

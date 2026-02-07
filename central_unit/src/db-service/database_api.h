@@ -13,75 +13,58 @@ namespace SmartHomeDB {
 
     namespace SqlKeywords {
         // Keys
-        inline constexpr std::string_view SELECT_STR = "select";
-        inline constexpr std::string_view INSERT_INTO_STR = "insert into";
-        inline constexpr std::string_view UPDATE_STR = "update";
-        inline constexpr std::string_view DELETE_STR = "delete";
-        inline constexpr std::string_view FROM_STR = "from";
-        inline constexpr std::string_view WHERE_STR = "where";
-        inline constexpr std::string_view ORDER_BY_STR = "order by";
-        inline constexpr std::string_view LIMIT_STR = "limit";
-        inline constexpr std::string_view RETURNING_STR = "returning";
-        inline constexpr std::string_view VALUES_STR = "values";
-        inline constexpr std::string_view SET_STR = "set";
+        inline constexpr std::string_view SELECT = "select";
+        inline constexpr std::string_view INSERT_INTO = "insert into";
+        inline constexpr std::string_view UPDATE = "update";
+        inline constexpr std::string_view DELETE = "delete";
+        inline constexpr std::string_view FROM = "from";
+        inline constexpr std::string_view WHERE = "where";
+        inline constexpr std::string_view ORDER_BY = "order by";
+        inline constexpr std::string_view LIMIT = "limit";
+        inline constexpr std::string_view RETURNING = "returning";
+        inline constexpr std::string_view VALUES = "values";
+        inline constexpr std::string_view SET = "set";
 
         // Values
-        inline constexpr std::string_view ASC_STR = "asc";
-        inline constexpr std::string_view DESC_STR = "desc";
-        inline constexpr std::string_view IS_STR = "is";
-        inline constexpr std::string_view NOT_STR = "not";
+        inline constexpr std::string_view ASC = "asc";
+        inline constexpr std::string_view DESC = "desc";
+        inline constexpr std::string_view IS = "is";
+        inline constexpr std::string_view NOT = "not";
+        /// \c NULL is a macro in C/C++, \c NULL_STR is used to avoid conflicts
         inline constexpr std::string_view NULL_STR = "null";
-        inline constexpr std::string_view TRUE_STR = "true";
-        inline constexpr std::string_view FALSE_STR = "false";
-        inline constexpr std::string_view WILDCARD_STR = "*";
+        inline constexpr std::string_view TRUE = "true";
+        inline constexpr std::string_view FALSE = "false";
+        inline constexpr std::string_view WILDCARD = "*";
 
         //Aggregates
-        inline constexpr std::string_view COUNT_STR = "count";
-        inline constexpr std::string_view AVG_STR = "avg";
-        inline constexpr std::string_view MAX_STR = "max";
-        inline constexpr std::string_view MIN_STR = "min";
+        inline constexpr std::string_view COUNT = "count";
+        inline constexpr std::string_view AVG = "avg";
+        inline constexpr std::string_view MAX = "max";
+        inline constexpr std::string_view MIN = "min";
 
         inline const std::set AGGREGATES = {
-            COUNT_STR, AVG_STR, MAX_STR, MIN_STR
+            COUNT, AVG, MAX, MIN
         };
 
         // Operators
-        inline constexpr std::string_view EQUAL_STR = "=";
-        inline constexpr std::string_view NOT_EQUAL_STR = "!=";
-        inline constexpr std::string_view GREATER_STR = ">";
-        inline constexpr std::string_view LESS_STR = "<";
-        inline constexpr std::string_view GREATER_OR_EQUAL_STR = ">=";
-        inline constexpr std::string_view LESS_OR_EQUAL_STR = "<=";
-        inline constexpr std::string_view LIKE_STR = "like";
+        inline constexpr std::string_view EQUAL = "=";
+        inline constexpr std::string_view NOT_EQUAL = "!=";
+        inline constexpr std::string_view GREATER = ">";
+        inline constexpr std::string_view LESS = "<";
+        inline constexpr std::string_view GREATER_OR_EQUAL = ">=";
+        inline constexpr std::string_view LESS_OR_EQUAL = "<=";
+        inline constexpr std::string_view LIKE = "like";
 
         inline const std::set OPERATORS = {
-            EQUAL_STR, NOT_EQUAL_STR, GREATER_STR, LESS_STR, GREATER_OR_EQUAL_STR, LESS_OR_EQUAL_STR, LIKE_STR
+            EQUAL, NOT_EQUAL, GREATER, LESS, GREATER_OR_EQUAL, LESS_OR_EQUAL, LIKE
         };
 
         // Reserved operators
-        inline constexpr std::string_view AND_STR = "and";
-        inline constexpr std::string_view OR_STR = "or";
+        inline constexpr std::string_view AND = "and";
+        inline constexpr std::string_view OR = "or";
     }
 
-    namespace ApiKeywords {
-        inline constexpr std::string_view SET_STR = "set";
-        inline constexpr std::string_view GET_STR = "get";
-        inline constexpr std::string_view DELETE_STR = "delete";
-        inline constexpr std::string_view SUBSELECT_STR = "$subselect";
-
-        inline constexpr std::string_view TABLE_STR = "table";
-        inline constexpr std::string_view COLUMNS_STR = "columns";
-        inline constexpr std::string_view COLUMN_STR = "column";
-        inline constexpr std::string_view AGGREGATES_STR = "aggregates";
-        inline constexpr std::string_view WHERE_STR = "where";
-        inline constexpr std::string_view ORDER_BY_STR = "order_by";
-        inline constexpr std::string_view ORDER_STR = "order";
-        inline constexpr std::string_view LIMIT_STR = "limit";
-        inline constexpr std::string_view VALUES_STR = "values";
-        inline constexpr std::string_view RETURNING_STR = "returning";
-    }
-
-    namespace ak = ApiKeywords;
+    namespace sjp = SmartHome::JsonRpcStrings::ParamsKeys;
     namespace sk = SqlKeywords;
 
     /**
@@ -368,8 +351,6 @@ namespace SmartHomeDB {
          * @return Lowercased string.
          */
         static std::string toLower(std::string_view str);
-
-        static constexpr std::string_view msTARGET_STR = "database";
 
 
         std::shared_ptr<DatabaseClient> mpDatabaseClient; ///< Database client used to execute queries

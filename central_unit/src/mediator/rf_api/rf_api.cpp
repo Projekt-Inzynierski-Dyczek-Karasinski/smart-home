@@ -1,12 +1,14 @@
 #include "rf_api.h"
 #include "../mediator.h"
 #include "rf_client.h"
+#include "constants.h"
 
 #include <boost/algorithm/string/case_conv.hpp>
 namespace sj = SmartHome::JsonRpcStrings;
 
 namespace SmartHomeMediator {
     using namespace std::string_literals;
+    namespace sc = SmartHome::Constants;
 
     void RfApi::initialize(const std::function<void(const std::string &message)> &messageHandler) {
         mMessageHandler = messageHandler;
@@ -88,6 +90,7 @@ namespace SmartHomeMediator {
 
         try {
             apiRequest(jsonRpcRequest);
+            response.id = apiRequest.id;
         } catch (const std::exception &e) {
             pLogger->errorf("[RF_API] [HANDLE_INCOMING] Failed to parse request message to ApiRequest: %s",
                             e.what());
@@ -176,7 +179,7 @@ namespace SmartHomeMediator {
             notify.params.emplace(nlohmann::json::object());
             auto &params = notify.params.value();
 
-            notify.method = SmartHome::API::getTargetMethodString(RfTypes::CORE_STRING, RfTypes::NOTIFY_STRING);
+            notify.method = SmartHome::API::getTargetMethodString(sc::Targets::CORE, sc::Methods::NOTIFY);
 
             auto notificationType = std::get<RfTypes::NotificationType>(rfCommand.requestType.value());
             params[sj::ParamsKeys::TYPE] = notificationTypeToString(notificationType);
@@ -202,14 +205,14 @@ namespace SmartHomeMediator {
         const auto targetLower = boost::algorithm::to_lower_copy(std::string(targetStr));
         const auto methodLower = boost::algorithm::to_lower_copy(std::string(methodStr));
 
-        if (targetLower != RfTypes::MEDIATOR_STRING) {
+        if (targetLower != sc::Targets::MEDIATOR && targetLower != sc::Targets::MODULE_MEDIATOR) {
             throw std::invalid_argument("Missing or invalid target parameter");
         }
 
         std::unique_ptr<nlohmann::json> pMethodParams;
         if (!params.empty()) {
             pMethodParams = std::make_unique<nlohmann::json>(params);
-        } else if (methodLower != RfTypes::PING_STRING) {
+        } else if (methodLower != sc::Methods::PING) {
             throw std::invalid_argument("Missing method params");
         }
 
@@ -248,12 +251,12 @@ namespace SmartHomeMediator {
 
         bool argsRequired = false;
 
-        if (method == RfTypes::GET_STRING) {
+        if (method == sc::Methods::GET) {
             pConfigCommand->configCommandType = RfTypes::MediatorConfigCommandType::GET;
-        } else if (method == RfTypes::SET_STRING) {
+        } else if (method == sc::Methods::SET) {
             pConfigCommand->configCommandType = RfTypes::MediatorConfigCommandType::SET;
             argsRequired = true;
-        } else if (method == RfTypes::EXECUTE_STRING) {
+        } else if (method == sc::Methods::EXECUTE) {
             pConfigCommand->configCommandType = RfTypes::MediatorConfigCommandType::EXECUTE;
             argsRequired = true;
         } else {
@@ -285,7 +288,7 @@ namespace SmartHomeMediator {
     void RfApi::parseRequest(RfTypes::RfCommand *pCommand,
                              const std::string_view method,
                              nlohmann::json *pMethodParams) {
-        if (method == RfTypes::PING_STRING) {
+        if (method == sc::Methods::PING) {
             pCommand->rfCommandType = RfTypes::RfCommandType::PING;
             return;
         }
@@ -293,10 +296,11 @@ namespace SmartHomeMediator {
         if (!(pMethodParams &&
               pMethodParams->contains(sj::ParamsKeys::TYPE) &&
               pMethodParams->at(sj::ParamsKeys::TYPE).is_string())) {
-            throw std::invalid_argument("Invalid method specified");
+            throw std::invalid_argument(
+                "'type' field is required for get, set and execute commands and must be a string");
         }
 
-        if (method == RfTypes::SET_STRING) {
+        if (method == sc::Methods::SET) {
             // Handle set command
             pCommand->rfCommandType = RfTypes::RfCommandType::SET;
             // Read set type from 'type' field
@@ -306,7 +310,7 @@ namespace SmartHomeMediator {
             } catch (const std::exception &e) {
                 throwParseError("set", e.what(), pMethodParams->dump());
             }
-        } else if (method == RfTypes::GET_STRING) {
+        } else if (method == sc::Methods::GET) {
             // Handle get command
             pCommand->rfCommandType = RfTypes::RfCommandType::GET;
             // Read get type from 'type' field
@@ -316,7 +320,7 @@ namespace SmartHomeMediator {
             } catch (const std::exception &e) {
                 throwParseError("get", e.what(), pMethodParams->dump());
             }
-        } else if (method == RfTypes::EXECUTE_STRING) {
+        } else if (method == sc::Methods::EXECUTE) {
             // Handle execute command
             std::string action;
             try {
@@ -326,12 +330,12 @@ namespace SmartHomeMediator {
             }
 
             // TODO implement function when adding more actions
-            if (action == RfTypes::SLEEP_STRING) {
+            if (action == sc::MediatorTypes::SLEEP) {
                 pCommand->rfCommandType = RfTypes::RfCommandType::SLEEP;
-            } else if (action == RfTypes::DEEP_SLEEP_STRING)
+            } else if (action == sc::MediatorTypes::DEEP_SLEEP)
                 pCommand->rfCommandType = RfTypes::RfCommandType::DEEP_SLEEP;
             else {
-                throw std::invalid_argument("Invalid action parameter specified");
+                throw std::invalid_argument("Invalid 'type' parameter specified");
             }
         } else {
             throw std::invalid_argument("API method not supported: "s + method.data());
@@ -350,7 +354,7 @@ namespace SmartHomeMediator {
     void RfApi::parseNotification(RfTypes::RfCommand *pCommand,
                                   const std::string_view method,
                                   nlohmann::json *pMethodParams) {
-        if (method != RfTypes::NOTIFY_STRING) {
+        if (method != sc::Methods::NOTIFY) {
             throw std::invalid_argument("API notification is not of notify method");
         }
 

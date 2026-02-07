@@ -3,7 +3,6 @@
 #include "async_logger.h"
 
 #include <string>
-#include <string_view>
 #include <vector>
 #include <memory>
 
@@ -37,7 +36,7 @@ namespace SmartHomeMediator {
          *
          * @return Awaitable with received data string.
          */
-        virtual ba::awaitable<std::vector<uint8_t>> read() = 0;
+        virtual ba::awaitable<std::vector<uint8_t> > read() = 0;
 
         /**
          * @brief Set RF transceiver configuration option.
@@ -56,7 +55,7 @@ namespace SmartHomeMediator {
          *
          * @return Awaitable with option value, or empty string on error.
          */
-        virtual ba::awaitable<std::vector<uint8_t>> getOption(std::string option) = 0;
+        virtual ba::awaitable<std::vector<uint8_t> > getOption(std::string option) = 0;
 
         /**
          * @brief Get all RF transceiver configuration options.
@@ -79,11 +78,7 @@ namespace SmartHomeMediator {
          */
         virtual bool isMultiChannel() = 0;
 
-        /// String used by setOption when changing channels if transceiver supports it
-        static constexpr std::string_view msCHANNEL_OPTION_STRING = "channel";
-
     protected:
         std::shared_ptr<su::Logger> mpLogger;
     };
-
 }

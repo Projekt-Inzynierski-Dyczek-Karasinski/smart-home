@@ -41,6 +41,7 @@ target_link_libraries(smarthomed PRIVATE
         smarthome::api
         smarthome::ipc
         smarthome::utility
+        smarthome::constants
         Boost::program_options
         nlohmann_json::nlohmann_json
 )

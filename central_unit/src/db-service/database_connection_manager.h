@@ -1,5 +1,6 @@
 #pragma once
 #include "logger.h"
+#include "constants.h"
 
 #include <condition_variable>
 #include <memory>
@@ -38,7 +39,7 @@ namespace SmartHomeDB {
             std::string dbPassword; // No default password
 
             // Additional connection options
-            std::string serviceName = "smarthome-database";
+            std::string serviceName = SmartHome::Constants::DefaultServiceNames::DATABASE.data();
             uint connectionTimeoutSeconds = 10;
             bool isKeepAliveEnabled = true;
             uint keepAliveSeconds = 30;

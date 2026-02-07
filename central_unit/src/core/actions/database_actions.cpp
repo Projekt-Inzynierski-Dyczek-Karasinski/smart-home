@@ -5,6 +5,7 @@ namespace SmartHome {
     using ai = API::InternalApi;
 
     namespace jmik = JsonRpcStrings::ModuleInfoKeys;
+    namespace jp = JsonRpcStrings::ParamsKeys;
 
     awaitOptApiResponse DatabaseActions::databaseRequestHandler(const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[DATABASE_ACTIONS] [REQUEST_HANDLER] called");
@@ -36,9 +37,9 @@ namespace SmartHome {
         API::ApiRequest request;
 
         nlohmann::json dbQuery = {
-            {"table", "modules"},
-            {"columns", {"logic_address", "name", "config", "last_online"}},
-            {"where", {{"id", moduleId}}},
+            {jp::TABLE, "modules"},
+            {jp::COLUMNS, {"logic_address", "name", "config", "last_online"}},
+            {jp::WHERE, {{"id", moduleId}}},
         };
 
         const API::InternalApi::Method method(API::InternalApi::MethodTypes::GET);
@@ -53,17 +54,17 @@ namespace SmartHome {
         nlohmann::json result;
 
         if (response.error.has_value()) {
-            result["error"] = response.error.value().data;
+            result[jp::ERROR] = response.error.value().data;
             co_return result;
         }
 
         if (response.result.has_value()) {
             auto responseResultJson = nlohmann::json::parse(response.result.value());
 
-            if (responseResultJson.contains("affected_rows") &&
-                responseResultJson["affected_rows"] == 1 &&
-                responseResultJson.contains("rows")) {
-                auto row = responseResultJson["rows"].front();
+            if (responseResultJson.contains(jp::AFFECTED_ROWS) &&
+                responseResultJson[jp::AFFECTED_ROWS] == 1 &&
+                responseResultJson.contains(jp::ROWS)) {
+                auto row = responseResultJson[jp::ROWS].front();
 
                 // Extract logic address and RF channel from response
                 try {
@@ -90,7 +91,7 @@ namespace SmartHome {
                         "[DATABASE_ACTIONS] [GET_ADDR_INFO] Failed to update config cache: %s", e.what());
                 }
             } else {
-                result["error"] = "Module not found";
+                result[jp::ERROR] = "Module not found";
             }
         }
         co_return result;
@@ -104,10 +105,10 @@ namespace SmartHome {
 
 
         nlohmann::json dbQuerySubselect = {
-            {"table", "sensors"},
-            {"columns", {"id"}},
+            {jp::TABLE, "sensors"},
+            {jp::COLUMNS, {"id"}},
             {
-                "where", {
+                jp::WHERE, {
                     {"module_id", moduleId},
                     {"logic_id", sensorLogicId}
                 }
@@ -115,10 +116,10 @@ namespace SmartHome {
         };
 
         nlohmann::json dbQuery = {
-            {"table", "sensor_readings"},
+            {jp::TABLE, "sensor_readings"},
             {
-                "values", {
-                    {"sensor_id", {{"$subselect", dbQuerySubselect}}},
+                jp::VALUES, {
+                    {"sensor_id", {{jp::SUBSELECT, dbQuerySubselect}}},
                     {value.is_number() ? "value_numeric" : "value_text", value},
                     {"metadata", metadata}
                 }
@@ -139,9 +140,9 @@ namespace SmartHome {
 
 
         nlohmann::json dbQuery = {
-            {"table", "logs"},
+            {jp::TABLE, "logs"},
             {
-                "values", {
+                jp::VALUES, {
                     {"type", type},
                     {"content", content},
                     {"module_id", moduleId}
@@ -171,9 +172,9 @@ namespace SmartHome {
         oss << std::put_time(&tmUTC, "%Y-%m-%dT%H:%M:%SZ");
 
         nlohmann::json dbQuery = {
-            {"table", "modules"},
-            {"values", {{"last_online", oss.str()}}},
-            {"where", {{"id", moduleId}}}
+            {jp::TABLE, "modules"},
+            {jp::VALUES, {{"last_online", oss.str()}}},
+            {jp::WHERE, {{"id", moduleId}}}
         };
 
         const API::InternalApi::Method method(API::InternalApi::MethodTypes::SET);
@@ -191,8 +192,8 @@ namespace SmartHome {
         API::ApiRequest request;
 
         nlohmann::json dbQuery = {
-            {"table", "modules"},
-            {"columns", nlohmann::json::array({"id", "logic_address", "config", "last_online"})},
+            {jp::TABLE, "modules"},
+            {jp::COLUMNS, nlohmann::json::array({"id", "logic_address", "config", "last_online"})},
         };
 
         const API::InternalApi::Target target(API::InternalApi::TargetTypes::DATABASE);
@@ -215,9 +216,9 @@ namespace SmartHome {
         if (response.result.has_value()) {
             auto responseResultJson = nlohmann::json::parse(response.result.value());
 
-            if (responseResultJson.contains("affected_rows") &&
-                responseResultJson.contains("rows")) {
-                for (const auto &row: responseResultJson["rows"]) {
+            if (responseResultJson.contains(jp::AFFECTED_ROWS) &&
+                responseResultJson.contains(jp::ROWS)) {
+                for (const auto &row: responseResultJson[jp::ROWS]) {
                     try {
                         CachedModule module{
                             .id = row["id"],
@@ -248,9 +249,9 @@ namespace SmartHome {
         API::ApiRequest request;
 
         nlohmann::json dbQuery = {
-            {"table", "sensors"},
+            {jp::TABLE, "sensors"},
             {
-                "columns", nlohmann::json::array(
+                jp::COLUMNS, nlohmann::json::array(
                     {"id", "logic_id", "module_id", "name", "type", "config"})
             },
         };
@@ -275,9 +276,9 @@ namespace SmartHome {
         if (response.result.has_value()) {
             auto responseResultJson = nlohmann::json::parse(response.result.value());
 
-            if (responseResultJson.contains("affected_rows") &&
-                responseResultJson.contains("rows")) {
-                for (const auto &row: responseResultJson["rows"]) {
+            if (responseResultJson.contains(jp::AFFECTED_ROWS) &&
+                responseResultJson.contains(jp::ROWS)) {
+                for (const auto &row: responseResultJson[jp::ROWS]) {
                     try {
                         CachedSensor sensor{
                             .id = row["id"],

@@ -1,4 +1,5 @@
 #include "socket_client.h"
+#include "../constants/constants.h"
 
 namespace SmartHome::IPC {
     SocketClient::~SocketClient() {
@@ -48,8 +49,8 @@ namespace SmartHome::IPC {
         // Build handshake request
         API::ApiRequest request;
         nlohmann::json jsonParams;
-        request.method = API::getTargetMethodString(msCORE_TARGET_STRING, msSET_METHOD_STRING);
-        jsonParams[msCONNECTION_TYPE_STRING] = mTargetTypeOfClient;
+        request.method = API::getTargetMethodString(Constants::Targets::CORE, Constants::Methods::SET);
+        jsonParams[Constants::CoreTypes::CONNECTION_TYPE] = mTargetTypeOfClient;
         request.params.emplace(jsonParams);
         request.id = API::getNextApiId();
 

@@ -102,10 +102,10 @@ namespace SmartHome {
         // Load YAML config
         auto configManager = Utils::ConfigManager(logger);
         Utils::Logger::Config loggerConfig;
-        loggerConfig.logFile.path = s_DEFAULT_LOGFILE_PATH;
+        loggerConfig.logFile.path = std::string{Constants::DefaultPaths::CORE_LOGFILE};
         const std::string configPath = vm.contains("config")
                                            ? vm["config"].as<std::string>()
-                                           : s_DEFAULT_CONFIG_PATH.data();
+                                           : std::string{Constants::DefaultPaths::CORE_CONFIG};
         if (configManager.loadConfig(configPath)) {
             logger->debug("[MAIN_CORE] Loading YAML logger config");
             loadLoggerYamlConfig(configManager, loggerConfig);

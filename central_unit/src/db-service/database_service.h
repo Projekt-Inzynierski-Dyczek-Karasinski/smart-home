@@ -6,6 +6,7 @@
 #include "socket_server.h"
 #include "service_manager/service_manager.h"
 #include "async_logger.h"
+#include "constants.h"
 
 #include <atomic>
 #include <memory>
@@ -20,21 +21,19 @@ namespace SmartHomeDB {
     namespace bs = boost::system;
     namespace si = SmartHome::IPC;
     namespace su = SmartHome::Utils;
+    namespace sc = SmartHome::Constants;
 
     using namespace std::chrono_literals;
 
     class DatabaseClient;
 
     class DatabaseService {
-        /// Service name
-        static constexpr std::string_view msDEFAULT_SERVICE_NAME = "smarthome-databased";
-
     public:
         /**
          * @brief Configuration structure for DatabaseService initialization.
          */
         struct Config {
-            std::string serviceName = msDEFAULT_SERVICE_NAME.data();
+            std::string serviceName = sc::DefaultServiceNames::DATABASE.data();
 
             DatabaseConnectionManager::Config dbConnConfig{};
 
@@ -46,7 +45,8 @@ namespace SmartHomeDB {
             };
             /// Default UDS config from socket server
             si::SocketServer::Config::Uds uds{
-                .isEnabled = true, .endpointPath = "/var/run/smarthomed.sock"
+                .isEnabled = true, .endpointPath = sc::DefaultPaths::UDS.data()
+
             };
         };
 
@@ -157,8 +157,6 @@ namespace SmartHomeDB {
         static constexpr std::array msSIGNALS_TO_HANDLE = {SIGINT, SIGTERM, SIGHUP};
         /// Maximum time to wait for graceful shutdown
         static constexpr auto msSHUTDOWN_TIMEOUT = 2500ms;
-        /// IPC target type for handshake
-        static constexpr std::string_view msCLIENT_TARGET_TYPE = "database";
 
         Config mConfig;
 

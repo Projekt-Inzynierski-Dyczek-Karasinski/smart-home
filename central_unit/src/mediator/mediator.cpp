@@ -1,6 +1,5 @@
 #include "mediator.h"
 
-
 namespace SmartHomeMediator {
     Mediator &Mediator::Instance() {
         static Mediator instance;
@@ -17,7 +16,7 @@ namespace SmartHomeMediator {
         mpLogger = std::make_shared<su::AsyncLogger>(logger, mMediatorUtilityIoContext);
 
         // Start service
-        mpService = su::ServiceManager::create(logger, msSERVICE_NAME, su::ServiceType::AUTO);
+        mpService = su::ServiceManager::create(logger, sc::DefaultServiceNames::MEDIATOR, su::ServiceType::AUTO);
         mpService->setIoContext(mMediatorIoContext);
         if (!mpService->onInitialize()) {
             logger->error("[MEDIATOR] Failed to initialize service");
@@ -30,7 +29,9 @@ namespace SmartHomeMediator {
         mConfig = configStruct;
 
         // Attempt establishing connection with SmartHome daemon
-        mpApiClient = std::make_unique<si::SocketClient>(&mApiClientIoContext, mpLogger, msCLIENT_TARGET_TYPE.data());
+        mpApiClient = std::make_unique<si::SocketClient>(&mApiClientIoContext,
+                                                         mpLogger,
+                                                         sc::Targets::MODULE_MEDIATOR.data());
         bool isConnectionEstablished = false;
         if (mConfig.uds.isEnabled) {
             isConnectionEstablished = mpApiClient->connectToServer(mConfig.uds.endpointPath);

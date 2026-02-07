@@ -2,6 +2,8 @@
 #include "config_manager/config_manager.h"
 #include "actions/actions.h"
 #include "actions/database_actions.h"
+#include "constants.h"
+
 
 #include <chrono>
 #include <cmath>
@@ -30,7 +32,8 @@ namespace SmartHome {
         // Initialize AsyncLogger, using Logger for further initialization
         mpLogger = std::make_shared<Utils::AsyncLogger>(logger, mCoreUtilityIoContext);
 
-        mpService = Utils::ServiceManager::create(logger, ms_ServiceName, Utils::ServiceType::AUTO);
+        mpService = Utils::ServiceManager::create(logger, Constants::DefaultServiceNames::CORE,
+                                                  Utils::ServiceType::AUTO);
         mpService->setIoContext(mCoreIoContext);
 
         if (!mpService->onInitialize()) {

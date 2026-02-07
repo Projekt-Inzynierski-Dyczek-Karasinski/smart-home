@@ -1,8 +1,9 @@
 #include "core_actions.h"
+#include "database_actions.h"
+#include "constants.h"
 
 #include <boost/algorithm/string/case_conv.hpp>
 
-#include "database_actions.h"
 
 namespace SmartHome {
     namespace jp = JsonRpcStrings::ParamsKeys;
@@ -201,42 +202,52 @@ namespace SmartHome {
 
         const auto &typeParam = command.params->at(jp::TYPE);
         // Handle default db trigger notification
-        if (typeParam == "modules_changed") {
+        if (typeParam == Constants::DatabaseTypes::MODULES_CHANGED) {
             co_await DatabaseActions::fetchModulesConfigs();
             co_return std::nullopt;
         }
 
-        if (typeParam == "sensors_changed") {
+        if (typeParam == Constants::DatabaseTypes::SENSORS_CHANGED) {
             co_await DatabaseActions::fetchSensorsConfigs();
             co_return std::nullopt;
         }
 
+        // TODO implement handling module mediator notifications
         // Module mediator notifications
-        if (typeParam == "manual_trigger") {
-            // Handle manually trigger notification from module
+        if (typeParam == Constants::MediatorTypes::MANUAL_TRIGGER) {
+            Core::Instance().mpLogger->infof(
+                "[CORE_ACTIONS] [NOTIFY] Manual trigger notification received with data: %s",
+                command.params->dump().c_str());
         }
 
+        if (typeParam == Constants::MediatorTypes::POWER_LOSS) {
+            Core::Instance().mpLogger->infof(
+                "[CORE_ACTIONS] [NOTIFY] Power loss notification received with data: %s",
+                command.params->dump().c_str());
+        }
 
-        // TODO !pr finish, implement common constant strings
+        if (typeParam == Constants::MediatorTypes::ALERT) {
+            Core::Instance().mpLogger->infof(
+                "[CORE_ACTIONS] [NOTIFY] Alert notification received with data: %s",
+                command.params->dump().c_str());
+        }
 
-        if (typeParam == "")
-
-            co_return std::nullopt;
+        co_return std::nullopt;
     }
 
     std::string_view CoreActions::setKeyToString(const SetKeys setKey) {
         switch (setKey) {
             case SetKeys::CONNECTION_TYPE:
-                return msCONNECTION_TYPE_STRING;
+                return Constants::CoreTypes::CONNECTION_TYPE;
             case SetKeys::UNDEFINED:
             default:
-                return "undefined";
+                return Constants::Common::UNDEFINED;
         }
     }
 
     CoreActions::SetKeys CoreActions::stringToSetKey(const std::string_view setKey) {
         std::map<std::string_view, SetKeys> setKeyMap = {
-            {msCONNECTION_TYPE_STRING, SetKeys::CONNECTION_TYPE}
+            {Constants::CoreTypes::CONNECTION_TYPE, SetKeys::CONNECTION_TYPE}
         };
 
         const auto iter = setKeyMap.find(boost::algorithm::to_lower_copy(std::string(setKey)));

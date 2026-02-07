@@ -2,6 +2,7 @@
 
 #include "core.h"
 #include "config_manager/config_manager.h"
+#include "constants.h"
 
 #include <boost/process.hpp>
 #include <boost/program_options.hpp>
@@ -19,9 +20,9 @@ namespace SmartHome {
         /// Mode in which mediator will run
         Utils::ServiceType serviceType = Utils::ServiceType::AUTO;
         /// Path to mediator executable for standalone mode
-        std::string execPath = "/usr/local/bin/smarthome-mediator";
+        std::string execPath = std::string{Constants::DefaultPaths::MEDIATOR_EXEC};
         /// Path to mediator's own YAML config file
-        std::string configPath = "/etc/smarthome/mediator.yaml";
+        std::string configPath = std::string{Constants::DefaultPaths::MEDIATOR_CONFIG};
     };
 
     /**
@@ -102,9 +103,6 @@ namespace SmartHome {
                      MediatorConfig &mediatorConfig);
 
 
-    /// Default path for smarthome YAML config
-    static constexpr std::string_view s_DEFAULT_CONFIG_PATH = "/etc/smarthome/smart_home.yaml";
-    static constexpr std::string_view s_DEFAULT_LOGFILE_PATH = "/var/log/smarthome/core.log";
 
     static constexpr auto s_MAX_RETRIES = 10;
     static constexpr auto s_RETRY_DELAY = 250ms;

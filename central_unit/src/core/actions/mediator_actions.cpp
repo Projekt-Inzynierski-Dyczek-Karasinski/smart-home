@@ -1,5 +1,6 @@
 #include "mediator_actions.h"
 #include "database_actions.h"
+#include "constants.h"
 
 namespace SmartHome {
     using ai = API::InternalApi;
@@ -37,8 +38,10 @@ namespace SmartHome {
 
         // Send to db
         if (parsedParams.moduleId.has_value()) {
-            static const std::set<std::string_view> sensorReadApplicableGetTypes = {
-                "sensor_value", "force_read_sensor_value", "actuator_value"
+            static const std::set sensorReadApplicableGetTypes = {
+                Constants::MediatorTypes::SENSOR_VALUE,
+                Constants::MediatorTypes::FORCE_READ_SENSOR_VALUE,
+                Constants::MediatorTypes::ACTUATOR_VALUE
             };
 
             if (commandResult.result.has_value()) {
@@ -96,8 +99,8 @@ namespace SmartHome {
 
         // Send to db
         if (parsedParams.moduleId.has_value()) {
-            static const std::set<std::string_view> sensorReadApplicableSetTypes = {
-                "toggle_actuator", "set_actuator_value",
+            static const std::set sensorReadApplicableSetTypes = {
+                Constants::MediatorTypes::TOGGLE_ACTUATOR, Constants::MediatorTypes::SET_ACTUATOR_VALUE,
             };
 
             if (commandResult.result.has_value()) {
@@ -161,8 +164,8 @@ namespace SmartHome {
 
                 char buffer[1024];
 
-                std::string action = "<none>";
-                std::string actionArgument = "<none>";
+                std::string action = Constants::Common::NONE_BRACKETS.data();
+                std::string actionArgument = Constants::Common::NONE_BRACKETS.data();
                 if (type.has_value()) {
                     action = type.value();
                 }

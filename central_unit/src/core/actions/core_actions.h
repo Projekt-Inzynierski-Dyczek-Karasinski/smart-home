@@ -131,7 +131,5 @@ namespace SmartHome {
 
         static std::optional<std::unordered_set<connectionId_t> > findConnections(
             std::string_view connectionTypeString);
-        /// Connection type configuration key string
-        static constexpr std::string_view msCONNECTION_TYPE_STRING = "connection_type";
     };
 }

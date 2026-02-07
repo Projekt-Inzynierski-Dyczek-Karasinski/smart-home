@@ -32,7 +32,7 @@ namespace SmartHomeMediator {
      *
      * @note Whitespace is ignored. String must be exactly 17 characters after stripping whitespace.
      */
-    std::optional<std::array<uint8_t, 6>> parseMacAddress(const std::string& macStr);
+    std::optional<std::array<uint8_t, 6> > parseMacAddress(const std::string &macStr);
 
     /**
      * @brief Read MAC address for network interface from sysfs.
@@ -43,7 +43,7 @@ namespace SmartHomeMediator {
      *
      * @note Reads from /sys/class/net/[interface]/address.
      */
-    std::optional<std::array<uint8_t, 6>> getMacAddressForInterface(const std::string& interface);
+    std::optional<std::array<uint8_t, 6> > getMacAddressForInterface(const std::string &interface);
 
     /**
      * @brief Get MAC address of first available network interface.
@@ -53,7 +53,7 @@ namespace SmartHomeMediator {
      *
      * @return 6-byte MAC address array, or std::nullopt if no valid interface found.
      */
-    std::optional<std::array<uint8_t, 6>> getDefaultMacAddress();
+    std::optional<std::array<uint8_t, 6> > getDefaultMacAddress();
 
     /**
      * @brief Loads logger configuration values from YAML file.
@@ -114,10 +114,5 @@ namespace SmartHomeMediator {
                      const bpo::parsed_options &parsed,
                      const std::shared_ptr<su::Logger> &logger,
                      Mediator::Config &mediatorConfig);
-
-
-    /// Default path for smarthome YAML config
-    static constexpr std::string_view sDEFAULT_CONFIG_PATH = "/etc/smarthome/mediator.yaml";
-    static constexpr std::string_view sDEFAULT_LOGFILE_PATH = "/var/log/smarthome/mediator.log";
 
 }
