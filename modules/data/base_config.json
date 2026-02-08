@@ -1,4 +1,6 @@
 {
+  "buttonPin": 27,
+  "ledPin": 26,
   "addressing": {
     "ip": 2,
     "mac": "80:B5:4E:C5:A5:C8",
@@ -10,24 +12,33 @@
     "set": 32,
     "baudrate": 9600
   },
-  "buttonPin": 27,
-  "ledPin": 26,
+  "otaCheck": 2,
+  "idleAutoSleep": {
+    "sleepTime": 86400000,
+    "idleTimeout": 300000
+  },
   "sensorsData": {
     "powerPin": 13,
     "readingsTimeout": 60000,
     "sensors": [
-
+      {
+        "type": "batterySensor",
+        "data": {
+          "id": 1,
+          "readPin": 13,
+          "canAwake": false,
+          "additional": {
+            "rVCC": 100000,
+            "rGND": 100000,
+            "Vmin": 4350,
+            "Vmax": 4800
+          }
+        }
+      }
     ]
   },
   "actuatorsData": {
     "actuators": [
     ]
-  },
-  "ota": {
-    "version": 1
-  },
-  "idleAutoSleep": {
-    "sleepTime": 86400000,
-    "idleTimeout": 60000
   }
 }

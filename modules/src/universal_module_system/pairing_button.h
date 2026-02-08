@@ -101,11 +101,15 @@ namespace UniversalModuleSystem {
         std::shared_ptr<DebugLED> mpDebugLED;
         std::shared_ptr<ul::Logger> mpLogger;
         Comms::Communication *mpCommunication;
+        uint8_t mButtonPin;
 
         std::atomic<ButtonModes> mButtonMode{ButtonModes::IDLE}; ///< State of button.
         std::atomic<uint8_t> mButtonPressCounter{0}; ///< Counter for how long is button pressed in <code>DEBOUNCING_TIME</code> (0.1) s.
         std::atomic<int8_t> mButtonNotPressedCounter{3}; ///< Counter for how long is not button pressed (for debouncing).
 
         TimerHandle_t mButtonPressTimer = nullptr; ///< FreeRTOS software timer to measure how long is button pressed.
+
+        // JSON key
+        static constexpr char ms_BUTTON_PIN[] = "buttonPin";
     };
 }

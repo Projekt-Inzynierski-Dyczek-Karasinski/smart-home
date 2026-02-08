@@ -1,14 +1,32 @@
 #include "debug_led.h"
 
 #include <memory>
+#include <nlohmann/json.hpp>
 
 #include "../../config/system_config/universal_module_system_config.h"
 #include "../config/user_config/critical_config.h"
+#include "data_manager.h"
+
+namespace nl = nlohmann;
 
 namespace UniversalModuleSystem {
     DebugLED::DebugLED(const std::shared_ptr<ul::Logger> &logger) : mpLogger(logger) {
-        pinMode(LED_PIN, OUTPUT);
-        digitalWrite(LED_PIN, LOW);
+        try {
+            const auto &dataManager = DataManager::getInstance();
+            nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
+            mLedPin = jsonData[ms_LED_PIN].get<uint8_t>();
+        } catch (...) {
+            mpLogger->error("DebugLED", "Can not load led pin from base_config.json, loading from critical_config.h");
+            mLedPin = LED_PIN;
+        }
+        if (mLedPin != LED_PIN) {
+            mpLogger->warning(
+                "DebugLED",
+                "Led pin defined in critical_config.h and base_config.json do not match, loading pin defined in base_config.json"
+            );
+        }
+        pinMode(mLedPin, OUTPUT);
+        digitalWrite(mLedPin, LOW);
 
         mpLogger->verbose("DebugLED Class", "DebugLED initialized.");
     }
@@ -17,25 +35,25 @@ namespace UniversalModuleSystem {
         deleteBlinkTask();
         deleteResetBlinkTask();
         deleteBlinkTimeout();
-        digitalWrite(LED_PIN, LOW);
+        digitalWrite(mLedPin, LOW);
     }
 
     void DebugLED::wifiConnected() {
         deleteBlinkTask();
         deleteResetBlinkTask();
-        digitalWrite(LED_PIN, HIGH);
+        digitalWrite(mLedPin, HIGH);
     }
 
     void DebugLED::wifiDisconnected() {
         deleteBlinkTask();
         deleteResetBlinkTask();
-        digitalWrite(LED_PIN, LOW);
+        digitalWrite(mLedPin, LOW);
     }
 
     void DebugLED::blink(const uint32_t ledOnDuration, const uint32_t ledOffDuration) const {
-        digitalWrite(LED_PIN, HIGH);
+        digitalWrite(mLedPin, HIGH);
         vTaskDelay(pdMS_TO_TICKS(ledOnDuration));
-        digitalWrite(LED_PIN, LOW);
+        digitalWrite(mLedPin, LOW);
         vTaskDelay(pdMS_TO_TICKS(ledOffDuration));
     }
 
@@ -45,7 +63,7 @@ namespace UniversalModuleSystem {
 
             vTaskDelete(mBlinkHandle);
             mBlinkHandle = nullptr;
-            digitalWrite(LED_PIN, LOW);
+            digitalWrite(mLedPin, LOW);
         }
     }
 
@@ -98,7 +116,7 @@ namespace UniversalModuleSystem {
 
             vTaskDelete(mBlinkHandle);
             mBlinkHandle = nullptr;
-            digitalWrite(LED_PIN, LOW);
+            digitalWrite(mLedPin, LOW);
         }
     }
 

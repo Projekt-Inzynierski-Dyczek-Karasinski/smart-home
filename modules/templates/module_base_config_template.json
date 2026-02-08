@@ -1,4 +1,6 @@
 {
+  "buttonPin": 27,
+  "ledPin": 26,
   "addressing": {
     "ip": 2,
     "mac": "80:B5:4E:C5:A5:C8",

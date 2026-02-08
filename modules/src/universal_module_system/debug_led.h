@@ -94,6 +94,10 @@ namespace UniversalModuleSystem {
         TaskHandle_t mBlinkHandle = nullptr; ///< FreeRTOS task handle to responsible for blinking LED.
         TimerHandle_t mBlinkTimeout = nullptr; ///< FreeRTOS software timer for automatic deleting <code>mBlinkHandle</code> task when timeout occurs.
 
+        uint8_t mLedPin;
         std::shared_ptr<ul::Logger> mpLogger;
+
+        // JSON key
+        static constexpr char ms_LED_PIN[] = "ledPin";
     };
 }
