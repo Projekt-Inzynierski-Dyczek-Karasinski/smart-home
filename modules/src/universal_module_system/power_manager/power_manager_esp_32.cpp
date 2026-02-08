@@ -54,6 +54,7 @@ namespace UniversalModuleSystem {
         esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(BUTTON_PIN), LOW);
 
         // rf module wake up
+        // TODO add changing FU mode for power saving
         if (enableWakeUpWithRfModule) {
             rtc_gpio_pulldown_dis(hc12WakeUpPin);
             rtc_gpio_pullup_en(hc12WakeUpPin);
