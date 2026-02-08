@@ -5,7 +5,7 @@
 #include <array>
 
 #include "utils/logger.h"
-#include "../config/ota_config.h"
+#include "../../../config/system_config/ota_config.h"
 
 namespace ul = Utils::Logging;
 

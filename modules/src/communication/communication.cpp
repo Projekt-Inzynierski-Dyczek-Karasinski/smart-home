@@ -2,7 +2,7 @@
 
 #include <optional>
 
-#include "../config/logger_config.h"
+#include "../../config/system_config/logger_config.h"
 #include "utils/uint8_array_handlers.h"
 #include "universal_module_system/power_manager/power_manager.h"
 #include "universal_module_system/data_manager.h"

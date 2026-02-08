@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../config/communication_config.h"
+#include "../../config/system_config/communication_config.h"
 
 #include "universal_module_system/debug_led.h"
 

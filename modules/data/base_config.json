@@ -10,24 +10,13 @@
     "set": 32,
     "baudrate": 9600
   },
+  "buttonPin": 27,
+  "ledPin": 26,
   "sensorsData": {
     "powerPin": 13,
     "readingsTimeout": 60000,
     "sensors": [
-      {
-        "type": "batterySensor",
-        "data": {
-          "id": 1,
-          "readPin": 12,
-          "canAwake": false,
-          "additional": {
-            "rVCC": 50000,
-            "rGND": 50000,
-            "Vmin": 4350,
-            "Vmax": 4800
-          }
-        }
-      }
+
     ]
   },
   "actuatorsData": {

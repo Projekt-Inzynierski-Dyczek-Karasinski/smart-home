@@ -1,6 +1,7 @@
 #include "pairing_button.h"
 
-#include "../config/universal_module_system_config.h"
+#include "../../config/system_config/universal_module_system_config.h"
+#include "../config/user_config/critical_config.h"
 
 #include "data_manager.h"
 #include "power_manager/power_manager.h"
@@ -17,7 +18,6 @@ namespace UniversalModuleSystem {
     PairingButton::PairingButton(const std::shared_ptr<DebugLED> &debugLED, Comms::Communication *communication,
                                  const std::shared_ptr<ul::Logger> &logger)
         : mpDebugLED(debugLED), mpLogger(logger), mpCommunication(communication) {
-
         pinMode(BUTTON_PIN, INPUT_PULLUP);
 
         attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
@@ -63,6 +63,19 @@ namespace UniversalModuleSystem {
             vTaskDelay(pdMS_TO_TICKS(1000));
     }
 
+    void PairingButton::toggleOtaTask(void *parameters) {
+        const auto &pb = *static_cast<PairingButton *>(parameters);
+
+        auto &ota = ums::Ota::getInstance();
+        ota.toggleOta();
+        pb.mpLogger->debug("PairingButton", "Ota Toggled");
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
+
+        pb.mpLogger->debug("PairingButton", "ToggleOtaTask delete");
+        vTaskDelete(nullptr);
+    }
+
     void PairingButton::buttonPressTimerCallback(TimerHandle_t xTimer) {
         auto &pb = *static_cast<PairingButton *>(pvTimerGetTimerID(xTimer));
         if (digitalRead(BUTTON_PIN) == LOW) {
@@ -96,9 +109,15 @@ namespace UniversalModuleSystem {
             // if button will not be press for 3*DEBOUNCING_TIME (0.3 seconds) timer will stop
             if (pb.mButtonNotPressedCounter.load() <= 0) {
                 if (pb.mButtonMode.load() == ButtonModes::PAIR) {
-                    auto &ota = ums::Ota::getInstance();
-                    ota.toggleOta();
-                    pb.mpLogger->debug("PairingButton Timer", "startAddressingAlgorithm()");
+                    xTaskCreate(
+                        toggleOtaTask,
+                        "Toggle Ota",
+                        TOGGLE_OTA_TASK_SIZE,
+                        &pb,
+                        HIGH_TASK_PRIORITY,
+                        nullptr
+                    );
+                    pb.mpLogger->debug("PairingButton Timer", "Toggle ota.");
                 }
                 pb.deleteButtonPressTimer();
             }

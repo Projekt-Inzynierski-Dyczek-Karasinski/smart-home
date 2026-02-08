@@ -2,7 +2,8 @@
 
 #include <memory>
 
-#include "../config/universal_module_system_config.h"
+#include "../../config/system_config/universal_module_system_config.h"
+#include "../config/user_config/critical_config.h"
 
 namespace UniversalModuleSystem {
     DebugLED::DebugLED(const std::shared_ptr<ul::Logger> &logger) : mpLogger(logger) {

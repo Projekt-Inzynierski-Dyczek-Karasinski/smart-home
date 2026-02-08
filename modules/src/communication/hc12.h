@@ -77,6 +77,13 @@ namespace Comms {
          */
         void sleep() const;
 
+        // JSON key
+        static constexpr char s_HC12_DATA[] = "hc12";
+        static constexpr char s_TX_PIN[] = "tx";
+        static constexpr char s_RX_PIN[] = "rx";
+        static constexpr char s_SET_PIN[] = "set";
+        static constexpr char s_BAUDRATE[] = "baudrate";
+
     private:
         /**
          * @brief Struct handling unpacking json hc12 data.
@@ -88,13 +95,6 @@ namespace Comms {
             const uint8_t rxPin;
             const uint8_t setPin;
             const uint32_t baudrate;
-
-        private:
-            // JSON keys
-            static constexpr char ms_TX_PIN[] = "tx";
-            static constexpr char ms_RX_PIN[] = "rx";
-            static constexpr char ms_SET_PIN[] = "set";
-            static constexpr char ms_BAUDRATE[] = "baudrate";
         };
 
         /**
@@ -199,8 +199,5 @@ namespace Comms {
 
         std::shared_ptr<ul::Logger> mpLogger;
         const HC12Data m_HC12_DATA;
-
-        // JSON key
-        static constexpr char ms_HC12_DATA[] = "hc12";
     };
 }

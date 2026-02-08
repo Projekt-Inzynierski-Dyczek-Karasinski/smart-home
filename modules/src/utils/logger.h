@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include <atomic>
 
-#include "../config/logger_config.h"
+#include "../../config/system_config/logger_config.h"
 
 namespace Utils {
     namespace Logging {

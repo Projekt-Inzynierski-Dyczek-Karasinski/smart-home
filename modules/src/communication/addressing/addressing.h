@@ -4,8 +4,8 @@
 #include <atomic>
 #include <memory>
 
-#include "../config/communication_config.h"
-#include "../config/addressing_config.h"
+#include "../../../config/system_config/communication_config.h"
+#include "../../../config/system_config/addressing_config.h"
 
 #include "utils/logger.h"
 

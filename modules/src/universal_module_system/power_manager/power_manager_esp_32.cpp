@@ -4,10 +4,18 @@
 
 #include "universal_module_system/ota/ota.h"
 
-#include "../../../config/universal_module_system_config.h"
+#define RF_MODULE_WAKE_UP_PIN_BITMASK(gpio_num) 1ULL << gpio_num
+
+#include "../../../config/system_config/universal_module_system_config.h"
+#include "../config/user_config/critical_config.h"
+
 #include "universal_module_system/data_manager.h"
 #include "communication/communication.h"
 #include "communication/api/command_handler.h"
+
+#ifdef HC12_MODULE
+#include "communication/hc12.h"
+#endif
 
 namespace nl = nlohmann;
 namespace API = Comms::API;
@@ -25,6 +33,15 @@ namespace UniversalModuleSystem {
     }
 
     void PowerManagerESP32::enterSleep(const uint32_t milliSeconds, const bool enableWakeUpWithRfModule) {
+        #ifdef HC12_MODULE
+            const auto &dataManager = DataManager::getInstance();
+            using HC12 = Comms::HC12;
+            nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
+            const gpio_num_t hc12WakeUpPin = jsonData[HC12::s_HC12_DATA][HC12::s_RX_PIN].get<gpio_num_t>();
+        #else
+        #error "Not implemented"
+        #endif
+        
         constexpr uint16_t US_TO_MILLISECONDS_FACTOR = 1000;
 
         // disable WiFi and ota
@@ -32,20 +49,20 @@ namespace UniversalModuleSystem {
         ota.endOta();
 
         // button wake up
-        rtc_gpio_pulldown_dis(BUTTON_PIN_AS_GPIO);
-        rtc_gpio_pullup_en(BUTTON_PIN_AS_GPIO);
-        esp_sleep_enable_ext0_wakeup(BUTTON_PIN_AS_GPIO, LOW);
+        rtc_gpio_pulldown_dis(static_cast<gpio_num_t>(BUTTON_PIN));
+        rtc_gpio_pullup_en(static_cast<gpio_num_t>(BUTTON_PIN));
+        esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(BUTTON_PIN), LOW);
 
         // rf module wake up
         if (enableWakeUpWithRfModule) {
-            rtc_gpio_pulldown_dis(RF_MODULE_WAKE_UP_PIN);
-            rtc_gpio_pullup_en(RF_MODULE_WAKE_UP_PIN);
+            rtc_gpio_pulldown_dis(hc12WakeUpPin);
+            rtc_gpio_pullup_en(hc12WakeUpPin);
             // NOTE: ESP_EXT1_WAKEUP_ALL_LOW is deprecated on ESP32-S3 boards, but ESP_EXT1_WAKEUP_ANY_LOW doesn't exist on ESP32-WROOM
             // For wake up logic it doesn't matter if is all or any, because RF_MODULE_WAKE_UP_PIN_BITMASK have only one pin assigned
             #ifdef ESP32_WROOM_BOARD_TYPE
-                esp_sleep_enable_ext1_wakeup(RF_MODULE_WAKE_UP_PIN_BITMASK, ESP_EXT1_WAKEUP_ALL_LOW);
+                esp_sleep_enable_ext1_wakeup(RF_MODULE_WAKE_UP_PIN_BITMASK(hc12WakeUpPin), ESP_EXT1_WAKEUP_ALL_LOW);
             #else
-                esp_sleep_enable_ext1_wakeup(RF_MODULE_WAKE_UP_PIN_BITMASK, ESP_EXT1_WAKEUP_ANY_LOW);
+                esp_sleep_enable_ext1_wakeup(RF_MODULE_WAKE_UP_PIN_BITMASK(hc12WakeUpPin), ESP_EXT1_WAKEUP_ANY_LOW);
             #endif
         } else {
             const auto &communication = Comms::Communication::getInstance(nullptr, nullptr);

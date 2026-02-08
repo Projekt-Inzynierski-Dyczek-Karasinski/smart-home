@@ -66,6 +66,10 @@ namespace UniversalModuleSystem {
          */
         static void factoryResetTask(void *parameters);
 
+        // TODO !pr add comment
+
+        static void toggleOtaTask(void *parameters);
+
         /**
          * @brief Callback method that is called periodically by the Button Press Timer to handle button debouncing and logic.
          * @details This method:

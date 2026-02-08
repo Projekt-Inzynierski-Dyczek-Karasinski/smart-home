@@ -150,8 +150,10 @@ namespace UniversalModuleSystem {
     }
 
     void OtaESP32::otaTask(void *parameters) {
+        const auto &ota = *static_cast<OtaESP32 *>(parameters);
+
         ArduinoOTA.begin();
-        auto &powerManager = PowerManager::getInstance();
+        auto &powerManager = PowerManager::getInstance(ota.mpLogger);
 
         for (;;) {
             ArduinoOTA.handle();

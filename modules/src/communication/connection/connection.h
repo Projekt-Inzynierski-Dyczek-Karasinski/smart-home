@@ -5,7 +5,7 @@
 #include <random>
 #include <optional>
 
-#include "../config/communication_config.h"
+#include "../../../config/system_config/communication_config.h"
 
 #include "utils/uint8_array_handlers.h"
 #include "communication/api/command_handler.h"

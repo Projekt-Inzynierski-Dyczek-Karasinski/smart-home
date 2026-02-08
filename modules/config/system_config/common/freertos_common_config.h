@@ -6,7 +6,6 @@
 #define HIGH_TASK_PRIORITY 4
 #define CRITICAL_TASK_PRIORITY 5
 
-// TODO check stack usage for all FreeRTOS tasks
 // WARNING: smaller task size than 1024B is NOT recommended (theoretically the smallest task size for ESP32 is 768B)
 #define SMALL_TASK_SIZE 1024 // 1kB
 #define MEDIUM_TASK_SIZE 2048 // 2kB
@@ -20,6 +19,7 @@
 
 // PairingButton
 #define FACTORY_RESET_TASK_SIZE     BIG_TASK_SIZE
+#define TOGGLE_OTA_TASK_SIZE        BIG_TASK_SIZE
 
 // Communication
 #define COMMUNICATION_MAIN_TASK_SIZE    BIG_TASK_SIZE
