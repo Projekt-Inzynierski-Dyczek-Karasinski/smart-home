@@ -164,30 +164,23 @@ namespace Comms {
     }
 
     // ====================== Communication Main ======================
-    void Communication::receivedMessageDecider(bool *isReadingRawMessage) {
+    void Communication::receivedMessageDecider() {
         uint8_t buffer[MESSAGE_SIZE];
 
         if (xQueueReceive(mReceiveMessageQueue, buffer, 0) == pdTRUE) {
-            // TODO !mm change/remove addressing algorithm
-            // if it is addressing message
-            if ((buffer[0] == (uint8_t)'A' && buffer[1] == (uint8_t)'D') || *isReadingRawMessage) {
-                *isReadingRawMessage = false;
-                mpAddressing->addMessage(buffer);
-            }
             // if is HC12 command
             #ifdef HC12_MODULE
-                else if (buffer[0] == (uint8_t)'H' && buffer[1] == (uint8_t)'C') {
+                if (buffer[0] == (uint8_t)'H' && buffer[1] == (uint8_t)'C') {
                     mpRfModule->setupHC12(buffer);
                 }
             #endif
             else {
                 mpConnection->messageDecider(buffer);
             }
-            *isReadingRawMessage = false;
         }
     }
 
-    void Communication::normalOperationHandling(bool *isReadingRawMessage) {
+    void Communication::normalOperationHandling() {
         // extra protection if somehow queues are not empty and corresponding task is suspended
         if (uxQueueMessagesWaiting(mReceiveByteQueue) != 0) {
             mpLogger->debug("Communication Main", "vTaskResume(mDecodeMessageTaskHandle);");
@@ -199,7 +192,7 @@ namespace Comms {
         }
 
         // monitor incoming rf messages
-        receivedMessageDecider(isReadingRawMessage);
+        receivedMessageDecider();
 
         // delay for watchdog
         vTaskDelay(pdMS_TO_TICKS(1));
@@ -210,7 +203,6 @@ namespace Comms {
 
         uint8_t status = DEFAULT_STATUS_NOTIF;
         uint8_t pingAttempts = 0;
-        bool isReadingRawMessage = false;
         for (;;) {
             // change status
             if (xQueueReceive(com.mMainNotificationsQueue, &status, 0) == pdFALSE) {
@@ -219,7 +211,7 @@ namespace Comms {
             }
             switch (status) {
                 case DEFAULT_STATUS_NOTIF:
-                    com.normalOperationHandling(&isReadingRawMessage);
+                    com.normalOperationHandling();
                     break;
 
                 case BYTE_TIMEOUT_NOTIF:
@@ -241,12 +233,10 @@ namespace Comms {
                     break;
 
                 case READ_RAW_MESSAGE_NOTIF:
-                    isReadingRawMessage = true;
                     xTaskNotify(com.mDecodeMessageTaskHandle, READ_RAW_MESSAGE_NOTIF, eSetValueWithOverwrite);
                     break;
 
                 case STOP_ADDRESSING_ALGORITHM_NOTIF:
-                    isReadingRawMessage = false;
                     com.mpDebugLED->deleteBlinkTask();
                     com.mpAddressing->stopAddressing();
                     break;
@@ -340,16 +330,12 @@ namespace Comms {
         };
         resetProtocolBuffer();
 
-        auto handleIncorrectMessage = [&](const bool isReadingRawMessage) {
+        auto handleIncorrectMessage = [&]() {
             xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
             // wait for possible rest of the message and send "repeat"
             vTaskDelay(RECEIVE_MESSAGE_TIMEOUT);
             resetProtocolBuffer();
             xQueueReset(com.mReceiveByteQueue);
-            // TODO change?
-            if (!isReadingRawMessage) {
-                com.mpConnection->transmitRepeatMessage();
-            }
         };
 
         // buffer for byte received from rfModule
@@ -399,12 +385,12 @@ namespace Comms {
                     // if message is not end properly
                     const uint8_t endOfMessage = protocolBuffer[protoBuffMessageIndex][PROTOCOL_SIZE - 1];
                     if (endOfMessage != 0) {
-                        handleIncorrectMessage(isRawMessage);
+                        handleIncorrectMessage();
                         com.mpLogger->warningv("Communication Decode", "Bad end of message. Message should end with 0 (\\0 char), but got: ", endOfMessage);
                     }
                     // if checksum is incorrect
                     else if (!com.isCheckSumCorrect(protocolBuffer[protoBuffMessageIndex])) {
-                        handleIncorrectMessage(isRawMessage);
+                        handleIncorrectMessage();
                         com.mpLogger->warning("Communication Decode", "Bad checksum");
                     }
                     // if MAC is incorrect wait for possible rest of message and ignore it
@@ -435,7 +421,7 @@ namespace Comms {
                         // if packet loss
                         if (!com.extractMessageFromProtocolBuffer(protocolBuffer, messageBuffer)) {
                             com.mpLogger->warning("Communication Decode", "Lost packet.");
-                            handleIncorrectMessage(isRawMessage);
+                            handleIncorrectMessage();
                             continue;
                         }
 

@@ -144,14 +144,12 @@ namespace Comms {
 
         /**
          * @brief Decides what to do with incoming messages (both internal and RF).
-         * @param isReadingRawMessage Pointer to flag for raw message state.
          */
-        void receivedMessageDecider(bool *isReadingRawMessage);
+        void receivedMessageDecider();
         /**
          * @brief Handles when main task is in default state.
-         * @param isReadingRawMessage Pointer to flag for raw message state.
          */
-        void normalOperationHandling(bool *isReadingRawMessage);
+        void normalOperationHandling();
         /**
          * @brief Main FreeRTOS task for Communication class.
          * It is responsible for suspending/deleting resuming/creating other communication related tasks.

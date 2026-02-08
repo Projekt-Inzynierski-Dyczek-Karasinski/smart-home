@@ -26,6 +26,10 @@
 #ifdef ESP32_S3_BOARD_TYPE
     #ifdef DEBUG_MODE
         #define CENTRAL_UNIT // TODO !mm remove/comment
+        #ifdef CENTRAL_UNIT
+            #undef MAX_CHANNEL
+            #define MAX_CHANNEL 4
+        #endif
     #endif
 
     #if defined(ESP32_WROOM_BOARD_TYPE)

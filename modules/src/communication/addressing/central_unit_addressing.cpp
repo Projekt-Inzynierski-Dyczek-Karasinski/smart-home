@@ -104,7 +104,6 @@ namespace Comms {
 
     // ===================== Addressing Algorithm =====================
     void CentralUnitAddressing::prepareSummary(uint8_t *sendBuffer, const ModuleAddressingData *moduleData) const {
-        // TODO change API Calls to numeric values
         // prepare summary data (data without mac)
         const uint8_t summaryData[] = {
             (uint8_t)'i',
@@ -156,7 +155,6 @@ namespace Comms {
                     case START_ADDRESSING:
                         // NOTE: receiveBuffer contains raw message!
                         // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
-                        // TODO implement for other new connection messages
                         if (uah::areArraysEqual(&receiveBuffer[8], (uint8_t*)ADDRESSING_NC_REAL_MAC_RF_CHANNELS, SPECIAL_MESSAGE_LEN)) {
                             uint8_t moduleMAC[MAC_ADDRESS_LENGTH];
                             uah::prepareBuffer(moduleMAC, receiveBuffer, MAC_ADDRESS_LENGTH, MAC_ADDRESS_LENGTH);
