@@ -5,6 +5,7 @@
 #endif
 
 #include <string_view>
+#include <memory>
 #include <WiFi.h>
 
 #include <nlohmann/json.hpp>
@@ -59,7 +60,6 @@ namespace UniversalModuleSystem {
         std::array<uint8_t, 4> ipAddress{};
 
         // JSON keys
-        static constexpr std::string_view ms_OTA_DATA = "ota";
-        static constexpr std::string_view ms_OTA_VERSION_CHECK = "version";
+        static constexpr std::string_view ms_OTA_DATA = "otaCheck";
     };
 }

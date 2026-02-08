@@ -4,7 +4,6 @@
 
 #include "../../config/system_config/universal_module_system_config.h"
 #include "../../config/system_config/addressing_config.h"
-#include "../../config/system_config/ota_config.h"
 
 namespace nl = nlohmann;
 

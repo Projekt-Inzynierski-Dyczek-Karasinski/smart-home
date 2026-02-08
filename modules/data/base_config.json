@@ -1,33 +1,98 @@
 {
   "addressing": {
-    "ip": 2,
-    "mac": "80:B5:4E:C5:A5:C8",
-    "rfChannel": 2
+    "mod": [
+      {
+        "imr": true,
+        "ip": 2,
+        "mac": [
+          176,
+          167,
+          50,
+          241,
+          129,
+          60
+        ],
+        "rfChannel": 2
+      },
+      {
+        "imr": true,
+        "ip": 3,
+        "mac": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "rfChannel": 3
+      },
+      {
+        "imr": true,
+        "ip": 4,
+        "mac": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "rfChannel": 4
+      }
+    ],
+    "num": [
+      1,
+      1,
+      1,
+      1
+    ]
   },
-  "hc12": {
-    "rx": 25,
-    "tx": 33,
-    "set": 32,
-    "baudrate": 9600
-  },
-  "buttonPin": 27,
-  "ledPin": 26,
   "sensorsData": {
     "powerPin": 13,
     "readingsTimeout": 60000,
     "sensors": [
-
+      {
+        "type": "batterySensor",
+        "data": {
+          "id": 1,
+          "readPin": 16,
+          "canAwake": false,
+          "additional": {
+            "rVCC": 94000,
+            "rGND": 97000,
+            "Vmin": 4350,
+            "Vmax": 4800
+          }
+        }
+      },
+      {
+        "type": "lightSensor",
+        "data": {
+          "id": 2,
+          "readPin": 17,
+          "canAwake": false,
+          "additional": {
+          }
+        }
+      },
+      {
+        "type": "DHT22",
+        "data": {
+          "id": 3,
+          "readPin": 12,
+          "canAwake": false,
+          "additional": {
+          }
+        }
+      }
     ]
   },
-  "actuatorsData": {
-    "actuators": [
-    ]
-  },
-  "ota": {
-    "version": 1
-  },
-  "idleAutoSleep": {
-    "sleepTime": 86400000,
-    "idleTimeout": 60000
+  "otaCheck": 2,
+  "hc12": {
+    "rx": 6,
+    "tx": 7,
+    "set": 5,
+    "baudrate": 9600
   }
 }

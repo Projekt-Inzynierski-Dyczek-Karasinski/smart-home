@@ -99,7 +99,7 @@ namespace UniversalModuleSystem {
     void OtaESP32::autoBeginOta() {
         const auto &dataManager = DataManager::getInstance();
         nl::json otaData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
-        const uint8_t otaCheck = otaData[ms_OTA_DATA][ms_OTA_VERSION_CHECK].get<uint8_t>();
+        const uint8_t otaCheck = otaData[ms_OTA_DATA].get<uint8_t>();
 
         /*
          if magic numbers in ota_config.h and base_config.json don't mach

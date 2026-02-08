@@ -88,9 +88,7 @@
       }
     ]
   },
-  "ota": {
-    "version": 1
-  },
+  "otaCheck": 2,
   "hc12": {
     "rx": 6,
     "tx": 7,

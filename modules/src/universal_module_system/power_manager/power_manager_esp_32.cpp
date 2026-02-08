@@ -41,7 +41,7 @@ namespace UniversalModuleSystem {
         #else
         #error "Not implemented"
         #endif
-        
+
         constexpr uint16_t US_TO_MILLISECONDS_FACTOR = 1000;
 
         // disable WiFi and ota

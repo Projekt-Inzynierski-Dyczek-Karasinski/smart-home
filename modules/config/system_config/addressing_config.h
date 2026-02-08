@@ -23,6 +23,7 @@
 
 // ===================== Addressing API Calls =====================
 // TODO !mm remove
+#define SPECIAL_MESSAGE_LEN 6
 #define ADDRESSING_ABORT "ADabor"
 #define ADDRESSING_RESTART "ADrest"
 #define ADDRESSING_NC_REAL_MAC_RF_CHANNELS "ADncry"

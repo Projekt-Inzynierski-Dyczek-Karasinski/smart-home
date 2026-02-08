@@ -43,9 +43,7 @@
       }
     ]
   },
-  "ota": {
-    "version": 1
-  },
+  "otaCheck": 2,
   "idleAutoSleep": {
     "sleepTime": 86400000,
     "idleTimeout": 300000
