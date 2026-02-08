@@ -31,8 +31,10 @@ namespace UniversalModuleSystem {
         PairingButton(const PairingButton&) = delete;
         PairingButton& operator=(const PairingButton&) = delete;
 
-        // TODO !pr add comment
-
+        /**
+         * @brief Checks if the pairing button is pressed.
+         * @return True if the button is pressed, false otherwise.
+         */
         static bool isButtonPressed();
 
     private:
@@ -59,15 +61,22 @@ namespace UniversalModuleSystem {
         static void IRAM_ATTR buttonISR();
 
         /**
-         * @brief FreeRTOS Task handling resting module to factory settings.
+         * @brief FreeRTOS task handling resting module to factory settings.
          * @details This task exists only because features needed to perform a factory reset
-         * cause a "stack canary watchpoint trigger" in <code>buttonPressTimerCallback</code>.
+         * trigger a "stack canary watchpoint trigger" in <code>buttonPressTimerCallback</code>.
          * @param parameters FreeRTOS task parameters.
          */
         static void factoryResetTask(void *parameters);
 
-        // TODO !pr add comment
-
+        /**
+         * @brief FreeRTOS task toggling OTA mode.
+         * @details This task exists only because the features needed to toggle OTA mode
+         * trigger a "stack canary watchpoint trigger" in <code>buttonPressTimerCallback</code>.
+         *
+         * @param parameters FreeRTOS task parameters.
+         *
+         * @note The task self-deletes after toggling OTA.
+         */
         static void toggleOtaTask(void *parameters);
 
         /**

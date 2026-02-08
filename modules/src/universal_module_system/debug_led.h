@@ -49,10 +49,16 @@ namespace UniversalModuleSystem {
          */
         void deleteResetBlinkTask();
 
-        // TODO !pr add comments
-
+        /**
+         * @brief Indicate that the module is connected to Wi-Fi.
+         * @details Stops blinking and turns the LED on.
+         */
         void wifiConnected();
 
+        /**
+         * @brief Indicate that the module is disconnected from Wi-Fi.
+         * @details Stops blinking and turns the LED off.
+         */
         void wifiDisconnected();
 
     private:

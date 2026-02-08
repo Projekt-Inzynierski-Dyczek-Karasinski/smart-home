@@ -15,7 +15,6 @@ namespace ul = Utils::Logging;
 namespace ums = UniversalModuleSystem;
 
 void setup() {
-    // TODO !pr remove VERBOSE
     const auto logger = std::make_shared<ul::Logger>();
 
     auto &dataManager = ums::DataManager::getInstance(logger);
