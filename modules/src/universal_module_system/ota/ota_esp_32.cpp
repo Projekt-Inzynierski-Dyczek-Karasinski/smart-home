@@ -108,7 +108,7 @@ namespace UniversalModuleSystem {
          on system boot, begin ota and stop rest of the program
         */
         if (otaCheck != OTA_CHECK || PairingButton::isButtonPressed()) {
-            mpLogger->warning("OtaESP32", "Ota magic numbers don't mach or ParringButton is pressed.");
+            mpLogger->warning("OtaESP32", "Ota magic numbers don't mach or ParingButton is pressed.");
             mpLogger->warning("OtaESP32", "Starting OTA and stopping rest of the program.");
             beginOta();
 
