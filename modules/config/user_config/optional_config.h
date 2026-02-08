@@ -1,0 +1,8 @@
+//
+// Created by karas on 2026-02-08.
+//
+
+#ifndef MODULES_OPTIONAL_CONFIG_H
+#define MODULES_OPTIONAL_CONFIG_H
+
+#endif //MODULES_OPTIONAL_CONFIG_H
