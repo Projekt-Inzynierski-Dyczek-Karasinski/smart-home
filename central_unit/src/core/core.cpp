@@ -181,70 +181,104 @@ namespace SmartHome {
             co_return;
         }, ba::detached);
 
-        //TODO implement watchdog working in CoreThread
-        mCoreThreadPool->join();
-        mCoreThreadPool.reset();
+        mpLogger->info("[CORE] Core running");
 
-        mpLogger->debug("[CORE] Exiting");
-        stopCoreUtilityThread();
-    }
-
-    void Core::shutdown() {
-        // FIXME rework shutdown - implement shutdown from db-service
-        //TODO add is shutting down check
-        mpLogger->debug("[CORE] Starting core shutdown");
-
-        // Signal and initialize shutdown
-        mIsRunning.store(false);
-        auto &ipcServer = IPC::SocketServer::Instance();
-        ipcServer.stopAcceptors();
-
-        mpScheduler.reset();
-
-        Actions::onCoreShutdown();
-
-        // Start shutdown timeout timer
-        auto shutdownTimeout = make_shared<ba::steady_timer>(mCoreUtilityIoContext, ms_SHUTDOWN_TIMEOUT);
-        shutdownTimeout->async_wait([this, shutdownTimeout](const bs::error_code &ec) {
-            if (!ec) {
-                mCoreWorkerThreadPool->stop();
-                mCoreThreadPool->stop();
-                mSocketServerThreadPool->stop();
-            }
-        });
-
-        // Join worker thread
-        mCoreWorkerGuard.reset();
-        mCoreWorkerThreadPool->join();
-
-        // Disable core thread guard for later join
-        mCoreGuard->reset();
-
-        // Stop IPC server
-        if (mConfig.tcp.isEnabled || mConfig.uds.isEnabled) {
-            mpLogger->debug("[CORE] Shutting down IPC socket server");
-            if (ipcServer.isRunning()) {
-                ipcServer.stopSocketServer();
-            }
+        if (mCoreThreadPool) {
+            mCoreThreadPool->join();
+            mCoreThreadPool.reset();
         }
 
-        // Waiting for IPC server threads to finish
-        if (mSocketServerThreadPool.has_value()) {
-            mSocketServerGuard.reset();
+        mpLogger->debug("[CORE] Core main threads finished");
+
+        // Join worker threads
+        if (mCoreWorkerThreadPool) {
+            mCoreWorkerThreadPool->join();
+            mCoreWorkerThreadPool.reset();
+        }
+
+        mpLogger->debug("[CORE] Worker threads finished");
+
+        // Join socket server threads
+        if (mSocketServerThreadPool) {
             mSocketServerThreadPool->join();
             mSocketServerThreadPool.reset();
         }
 
-        mpService->onStop();
-        mpService.reset();
+        mpLogger->debug("[CORE] Socket server threads finished, stopping utilities");
 
-        // Stop handling signals
+        // Stop utility context last (handles logging, timeout timers)
+        if (!mCoreUtilityIoContext.stopped()) {
+            mCoreUtilityIoContext.stop();
+        }
+
+        if (mCoreUtilityThread && mCoreUtilityThread->joinable()) {
+            mCoreUtilityThread->join();
+            mCoreUtilityThread.reset();
+        }
+
+        mpLogger->debug("[CORE] Exiting");
+    }
+
+    void Core::shutdown() {
+        mpLogger->info("[CORE] Shutdown requested");
+
+        bool expected = true;
+        if (!mIsRunning.compare_exchange_strong(expected, false)) {
+            mpLogger->error("[CORE] Shutdown called while core is not running");
+            return;
+        }
+
+        // Stop accepting new connections
+        auto &ipcServer = IPC::SocketServer::Instance();
+        ipcServer.stopAcceptors();
+
+        // Stop scheduler
+        mpScheduler.reset();
+
+        // Cancel active requests/commands
+        Actions::onCoreShutdown();
+
+        // Release all work guards — let io_contexts drain naturally
+        mCoreWorkerGuard.reset();
+        mCoreGuard.reset();
+        mSocketServerGuard.reset();
+
+        // Shutdown timeout as safety net
+        const auto timeoutTimer = std::make_shared<ba::steady_timer>(mCoreUtilityIoContext, ms_SHUTDOWN_TIMEOUT);
+        timeoutTimer->async_wait([this, timeoutTimer](const bs::error_code &ec) {
+            if (!ec) {
+                mpLogger->warning("[CORE] Shutdown timeout - force stopping IO contexts");
+                if (!mCoreWorkerIoContext.stopped()) mCoreWorkerIoContext.stop();
+                if (!mCoreIoContext.stopped()) mCoreIoContext.stop();
+                if (!mSocketServerIoContext.stopped()) mSocketServerIoContext.stop();
+            }
+        });
+
+        // Stop IPC server
+        if (ipcServer.isRunning()) {
+            mpLogger->debug("[CORE] Shutting down IPC socket server");
+            ipcServer.stopSocketServer();
+        }
+
+        // Cancel signals
         if (mSignals.has_value()) {
             mSignals->cancel();
             mSignals.reset();
         }
 
-        mpLogger->debug("[CORE] Shutdown complete");
+        // Stop service manager
+        if (mpService) {
+            mpService->onStop();
+            mpService.reset();
+        }
+
+        // Reset shared objects
+        mpApi.reset();
+
+        mpLogger->debug("[CORE] Shutdown complete - waiting for threads to join in run()");
+
+        // Reset utility guard so timeout timer can also finish
+        mCoreUtilityGuard.reset();
     }
 
     bool Core::isRunning() const {
@@ -279,9 +313,51 @@ namespace SmartHome {
     Core::Core() = default;
 
     Core::~Core() {
-        // FIXME rework shutdown - implement shutdown from db-service
-        if (mIsRunning.load()) {
+        if (isRunning()) {
             shutdown();
+            return;
+        }
+
+        // Cleanup after failed initialization
+        if (!isRunning() && !mIsInitialized.load(std::memory_order_acquire)) {
+            if (mpLogger) mpLogger->warning("[CORE] Running cleanup after failed initialization");
+
+            if (mSignals.has_value()) {
+                mSignals->cancel();
+                mSignals.reset();
+            }
+
+            if (mpService) {
+                mpService->onStop();
+                mpService.reset();
+            }
+
+            mCoreGuard.reset();
+            mCoreWorkerGuard.reset();
+            mSocketServerGuard.reset();
+            mCoreUtilityGuard.reset();
+
+            if (!mCoreIoContext.stopped()) mCoreIoContext.stop();
+            if (!mCoreWorkerIoContext.stopped()) mCoreWorkerIoContext.stop();
+            if (!mSocketServerIoContext.stopped()) mSocketServerIoContext.stop();
+            if (!mCoreUtilityIoContext.stopped()) mCoreUtilityIoContext.stop();
+
+            if (mCoreThreadPool) {
+                mCoreThreadPool->join();
+                mCoreThreadPool.reset();
+            }
+            if (mCoreWorkerThreadPool) {
+                mCoreWorkerThreadPool->join();
+                mCoreWorkerThreadPool.reset();
+            }
+            if (mSocketServerThreadPool) {
+                mSocketServerThreadPool->join();
+                mSocketServerThreadPool.reset();
+            }
+            if (mCoreUtilityThread && mCoreUtilityThread->joinable()) {
+                mCoreUtilityThread->join();
+                mCoreUtilityThread.reset();
+            }
         }
     }
 
