@@ -98,28 +98,16 @@ namespace SmartHome {
     }
 
 
-    void DatabaseActions::postSensorReading(uint moduleId, uint sensorLogicId,
-                                            nlohmann::json value,
-                                            nlohmann::json metadata) {
+    void DatabaseActions::postSensorReading(
+        uint sensorId,
+        nlohmann::json value, nlohmann::json metadata) {
         API::ApiRequest notification;
-
-
-        nlohmann::json dbQuerySubselect = {
-            {jp::TABLE, "sensors"},
-            {jp::COLUMNS, {"id"}},
-            {
-                jp::WHERE, {
-                    {"module_id", moduleId},
-                    {"logic_id", sensorLogicId}
-                }
-            }
-        };
 
         nlohmann::json dbQuery = {
             {jp::TABLE, "sensor_readings"},
             {
                 jp::VALUES, {
-                    {"sensor_id", {{jp::SUBSELECT, dbQuerySubselect}}},
+                    {"sensor_id", sensorId},
                     {value.is_number() ? "value_numeric" : "value_text", value},
                     {"metadata", metadata}
                 }
@@ -162,18 +150,11 @@ namespace SmartHome {
     void DatabaseActions::updateModuleLastOnline(uint moduleId) {
         API::ApiRequest notification;
 
-        auto nowTimeP = std::chrono::system_clock::now();
-        auto nowTimeT = std::chrono::system_clock::to_time_t(nowTimeP);
-
-        std::tm tmUTC;
-        gmtime_r(&nowTimeT, &tmUTC);
-
-        std::ostringstream oss;
-        oss << std::put_time(&tmUTC, "%Y-%m-%dT%H:%M:%SZ");
+        const auto timestamp = Utils::timePointToTimestampTz(std::chrono::system_clock::now());
 
         nlohmann::json dbQuery = {
             {jp::TABLE, "modules"},
-            {jp::VALUES, {{"last_online", oss.str()}}},
+            {jp::VALUES, {{"last_online", timestamp}}},
             {jp::WHERE, {{"id", moduleId}}}
         };
 
@@ -223,6 +204,7 @@ namespace SmartHome {
                         CachedModule module{
                             .id = row["id"],
                             .logicAddress = row["logic_address"],
+                            .name = row["name"],
                             .config = row["config"],
                             .lastOnline = Utils::parseTimestampTz(row["last_online"])
                         };
@@ -397,7 +379,7 @@ namespace SmartHome {
 
     ba::awaitable<API::ApiResponse> DatabaseActions::sendRequestToDbService(API::ApiRequest &&request) {
         API::InternalApi::Command command(request);
-        auto pCmdMeta = std::make_shared<Actions::CommandMetadata>(
+        const auto pCmdMeta = std::make_shared<Actions::CommandMetadata>(
             command,
             std::make_shared<ba::steady_timer>(Core::Instance().coreUtilityIoContext()),
             Actions::getNextId());

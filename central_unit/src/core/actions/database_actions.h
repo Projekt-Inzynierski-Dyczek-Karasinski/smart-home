@@ -44,12 +44,11 @@ namespace SmartHome {
          * @details Builds a SET notification which inserts a \c 'sensor_readings' row using a
          *          subselect to resolve sensor id and sends it as an asynchronous notification.
          *
-         * @param moduleId Module id associated with the sensor.
-         * @param sensorLogicId Logical sensor id within the module.
+         * @param sensorId Sensor id for the reading.
          * @param value Sensor value (numeric or textual) to store.
          * @param metadata Additional JSON metadata to store alongside the reading.
          */
-        static void postSensorReading(uint moduleId, uint sensorLogicId, nlohmann::json value, nlohmann::json metadata);
+        static void postSensorReading(uint sensorId, nlohmann::json value, nlohmann::json metadata);
 
         /**
          * @brief Post a log entry to the database for a module.
@@ -73,13 +72,29 @@ namespace SmartHome {
          */
         static void updateModuleLastOnline(uint moduleId);
 
+        /**
+         * @brief Fetch module configuration rows into config cache.
+         *
+         * @details Clears module cache and queries db-service for all modules,
+         *          then populates \c ConfigCache with returned rows.
+         */
         static ba::awaitable<void> fetchModulesConfigs();
 
+        /**
+         * @brief Fetch sensor configuration rows into config cache.
+         *
+         * @details Clears readings and sensor cache, queries db-service for all sensors,
+         *          then populates \c ConfigCache with returned rows.
+         */
         static ba::awaitable<void> fetchSensorsConfigs();
 
+        /**
+         * @brief Fetch module and sensor configurations.
+         *
+         * @details Clears caches and sequentially fetches modules and sensors from db-service.
+         */
         static ba::awaitable<void> fetchAllConfigs();
 
-    private:
         /**
          * @brief Send an asynchronous notification request to db-service.
          *
@@ -105,8 +120,19 @@ namespace SmartHome {
         static ba::awaitable<API::ApiResponse> sendRequestToDbService(API::ApiRequest &&request,
                                                                       cmdMetaPtr commandMetadata);
 
+        /**
+         * @brief Send request to db-service and await response.
+         *
+         * @details Convenience overload that creates command metadata and delegates to the
+         *          main request handler.
+         *
+         * @param request API request to send to db-service.
+         *
+         * @return API response from db-service or error on failure.
+         */
         static ba::awaitable<API::ApiResponse> sendRequestToDbService(API::ApiRequest &&request);
 
+    private:
         /**
          * @brief Validate incoming command parameters for database operations.
          *
@@ -127,7 +153,6 @@ namespace SmartHome {
          *
          * @param request API request to populate.
          * @param command Command providing id and method values.
-         *
          */
         static void prepareRequestToDatabase(API::ApiRequest &request,
                                              const API::InternalApi::Command &command);
