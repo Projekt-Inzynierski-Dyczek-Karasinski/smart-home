@@ -53,6 +53,11 @@ services:
     service_type: *standalone_daemon
     exec_path: ~ #Option for standalone mode - Default: /usr/local/bin/smarthome-mediator
     config_path: ~ # Default: /etc/smarthome/mediator.yaml
+  db-service:
+    enabled: true
+    service_type: *standalone_daemon
+    exec_path: ~ #Option for standalone mode - Default: /usr/local/bin/db-service
+    config_path: ~ # Default: /etc/smarthome/db-serivce.yaml
 
 # TODO add more config options for gui
 gui:

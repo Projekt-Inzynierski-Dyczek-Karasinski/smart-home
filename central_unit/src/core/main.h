@@ -26,6 +26,20 @@ namespace SmartHome {
     };
 
     /**
+     *@brief Configuration for launching and managing database service.
+     */
+    struct DbServiceConfig {
+        /// Enable/Disable db-service launch by Core
+        bool isEnabled = false;
+        /// Mode in which db-service will run
+        Utils::ServiceType serviceType = Utils::ServiceType::AUTO;
+        /// Path to db-service executable for standalone mode
+        std::string execPath = std::string{Constants::DefaultPaths::DB_SERVICE_EXEC};
+        /// Path to db-service's own YAML config file
+        std::string configPath = std::string{Constants::DefaultPaths::DB_SERVICE_CONFIG};
+    };
+
+    /**
      * @brief Temporary storage for logger command-line options.
      *
      * @details Holds logger settings parsed from program options before they are merged with YAML configuration.
@@ -58,10 +72,11 @@ namespace SmartHome {
      * @param configManager Configuration manager instance for YAML file handling.
      * @param coreConfig Core configuration struct to be updated.
      * @param mediatorConfig Mediator launch configuration struct to be updated.
+     * @param dbServiceConfig
      */
     void loadYamlConfigs(Utils::ConfigManager &configManager,
                          Core::Config &coreConfig,
-                         MediatorConfig &mediatorConfig);
+                         MediatorConfig &mediatorConfig, DbServiceConfig &dbServiceConfig);
 
     /**
      * @brief Overwrites configurations with command-line options.
@@ -93,6 +108,7 @@ namespace SmartHome {
      * @param logger Logger instance to configure and use for loading messages.
      * @param coreConfig Core configuration struct to fill.
      * @param mediatorConfig Mediator configuration struct to fill.
+     * @param dbServiceConfig
      *
      * @note Priority order: defaults -> YAML -> command-line.
      */
@@ -100,9 +116,26 @@ namespace SmartHome {
                      const bpo::parsed_options &parsed,
                      const std::shared_ptr<Utils::Logger> &logger,
                      Core::Config &coreConfig,
-                     MediatorConfig &mediatorConfig);
+                     MediatorConfig &mediatorConfig, DbServiceConfig &dbServiceConfig);
 
-
+    /**
+     * @brief Runs a process with retry mechanism.
+     *
+     * @param logger Logger instance for logging process launch attempts and errors.
+     * @param serviceType Service type to determine launch mode (e.g., AUTO, SYSTEMD, STANDALONE).
+     * @param execPath Path to executable for standalone launch mode.
+     * @param configPath Path to configuration file to pass to the process.
+     * @param processName Name of the process for logging purposes.
+     * @param process Reference to a boost::process::child object to store the launched process handle.
+     *
+     * @return true if the process was launched successfully, false otherwise.
+     */
+    bool runProcess(const std::shared_ptr<Utils::Logger> &logger,
+                    Utils::ServiceType serviceType,
+                    std::string_view execPath,
+                    std::string_view configPath,
+                    std::string_view processName,
+                    bp::child &process);
 
     static constexpr auto s_MAX_RETRIES = 10;
     static constexpr auto s_RETRY_DELAY = 250ms;
