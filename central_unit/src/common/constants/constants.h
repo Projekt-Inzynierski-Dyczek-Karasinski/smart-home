@@ -114,6 +114,35 @@ namespace SmartHome::Constants {
         inline constexpr std::string_view CHANNEL = "channel";
     }
 
+    namespace SensorConfigKeys {
+        inline constexpr std::string_view USE_CACHE = "use_cache";
+        inline constexpr std::string_view CACHE_TTL = "cache_ttl";
+
+        inline constexpr std::string_view VALUES = "values";
+        // Value keys
+        inline constexpr std::string_view INDEX = "index";
+        inline constexpr std::string_view LABEL = "label";
+        inline constexpr std::string_view UNIT = "unit";
+        inline constexpr std::string_view PRECISION = "precision";
+        // -----------------
+
+        inline constexpr std::string_view EVENTS = "events";
+        // Event keys
+        inline constexpr std::string_view CONDITION = "condition";
+        // -----------------
+
+        inline constexpr std::string_view SCHEDULE = "schedule";
+        // Schedule keys
+        inline constexpr std::string_view RRULE = "rrule";
+        inline constexpr std::string_view DTSTART = "dtstart";
+        // -----------------
+
+        // Events / Schedule keys
+        inline constexpr std::string_view ENABLED = "enabled";
+        inline constexpr std::string_view ACTION = "action";
+        // Action keys - shared with SmartHome::JsonRpcStrings
+    }
+
     namespace HumanReadableErrors {
         inline constexpr std::string_view UNKNOWN_ERROR = "Unknown error";
         inline constexpr std::string_view BAD_COMMAND = "Bad command";

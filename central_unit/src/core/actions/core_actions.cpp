@@ -179,6 +179,7 @@ namespace SmartHome {
 
         if (typeParam == Constants::DatabaseTypes::SENSORS_CHANGED) {
             co_await DatabaseActions::fetchSensorsConfigs();
+            Core::Instance().scheduler().loadFromCache();
             co_return std::nullopt;
         }
 

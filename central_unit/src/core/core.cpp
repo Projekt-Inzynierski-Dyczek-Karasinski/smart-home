@@ -156,18 +156,28 @@ namespace SmartHome {
             const auto target = sai::Target(sai::TargetTypes::DATABASE);
             ba::steady_timer retryTimer(co_await ba::this_coro::executor);
 
+            // Delay before first check to allow database service to start and register connection
+            retryTimer.expires_after(5s);
+            co_await retryTimer.async_wait(ba::use_awaitable);
+
             if (!CoreActions::findConnections(target.to_string()).has_value()) {
                 mpLogger->warning("[CORE] No database service connection found on startup, entering retry loop...");
 
                 while (mIsRunning && !CoreActions::findConnections(target.to_string()).has_value()) {
                     mpLogger->debug(
-                        "[CORE] No database service connection found, retrying in 1 second...");
-                    retryTimer.expires_after(1s);
+                        "[CORE] No database service connection found, retrying in 5 seconds...");
+                    retryTimer.expires_after(5s);
                     co_await retryTimer.async_wait(ba::use_awaitable);
                 }
             }
 
             co_await DatabaseActions::fetchAllConfigs();
+
+            // Start scheduler after populating cache
+            mpScheduler = std::make_unique<Scheduler>(mCoreIoContext, mConfigCache, mpLogger);
+            mpScheduler->loadFromCache();
+            mpScheduler->start();
+
             co_return;
         }, ba::detached);
 
@@ -188,6 +198,8 @@ namespace SmartHome {
         mIsRunning.store(false);
         auto &ipcServer = IPC::SocketServer::Instance();
         ipcServer.stopAcceptors();
+
+        mpScheduler.reset();
 
         Actions::onCoreShutdown();
 
@@ -245,6 +257,10 @@ namespace SmartHome {
 
     ReadingsCache &Core::readingsCache() {
         return mReadingsCache;
+    }
+
+    Scheduler &Core::scheduler() const {
+        return *mpScheduler;
     }
 
     ba::io_context &Core::coreUtilityIoContext() {

@@ -77,15 +77,18 @@ namespace SmartHome {
 
                 // Update config cache with retrieved info
                 try {
-                    Core::Instance().configCache().setModule(
-                        CachedModule{
-                            .id = moduleId,
-                            .logicAddress = row[jmik::LOGIC_ADDRESS],
-                            .name = row["name"],
-                            .config = row["config"],
-                            .lastOnline = Utils::parseTimestampTz(row["last_online"])
-                        }
-                    );
+                    auto module = CachedModule{
+                        .id = moduleId,
+                        .logicAddress = row[jmik::LOGIC_ADDRESS],
+                        .name = row["name"],
+                        .config = row["config"],
+                    };
+
+                    if (!row["last_online"].is_null()) {
+                        module.lastOnline = Utils::parseTimestampTz(row["last_online"]);
+                    }
+
+                    Core::Instance().configCache().setModule(module);
                 } catch (const std::exception &e) {
                     Core::Instance().mpLogger->errorf(
                         "[DATABASE_ACTIONS] [GET_ADDR_INFO] Failed to update config cache: %s", e.what());
@@ -174,7 +177,7 @@ namespace SmartHome {
 
         nlohmann::json dbQuery = {
             {jp::TABLE, "modules"},
-            {jp::COLUMNS, nlohmann::json::array({"id", "logic_address", "config", "last_online"})},
+            {jp::COLUMNS, nlohmann::json::array({"id", "name", "logic_address", "config", "last_online"})},
         };
 
         const API::InternalApi::Target target(API::InternalApi::TargetTypes::DATABASE);
@@ -206,8 +209,12 @@ namespace SmartHome {
                             .logicAddress = row["logic_address"],
                             .name = row["name"],
                             .config = row["config"],
-                            .lastOnline = Utils::parseTimestampTz(row["last_online"])
                         };
+
+                        if (!row["last_online"].is_null()) {
+                            module.lastOnline = Utils::parseTimestampTz(row["last_online"]);
+                        }
+
                         cache.setModule(module);
                     } catch (const std::exception &e) {
                         Core::Instance().mpLogger->errorf(

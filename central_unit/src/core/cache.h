@@ -23,7 +23,7 @@ namespace SmartHome {
         uint logicAddress; ///< Module logic address used in module mediator communication
         std::string name; ///< Human-readable name
         nlohmann::json config; ///< Module configuration payload
-        std::chrono::system_clock::time_point lastOnline; ///< Last online timestamp
+        std::optional<std::chrono::system_clock::time_point> lastOnline; ///< Last online timestamp
 
         /**
          * @brief Serialize cached module into JSON.

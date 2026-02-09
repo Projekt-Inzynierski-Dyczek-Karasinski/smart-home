@@ -5,6 +5,7 @@
 #include "async_logger.h"
 #include "api/internal_api.h"
 #include "cache.h"
+#include "scheduler.h"
 
 #include <atomic>
 #include <memory>
@@ -137,6 +138,8 @@ namespace SmartHome {
          */
         ReadingsCache &readingsCache();
 
+        Scheduler &scheduler() const;
+
         /**
          * @brief Core utility IO context getter.
          *
@@ -207,6 +210,9 @@ namespace SmartHome {
         // Cache
         ConfigCache mConfigCache;
         ReadingsCache mReadingsCache{mConfigCache};
+
+        // Scheduler
+        std::unique_ptr<Scheduler> mpScheduler;
 
         // Socket server resources
         ba::io_context mSocketServerIoContext;
