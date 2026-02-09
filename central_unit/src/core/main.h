@@ -72,7 +72,7 @@ namespace SmartHome {
      * @param configManager Configuration manager instance for YAML file handling.
      * @param coreConfig Core configuration struct to be updated.
      * @param mediatorConfig Mediator launch configuration struct to be updated.
-     * @param dbServiceConfig
+     * @param dbServiceConfig Database service launch configuration struct to be updated.
      */
     void loadYamlConfigs(Utils::ConfigManager &configManager,
                          Core::Config &coreConfig,
@@ -108,7 +108,7 @@ namespace SmartHome {
      * @param logger Logger instance to configure and use for loading messages.
      * @param coreConfig Core configuration struct to fill.
      * @param mediatorConfig Mediator configuration struct to fill.
-     * @param dbServiceConfig
+     * @param dbServiceConfig Database service configuration struct to fill.
      *
      * @note Priority order: defaults -> YAML -> command-line.
      */
