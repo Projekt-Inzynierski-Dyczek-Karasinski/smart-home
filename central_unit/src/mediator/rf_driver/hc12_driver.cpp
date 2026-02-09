@@ -403,7 +403,7 @@ namespace SmartHomeMediator {
                 commandStr = "AT+P" + std::string(value);
                 break;
             case Hc12Option::DEFAULT:
-                if (value != sc::MediatorArgs::ALL_OPTIONS) break;
+                if (value != sc::MediatorSpecial::ALL_OPTIONS) break;
                 commandStr = "AT+DEFAULT";
                 break;
             default:

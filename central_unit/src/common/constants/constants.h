@@ -57,8 +57,21 @@ namespace SmartHome::Constants {
     }
 
     namespace CoreTypes {
-        // Set keys strings
+        // Config / metadata endpoints (get only, read from cache)
+        inline constexpr std::string_view MODULES = "modules";
+        inline constexpr std::string_view MODULE = "module";
+        inline constexpr std::string_view MODULE_SENSORS = "module_sensors";
+        inline constexpr std::string_view SENSORS = "sensors";
+        inline constexpr std::string_view SENSOR = "sensor";
+
+        // Historical data endpoints (get only, sent to database)
+        inline constexpr std::string_view SENSOR_READINGS = "sensor_readings";
+        inline constexpr std::string_view LOGS = "logs";
+
+        // Core config keys (set only)
         inline constexpr std::string_view CONNECTION_TYPE = "connection_type";
+        // Core keys (get only)
+        inline constexpr std::string_view _DEBUG_CACHE = "_debug_cache";
     }
 
     namespace MediatorTypes {
@@ -75,7 +88,7 @@ namespace SmartHome::Constants {
         inline constexpr std::string_view ACTUATOR_VALUE = "actuator_value";
         inline constexpr std::string_view FORCE_READ_SENSOR_VALUE = "force_read_sensor_value";
         inline constexpr std::string_view BATTERY_LEVEL = "battery_level";
-        inline constexpr std::string_view LOGS = "logs";
+        inline constexpr std::string_view MODULE_LOGS = "module_logs";
 
         // Notify types strings
         // Sent to modules
@@ -96,7 +109,7 @@ namespace SmartHome::Constants {
         inline constexpr std::string_view SENSORS_CHANGED = "sensors_changed";
     }
 
-    namespace MediatorArgs {
+    namespace MediatorSpecial {
         inline constexpr std::string_view ALL_OPTIONS = "all_options";
         inline constexpr std::string_view CHANNEL = "channel";
     }

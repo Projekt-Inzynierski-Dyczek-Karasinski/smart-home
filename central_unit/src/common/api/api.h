@@ -34,6 +34,7 @@ namespace SmartHome::JsonRpcStrings {
         inline constexpr std::string_view TYPE = "type";
         inline constexpr std::string_view ARGS = "args";
         inline constexpr std::string_view DATA = "data";
+        inline constexpr std::string_view FORCE = "force";
 
         // Database API specific keys
         // Request parameter keys for database operations
@@ -177,6 +178,7 @@ namespace SmartHome::API {
         MEDIATOR_COMMUNICATION_ERROR = -32002,
         MEDIATOR_RUNTIME_ERROR = -32003,
         NOT_IMPLEMENTED = -32004,
+        NOT_FOUND = -32005,
     };
 
     /**

@@ -201,7 +201,7 @@ namespace SmartHomeMediator {
                     break;
                 case RfTypes::MediatorConfigCommandType::GET:
                     // Get all options
-                    if (key == sc::MediatorArgs::ALL_OPTIONS) {
+                    if (key == sc::MediatorSpecial::ALL_OPTIONS) {
                         try {
                             apiResponse.result = co_await mpRfDriver->getAllOptions();
                         } catch (const std::exception &e) {
@@ -572,7 +572,7 @@ namespace SmartHomeMediator {
         constexpr int retries = 3;
         for (int i = 0; i < retries; i++) {
             try {
-                isSuccessful = co_await mpRfDriver->setOption(sc::MediatorArgs::CHANNEL.data(),
+                isSuccessful = co_await mpRfDriver->setOption(sc::MediatorSpecial::CHANNEL.data(),
                                                               std::to_string(channel));
             } catch (const std::exception &e) {
                 mpLogger->errorf("[SESSION] [CHANGE_CHANNEL] Failed to change RF channel. Attempt %d/%d. Cause: %s",

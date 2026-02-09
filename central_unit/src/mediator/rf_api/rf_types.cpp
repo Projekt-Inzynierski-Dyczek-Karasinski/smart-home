@@ -425,7 +425,7 @@ namespace SmartHomeMediator::RfTypes {
             {sc::MediatorTypes::SENSOR_VALUE, GetType::SENSOR_VALUE},
             {sc::MediatorTypes::CONFIG_OPTION, GetType::CONFIG_OPTION},
             {sc::MediatorTypes::SENSOR_LIST, GetType::SENSOR_LIST},
-            {sc::MediatorTypes::LOGS, GetType::LOGS},
+            {sc::MediatorTypes::MODULE_LOGS, GetType::LOGS},
             {sc::MediatorTypes::BATTERY_LEVEL, GetType::BATTERY_LEVEL},
             {sc::MediatorTypes::FORCE_READ_SENSOR_VALUE, GetType::FORCE_READ_SENSOR_VALUE}
         };

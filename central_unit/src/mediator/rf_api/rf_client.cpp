@@ -72,7 +72,7 @@ namespace SmartHomeMediator {
 
             // Set channel to default
             try {
-                success = co_await mpDriver->setOption(sc::MediatorArgs::CHANNEL.data(),
+                success = co_await mpDriver->setOption(sc::MediatorSpecial::CHANNEL.data(),
                                                        std::to_string(mRfMainChannel));
             } catch (const std::exception &e) {
                 mpLogger->errorf("[RF_CLIENT] Initialization error: %s", e.what());
