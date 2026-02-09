@@ -36,7 +36,7 @@ namespace SmartHome::Utils {
     /**
      * @brief Parse a timestamp with timezone information into a std::chrono::system_clock::time_point.
      *
-     * @param timestamp Timestamp string in the format "YYYY-MM-DD HH:MM:SS±HH"
+     * @param timestamp Timestamp string ISO 8601 format "YYYY-MM-DDTHH:MM:SS±HH"
      *                  where the last part is an optional timezone offset in hours.
      *
      * @return Parsed time point representing the given timestamp in UTC.
@@ -44,6 +44,15 @@ namespace SmartHome::Utils {
      * @note Used for postgreSQL timestamptz, ignores microseconds.
      */
     std::chrono::system_clock::time_point parseTimestampTz(const std::string &timestamp);
+
+    /**
+     * @brief Convert a std::chrono::system_clock::time_point to a timestamp string with timezone information.
+     *
+     * @param timePoint Time point to convert.
+     *
+     * @return Timestamp string in the ISO 8601 format "YYYY-MM-DDTHH:MM:SSZ" (UTC time).
+     */
+    std::string timePointToTimestampTz(const std::chrono::system_clock::time_point &timePoint);
 
     /**
      * @brief RAII wrapper for exclusive file locking.

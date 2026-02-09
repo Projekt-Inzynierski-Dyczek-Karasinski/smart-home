@@ -51,6 +51,18 @@ namespace SmartHome::Utils {
         return tp;
     }
 
+    std::string timePointToTimestampTz(const std::chrono::system_clock::time_point &timePoint) {
+        const auto timeT = std::chrono::system_clock::to_time_t(timePoint);
+
+        std::tm tmUTC;
+        gmtime_r(&timeT, &tmUTC);
+
+        std::ostringstream oss;
+        oss << std::put_time(&tmUTC, "%Y-%m-%dT%H:%M:%SZ");
+
+        return oss.str();
+    }
+
     FileLock::FileLock(const std::string &lockFilePath) {
         mLockFilePath = lockFilePath;
 
