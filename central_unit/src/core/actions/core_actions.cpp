@@ -287,7 +287,7 @@ namespace SmartHome {
         }
     }
 
-    std::expected<uint, API::ApiError> CoreActions::requireModuleId(const nlohmann::json &params) {
+    CoreActions::ValidationResult<uint> CoreActions::requireModuleId(const nlohmann::json &params) {
         if (!params.contains(jp::MODULE_ID) ||
             !params.at(jp::MODULE_ID).is_number_integer()) {
             return std::unexpected(API::ApiError(
@@ -300,7 +300,7 @@ namespace SmartHome {
         return value >= 0 ? static_cast<uint>(value) : 0;
     }
 
-    std::expected<uint, API::ApiError> CoreActions::requireLimitArg(const nlohmann::json &params) {
+    CoreActions::ValidationResult<uint> CoreActions::requireLimitArg(const nlohmann::json &params) {
         if (!params.contains(jp::ARGS) ||
             !params.at(jp::ARGS).is_array() ||
             params.at(jp::ARGS).empty() ||
@@ -315,7 +315,7 @@ namespace SmartHome {
         return value >= 0 ? static_cast<uint>(value) : 0;
     }
 
-    std::expected<uint, API::ApiError> CoreActions::requireSensorLogicIdArg(const nlohmann::json &params) {
+    CoreActions::ValidationResult<uint> CoreActions::requireSensorLogicIdArg(const nlohmann::json &params) {
         if (!params.contains(jp::ARGS) ||
             !params.at(jp::ARGS).is_array() ||
             params.at(jp::ARGS).empty() ||
@@ -330,7 +330,7 @@ namespace SmartHome {
         return value >= 0 ? static_cast<uint>(value) : 0;
     }
 
-    std::expected<uint, API::ApiError> CoreActions::resolveSensorId(const nlohmann::json &params) {
+    CoreActions::ValidationResult<uint> CoreActions::resolveSensorId(const nlohmann::json &params) {
         if (!params.contains(jp::ARGS) ||
             !params.at(jp::ARGS).is_array() ||
             params.at(jp::ARGS).empty() ||
@@ -366,7 +366,7 @@ namespace SmartHome {
         return value >= 0 ? static_cast<uint>(value) : 0;
     }
 
-    ba::awaitable<std::expected<nlohmann::json, API::ApiError> > CoreActions::queryDatabase(
+    ba::awaitable<CoreActions::ValidationResult<nlohmann::json> > CoreActions::queryDatabase(
         const nlohmann::json &dbQuery) {
         API::ApiRequest request;
         const API::InternalApi::Target target(API::InternalApi::TargetTypes::DATABASE);

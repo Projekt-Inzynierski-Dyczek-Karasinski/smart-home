@@ -145,6 +145,8 @@ namespace SmartHome {
         static void clearStaleConnectionTypes();
 
         // Handler helpers
+        template<typename T>
+        using ValidationResult = std::expected<T, API::ApiError>;
 
         /**
          * @brief Require module_id in params.
@@ -153,7 +155,7 @@ namespace SmartHome {
          *
          * @return module id on success, API error on validation failure.
          */
-        static std::expected<uint, API::ApiError> requireModuleId(const nlohmann::json &params);
+        static ValidationResult<uint> requireModuleId(const nlohmann::json &params);
 
         /**
          * @brief Require limit argument in params.
@@ -162,7 +164,7 @@ namespace SmartHome {
          *
          * @return limit value on success, API error on validation failure.
          */
-        static std::expected<uint, API::ApiError> requireLimitArg(const nlohmann::json &params);
+        static ValidationResult<uint> requireLimitArg(const nlohmann::json &params);
 
         /**
          * @brief Require sensor logic id argument in params.
@@ -171,7 +173,7 @@ namespace SmartHome {
          *
          * @return sensor logic id on success, API error on validation failure.
          */
-        static std::expected<uint, API::ApiError> requireSensorLogicIdArg(const nlohmann::json &params);
+        static ValidationResult<uint> requireSensorLogicIdArg(const nlohmann::json &params);
 
         /**
          * @brief Resolve sensor id from params.
@@ -182,7 +184,7 @@ namespace SmartHome {
          *
          * @return resolved sensor id on success, API error on failure.
          */
-        static std::expected<uint, API::ApiError> resolveSensorId(const nlohmann::json &params);
+        static ValidationResult<uint> resolveSensorId(const nlohmann::json &params);
 
         /**
          * @brief Execute database query for core GET handlers.
@@ -191,7 +193,7 @@ namespace SmartHome {
          *
          * @return JSON response on success, API error on failure.
          */
-        static ba::awaitable<std::expected<nlohmann::json, API::ApiError> >
+        static ba::awaitable<ValidationResult<nlohmann::json> >
         queryDatabase(const nlohmann::json &dbQuery);
 
         // Core type handlers
