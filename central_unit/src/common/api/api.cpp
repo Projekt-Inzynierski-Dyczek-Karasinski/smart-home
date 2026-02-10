@@ -488,9 +488,10 @@ namespace SmartHome::API {
     }
 
     apiId_t getNextApiId() {
-        static std::atomic<apiId_t> id = 0;
+        static std::atomic<apiId_t> id = 1;
         apiId_t expected = std::numeric_limits<apiId_t>::max(); // Wrap around check
-        if (id.compare_exchange_strong(expected, 0, std::memory_order::relaxed)) [[unlikely]] {
+        // Set to 1 after wrap around
+        if (id.compare_exchange_strong(expected, 1, std::memory_order::relaxed)) [[unlikely]] {
             return expected; // Return max value before wrap around
         }
         return id.fetch_add(1, std::memory_order::relaxed);

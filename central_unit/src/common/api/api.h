@@ -449,6 +449,8 @@ namespace SmartHome::API {
      * @brief Get next unique API identifier.
      *
      * @return Next unique API identifier.
+     *
+     * @note Starts from 1, and wraps around to 1 after reaching maximum value of apiId_t.
      */
     apiId_t getNextApiId();
 
