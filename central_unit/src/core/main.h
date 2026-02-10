@@ -12,7 +12,7 @@ namespace bpo = boost::program_options;
 
 namespace SmartHome {
     /**
-     *@brief Default configuration for launching and managing processes.
+     * @brief Default configuration for launching and managing processes.
      */
     struct ProcessConfig {
         /// Enable/Disable process launch by Core
@@ -26,7 +26,7 @@ namespace SmartHome {
     };
 
     /**
-     *@brief Configuration for launching and managing mediator service.
+     * @brief Configuration for launching and managing mediator service.
      */
     struct MediatorConfig : ProcessConfig {
         MediatorConfig() {
@@ -36,7 +36,7 @@ namespace SmartHome {
     };
 
     /**
-     *@brief Configuration for launching and managing database service.
+     * @brief Configuration for launching and managing database service.
      */
     struct DbServiceConfig : ProcessConfig {
         DbServiceConfig() {
