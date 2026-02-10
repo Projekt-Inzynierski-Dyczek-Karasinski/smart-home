@@ -12,31 +12,37 @@ namespace bpo = boost::program_options;
 
 namespace SmartHome {
     /**
+     *@brief Default configuration for launching and managing processes.
+     */
+    struct ProcessConfig {
+        /// Enable/Disable process launch by Core
+        bool isEnabled = false;
+        /// Mode in which process will run
+        Utils::ServiceType serviceType = Utils::ServiceType::AUTO;
+        /// Path to process executable for standalone mode
+        std::string execPath;
+        /// Path to process's own YAML config file
+        std::string configPath;
+    };
+
+    /**
      *@brief Configuration for launching and managing mediator service.
      */
-    struct MediatorConfig {
-        /// Enable/Disable mediator launch by Core
-        bool isEnabled = false;
-        /// Mode in which mediator will run
-        Utils::ServiceType serviceType = Utils::ServiceType::AUTO;
-        /// Path to mediator executable for standalone mode
-        std::string execPath = std::string{Constants::DefaultPaths::MEDIATOR_EXEC};
-        /// Path to mediator's own YAML config file
-        std::string configPath = std::string{Constants::DefaultPaths::MEDIATOR_CONFIG};
+    struct MediatorConfig : ProcessConfig {
+        MediatorConfig() {
+            execPath = Constants::DefaultPaths::MEDIATOR_EXEC;
+            configPath = Constants::DefaultPaths::MEDIATOR_CONFIG;
+        }
     };
 
     /**
      *@brief Configuration for launching and managing database service.
      */
-    struct DbServiceConfig {
-        /// Enable/Disable db-service launch by Core
-        bool isEnabled = false;
-        /// Mode in which db-service will run
-        Utils::ServiceType serviceType = Utils::ServiceType::AUTO;
-        /// Path to db-service executable for standalone mode
-        std::string execPath = std::string{Constants::DefaultPaths::DB_SERVICE_EXEC};
-        /// Path to db-service's own YAML config file
-        std::string configPath = std::string{Constants::DefaultPaths::DB_SERVICE_CONFIG};
+    struct DbServiceConfig : ProcessConfig {
+        DbServiceConfig() {
+            execPath = Constants::DefaultPaths::DB_SERVICE_EXEC;
+            configPath = Constants::DefaultPaths::DB_SERVICE_CONFIG;
+        }
     };
 
     /**
@@ -122,19 +128,15 @@ namespace SmartHome {
      * @brief Runs a process with retry mechanism.
      *
      * @param logger Logger instance for logging process launch attempts and errors.
-     * @param serviceType Service type to determine launch mode (e.g., AUTO, SYSTEMD, STANDALONE).
-     * @param execPath Path to executable for standalone launch mode.
-     * @param configPath Path to configuration file to pass to the process.
      * @param processName Name of the process for logging purposes.
+     * @param processConfig Configuration struct containing process launch parameters.
      * @param process Reference to a boost::process::child object to store the launched process handle.
      *
      * @return true if the process was launched successfully, false otherwise.
      */
     bool runProcess(const std::shared_ptr<Utils::Logger> &logger,
-                    Utils::ServiceType serviceType,
-                    std::string_view execPath,
-                    std::string_view configPath,
                     std::string_view processName,
+                    const ProcessConfig &processConfig,
                     bp::child &process);
 
     static constexpr auto s_MAX_RETRIES = 10;

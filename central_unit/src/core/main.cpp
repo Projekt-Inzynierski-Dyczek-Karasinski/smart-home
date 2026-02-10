@@ -134,18 +134,17 @@ namespace SmartHome {
     }
 
     bool runProcess(const std::shared_ptr<Utils::Logger> &logger,
-                    const Utils::ServiceType serviceType,
-                    const std::string_view execPath,
-                    const std::string_view configPath,
-                    const std::string_view processName, bp::child &process) {
+                    const std::string_view processName,
+                    const ProcessConfig &processConfig,
+                    bp::child &process) {
         logger->debugf("[MAIN_CORE] Launching %s", processName.data());
-        switch (serviceType) {
+        switch (processConfig.serviceType) {
             default:
             case Utils::ServiceType::AUTO:
             case Utils::ServiceType::STANDALONE:
-                if (std::filesystem::exists(execPath)) {
+                if (std::filesystem::exists(processConfig.execPath)) {
                     logger->infof("[MAIN_CORE] Starting %s in STANDALONE mode", processName.data());
-                    process = bp::child(execPath.data(), "--config", configPath.data());
+                    process = bp::child(processConfig.execPath.data(), "--config", processConfig.configPath.data());
                     return true;
                 } else {
                     logger->errorf("[MAIN_CORE] Could not find %s executable", processName.data());
@@ -250,11 +249,7 @@ int main(int argc, char *argv[]) {
     // Launch mediator if enabled
     bp::child mediator;
     if (mediatorConfig.isEnabled) {
-        if (runProcess(logger, mediatorConfig.serviceType,
-                       mediatorConfig.execPath,
-                       mediatorConfig.configPath,
-                       "smarthome-radiod",
-                       mediator)) {
+        if (runProcess(logger, "smarthome-radiod", mediatorConfig, mediator)) {
             logger->info("[MAIN_CORE] Mediator launched successfully");
         } else {
             logger->error("[MAIN_CORE] Failed to launch mediator");
@@ -263,11 +258,7 @@ int main(int argc, char *argv[]) {
 
     bp::child dbService;
     if (dbServiceConfig.isEnabled) {
-        if (runProcess(logger, dbServiceConfig.serviceType,
-                       dbServiceConfig.execPath,
-                       dbServiceConfig.configPath,
-                       "smarthome-databased",
-                       dbService)) {
+        if (runProcess(logger, "smarthome-databased", dbServiceConfig, dbService)) {
             logger->info("[MAIN_CORE] Database service launched successfully");
         } else {
             logger->error("[MAIN_CORE] Failed to launch database service");
