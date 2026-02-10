@@ -86,6 +86,13 @@ namespace SmartHome {
          */
         [[nodiscard]] size_t taskCount() const;
 
+        /**
+         * @brief Get the next scheduled run time for any task belonging to a module.
+         *
+         * @return Time point of the next scheduled run for the module, or std::nullopt if no tasks are scheduled for it.
+         */
+        std::optional<std::chrono::system_clock::time_point> getNextRunForModule(uint moduleId) const;
+
     private:
         /**
          * @brief RAII wrapper for icalrecur_iterator lifecycle.

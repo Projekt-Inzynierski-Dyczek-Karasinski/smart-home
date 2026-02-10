@@ -299,7 +299,8 @@ namespace SmartHomeMediator {
 
                 // Parse RF response to SmartHome::API format
                 try {
-                    ctx.resultsVector.push_back(RfApi::toApiString(*ctx.pCommandResponse));
+                    const auto apiString = RfApi::toApiString(*ctx.pCommandResponse);
+                    if (!apiString.empty()) ctx.resultsVector.push_back(apiString);
                 } catch (const std::exception &e) {
                     mpLogger->debugf("[SESSION] [EXECUTE] [AWAIT_RESPONSE] parse to api response failed: %s",
                                      e.what());
@@ -415,7 +416,8 @@ namespace SmartHomeMediator {
 
                 // Try parsing to SmartHome::API format
                 try {
-                    ctx.resultsVector.push_back(RfApi::toApiString(*ctx.pCommandResponse));
+                    const auto apiString = RfApi::toApiString(*ctx.pCommandResponse);
+                    if (!apiString.empty()) ctx.resultsVector.push_back(apiString);
                 } catch (const std::exception &e) {
                     mpLogger->debugf("[SESSION] [EXECUTE] [AWAIT_NOTIFICATION] parse to api response failed: %s",
                                      e.what());

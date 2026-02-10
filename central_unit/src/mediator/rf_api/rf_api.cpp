@@ -125,7 +125,11 @@ namespace SmartHomeMediator {
             SmartHome::API::ApiError error;
             SmartHome::API::ApiResponse response;
 
+
             if (rfCommand.requestId.has_value()) {
+                // 0 is treated as undefined request id for RF communication protocol
+                // Don't send response for RF notifications (undefined id in RF protocol)
+                if (rfCommand.requestId.value() == 0) return "";
                 response.id = rfCommand.requestId.value();
             } else {
                 // Set response id as null when command id is not set (error response)
@@ -227,7 +231,15 @@ namespace SmartHomeMediator {
         }
 
         if (apiRequest.id.isUndefined()) {
-            parseNotification(pRfCommand.get(), methodLower, pMethodParams.get());
+            // Handle RF notification
+            if (methodLower == sc::Methods::NOTIFY) {
+                parseNotification(pRfCommand.get(), methodLower, pMethodParams.get());
+                return pRfCommand;
+            }
+
+            // Handle JSON-RPC notification (no response expected, used for fire-and-forget commands like sleep)
+            parseRequest(pRfCommand.get(), methodLower, pMethodParams.get());
+            pRfCommand->requestId = 0; // Treat undefined id as 0 for RF communication protocol
             return pRfCommand;
         }
 

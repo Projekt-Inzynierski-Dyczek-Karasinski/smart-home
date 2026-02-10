@@ -69,7 +69,8 @@ namespace SmartHome {
                 // Extract logic address and RF channel from response
                 try {
                     result[jmik::LOGIC_ADDRESS] = row[jmik::LOGIC_ADDRESS];
-                    result[jmik::RF_CHANNEL] = row["config"][jmik::RF_CHANNEL];
+                    result[Constants::ModuleConfigKeys::CONNECTION] =
+                            row["config"][Constants::ModuleConfigKeys::CONNECTION];
                 } catch (const std::exception &e) {
                     Core::Instance().mpLogger->errorf(
                         "[DATABASE_ACTIONS] [GET_ADDR_INFO] Failed to parse db response %s", e.what());

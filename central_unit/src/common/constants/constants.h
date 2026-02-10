@@ -143,6 +143,16 @@ namespace SmartHome::Constants {
         // Action keys - shared with SmartHome::JsonRpcStrings
     }
 
+    namespace ModuleConfigKeys {
+        inline constexpr std::string_view TYPE = "type";
+
+        inline constexpr std::string_view CONNECTION = "connection";
+
+        inline constexpr std::string_view SLEEP_AFTER_SEND = "sleep_after_send";
+        inline constexpr std::string_view POWER_SAVING = "power_saving";
+        inline constexpr std::string_view DEFAULT_SLEEP_DURATION = "default_sleep_duration";
+    }
+
     namespace HumanReadableErrors {
         inline constexpr std::string_view UNKNOWN_ERROR = "Unknown error";
         inline constexpr std::string_view BAD_COMMAND = "Bad command";

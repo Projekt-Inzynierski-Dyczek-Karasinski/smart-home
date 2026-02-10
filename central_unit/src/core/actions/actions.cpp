@@ -208,6 +208,7 @@ namespace SmartHome {
         requestCallback(id, std::move(responseString));
     }
 
+    // FIXME segfault can happen when received unexpected response
     void Actions::handleIncomingResponse(const connectionId_t connectionId, const API::ApiResponse &response) {
         Core::Instance().mpLogger->debug("[ACTIONS] [HANDLE_INCOMING_RESPONSE] called");
         if (!response.id.hasValue()) {

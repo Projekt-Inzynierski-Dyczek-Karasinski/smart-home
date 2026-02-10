@@ -7,6 +7,7 @@ namespace SmartHome {
     namespace jp = JsonRpcStrings::ParamsKeys;
     namespace jmik = JsonRpcStrings::ModuleInfoKeys;
     namespace jr = JsonRpcStrings::ResponseKeys;
+    namespace cmck = Constants::ModuleConfigKeys;
 
     awaitOptApiResponse MediatorActions::mediatorGetHandler(const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[MEDIATOR_ACTIONS] [GET] called");
@@ -239,6 +240,9 @@ namespace SmartHome {
             co_return resultResponse;
         }
 
+        // Send sleep before request, to allow API to batch it together
+        sendSleepIfConfigured(moduleId, rtmParams[jp::MODULE_INFO]);
+
         resultResponse = co_await sendRequestToMediator(std::move(request), commandMetadata);
 
         // Send to db
@@ -327,6 +331,75 @@ namespace SmartHome {
         co_return requestResult;
     }
 
+    void MediatorActions::sendSleepIfConfigured(uint moduleId, const nlohmann::json &moduleInfo) {
+        Core::Instance().mpLogger->debug("[TEST] SLEEP");
+        const auto configOpt = Core::Instance().configCache().getModule(moduleId);
+        if (!configOpt.has_value()) return;
+        Core::Instance().mpLogger->debug("[TEST] SLEEP2");
+
+        const auto &config = configOpt->config;
+        if (!config.contains(cmck::SLEEP_AFTER_SEND) ||
+            !config.at(cmck::SLEEP_AFTER_SEND).is_boolean() ||
+            !config.at(cmck::SLEEP_AFTER_SEND))
+            return;
+        Core::Instance().mpLogger->debug("[TEST] SLEEP3");
+
+        uint sleepDurationMs = 0;
+        const auto nextScheduledRunTimePoint = Core::Instance().scheduler().getNextRunForModule(moduleId);
+        if (nextScheduledRunTimePoint.has_value()) {
+            sleepDurationMs = static_cast<uint>(
+                std::chrono::duration_cast<std::chrono::milliseconds>(nextScheduledRunTimePoint.value() -
+                                                                      std::chrono::system_clock::now()).count());
+        } else if (config.contains(cmck::DEFAULT_SLEEP_DURATION) &&
+                   config.at(cmck::DEFAULT_SLEEP_DURATION).is_number_integer()) {
+            sleepDurationMs = config.at(cmck::DEFAULT_SLEEP_DURATION).get<uint>();
+        } else { return; }
+        Core::Instance().mpLogger->debug("[TEST] SLEEP4");
+
+        if (sleepDurationMs == 0) return;
+        Core::Instance().mpLogger->debug("[TEST] SLEEP5");
+
+        std::string actionStr = Constants::MediatorTypes::SLEEP.data();
+        if (config.contains(cmck::POWER_SAVING) && config.at(cmck::POWER_SAVING).is_boolean() &&
+            config.at(cmck::POWER_SAVING)) {
+            actionStr = Constants::MediatorTypes::DEEP_SLEEP.data();
+        }
+
+        API::ApiRequest sleepNotification;
+        sleepNotification.method = API::getTargetMethodString(Constants::Targets::MODULE_MEDIATOR,
+                                                              Constants::Methods::EXECUTE);
+
+        API::InternalApi::Command command(sleepNotification);
+        auto &params = prepareRequestToMediator(sleepNotification, command);
+        params[jp::TYPE] = actionStr;
+        params[jp::ARGS] = nlohmann::json::array({sleepDurationMs});
+        params[jp::MODULE_INFO] = moduleInfo;
+
+        std::optional<connectionId_t> mediatorConnectionId;
+
+        // Find mediator connection, TODO add function for finding connection
+        {
+            std::scoped_lock lock(Actions::msConnectionTypeMapLock);
+            auto iter = Actions::msConnectionTypeMap.find(sai::TargetTypes::MODULE_MEDIATOR);
+            if (iter != Actions::msConnectionTypeMap.end() && !iter->second.empty()) {
+                mediatorConnectionId = *iter->second.begin();
+            }
+        }
+
+        if (!mediatorConnectionId.has_value()) {
+            return;
+        }
+        Core::Instance().mpLogger->debug("[TEST] SLEEP6");
+
+        const auto mediatorId = mediatorConnectionId.value();
+
+        ba::post(Core::Instance().coreWorkerIoContext(),
+                 [sleepRequest = std::move(sleepNotification), mediatorId]() mutable {
+                     Core::Instance().mpLogger->debug("[TEST] SLEEP7");
+                     Actions::handleOutgoingRequest(mediatorId, std::move(sleepRequest), nullptr);
+                 });
+    }
+
     nlohmann::json &MediatorActions::prepareRequestToMediator(API::ApiRequest &request,
                                                               const API::InternalApi::Command &command) {
         request.id = command.commandId;
@@ -343,26 +416,37 @@ namespace SmartHome {
                                                                  std::string &error) {
         nlohmann::json moduleInfo;
         auto module = Core::Instance().configCache().getModule(moduleId);
-        if (module.has_value() && module->config.contains(jmik::RF_CHANNEL)) {
+
+
+        if (module.has_value() &&
+            module->config.contains(cmck::CONNECTION) &&
+            module->config.at(cmck::CONNECTION).contains(jmik::RF_CHANNEL) &&
+            module->config.at(cmck::CONNECTION)[jmik::RF_CHANNEL].is_number_integer()) {
             Core::Instance().mpLogger->debugf(
                 "[MEDIATOR_ACTIONS] [GET_MODULE_INFO] Fetched module info from cache for module %u",
                 moduleId);
             moduleInfo[jmik::LOGIC_ADDRESS] = module->logicAddress;
-            moduleInfo[jmik::RF_CHANNEL] = module->config.at(jmik::RF_CHANNEL);
+            moduleInfo[cmck::CONNECTION] =
+                    module->config.at(cmck::CONNECTION);
         } else {
             moduleInfo = co_await DatabaseActions::getModuleAddressingInfo(moduleId);
         }
 
 
-        if (!moduleInfo.contains(jmik::LOGIC_ADDRESS) || !moduleInfo.contains(jmik::RF_CHANNEL)) {
-            if (moduleInfo.contains(jr::ERROR)) error = moduleInfo[jr::ERROR];
-            else error = "Failed to fetch module info from database: unknown error";
+        if (!moduleInfo.contains(jmik::LOGIC_ADDRESS) ||
+            !moduleInfo.contains(cmck::CONNECTION) ||
+            !moduleInfo[cmck::CONNECTION].contains(jmik::RF_CHANNEL)) {
+            if (moduleInfo.contains(jr::ERROR)) {
+                error = moduleInfo[jr::ERROR];
+            } else {
+                error = "Failed to fetch module info from database: unknown error";
+            }
             co_return false;
         }
 
         preparedParams[jp::MODULE_INFO] = nlohmann::json::object({
             {jmik::LOGIC_ADDRESS, moduleInfo.at(jmik::LOGIC_ADDRESS)},
-            {jmik::RF_CHANNEL, moduleInfo.at(jmik::RF_CHANNEL)},
+            {jmik::RF_CHANNEL, moduleInfo.at(cmck::CONNECTION).at(jmik::RF_CHANNEL)},
         });
 
         co_return true;

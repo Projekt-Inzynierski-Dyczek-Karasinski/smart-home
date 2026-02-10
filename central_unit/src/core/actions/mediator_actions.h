@@ -79,6 +79,7 @@ namespace SmartHome {
          */
         static awaitOptApiResponse mediatorPingHandler(const cmdMetaPtr &commandMetadata);
 
+
         /**
          * @brief Send mediator request to a specific module and await response.
          *
@@ -123,6 +124,13 @@ namespace SmartHome {
             std::optional<nlohmann::json> args;
         };
 
+        /**
+         * @brief Send sleep command to module via mediator if configured for the module.
+         *
+         * @param moduleId Target module identifier.
+         * @param moduleInfo Module information JSON containing addressing details.
+         */
+        static void sendSleepIfConfigured(uint moduleId, const nlohmann::json &moduleInfo);
 
         /**
          * @brief Prepare API request structure for mediator.

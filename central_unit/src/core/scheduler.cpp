@@ -102,6 +102,29 @@ namespace SmartHome {
         return mTaskQueue.size();
     }
 
+    std::optional<std::chrono::system_clock::time_point> Scheduler::getNextRunForModule(const uint moduleId) const {
+        std::scoped_lock lock(mMutex);
+
+        auto queueCopy = mTaskQueue;
+        std::optional<std::chrono::system_clock::time_point> earliest;
+
+        while (!queueCopy.empty()) {
+            const auto &task = queueCopy.top();
+
+            if (!task->removed) {
+                const auto sensor = mConfigCache.getSensor(task->sensorId);
+                if (sensor.has_value() && sensor->moduleId == moduleId) {
+                    earliest = task->nextRun;
+                    break;
+                }
+            }
+
+            queueCopy.pop();
+        }
+
+        return earliest;
+    }
+
     bool Scheduler::ScheduledTask::advanceToNext() {
         if (!rruleIterator) return false;
 
