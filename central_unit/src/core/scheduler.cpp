@@ -10,10 +10,11 @@ namespace SmartHome {
 
     Scheduler::Scheduler(ba::io_context &ioContext,
                          const ConfigCache &configCache,
-                         const std::shared_ptr<Utils::AsyncLogger> &logger) : mIoContext(ioContext),
-                                                                              mTimer(ioContext),
-                                                                              mConfigCache(configCache),
-                                                                              mpLogger(logger) {
+                         const std::shared_ptr<Utils::AsyncLogger> &logger)
+        : mIoContext(ioContext),
+          mTimer(ioContext),
+          mConfigCache(configCache),
+          mpLogger(logger) {
     }
 
     Scheduler::~Scheduler() {
