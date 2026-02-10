@@ -153,7 +153,7 @@ namespace SmartHome {
          *
          * @param params Request params JSON.
          *
-         * @return module id on success, API error on validation failure.
+         * @return Module id on success, API error on validation failure.
          */
         static ValidationResult<uint> requireModuleId(const nlohmann::json &params);
 
@@ -162,7 +162,7 @@ namespace SmartHome {
          *
          * @param params Request params JSON.
          *
-         * @return limit value on success, API error on validation failure.
+         * @return Limit value on success, API error on validation failure.
          */
         static ValidationResult<uint> requireLimitArg(const nlohmann::json &params);
 
@@ -171,7 +171,7 @@ namespace SmartHome {
          *
          * @param params Request params JSON.
          *
-         * @return sensor logic id on success, API error on validation failure.
+         * @return Sensor logic id on success, API error on validation failure.
          */
         static ValidationResult<uint> requireSensorLogicIdArg(const nlohmann::json &params);
 
@@ -182,7 +182,7 @@ namespace SmartHome {
          *
          * @param params Request params JSON.
          *
-         * @return resolved sensor id on success, API error on failure.
+         * @return Resolved sensor id on success, API error on failure.
          */
         static ValidationResult<uint> resolveSensorId(const nlohmann::json &params);
 
