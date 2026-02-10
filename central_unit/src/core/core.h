@@ -138,6 +138,11 @@ namespace SmartHome {
          */
         ReadingsCache &readingsCache();
 
+        /**
+         * @brief Scheduler getter.
+         *
+         * @return Reference to scheduler instance.
+         */
         Scheduler &scheduler() const;
 
         /**
