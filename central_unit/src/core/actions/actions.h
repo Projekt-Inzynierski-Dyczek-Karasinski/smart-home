@@ -98,10 +98,10 @@ namespace SmartHome {
             std::unordered_map<apiId_t, std::shared_ptr<std::promise<API::ApiResponse> > > requestsPromises;
             /// For aggregating request to send in batch
             std::shared_ptr<ba::steady_timer> sendTimer = std::make_shared<ba::steady_timer>(
-                Core::Instance().getCoreIoContext());
+                Core::Instance().coreIoContext());
             /// Request-level timeout timer
             std::shared_ptr<ba::steady_timer> timeoutTimer = std::make_shared<ba::steady_timer>(
-                Core::Instance().getCoreIoContext());
+                Core::Instance().coreIoContext());
         };
 
         /// Callback type for request completion notification
@@ -370,10 +370,10 @@ namespace SmartHome {
         static std::mutex msResponsesLock;
 
         static std::unordered_map<connectionId_t, sai::TargetTypes> msConnectionsMap;
-        static std::mutex msConnectionsMapLock;
+        static std::shared_mutex msConnectionsMapLock;
 
         static std::unordered_map<sai::TargetTypes, std::unordered_set<connectionId_t> > msConnectionTypeMap;
-        static std::mutex msConnectionTypeMapLock;
+        static std::shared_mutex msConnectionTypeMapLock;
 
         /// After not adding new messages to send for timeout duration, send aggregated batch message.
         static constexpr auto msAGGREGATE_OUTGOING_TIMEOUT = 10ms;

@@ -1,4 +1,5 @@
 #include "api.h"
+#include "../constants/constants.h"
 
 #include <atomic>
 #include <iostream>
@@ -312,10 +313,10 @@ namespace SmartHome::API {
 
     std::string getTargetMethodString(std::string_view target, std::string_view method) {
         if (target.empty()) {
-            target = "<undefined>";
+            target = Constants::Common::UNDEFINED_BRACKETS;
         }
         if (method.empty()) {
-            method = "<undefined>";
+            method = Constants::Common::UNDEFINED_BRACKETS;
         }
         return std::string(target) + "." + std::string(method);
     }
@@ -355,6 +356,8 @@ namespace SmartHome::API {
                 return "Mediator runtime error";
             case ErrorCodes::NOT_IMPLEMENTED:
                 return "Not implemented";
+            case ErrorCodes::NOT_FOUND:
+                return "Not found";
             case ErrorCodes::UNKNOWN_ERROR:
                 return "Unknown error";
             default:
@@ -485,9 +488,10 @@ namespace SmartHome::API {
     }
 
     apiId_t getNextApiId() {
-        static std::atomic<apiId_t> id = 0;
+        static std::atomic<apiId_t> id = 1;
         apiId_t expected = std::numeric_limits<apiId_t>::max(); // Wrap around check
-        if (id.compare_exchange_strong(expected, 0, std::memory_order::relaxed)) [[unlikely]] {
+        // Set to 1 after wrap around
+        if (id.compare_exchange_strong(expected, 1, std::memory_order::relaxed)) [[unlikely]] {
             return expected; // Return max value before wrap around
         }
         return id.fetch_add(1, std::memory_order::relaxed);

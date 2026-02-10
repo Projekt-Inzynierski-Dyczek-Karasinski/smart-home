@@ -1,10 +1,13 @@
 #include "database_api.h"
+#include "database_service.h"
+#include "constants.h"
 
 #include <set>
 
-#include "database_service.h"
 
 namespace SmartHomeDB {
+    namespace sc = SmartHome::Constants;
+
     void DatabaseApi::initialize(const std::function<void(const std::string &message)> &callback) {
         mCallback = callback;
     }
@@ -118,27 +121,27 @@ namespace SmartHomeDB {
 
         const auto methodLower = toLower(methodStr);
 
-        if (!params.contains(ak::TABLE_STR) || !params[ak::TABLE_STR].is_string()) {
+        if (!params.contains(sjp::TABLE) || !params[sjp::TABLE].is_string()) {
             throw std::runtime_error("Missing or invalid 'table' field");
         }
 
-        const std::string table = params[ak::TABLE_STR];
+        const std::string table = params[sjp::TABLE];
 
-        if (methodLower == ak::GET_STR) {
+        if (methodLower == sc::Methods::GET) {
             return buildSelectQuery(table, params);
         }
-        if (methodLower == ak::SET_STR) {
-            if (!params.contains(sk::WHERE_STR) && !params.contains(ak::VALUES_STR)) {
+        if (methodLower == sc::Methods::SET) {
+            if (!params.contains(sk::WHERE) && !params.contains(sjp::VALUES)) {
                 throw std::runtime_error("SET requires either 'where' (for UPDATE) or full 'values' (for INSERT)");
             }
 
-            if (params.contains(sk::WHERE_STR)) {
+            if (params.contains(sk::WHERE)) {
                 return buildUpdateQuery(table, params);
             }
 
             return buildInsertQuery(table, params);
         }
-        if (methodLower == ak::DELETE_STR) {
+        if (methodLower == sc::Methods::DELETE) {
             return buildDeleteQuery(table, params);
         }
 
@@ -331,45 +334,69 @@ namespace SmartHomeDB {
         mCallback(message);
     }
 
+    void DatabaseApi::handleIncomingDbTrigger(std::string &&triggerName, std::string &&triggerData) {
+        const auto pLogger = DatabaseService::Instance().pLogger;
+        pLogger->debugf("[DB_API] [HANDLE_DB_TRIGGER] Message: %s", triggerName.c_str());
+
+        sa::ApiRequest notification;
+        notification.method = "core.notify";
+
+        auto &params = notification.params.emplace(nlohmann::json::object());
+        params[sj::ParamsKeys::TYPE] = triggerName;
+
+        // Try to parse trigger data as JSON
+        if (nlohmann::json::accept(triggerData)) {
+            try {
+                params[sj::ParamsKeys::DATA] = nlohmann::json::parse(triggerData);
+            } catch (const std::exception &e) {
+                pLogger->errorf("[DB_API] Failed to parse trigger data JSON: %s", e.what());
+            }
+        }
+        // Fallback to raw string data
+        if (!params.contains(sj::ParamsKeys::DATA)) params[sj::ParamsKeys::DATA] = triggerData;
+
+        handleOutgoing(0, notification.to_string());
+    }
+
     DatabaseClient::DbQuery DatabaseApi::buildSelectQuery(const std::string &table, const nlohmann::json &params) {
         DatabaseClient::DbQuery query;
 
-        query.sql = toUpper(sk::SELECT_STR) + " ";
+        query.sql = toUpper(sk::SELECT) + " ";
 
-        if (params.contains(ak::AGGREGATES_STR) && params.contains(ak::COLUMNS_STR)) {
+        if (params.contains(sjp::AGGREGATES) && params.contains(sjp::COLUMNS)) {
             throw std::runtime_error("Cannot use both 'aggregates' and 'columns'");
         }
 
-        if (params.contains(ak::AGGREGATES_STR)) {
-            query.sql += buildAggregates(params[ak::AGGREGATES_STR]);
-        } else if (params.contains(ak::COLUMNS_STR)) {
-            query.sql += buildColumns(params[ak::COLUMNS_STR]);
+        if (params.contains(sjp::AGGREGATES)) {
+            query.sql += buildAggregates(params[sjp::AGGREGATES]);
+        } else if (params.contains(sjp::COLUMNS)) {
+            query.sql += buildColumns(params[sjp::COLUMNS]);
         } else {
-            query.sql += sk::WILDCARD_STR;
+            query.sql += sk::WILDCARD;
         }
 
-        query.sql += " " + toUpper(sk::FROM_STR) + " " + sqlIdentifier(table);
+        query.sql += " " + toUpper(sk::FROM) + " " + sqlIdentifier(table);
 
-        if (params.contains(ak::WHERE_STR)) {
+        if (params.contains(sjp::WHERE)) {
             int paramIndex = 1;
-            query.sql += " " + toUpper(sk::WHERE_STR);
-            query.sql += " " + buildWhereClause(params[ak::WHERE_STR], query.params, paramIndex);
+            query.sql += " " + toUpper(sk::WHERE);
+            query.sql += " " + buildWhereClause(params[sjp::WHERE], query.params, paramIndex);
         }
 
-        if (params.contains(ak::ORDER_BY_STR)) {
-            query.sql += " " + toUpper(sk::ORDER_BY_STR) + " " + buildOrderBy(params[ak::ORDER_BY_STR]);
+        if (params.contains(sjp::ORDER_BY)) {
+            query.sql += " " + toUpper(sk::ORDER_BY) + " " + buildOrderBy(params[sjp::ORDER_BY]);
         }
 
-        if (params.contains(ak::LIMIT_STR)) {
-            if (!params[ak::LIMIT_STR].is_number_integer()) {
+        if (params.contains(sjp::LIMIT)) {
+            if (!params[sjp::LIMIT].is_number_integer()) {
                 throw std::runtime_error("'limit' must be an integer");
             }
 
-            const int limit = params[ak::LIMIT_STR];
+            const int limit = params[sjp::LIMIT];
             if (limit < 0) {
                 throw std::runtime_error("'limit' must be non-negative");
             }
-            query.sql += " " + toUpper(sk::LIMIT_STR) + " " + std::to_string(limit);
+            query.sql += " " + toUpper(sk::LIMIT) + " " + std::to_string(limit);
         }
 
         const auto pLogger = DatabaseService::Instance().pLogger;
@@ -378,18 +405,18 @@ namespace SmartHomeDB {
     }
 
     DatabaseClient::DbQuery DatabaseApi::buildInsertQuery(const std::string &table, const nlohmann::json &params) {
-        if (!params.contains(ak::VALUES_STR) || !params[ak::VALUES_STR].is_object()) {
+        if (!params.contains(sjp::VALUES) || !params[sjp::VALUES].is_object()) {
             throw std::runtime_error("INSERT requires 'values' object");
         }
 
-        if (params[ak::VALUES_STR].empty()) {
+        if (params[sjp::VALUES].empty()) {
             throw std::runtime_error("'values' cannot be empty");
         }
 
         DatabaseClient::DbQuery query;
         int paramIndex = 1;
 
-        const auto &values = params[ak::VALUES_STR];
+        const auto &values = params[sjp::VALUES];
 
         std::vector<std::string> columns;
         std::vector<std::string> placeholders;
@@ -399,14 +426,14 @@ namespace SmartHomeDB {
             placeholders.push_back(addParam(value, query.params, paramIndex));
         }
 
-        query.sql = toUpper(sk::INSERT_INTO_STR) + " " + sqlIdentifier(table) + " (";
+        query.sql = toUpper(sk::INSERT_INTO) + " " + sqlIdentifier(table) + " (";
         query.sql += joinStrings(columns, ", ");
-        query.sql += ") " + toUpper(sk::VALUES_STR) + " (";
+        query.sql += ") " + toUpper(sk::VALUES) + " (";
         query.sql += joinStrings(placeholders, ", ");
         query.sql += ")";
 
-        if (params.contains(ak::RETURNING_STR)) {
-            query.sql += buildReturning(params[ak::RETURNING_STR]);
+        if (params.contains(sjp::RETURNING)) {
+            query.sql += buildReturning(params[sjp::RETURNING]);
         }
 
         const auto pLogger = DatabaseService::Instance().pLogger;
@@ -415,36 +442,36 @@ namespace SmartHomeDB {
     }
 
     DatabaseClient::DbQuery DatabaseApi::buildUpdateQuery(const std::string &table, const nlohmann::json &params) {
-        if (!params.contains(ak::VALUES_STR) || !params[ak::VALUES_STR].is_object()) {
+        if (!params.contains(sjp::VALUES) || !params[sjp::VALUES].is_object()) {
             throw std::runtime_error("UPDATE requires 'values' object");
         }
 
-        if (params[ak::VALUES_STR].empty()) {
+        if (params[sjp::VALUES].empty()) {
             throw std::runtime_error("'values' cannot be empty");
         }
 
-        if (!params.contains(ak::WHERE_STR)) {
+        if (!params.contains(sjp::WHERE)) {
             throw std::runtime_error("UPDATE requires 'where' object");
         }
 
         DatabaseClient::DbQuery query;
         int paramIndex = 1;
 
-        const auto &values = params[ak::VALUES_STR];
+        const auto &values = params[sjp::VALUES];
 
         std::vector<std::string> setParts;
         for (const auto &[key, value]: values.items()) {
             std::string placeholder = addParam(value, query.params, paramIndex);
-            setParts.push_back(sqlIdentifier(key) + " " + sk::EQUAL_STR.data() + " " + placeholder);
+            setParts.push_back(sqlIdentifier(key) + " " + sk::EQUAL.data() + " " + placeholder);
         }
 
-        query.sql = toUpper(sk::UPDATE_STR) + " " + sqlIdentifier(table) + " " + toUpper(sk::SET_STR) + " ";
+        query.sql = toUpper(sk::UPDATE) + " " + sqlIdentifier(table) + " " + toUpper(sk::SET) + " ";
         query.sql += joinStrings(setParts, ", ");
-        query.sql += " " + toUpper(sk::WHERE_STR);
-        query.sql += " " + buildWhereClause(params[ak::WHERE_STR], query.params, paramIndex);
+        query.sql += " " + toUpper(sk::WHERE);
+        query.sql += " " + buildWhereClause(params[sjp::WHERE], query.params, paramIndex);
 
-        if (params.contains(ak::RETURNING_STR)) {
-            query.sql += " " + buildReturning(params[ak::RETURNING_STR]);
+        if (params.contains(sjp::RETURNING)) {
+            query.sql += " " + buildReturning(params[sjp::RETURNING]);
         }
 
         const auto pLogger = DatabaseService::Instance().pLogger;
@@ -453,19 +480,19 @@ namespace SmartHomeDB {
     }
 
     DatabaseClient::DbQuery DatabaseApi::buildDeleteQuery(const std::string &table, const nlohmann::json &params) {
-        if (!params.contains(ak::WHERE_STR)) {
+        if (!params.contains(sjp::WHERE)) {
             throw std::runtime_error("DELETE requires 'where' object");
         }
 
         DatabaseClient::DbQuery query;
         int paramIndex = 1;
 
-        query.sql = toUpper(sk::DELETE_STR) + " " + toUpper(sk::FROM_STR) + " " + sqlIdentifier(table);
-        query.sql += " " + toUpper(sk::WHERE_STR);
-        query.sql += " " + buildWhereClause(params[ak::WHERE_STR], query.params, paramIndex);
+        query.sql = toUpper(sk::DELETE) + " " + toUpper(sk::FROM) + " " + sqlIdentifier(table);
+        query.sql += " " + toUpper(sk::WHERE);
+        query.sql += " " + buildWhereClause(params[sjp::WHERE], query.params, paramIndex);
 
-        if (params.contains(ak::RETURNING_STR)) {
-            query.sql += " " + buildReturning(params[ak::RETURNING_STR]);
+        if (params.contains(sjp::RETURNING)) {
+            query.sql += " " + buildReturning(params[sjp::RETURNING]);
         }
 
         const auto pLogger = DatabaseService::Instance().pLogger;
@@ -478,36 +505,36 @@ namespace SmartHomeDB {
             throw std::runtime_error("'$subselect' must be an object");
         }
 
-        if (!subSelect.contains(ak::TABLE_STR) || !subSelect[ak::TABLE_STR].is_string()) {
+        if (!subSelect.contains(sjp::TABLE) || !subSelect[sjp::TABLE].is_string()) {
             throw std::runtime_error("Subselect requires 'table' field");
         }
 
-        std::string sql = "(" + toUpper(sk::SELECT_STR) + " ";
+        std::string sql = "(" + toUpper(sk::SELECT) + " ";
 
-        if (subSelect.contains(ak::COLUMNS_STR)) {
-            sql += buildColumns(subSelect[ak::COLUMNS_STR]);
+        if (subSelect.contains(sjp::COLUMNS)) {
+            sql += buildColumns(subSelect[sjp::COLUMNS]);
         } else {
-            sql += sk::WILDCARD_STR;
+            sql += sk::WILDCARD;
         }
 
-        sql += " " + toUpper(sk::FROM_STR) + " " + sqlIdentifier(subSelect[ak::TABLE_STR]);
+        sql += " " + toUpper(sk::FROM) + " " + sqlIdentifier(subSelect[sjp::TABLE]);
 
-        if (subSelect.contains(ak::WHERE_STR)) {
-            sql += " " + toUpper(sk::WHERE_STR) + " " + buildWhereClause(subSelect[ak::WHERE_STR], params, paramIndex);
+        if (subSelect.contains(sjp::WHERE)) {
+            sql += " " + toUpper(sk::WHERE) + " " + buildWhereClause(subSelect[sjp::WHERE], params, paramIndex);
         }
 
-        if (subSelect.contains(ak::ORDER_BY_STR)) {
-            sql += " " + toUpper(sk::ORDER_BY_STR) + " " + buildOrderBy(subSelect[ak::ORDER_BY_STR]);
+        if (subSelect.contains(sjp::ORDER_BY)) {
+            sql += " " + toUpper(sk::ORDER_BY) + " " + buildOrderBy(subSelect[sjp::ORDER_BY]);
         }
 
-        if (subSelect.contains(ak::LIMIT_STR)) {
-            if (!subSelect[ak::LIMIT_STR].is_number_integer()) {
+        if (subSelect.contains(sjp::LIMIT)) {
+            if (!subSelect[sjp::LIMIT].is_number_integer()) {
                 throw std::runtime_error("Subselect 'limit' field must be an integer");
             }
-            sql += " " + toUpper(sk::LIMIT_STR) + " " + std::to_string(subSelect[ak::LIMIT_STR].get<int>());
+            sql += " " + toUpper(sk::LIMIT) + " " + std::to_string(subSelect[sjp::LIMIT].get<int>());
         } else {
             // By default, set limit on subselect to 1
-            sql += " " + toUpper(sk::LIMIT_STR) + " 1";
+            sql += " " + toUpper(sk::LIMIT) + " 1";
         }
 
         sql += ")";
@@ -526,7 +553,7 @@ namespace SmartHomeDB {
             std::string column = sqlIdentifier(key);
 
             if (value.is_null()) {
-                auto isNullStr = joinStrings({sk::IS_STR.data(), sk::NULL_STR.data()}, " ");
+                auto isNullStr = joinStrings({sk::IS.data(), sk::NULL_STR.data()}, " ");
                 conditions.push_back(column + " " + toUpper(isNullStr));
             } else if (value.is_object()) {
                 for (const auto &[op, val]: value.items()) {
@@ -535,9 +562,9 @@ namespace SmartHomeDB {
                     }
 
                     if (val.is_null()) {
-                        if (op == sk::NOT_EQUAL_STR) {
+                        if (op == sk::NOT_EQUAL) {
                             auto isNotNullStr = joinStrings(
-                                {sk::IS_STR.data(), sk::NOT_STR.data(), sk::NULL_STR.data()}, " ");
+                                {sk::IS.data(), sk::NOT.data(), sk::NULL_STR.data()}, " ");
                             conditions.push_back(column + " " + toUpper(isNotNullStr));
                         } else {
                             throw std::runtime_error("Only '!=' operator allowed with NULL");
@@ -556,7 +583,7 @@ namespace SmartHomeDB {
                 const std::string placeholder = addParam(value, params, paramIndex);
                 std::string condition = column;
                 condition += " ";
-                condition += sk::EQUAL_STR.data();
+                condition += sk::EQUAL.data();
                 condition += " ";
                 condition += placeholder;
                 conditions.push_back(std::move(condition));
@@ -564,7 +591,7 @@ namespace SmartHomeDB {
         }
 
         // TODO consider rework to implement OR operator
-        return joinStrings(conditions, " "s + sk::AND_STR.data() + " ");
+        return joinStrings(conditions, " "s + sk::AND.data() + " ");
     }
 
     std::string DatabaseApi::buildColumns(const nlohmann::json &columns) {
@@ -602,8 +629,8 @@ namespace SmartHomeDB {
 
             auto colStr = column.get<std::string>();
 
-            if (colStr == sk::WILDCARD_STR) {
-                if (func != sk::COUNT_STR) {
+            if (colStr == sk::WILDCARD) {
+                if (func != sk::COUNT) {
                     throw std::runtime_error("Only COUNT function can use '*'");
                 }
                 parts.push_back(toUpper(func) + "(*)");
@@ -628,19 +655,19 @@ namespace SmartHomeDB {
                 throw std::runtime_error("'order_by' items must be objects");
             }
 
-            if (!item.contains(ak::COLUMN_STR) || !item[ak::COLUMN_STR].is_string()) {
+            if (!item.contains(sjp::COLUMN) || !item[sjp::COLUMN].is_string()) {
                 throw std::runtime_error("'order_by' items must have 'column' field");
             }
 
-            const std::string column = sqlIdentifier(item[ak::COLUMN_STR].get<std::string>());
-            std::string order = toUpper(sk::ASC_STR); // default ascending
+            const std::string column = sqlIdentifier(item[sjp::COLUMN].get<std::string>());
+            std::string order = toUpper(sk::ASC); // default ascending
 
-            if (item.contains(ak::ORDER_STR)) {
-                if (!item[ak::ORDER_STR].is_string()) {
+            if (item.contains(sjp::ORDER)) {
+                if (!item[sjp::ORDER].is_string()) {
                     throw std::runtime_error("'order' must be a string");
                 }
-                order = toUpper(item[ak::ORDER_STR].get<std::string>());
-                if (order != toUpper(sk::ASC_STR) && order != toUpper(sk::DESC_STR)) {
+                order = toUpper(item[sjp::ORDER].get<std::string>());
+                if (order != toUpper(sk::ASC) && order != toUpper(sk::DESC)) {
                     throw std::runtime_error("'order' must be 'DESC' or 'ASC'");
                 }
             }
@@ -655,10 +682,10 @@ namespace SmartHomeDB {
     }
 
     std::string DatabaseApi::buildReturning(const nlohmann::json &returning) {
-        std::string result = " " + toUpper(sk::RETURNING_STR) + " ";
+        std::string result = " " + toUpper(sk::RETURNING) + " ";
 
-        if (returning.is_string() && returning == sk::WILDCARD_STR) {
-            result += sk::WILDCARD_STR;
+        if (returning.is_string() && returning == sk::WILDCARD) {
+            result += sk::WILDCARD;
         } else if (returning.is_array()) {
             result += buildColumns(returning);
         } else {
@@ -670,8 +697,8 @@ namespace SmartHomeDB {
 
     std::string DatabaseApi::addParam(const nlohmann::json &value, pqxx::params &params, int &paramIndex) {
         // Handle special case - subselect
-        if (value.is_object() && value.contains(ak::SUBSELECT_STR)) {
-            return buildSubSelect(value[ak::SUBSELECT_STR], params, paramIndex);
+        if (value.is_object() && value.contains(sjp::SUBSELECT)) {
+            return buildSubSelect(value[sjp::SUBSELECT], params, paramIndex);
         }
 
         std::string placeholder = "$" + std::to_string(paramIndex++);

@@ -27,6 +27,7 @@ target_link_libraries(smarthome-mediator PRIVATE
         smarthome::api
         smarthome::utility
         smarthome::logger
+        smarthome::constants
         Boost::program_options
         Boost::system
         PkgConfig::GPIOD

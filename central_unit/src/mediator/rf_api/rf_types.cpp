@@ -1,9 +1,11 @@
 #include "rf_types.h"
+#include "constants.h"
 
 #include <boost/algorithm/string/case_conv.hpp>
 
 namespace SmartHomeMediator::RfTypes {
     namespace sj = SmartHome::JsonRpcStrings;
+    namespace sc = SmartHome::Constants;
 
 
     Packet Packet::from_bytes(const std::span<const uint8_t> data) {
@@ -402,30 +404,30 @@ namespace SmartHomeMediator::RfTypes {
     std::string_view getStringFromRfErrorCode(const RfErrorCode code) {
         switch (code) {
             case RfErrorCode::UNKNOWN:
-                return "Unknown error";
+                return sc::HumanReadableErrors::UNKNOWN_ERROR;
             case RfErrorCode::BAD_COMMAND:
-                return "Bad command";
+                return sc::HumanReadableErrors::BAD_COMMAND;
             case RfErrorCode::UNKNOWN_COMMAND:
-                return "Unknown command";
+                return sc::HumanReadableErrors::UNKNOWN_COMMAND;
             case RfErrorCode::BAD_ARGUMENT:
-                return "Bad argument";
+                return sc::HumanReadableErrors::BAD_ARGUMENT;
             case RfErrorCode::NOT_IMPLEMENTED:
-                return "Not implemented";
+                return sc::HumanReadableErrors::NOT_IMPLEMENTED;
             case RfErrorCode::INTERNAL_ERROR:
-                return "Internal error";
+                return sc::HumanReadableErrors::INTERNAL_ERROR;
             default:
-                return "Undefined error";
+                return sc::HumanReadableErrors::UNDEFINED_ERROR;
         }
     }
 
     GetType getTypeFromString(const std::string_view value) {
         static const std::unordered_map<std::string_view, GetType> strToGetMap{
-            {SENSOR_VALUE_STRING, GetType::SENSOR_VALUE},
-            {CONFIG_OPTION_STRING, GetType::CONFIG_OPTION},
-            {SENSOR_LIST_STRING, GetType::SENSOR_LIST},
-            {LOGS_STRING, GetType::LOGS},
-            {BATTERY_LEVEL_STRING, GetType::BATTERY_LEVEL},
-            {FORCE_READ_SENSOR_VALUE_STRING, GetType::FORCE_READ_SENSOR_VALUE}
+            {sc::MediatorTypes::SENSOR_VALUE, GetType::SENSOR_VALUE},
+            {sc::MediatorTypes::CONFIG_OPTION, GetType::CONFIG_OPTION},
+            {sc::MediatorTypes::SENSOR_LIST, GetType::SENSOR_LIST},
+            {sc::MediatorTypes::MODULE_LOGS, GetType::LOGS},
+            {sc::MediatorTypes::BATTERY_LEVEL, GetType::BATTERY_LEVEL},
+            {sc::MediatorTypes::FORCE_READ_SENSOR_VALUE, GetType::FORCE_READ_SENSOR_VALUE}
         };
 
         const auto iter = strToGetMap.find(boost::algorithm::to_lower_copy(std::string(value)));
@@ -434,9 +436,9 @@ namespace SmartHomeMediator::RfTypes {
 
     SetType setTypeFromString(const std::string_view value) {
         static const std::unordered_map<std::string_view, SetType> strToSetMap{
-            {CONFIG_OPTION_STRING, SetType::CONFIG_OPTION},
-            {TOGGLE_ACTUATOR_STRING, SetType::TOGGLE_ACTUATOR},
-            {SET_ACTUATOR_VALUE_STRING, SetType::SET_ACTUATOR_VALUE}
+            {sc::MediatorTypes::CONFIG_OPTION, SetType::CONFIG_OPTION},
+            {sc::MediatorTypes::TOGGLE_ACTUATOR, SetType::TOGGLE_ACTUATOR},
+            {sc::MediatorTypes::SET_ACTUATOR_VALUE, SetType::SET_ACTUATOR_VALUE}
         };
 
         const auto iter = strToSetMap.find(boost::algorithm::to_lower_copy(std::string(value)));
@@ -445,10 +447,10 @@ namespace SmartHomeMediator::RfTypes {
 
     NotificationType notificationTypeFromString(const std::string_view value) {
         static const std::unordered_map<std::string_view, NotificationType> strToNotifMap{
-            {MANUAL_TRIGGER_STRING, NotificationType::MANUAL_TRIGGER},
-            {POWER_LOSS_STRING, NotificationType::POWER_LOSS},
-            {ALERT_STRING, NotificationType::ALERT},
-            {WAKE_STRING, NotificationType::WAKE}
+            {sc::MediatorTypes::MANUAL_TRIGGER, NotificationType::MANUAL_TRIGGER},
+            {sc::MediatorTypes::POWER_LOSS, NotificationType::POWER_LOSS},
+            {sc::MediatorTypes::ALERT, NotificationType::ALERT},
+            {sc::MediatorTypes::WAKE, NotificationType::WAKE}
         };
 
         const auto iter = strToNotifMap.find(boost::algorithm::to_lower_copy(std::string(value)));
@@ -458,15 +460,15 @@ namespace SmartHomeMediator::RfTypes {
     std::string_view notificationTypeToString(const NotificationType value) {
         switch (value) {
             case NotificationType::MANUAL_TRIGGER:
-                return MANUAL_TRIGGER_STRING;
+                return sc::MediatorTypes::MANUAL_TRIGGER;
             case NotificationType::POWER_LOSS:
-                return POWER_LOSS_STRING;
+                return sc::MediatorTypes::POWER_LOSS;
             case NotificationType::ALERT:
-                return ALERT_STRING;
+                return sc::MediatorTypes::ALERT;
             case NotificationType::WAKE:
-                return WAKE_STRING;
+                return sc::MediatorTypes::WAKE;
             default:
-                return UNDEFINED_STRING;
+                return sc::Common::UNDEFINED;
         }
     }
 

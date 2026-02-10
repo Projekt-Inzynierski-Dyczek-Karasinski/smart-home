@@ -1,12 +1,17 @@
 #include "core.h"
 #include "config_manager/config_manager.h"
 #include "actions/actions.h"
+#include "actions/database_actions.h"
+#include "constants.h"
+
 
 #include <chrono>
 #include <cmath>
 #include <iostream>
 
 #include <boost/asio.hpp>
+
+#include "actions/core_actions.h"
 
 namespace ba = boost::asio;
 namespace bai = boost::asio::ip;
@@ -27,7 +32,8 @@ namespace SmartHome {
         // Initialize AsyncLogger, using Logger for further initialization
         mpLogger = std::make_shared<Utils::AsyncLogger>(logger, mCoreUtilityIoContext);
 
-        mpService = Utils::ServiceManager::create(logger, ms_ServiceName, Utils::ServiceType::AUTO);
+        mpService = Utils::ServiceManager::create(logger, Constants::DefaultServiceNames::CORE,
+                                                  Utils::ServiceType::AUTO);
         mpService->setIoContext(mCoreIoContext);
 
         if (!mpService->onInitialize()) {
@@ -145,83 +151,161 @@ namespace SmartHome {
         }
         socketServer.runSocketServer();
 
-        //TODO implement watchdog working in CoreThread
-        mCoreThreadPool->join();
-        mCoreThreadPool.reset();
+        // Fetch initial config from database to populate cache
+        ba::co_spawn(mCoreIoContext, [this]() -> ba::awaitable<void> {
+            const auto target = sai::Target(sai::TargetTypes::DATABASE);
+            ba::steady_timer retryTimer(co_await ba::this_coro::executor);
 
-        mpLogger->debug("[CORE] Exiting");
-        stopCoreUtilityThread();
-    }
+            // Delay before first check to allow database service to start and register connection
+            retryTimer.expires_after(5s);
+            co_await retryTimer.async_wait(ba::use_awaitable);
 
-    void Core::shutdown() {
-        // FIXME rework shutdown - implement shutdown from db-service
-        //TODO add is shutting down check
-        mpLogger->debug("[CORE] Starting core shutdown");
+            if (!CoreActions::findConnections(target.to_string()).has_value()) {
+                mpLogger->warning("[CORE] No database service connection found on startup, entering retry loop...");
 
-        // Signal and initialize shutdown
-        mIsRunning.store(false);
-        auto &ipcServer = IPC::SocketServer::Instance();
-        ipcServer.stopAcceptors();
-
-        Actions::onCoreShutdown();
-
-        // Start shutdown timeout timer
-        auto shutdownTimeout = make_shared<ba::steady_timer>(mCoreUtilityIoContext, ms_SHUTDOWN_TIMEOUT);
-        shutdownTimeout->async_wait([this, shutdownTimeout](const bs::error_code &ec) {
-            if (!ec) {
-                mCoreWorkerThreadPool->stop();
-                mCoreThreadPool->stop();
-                mSocketServerThreadPool->stop();
+                while (mIsRunning && !CoreActions::findConnections(target.to_string()).has_value()) {
+                    mpLogger->debug(
+                        "[CORE] No database service connection found, retrying in 5 seconds...");
+                    retryTimer.expires_after(5s);
+                    co_await retryTimer.async_wait(ba::use_awaitable);
+                }
             }
-        });
 
-        // Join worker thread
-        mCoreWorkerGuard.reset();
-        mCoreWorkerThreadPool->join();
+            co_await DatabaseActions::fetchAllConfigs();
 
-        // Disable core thread guard for later join
-        mCoreGuard->reset();
+            // Start scheduler after populating cache
+            mpScheduler = std::make_unique<Scheduler>(mCoreIoContext, mConfigCache, mpLogger);
+            mpScheduler->loadFromCache();
+            mpScheduler->start();
 
-        // Stop IPC server
-        if (mConfig.tcp.isEnabled || mConfig.uds.isEnabled) {
-            mpLogger->debug("[CORE] Shutting down IPC socket server");
-            if (ipcServer.isRunning()) {
-                ipcServer.stopSocketServer();
-            }
+            co_return;
+        }, ba::detached);
+
+        mpLogger->info("[CORE] Core running");
+
+        if (mCoreThreadPool) {
+            mCoreThreadPool->join();
+            mCoreThreadPool.reset();
         }
 
-        // Waiting for IPC server threads to finish
-        if (mSocketServerThreadPool.has_value()) {
-            mSocketServerGuard.reset();
+        mpLogger->debug("[CORE] Core main threads finished");
+
+        // Join worker threads
+        if (mCoreWorkerThreadPool) {
+            mCoreWorkerThreadPool->join();
+            mCoreWorkerThreadPool.reset();
+        }
+
+        mpLogger->debug("[CORE] Worker threads finished");
+
+        // Join socket server threads
+        if (mSocketServerThreadPool) {
             mSocketServerThreadPool->join();
             mSocketServerThreadPool.reset();
         }
 
-        mpService->onStop();
-        mpService.reset();
+        mpLogger->debug("[CORE] Socket server threads finished, stopping utilities");
 
-        // Stop handling signals
+        // Stop utility context last (handles logging, timeout timers)
+        if (!mCoreUtilityIoContext.stopped()) {
+            mCoreUtilityIoContext.stop();
+        }
+
+        if (mCoreUtilityThread && mCoreUtilityThread->joinable()) {
+            mCoreUtilityThread->join();
+            mCoreUtilityThread.reset();
+        }
+
+        mpLogger->debug("[CORE] Exiting");
+    }
+
+    void Core::shutdown() {
+        mpLogger->info("[CORE] Shutdown requested");
+
+        bool expected = true;
+        if (!mIsRunning.compare_exchange_strong(expected, false)) {
+            mpLogger->error("[CORE] Shutdown called while core is not running");
+            return;
+        }
+
+        // Stop accepting new connections
+        auto &ipcServer = IPC::SocketServer::Instance();
+        ipcServer.stopAcceptors();
+
+        // Stop scheduler
+        mpScheduler.reset();
+
+        // Cancel active requests/commands
+        Actions::onCoreShutdown();
+
+        // Release all work guards — let io_contexts drain naturally
+        mCoreWorkerGuard.reset();
+        mCoreGuard.reset();
+        mSocketServerGuard.reset();
+
+        // Shutdown timeout as safety net
+        const auto timeoutTimer = std::make_shared<ba::steady_timer>(mCoreUtilityIoContext, ms_SHUTDOWN_TIMEOUT);
+        timeoutTimer->async_wait([this, timeoutTimer](const bs::error_code &ec) {
+            if (!ec) {
+                mpLogger->warning("[CORE] Shutdown timeout - force stopping IO contexts");
+                if (!mCoreWorkerIoContext.stopped()) mCoreWorkerIoContext.stop();
+                if (!mCoreIoContext.stopped()) mCoreIoContext.stop();
+                if (!mSocketServerIoContext.stopped()) mSocketServerIoContext.stop();
+            }
+        });
+
+        // Stop IPC server
+        if (ipcServer.isRunning()) {
+            mpLogger->debug("[CORE] Shutting down IPC socket server");
+            ipcServer.stopSocketServer();
+        }
+
+        // Cancel signals
         if (mSignals.has_value()) {
             mSignals->cancel();
             mSignals.reset();
         }
 
-        mpLogger->debug("[CORE] Shutdown complete");
+        // Stop service manager
+        if (mpService) {
+            mpService->onStop();
+            mpService.reset();
+        }
+
+        // Reset shared objects
+        mpApi.reset();
+
+        mpLogger->debug("[CORE] Shutdown complete - waiting for threads to join in run()");
+
+        // Reset utility guard so timeout timer can also finish
+        mCoreUtilityGuard.reset();
     }
 
     bool Core::isRunning() const {
         return mIsRunning.load();
     }
 
-    ba::io_context &Core::getCoreUtilityIoContext() {
+    ConfigCache &Core::configCache() {
+        return mConfigCache;
+    }
+
+    ReadingsCache &Core::readingsCache() {
+        return mReadingsCache;
+    }
+
+    Scheduler &Core::scheduler() const {
+        return *mpScheduler;
+    }
+
+    ba::io_context &Core::coreUtilityIoContext() {
         return mCoreUtilityIoContext;
     }
 
-    ba::io_context &Core::getCoreWorkerIoContext() {
+    ba::io_context &Core::coreWorkerIoContext() {
         return mCoreWorkerIoContext;
     }
 
-    ba::io_context &Core::getCoreIoContext() {
+    ba::io_context &Core::coreIoContext() {
         return mCoreIoContext;
     }
 
@@ -229,9 +313,51 @@ namespace SmartHome {
     Core::Core() = default;
 
     Core::~Core() {
-        // FIXME rework shutdown - implement shutdown from db-service
-        if (mIsRunning.load()) {
+        if (isRunning()) {
             shutdown();
+            return;
+        }
+
+        // Cleanup after failed initialization
+        if (!isRunning() && !mIsInitialized.load(std::memory_order_acquire)) {
+            if (mpLogger) mpLogger->warning("[CORE] Running cleanup after failed initialization");
+
+            if (mSignals.has_value()) {
+                mSignals->cancel();
+                mSignals.reset();
+            }
+
+            if (mpService) {
+                mpService->onStop();
+                mpService.reset();
+            }
+
+            mCoreGuard.reset();
+            mCoreWorkerGuard.reset();
+            mSocketServerGuard.reset();
+            mCoreUtilityGuard.reset();
+
+            if (!mCoreIoContext.stopped()) mCoreIoContext.stop();
+            if (!mCoreWorkerIoContext.stopped()) mCoreWorkerIoContext.stop();
+            if (!mSocketServerIoContext.stopped()) mSocketServerIoContext.stop();
+            if (!mCoreUtilityIoContext.stopped()) mCoreUtilityIoContext.stop();
+
+            if (mCoreThreadPool) {
+                mCoreThreadPool->join();
+                mCoreThreadPool.reset();
+            }
+            if (mCoreWorkerThreadPool) {
+                mCoreWorkerThreadPool->join();
+                mCoreWorkerThreadPool.reset();
+            }
+            if (mSocketServerThreadPool) {
+                mSocketServerThreadPool->join();
+                mSocketServerThreadPool.reset();
+            }
+            if (mCoreUtilityThread && mCoreUtilityThread->joinable()) {
+                mCoreUtilityThread->join();
+                mCoreUtilityThread.reset();
+            }
         }
     }
 

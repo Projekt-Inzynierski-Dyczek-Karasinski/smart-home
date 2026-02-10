@@ -22,8 +22,10 @@ namespace SmartHome {
         configManager.getValue(root + ".path", config.logFile.path);
     }
 
-    void loadYamlConfigs(Utils::ConfigManager &configManager, Core::Config &coreConfig,
-                         MediatorConfig &mediatorConfig) {
+    void loadYamlConfigs(Utils::ConfigManager &configManager,
+                         Core::Config &coreConfig,
+                         MediatorConfig &mediatorConfig,
+                         DbServiceConfig &dbServiceConfig) {
         // Mediator config
         std::string root = "services.mediator";
         configManager.getValue(root + ".enabled", mediatorConfig.isEnabled);
@@ -31,6 +33,14 @@ namespace SmartHome {
             configManager.getValue<std::string>(root + ".service_type").value());
         configManager.getValue(root + ".exec_path", mediatorConfig.execPath);
         configManager.getValue(root + ".config_path", mediatorConfig.configPath);
+
+        // Db-service config
+        root = "services.db-service";
+        configManager.getValue(root + ".enabled", dbServiceConfig.isEnabled);
+        dbServiceConfig.serviceType = Utils::resolveServiceType(
+            configManager.getValue<std::string>(root + ".service_type").value());
+        configManager.getValue(root + ".exec_path", dbServiceConfig.execPath);
+        configManager.getValue(root + ".config_path", dbServiceConfig.configPath);
 
         // Core config
         root = "core";
@@ -72,7 +82,8 @@ namespace SmartHome {
                      const bpo::parsed_options &parsed,
                      const std::shared_ptr<Utils::Logger> &logger,
                      Core::Config &coreConfig,
-                     MediatorConfig &mediatorConfig) {
+                     MediatorConfig &mediatorConfig,
+                     DbServiceConfig &dbServiceConfig) {
         loggerTemporaryOptions logTmpOpt;
 
         // Set temporary logger config based on program options and default values before reading YAML config
@@ -102,16 +113,16 @@ namespace SmartHome {
         // Load YAML config
         auto configManager = Utils::ConfigManager(logger);
         Utils::Logger::Config loggerConfig;
-        loggerConfig.logFile.path = s_DEFAULT_LOGFILE_PATH;
+        loggerConfig.logFile.path = std::string{Constants::DefaultPaths::CORE_LOGFILE};
         const std::string configPath = vm.contains("config")
                                            ? vm["config"].as<std::string>()
-                                           : s_DEFAULT_CONFIG_PATH.data();
+                                           : std::string{Constants::DefaultPaths::CORE_CONFIG};
         if (configManager.loadConfig(configPath)) {
             logger->debug("[MAIN_CORE] Loading YAML logger config");
             loadLoggerYamlConfig(configManager, loggerConfig);
 
             logger->debug("[MAIN_CORE] Loading YAML core config");
-            loadYamlConfigs(configManager, coreConfig, mediatorConfig);
+            loadYamlConfigs(configManager, coreConfig, mediatorConfig, dbServiceConfig);
         } else {
             logger->error("[MAIN_CORE] Could not load YAML config");
         }
@@ -120,6 +131,57 @@ namespace SmartHome {
 
         logger->applyConfig(loggerConfig);
         logger->debug("[MAIN_CORE] Smarthome configured");
+    }
+
+    bool runProcess(const std::shared_ptr<Utils::Logger> &logger,
+                    const std::string_view processName,
+                    const ProcessConfig &processConfig,
+                    bp::child &process) {
+        logger->debugf("[MAIN_CORE] Launching %s", processName.data());
+        switch (processConfig.serviceType) {
+            default:
+            case Utils::ServiceType::AUTO:
+            case Utils::ServiceType::STANDALONE: {
+                if (std::filesystem::exists(processConfig.execPath)) {
+                    logger->infof("[MAIN_CORE] Starting %s in STANDALONE mode", processName.data());
+                    process = bp::child(processConfig.execPath.data(), "--config", processConfig.configPath.data());
+                    return true;
+                }
+
+                logger->errorf("[MAIN_CORE] Could not find %s executable", processName.data());
+                return false;
+            }
+            case Utils::ServiceType::SYSTEMD: {
+                logger->infof("[MAIN_CORE] Starting %s in SYSTEMD mode - waiting for service to be ready",
+                              processName.data());
+                bool isRunning = false;
+
+                for (int attempt = 1; attempt <= s_MAX_RETRIES; ++attempt) {
+                    const int ret = std::system(
+                        ("systemctl is-active --quiet " + std::string(processName) + ".service").c_str());
+                    if (ret == 0) {
+                        logger->infof("[MAIN_CORE] %s service is running", processName.data());
+                        isRunning = true;
+                        break;
+                    }
+
+                    if (attempt < s_MAX_RETRIES) {
+                        logger->debugf("[MAIN_CORE] %s not ready yet, retry %d/%d",
+                                       processName.data(),
+                                       attempt,
+                                       s_MAX_RETRIES);
+                        std::this_thread::sleep_for(s_RETRY_DELAY);
+                    }
+                }
+
+                if (!isRunning) {
+                    logger->warningf("[MAIN_CORE] %s service did not start within timeout", processName.data());
+                    logger->infof("[MAIN_CORE] Check status: sudo systemctl status %s.service", processName.data());
+                    return false;
+                }
+                return true;
+            }
+        }
     }
 }
 
@@ -165,14 +227,14 @@ int main(int argc, char *argv[]) {
 
     // Define instances
     auto &core = Core::Instance();
-    bp::child mediator;
     auto logger = std::make_shared<Utils::Logger>();
 
     // Define config structs with default values
     Core::Config coreConfig;
     MediatorConfig mediatorConfig;
+    DbServiceConfig dbServiceConfig;
 
-    loadConfigs(vm, parsed, logger, coreConfig, mediatorConfig);
+    loadConfigs(vm, parsed, logger, coreConfig, mediatorConfig, dbServiceConfig);
 
     // Initialize Core
     logger->debug("[MAIN_CORE] Initializing Core...");
@@ -186,44 +248,21 @@ int main(int argc, char *argv[]) {
     // TODO launch gui if in gui mode
 
     // Launch mediator if enabled
+    bp::child mediator;
     if (mediatorConfig.isEnabled) {
-        logger->debug("[MAIN_CORE] Initializing Mediator...");
-        switch (mediatorConfig.serviceType) {
-            default:
-            case Utils::ServiceType::AUTO:
-            case Utils::ServiceType::STANDALONE:
-                if (std::filesystem::exists(mediatorConfig.execPath)) {
-                    logger->info("[MAIN_CORE] Starting Mediator in STANDALONE mode");
-                    mediator = bp::child(mediatorConfig.execPath, "--config", mediatorConfig.configPath);
-                } else {
-                    logger->error("[MAIN_CORE] Could not find mediator executable");
-                }
-                break;
-            case Utils::ServiceType::SYSTEMD:
-                logger->info("[MAIN_CORE] Mediator in SYSTEMD mode - waiting for service to be ready"); {
-                    bool isRunning = false;
+        if (runProcess(logger, "smarthome-radiod", mediatorConfig, mediator)) {
+            logger->info("[MAIN_CORE] Mediator launched successfully");
+        } else {
+            logger->error("[MAIN_CORE] Failed to launch mediator");
+        }
+    }
 
-                    for (int attempt = 1; attempt <= s_MAX_RETRIES; ++attempt) {
-                        int ret = std::system("systemctl is-active --quiet smarthome-mediator.service");
-                        if (ret == 0) {
-                            logger->info("[MAIN_CORE] Mediator service is running");
-                            isRunning = true;
-                            break;
-                        }
-
-                        if (attempt < s_MAX_RETRIES) {
-                            logger->debugf("[MAIN_CORE] Mediator not ready yet, retry %d/%d", attempt, s_MAX_RETRIES);
-                            std::this_thread::sleep_for(s_RETRY_DELAY);
-                        }
-                    }
-
-                    if (!isRunning) {
-                        logger->warning("[MAIN_CORE] Mediator service did not start within timeout");
-                        logger->warning("[MAIN_CORE] RF features will be unavailable");
-                        logger->info("[MAIN_CORE] Check status: sudo systemctl status smarthome-mediator.service");
-                    }
-                    break;
-                }
+    bp::child dbService;
+    if (dbServiceConfig.isEnabled) {
+        if (runProcess(logger, "smarthome-databased", dbServiceConfig, dbService)) {
+            logger->info("[MAIN_CORE] Database service launched successfully");
+        } else {
+            logger->error("[MAIN_CORE] Failed to launch database service");
         }
     }
 
@@ -234,7 +273,7 @@ int main(int argc, char *argv[]) {
 
 
     // Wait for mediator to exit if enabled
-    if (mediatorConfig.isEnabled && mediator) {
+    if (mediator) {
         logger->debug("[MAIN_CORE] Waiting for mediator shutdown");
         if (mediatorConfig.serviceType == Utils::ServiceType::STANDALONE) {
             mediator.terminate(); //SIGTERM
@@ -244,6 +283,18 @@ int main(int argc, char *argv[]) {
             }
         } else if (mediatorConfig.serviceType == Utils::ServiceType::SYSTEMD) {
             logger->debug("[MAIN_CORE] Mediator in SYSTEMD mode - not stopping (managed by systemd)");
+        }
+    }
+    if (dbService) {
+        logger->debug("[MAIN_CORE] Waiting for db-service shutdown");
+        if (dbServiceConfig.serviceType == Utils::ServiceType::STANDALONE) {
+            dbService.terminate(); //SIGTERM
+            if (!dbService.wait_for(15s)) {
+                kill(dbService.id(), SIGKILL);
+                dbService.wait();
+            }
+        } else if (dbServiceConfig.serviceType == Utils::ServiceType::SYSTEMD) {
+            logger->debug("[MAIN_CORE] Db-service in SYSTEMD mode - not stopping (managed by systemd)");
         }
     }
 

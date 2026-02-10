@@ -33,6 +33,27 @@ namespace SmartHome::JsonRpcStrings {
         inline constexpr std::string_view MODULE_ID = "module_id";
         inline constexpr std::string_view TYPE = "type";
         inline constexpr std::string_view ARGS = "args";
+        inline constexpr std::string_view DATA = "data";
+        inline constexpr std::string_view FORCE = "force";
+
+        // Database API specific keys
+        // Request parameter keys for database operations
+        inline constexpr std::string_view SUBSELECT = "$subselect";
+        inline constexpr std::string_view TABLE = "table";
+        inline constexpr std::string_view COLUMNS = "columns";
+        inline constexpr std::string_view COLUMN = "column";
+        inline constexpr std::string_view AGGREGATES = "aggregates";
+        inline constexpr std::string_view WHERE = "where";
+        inline constexpr std::string_view ORDER_BY = "order_by";
+        inline constexpr std::string_view ORDER = "order";
+        inline constexpr std::string_view LIMIT = "limit";
+        inline constexpr std::string_view VALUES = "values";
+        inline constexpr std::string_view RETURNING = "returning";
+
+        // Result keys for database query responses
+        inline constexpr std::string_view AFFECTED_ROWS = "affected_rows";
+        inline constexpr std::string_view ROWS = "rows";
+        inline constexpr std::string_view ERROR = "error";
     }
 
     namespace ModuleInfoKeys {
@@ -157,6 +178,7 @@ namespace SmartHome::API {
         MEDIATOR_COMMUNICATION_ERROR = -32002,
         MEDIATOR_RUNTIME_ERROR = -32003,
         NOT_IMPLEMENTED = -32004,
+        NOT_FOUND = -32005,
     };
 
     /**
@@ -427,6 +449,8 @@ namespace SmartHome::API {
      * @brief Get next unique API identifier.
      *
      * @return Next unique API identifier.
+     *
+     * @note Starts from 1, and wraps around to 1 after reaching maximum value of apiId_t.
      */
     apiId_t getNextApiId();
 

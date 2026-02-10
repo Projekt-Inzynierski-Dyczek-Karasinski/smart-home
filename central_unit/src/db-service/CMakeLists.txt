@@ -9,9 +9,9 @@ include(FetchContent)
 
 FetchContent_Declare(
         libpqxx
-        GIT_REPOSITORY  https://github.com/jtv/libpqxx.git
-        GIT_TAG         7.10.5
-        GIT_SHALLOW     ON
+        GIT_REPOSITORY https://github.com/jtv/libpqxx.git
+        GIT_TAG 7.10.5
+        GIT_SHALLOW ON
 )
 
 # Build libpqxx static
@@ -40,6 +40,7 @@ target_link_libraries(smarthome-database PRIVATE
         smarthome::api
         smarthome::utility
         smarthome::logger
+        smarthome::constants
         Boost::program_options
         Boost::system
         pqxx

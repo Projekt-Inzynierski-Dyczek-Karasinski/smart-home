@@ -2,6 +2,7 @@
 #include "rf_api/rf_client.h"
 #include "rf_driver/hc12_driver.h"
 #include "rf_api/rf_api.h"
+#include "constants.h"
 
 #include <cmath>
 #include <utility>
@@ -9,6 +10,7 @@
 
 namespace SmartHomeMediator {
     using namespace std::string_literals;
+    namespace sc = SmartHome::Constants;
 
     Session::Session(RfTypes::SessionMetadata &&metadata,
                      const std::shared_ptr<HC12Driver> &pRfDriver,
@@ -199,7 +201,7 @@ namespace SmartHomeMediator {
                     break;
                 case RfTypes::MediatorConfigCommandType::GET:
                     // Get all options
-                    if (key == RfTypes::ALL_OPTIONS_STRING) {
+                    if (key == sc::MediatorSpecial::ALL_OPTIONS) {
                         try {
                             apiResponse.result = co_await mpRfDriver->getAllOptions();
                         } catch (const std::exception &e) {
@@ -297,7 +299,8 @@ namespace SmartHomeMediator {
 
                 // Parse RF response to SmartHome::API format
                 try {
-                    ctx.resultsVector.push_back(RfApi::toApiString(*ctx.pCommandResponse));
+                    const auto apiString = RfApi::toApiString(*ctx.pCommandResponse);
+                    if (!apiString.empty()) ctx.resultsVector.push_back(apiString);
                 } catch (const std::exception &e) {
                     mpLogger->debugf("[SESSION] [EXECUTE] [AWAIT_RESPONSE] parse to api response failed: %s",
                                      e.what());
@@ -413,7 +416,8 @@ namespace SmartHomeMediator {
 
                 // Try parsing to SmartHome::API format
                 try {
-                    ctx.resultsVector.push_back(RfApi::toApiString(*ctx.pCommandResponse));
+                    const auto apiString = RfApi::toApiString(*ctx.pCommandResponse);
+                    if (!apiString.empty()) ctx.resultsVector.push_back(apiString);
                 } catch (const std::exception &e) {
                     mpLogger->debugf("[SESSION] [EXECUTE] [AWAIT_NOTIFICATION] parse to api response failed: %s",
                                      e.what());
@@ -570,7 +574,7 @@ namespace SmartHomeMediator {
         constexpr int retries = 3;
         for (int i = 0; i < retries; i++) {
             try {
-                isSuccessful = co_await mpRfDriver->setOption(RfDriver::msCHANNEL_OPTION_STRING.data(),
+                isSuccessful = co_await mpRfDriver->setOption(sc::MediatorSpecial::CHANNEL.data(),
                                                               std::to_string(channel));
             } catch (const std::exception &e) {
                 mpLogger->errorf("[SESSION] [CHANGE_CHANNEL] Failed to change RF channel. Attempt %d/%d. Cause: %s",

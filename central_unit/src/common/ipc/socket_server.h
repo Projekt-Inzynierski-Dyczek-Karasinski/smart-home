@@ -3,6 +3,7 @@
 #include "socket_server_connection.h"
 #include "async_logger.h"
 #include "api.h"
+#include "../constants/constants.h"
 
 #include <utility>
 #include <unordered_map>
@@ -45,7 +46,7 @@ namespace SmartHome::IPC {
              */
             struct Uds {
                 bool isEnabled = true; ///< Enable UDS acceptor
-                std::string endpointPath = "/var/run/smarthomed.sock"; ///< Socket file path
+                std::string endpointPath = Constants::DefaultPaths::UDS.data(); ///< Socket file path
             } uds;
         };
 

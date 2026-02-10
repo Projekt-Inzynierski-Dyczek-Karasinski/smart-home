@@ -1,4 +1,5 @@
 #include "main.h"
+#include "constants.h"
 
 #include <iostream>
 #include <string>
@@ -10,6 +11,7 @@
 namespace ba = boost::asio;
 namespace bai = boost::asio::ip;
 namespace bpo = boost::program_options;
+namespace sc = SmartHome::Constants;
 
 namespace SmartHomeMediator {
     std::optional<std::array<uint8_t, 6> > parseMacAddress(const std::string &macStr) {
@@ -172,10 +174,10 @@ namespace SmartHomeMediator {
         // Load YAML config
         auto configManager = su::ConfigManager(logger);
         su::Logger::Config loggerConfig;
-        loggerConfig.logFile.path = sDEFAULT_LOGFILE_PATH;
+        loggerConfig.logFile.path = sc::DefaultPaths::MEDIATOR_LOGFILE;
         const std::string configPath = vm.contains("config")
                                            ? vm["config"].as<std::string>()
-                                           : sDEFAULT_CONFIG_PATH.data();
+                                           : sc::DefaultPaths::MEDIATOR_CONFIG.data();
         if (configManager.loadConfig(configPath)) {
             logger->debug("[MAIN_MEDIATOR] Loading YAML logger config");
             loadLoggerYamlConfig(configManager, loggerConfig);

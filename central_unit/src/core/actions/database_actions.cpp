@@ -1,9 +1,11 @@
 #include "database_actions.h"
+#include "utils.h"
 
 namespace SmartHome {
     using ai = API::InternalApi;
 
     namespace jmik = JsonRpcStrings::ModuleInfoKeys;
+    namespace jp = JsonRpcStrings::ParamsKeys;
 
     awaitOptApiResponse DatabaseActions::databaseRequestHandler(const cmdMetaPtr &commandMetadata) {
         Core::Instance().mpLogger->debug("[DATABASE_ACTIONS] [REQUEST_HANDLER] called");
@@ -35,9 +37,9 @@ namespace SmartHome {
         API::ApiRequest request;
 
         nlohmann::json dbQuery = {
-            {"table", "modules"},
-            {"columns", {"logic_address", "config"}},
-            {"where", {{"id", moduleId}}},
+            {jp::TABLE, "modules"},
+            {jp::COLUMNS, {"logic_address", "name", "config", "last_online"}},
+            {jp::WHERE, {{"id", moduleId}}},
         };
 
         const API::InternalApi::Method method(API::InternalApi::MethodTypes::GET);
@@ -47,68 +49,69 @@ namespace SmartHome {
         request.id = Actions::getNextId();
 
         request.params = dbQuery;
-
-        API::InternalApi::Command command(request);
-        auto pCmdMeta = std::make_shared<Actions::CommandMetadata>(
-            command,
-            std::make_shared<ba::steady_timer>(Core::Instance().getCoreUtilityIoContext()),
-            Actions::getNextId());
-
-
-        auto response = co_await sendRequestToDbService(std::move(request), pCmdMeta);
+        auto response = co_await sendRequestToDbService(std::move(request));
 
         nlohmann::json result;
 
         if (response.error.has_value()) {
-            result["error"] = response.error.value().data;
+            result[jp::ERROR] = response.error.value().data;
             co_return result;
         }
 
         if (response.result.has_value()) {
             auto responseResultJson = nlohmann::json::parse(response.result.value());
 
-            if (responseResultJson.contains("affected_rows") &&
-                responseResultJson["affected_rows"] == 1 &&
-                responseResultJson.contains("rows")) {
-                auto row = responseResultJson["rows"].front();
+            if (responseResultJson.contains(jp::AFFECTED_ROWS) &&
+                responseResultJson[jp::AFFECTED_ROWS] == 1 &&
+                responseResultJson.contains(jp::ROWS)) {
+                auto row = responseResultJson[jp::ROWS].front();
 
+                // Extract logic address and RF channel from response
                 try {
                     result[jmik::LOGIC_ADDRESS] = row[jmik::LOGIC_ADDRESS];
-                    result[jmik::RF_CHANNEL] = row["config"][jmik::RF_CHANNEL];
+                    result[Constants::ModuleConfigKeys::CONNECTION] =
+                            row["config"][Constants::ModuleConfigKeys::CONNECTION];
                 } catch (const std::exception &e) {
                     Core::Instance().mpLogger->errorf(
                         "[DATABASE_ACTIONS] [GET_ADDR_INFO] Failed to parse db response %s", e.what());
                 }
+
+                // Update config cache with retrieved info
+                try {
+                    auto module = CachedModule{
+                        .id = moduleId,
+                        .logicAddress = row[jmik::LOGIC_ADDRESS],
+                        .name = row["name"],
+                        .config = row["config"],
+                    };
+
+                    if (!row["last_online"].is_null()) {
+                        module.lastOnline = Utils::parseTimestampTz(row["last_online"]);
+                    }
+
+                    Core::Instance().configCache().setModule(module);
+                } catch (const std::exception &e) {
+                    Core::Instance().mpLogger->errorf(
+                        "[DATABASE_ACTIONS] [GET_ADDR_INFO] Failed to update config cache: %s", e.what());
+                }
             } else {
-                result["error"] = "Module not found";
+                result[jp::ERROR] = "Module not found";
             }
         }
         co_return result;
     }
 
 
-    void DatabaseActions::postSensorReading(uint moduleId, uint sensorLogicId,
-                                            nlohmann::json value,
-                                            nlohmann::json metadata) {
+    void DatabaseActions::postSensorReading(
+        uint sensorId,
+        nlohmann::json value, nlohmann::json metadata) {
         API::ApiRequest notification;
 
-
-        nlohmann::json dbQuerySubselect = {
-            {"table", "sensors"},
-            {"columns", {"id"}},
-            {
-                "where", {
-                    {"module_id", moduleId},
-                    {"logic_id", sensorLogicId}
-                }
-            }
-        };
-
         nlohmann::json dbQuery = {
-            {"table", "sensor_readings"},
+            {jp::TABLE, "sensor_readings"},
             {
-                "values", {
-                    {"sensor_id", {{"$subselect", dbQuerySubselect}}},
+                jp::VALUES, {
+                    {"sensor_id", sensorId},
                     {value.is_number() ? "value_numeric" : "value_text", value},
                     {"metadata", metadata}
                 }
@@ -129,9 +132,9 @@ namespace SmartHome {
 
 
         nlohmann::json dbQuery = {
-            {"table", "logs"},
+            {jp::TABLE, "logs"},
             {
-                "values", {
+                jp::VALUES, {
                     {"type", type},
                     {"content", content},
                     {"module_id", moduleId}
@@ -151,19 +154,12 @@ namespace SmartHome {
     void DatabaseActions::updateModuleLastOnline(uint moduleId) {
         API::ApiRequest notification;
 
-        auto nowTimeP = std::chrono::system_clock::now();
-        auto nowTimeT = std::chrono::system_clock::to_time_t(nowTimeP);
-
-        std::tm tmUTC;
-        gmtime_r(&nowTimeT, &tmUTC);
-
-        std::ostringstream oss;
-        oss << std::put_time(&tmUTC, "%Y-%m-%dT%H:%M:%SZ");
+        const auto timestamp = Utils::timePointToTimestampTz(std::chrono::system_clock::now());
 
         nlohmann::json dbQuery = {
-            {"table", "modules"},
-            {"values", {{"last_online", oss.str()}}},
-            {"where", {{"id", moduleId}}}
+            {jp::TABLE, "modules"},
+            {jp::VALUES, {{"last_online", timestamp}}},
+            {jp::WHERE, {{"id", moduleId}}}
         };
 
         const API::InternalApi::Method method(API::InternalApi::MethodTypes::SET);
@@ -173,6 +169,135 @@ namespace SmartHome {
         notification.params = dbQuery;
 
         sendNotificationToDbService(std::move(notification));
+    }
+
+    ba::awaitable<void> DatabaseActions::fetchModulesConfigs() {
+        auto &cache = Core::Instance().configCache();
+        cache.clearModules(); // Clear modules cache before fetching to avoid stale configs
+        API::ApiRequest request;
+
+        nlohmann::json dbQuery = {
+            {jp::TABLE, "modules"},
+            {jp::COLUMNS, nlohmann::json::array({"id", "name", "logic_address", "config", "last_online"})},
+        };
+
+        const API::InternalApi::Target target(API::InternalApi::TargetTypes::DATABASE);
+        const API::InternalApi::Method method(API::InternalApi::MethodTypes::GET);
+        request.method = API::getTargetMethodString(target.to_string(), method.to_string());
+
+        request.params = dbQuery;
+        request.id = Actions::getNextId();
+
+
+        auto response = co_await sendRequestToDbService(std::move(request));
+
+        if (response.error.has_value()) {
+            Core::Instance().mpLogger->errorf(
+                "[DATABASE_ACTIONS] [FETCH_MODULE_CONFIGS] Failed to fetch modules configs: %s",
+                response.error.value().data.c_str());
+            co_return;
+        }
+
+        if (response.result.has_value()) {
+            auto responseResultJson = nlohmann::json::parse(response.result.value());
+
+            if (responseResultJson.contains(jp::AFFECTED_ROWS) &&
+                responseResultJson.contains(jp::ROWS)) {
+                for (const auto &row: responseResultJson[jp::ROWS]) {
+                    try {
+                        CachedModule module{
+                            .id = row["id"],
+                            .logicAddress = row["logic_address"],
+                            .name = row["name"],
+                            .config = row["config"],
+                        };
+
+                        if (!row["last_online"].is_null()) {
+                            module.lastOnline = Utils::parseTimestampTz(row["last_online"]);
+                        }
+
+                        cache.setModule(module);
+                    } catch (const std::exception &e) {
+                        Core::Instance().mpLogger->errorf(
+                            "[DATABASE_ACTIONS] [FETCH_MODULE_CONFIGS] Failed to parse db response: %s", e.what());
+                    }
+                }
+            } else {
+                Core::Instance().mpLogger->error(
+                    "[DATABASE_ACTIONS] [FETCH_MODULE_CONFIGS] Invalid db response format");
+            }
+        }
+    }
+
+    ba::awaitable<void> DatabaseActions::fetchSensorsConfigs() {
+        // Clear readings cache to avoid stale readings after sensor config changes
+        Core::Instance().readingsCache().clear();
+
+        auto &cache = Core::Instance().configCache();
+        cache.clearSensors(); // Clear sensors cache before fetching to avoid stale configs
+
+        API::ApiRequest request;
+
+        nlohmann::json dbQuery = {
+            {jp::TABLE, "sensors"},
+            {
+                jp::COLUMNS, nlohmann::json::array(
+                    {"id", "logic_id", "module_id", "name", "type", "config"})
+            },
+        };
+
+        const API::InternalApi::Target target(API::InternalApi::TargetTypes::DATABASE);
+        const API::InternalApi::Method method(API::InternalApi::MethodTypes::GET);
+        request.method = API::getTargetMethodString(target.to_string(), method.to_string());
+
+        request.params = dbQuery;
+        request.id = Actions::getNextId();
+
+
+        auto response = co_await sendRequestToDbService(std::move(request));
+
+        if (response.error.has_value()) {
+            Core::Instance().mpLogger->errorf(
+                "[DATABASE_ACTIONS] [FETCH_SENSORS_CONFIGS] Failed to fetch sensors configs: %s",
+                response.error.value().data.c_str());
+            co_return;
+        }
+
+        if (response.result.has_value()) {
+            auto responseResultJson = nlohmann::json::parse(response.result.value());
+
+            if (responseResultJson.contains(jp::AFFECTED_ROWS) &&
+                responseResultJson.contains(jp::ROWS)) {
+                for (const auto &row: responseResultJson[jp::ROWS]) {
+                    try {
+                        CachedSensor sensor{
+                            .id = row["id"],
+                            .logicId = row["logic_id"],
+                            .moduleId = row["module_id"],
+                            .name = row["name"],
+                            .type = row["type"],
+                            .config = row["config"]
+                        };
+                        cache.setSensor(sensor);
+                    } catch (const std::exception &e) {
+                        Core::Instance().mpLogger->errorf(
+                            "[DATABASE_ACTIONS] [FETCH_SENSORS_CONFIGS] Failed to parse db response: %s", e.what());
+                    }
+                }
+            } else {
+                Core::Instance().mpLogger->error(
+                    "[DATABASE_ACTIONS] [FETCH_SENSORS_CONFIGS] Invalid db response format");
+            }
+        }
+    }
+
+    ba::awaitable<void> DatabaseActions::fetchAllConfigs() {
+        // Make sure cache is cleared before fetching to avoid stale configs
+        Core::Instance().readingsCache().clear();
+        Core::Instance().configCache().clear();
+
+        co_await fetchModulesConfigs();
+        co_await fetchSensorsConfigs();
     }
 
     void DatabaseActions::sendNotificationToDbService(API::ApiRequest &&notification) {
@@ -196,7 +321,7 @@ namespace SmartHome {
             return;
         }
 
-        ba::post(Core::Instance().getCoreWorkerIoContext(), [notification, dbServiceConnectionId]()mutable {
+        ba::post(Core::Instance().coreWorkerIoContext(), [notification, dbServiceConnectionId]()mutable {
             Actions::handleOutgoingRequest(dbServiceConnectionId, std::move(notification), nullptr);
         });
     }
@@ -233,7 +358,7 @@ namespace SmartHome {
             co_return requestResult;
         }
 
-        ba::post(Core::Instance().getCoreWorkerIoContext(),
+        ba::post(Core::Instance().coreWorkerIoContext(),
                  [promise, request, dbServiceConnectionId]()mutable {
                      Actions::handleOutgoingRequest(dbServiceConnectionId, std::move(request), promise);
                  });
@@ -258,6 +383,16 @@ namespace SmartHome {
         }
 
         co_return requestResult;
+    }
+
+    ba::awaitable<API::ApiResponse> DatabaseActions::sendRequestToDbService(API::ApiRequest &&request) {
+        API::InternalApi::Command command(request);
+        const auto pCmdMeta = std::make_shared<Actions::CommandMetadata>(
+            command,
+            std::make_shared<ba::steady_timer>(Core::Instance().coreUtilityIoContext()),
+            Actions::getNextId());
+
+        co_return co_await sendRequestToDbService(std::move(request), pCmdMeta);
     }
 
     bool DatabaseActions::areParamsValid(API::ApiError &error, const API::InternalApi::Command &command) {

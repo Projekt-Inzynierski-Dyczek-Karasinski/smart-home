@@ -43,7 +43,7 @@ namespace SmartHome {
                 requestId,
                 request,
                 std::make_shared<ba::steady_timer>(
-                    Core::Instance().getCoreUtilityIoContext(), msREQUEST_TIMEOUT),
+                    Core::Instance().coreUtilityIoContext(), msREQUEST_TIMEOUT),
                 request.commands.size(),
                 callback
             );
@@ -208,6 +208,7 @@ namespace SmartHome {
         requestCallback(id, std::move(responseString));
     }
 
+    // FIXME segfault can happen when received unexpected response
     void Actions::handleIncomingResponse(const connectionId_t connectionId, const API::ApiResponse &response) {
         Core::Instance().mpLogger->debug("[ACTIONS] [HANDLE_INCOMING_RESPONSE] called");
         if (!response.id.hasValue()) {
@@ -345,7 +346,7 @@ namespace SmartHome {
     }
 
     void Actions::onCoreShutdown() {
-        auto cleanupTimeout = std::make_shared<ba::steady_timer>(Core::Instance().getCoreUtilityIoContext(),
+        auto cleanupTimeout = std::make_shared<ba::steady_timer>(Core::Instance().coreUtilityIoContext(),
                                                                  msCLEANUP_TIMEOUT);
         std::atomic_bool cleanupTimeoutCalled = false;
         auto cleanup = [&cleanupTimeout, &cleanupTimeoutCalled] {
@@ -445,7 +446,7 @@ namespace SmartHome {
                                       apiId_t requestId) {
         const auto commandMetadata = std::make_shared<CommandMetadata>(
             newCommand,
-            std::make_shared<ba::steady_timer>(Core::Instance().getCoreUtilityIoContext()),
+            std::make_shared<ba::steady_timer>(Core::Instance().coreUtilityIoContext()),
             requestId
         );
 
@@ -502,7 +503,7 @@ namespace SmartHome {
             return;
         }
 
-        ba::co_spawn(Core::Instance().getCoreIoContext(),
+        ba::co_spawn(Core::Instance().coreIoContext(),
                      processCommand(commandMetadata, handler),
                      ba::detached);
     }
@@ -598,7 +599,7 @@ namespace SmartHome {
             auto &request = iter->second;
             if (request.pendingCommands.fetch_sub(1) == 1) {
                 if (const auto reqTimer = request.requestTimeoutTimer.load()) reqTimer->cancel();
-                ba::post(Core::Instance().getCoreIoContext(), [requestId] {
+                ba::post(Core::Instance().coreIoContext(), [requestId] {
                     handleOutgoingResponse(requestId);
                     cleanupRequest(requestId);
                 });
@@ -709,11 +710,11 @@ namespace SmartHome {
 
     std::unordered_map<connectionId_t, sai::TargetTypes> Actions::msConnectionsMap;
 
-    std::mutex Actions::msConnectionsMapLock;
+    std::shared_mutex Actions::msConnectionsMapLock;
 
     std::unordered_map<sai::TargetTypes, std::unordered_set<connectionId_t> > Actions::msConnectionTypeMap;
 
-    std::mutex Actions::msConnectionTypeMapLock;
+    std::shared_mutex Actions::msConnectionTypeMapLock;
 
     // ======================================== CommandHandler functions ========================================
 
@@ -744,7 +745,7 @@ namespace SmartHome {
         auto future = promise->get_future();
 
         // Be sure to implement timeouts and periodic isPending checks to avoid infinitely running operations.
-        ba::post(Core::Instance().getCoreWorkerIoContext(), [promise, commandMetadata, operationDuration] {
+        ba::post(Core::Instance().coreWorkerIoContext(), [promise, commandMetadata, operationDuration] {
             // This example simulates chain of operations with periodic checking for cancellation and command timeout.
             // While command timeout is not needed as request timeout exists, it is advised to use it especially for
             // longer operations in batch requests.

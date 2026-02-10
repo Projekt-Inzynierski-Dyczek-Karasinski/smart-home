@@ -126,9 +126,4 @@ namespace SmartHomeDB {
                      const bpo::parsed_options &parsed,
                      const std::shared_ptr<su::Logger> &pLogger,
                      DatabaseService::Config &databaseServiceConfig);
-
-
-    // Default paths for db-service
-    static constexpr std::string_view sDEFAULT_CONFIG_PATH = "/etc/smarthome/db-service.yaml";
-    static constexpr std::string_view sDEFAULT_LOGFILE_PATH = "/var/log/smarthome/db-service.log";
 }

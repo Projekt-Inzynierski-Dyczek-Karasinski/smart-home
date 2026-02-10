@@ -2,7 +2,6 @@
 
 #include "rf_types.h"
 #include "api.h"
-#include "../../core/api/internal_api.h"
 
 
 namespace sa = SmartHome::API;
@@ -57,6 +56,20 @@ namespace SmartHomeMediator {
          *           },
          *           "type": <string>,
          *           "args": []
+         *         }
+         *       }
+         *       \endcode
+         *       For request to be directed at mediator itself:
+         *        - \b "module_info" must be omitted
+         *        - \b "type" should contain rf_driver implementation dependent configuration key, or action for execute
+         *
+         * @note Example (set fu_mode to 4 on mediator using HC-12 driver):
+         *       \code{.json}
+         *       {
+         *         "method": "mediator.set",
+         *         "params": {
+         *           "type": "fu_mode",
+         *           "args": [4]
          *         }
          *       }
          *       \endcode

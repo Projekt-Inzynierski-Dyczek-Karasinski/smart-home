@@ -1,4 +1,5 @@
 #include "socket_connection.h"
+#include "../constants/constants.h"
 
 namespace SmartHome::IPC {
     SocketConnection::SocketConnection(ba::io_context &ioContext,
@@ -69,7 +70,7 @@ namespace SmartHome::IPC {
 
         try {
             std::visit([message](auto &socket) {
-                ba::write(socket, ba::buffer(message + ms_MESSAGE_DELIMITER.data()));
+                ba::write(socket, ba::buffer(message + Constants::Common::CRLF.data()));
             }, mSocket);
         } catch (bs::system_error &e) {
             handleError(e.code());
@@ -91,7 +92,7 @@ namespace SmartHome::IPC {
         auto strandWrapper = ba::bind_executor(mStrand, callback);
 
         std::visit([message, strandWrapper](auto &socket) {
-            ba::async_write(socket, ba::buffer(message + ms_MESSAGE_DELIMITER.data()), strandWrapper);
+            ba::async_write(socket, ba::buffer(message + Constants::Common::CRLF.data()), strandWrapper);
         }, mSocket);
     }
 
@@ -131,7 +132,7 @@ namespace SmartHome::IPC {
         return !mIsClosing && isSocketOpen;
     }
 
-    const boost::regex SocketConnection::ms_DELIMITER_REGEX(ms_MESSAGE_DELIMITER.data());
+    const boost::regex SocketConnection::ms_DELIMITER_REGEX(Constants::Common::CRLF.data());
 
     std::variant<bai::tcp::socket, bal::stream_protocol::socket> SocketConnection::createSocket(
         ba::io_context &ioContext, const Type socketType) {
@@ -174,8 +175,8 @@ namespace SmartHome::IPC {
         is.read(&message[0], static_cast<long>(bytesTransferred));
 
         // Cut delimiter from message
-        if (message.size() > ms_MESSAGE_DELIMITER.length() && message.ends_with(ms_MESSAGE_DELIMITER)) {
-            message.resize(message.size() - ms_MESSAGE_DELIMITER.length());
+        if (message.size() > Constants::Common::CRLF.length() && message.ends_with(Constants::Common::CRLF)) {
+            message.resize(message.size() - Constants::Common::CRLF.length());
         }
 
         return message;

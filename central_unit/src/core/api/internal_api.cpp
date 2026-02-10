@@ -1,4 +1,5 @@
 #include "internal_api.h"
+#include "constants.h"
 #include "../core.h"
 #include "../actions/actions.h"
 
@@ -22,34 +23,34 @@ namespace SmartHome::API {
     std::string_view InternalApi::Method::to_string() const {
         switch (type) {
             case MethodTypes::GET:
-                return msGET_STRING;
+                return Constants::Methods::GET;
             case MethodTypes::SET:
-                return msSET_STRING;
+                return Constants::Methods::SET;
             case MethodTypes::NOTIFY:
-                return msNOTIFY_STRING;
+                return Constants::Methods::NOTIFY;
             case MethodTypes::EXECUTE:
-                return msEXECUTE_STRING;
+                return Constants::Methods::EXECUTE;
             case MethodTypes::DELETE:
-                return msDELETE_STRING;
+                return Constants::Methods::DELETE;
             case MethodTypes::ECHO_REQUEST:
-                return msECHO_STRING;
+                return Constants::Methods::ECHO_STR;
             case MethodTypes::PING_REQUEST:
-                return msPING_STRING;
+                return Constants::Methods::PING;
             default:
-                return msUNKNOWN_STRING;
+                return Constants::Common::UNKNOWN;
         }
     }
 
     void InternalApi::Method::to_action(const std::string_view value) {
         static const std::unordered_map<std::string_view, MethodTypes> strToActMap{
-            {msGET_STRING, MethodTypes::GET},
-            {msSET_STRING, MethodTypes::SET},
-            {msNOTIFY_STRING, MethodTypes::NOTIFY},
-            {msEXECUTE_STRING, MethodTypes::EXECUTE},
-            {msDELETE_STRING, MethodTypes::DELETE},
-            {msECHO_STRING, MethodTypes::ECHO_REQUEST},
-            {msPING_STRING, MethodTypes::PING_REQUEST},
-            {msUNKNOWN_STRING, MethodTypes::UNKNOWN}
+            {Constants::Methods::GET, MethodTypes::GET},
+            {Constants::Methods::SET, MethodTypes::SET},
+            {Constants::Methods::NOTIFY, MethodTypes::NOTIFY},
+            {Constants::Methods::EXECUTE, MethodTypes::EXECUTE},
+            {Constants::Methods::DELETE, MethodTypes::DELETE},
+            {Constants::Methods::ECHO_STR, MethodTypes::ECHO_REQUEST},
+            {Constants::Methods::PING, MethodTypes::PING_REQUEST},
+            {Constants::Common::UNKNOWN, MethodTypes::UNKNOWN}
         };
 
         const auto iter = strToActMap.find(boost::algorithm::to_lower_copy(std::string(value)));
@@ -81,32 +82,32 @@ namespace SmartHome::API {
     std::string_view InternalApi::Target::to_string() const {
         switch (type) {
             case TargetTypes::CLI:
-                return msCLI_STRING;
+                return Constants::Targets::CLI;
             case TargetTypes::GUI:
-                return msGUI_STRING;
+                return Constants::Targets::GUI;
             case TargetTypes::WEB_SERVER:
-                return msWEB_SERVER_STRING;
+                return Constants::Targets::WEB_SERVER;
             case TargetTypes::CORE:
-                return msCORE_STRING;
+                return Constants::Targets::CORE;
             case TargetTypes::MODULE_MEDIATOR:
-                return msMODULE_MEDIATOR_STRING;
+                return Constants::Targets::MODULE_MEDIATOR;
             case TargetTypes::DATABASE:
-                return msDATABASE_STRING;
+                return Constants::Targets::DATABASE;
             default:
-                return msUNKNOWN_STRING;
+                return Constants::Common::UNKNOWN;
         }
     }
 
     void InternalApi::Target::to_target(const std::string_view value) {
         static const std::unordered_map<std::string_view, TargetTypes> strToTargMap{
-            {msCLI_STRING, TargetTypes::CLI},
-            {msGUI_STRING, TargetTypes::GUI},
-            {msWEB_SERVER_STRING, TargetTypes::WEB_SERVER},
-            {msWEB_STRING, TargetTypes::WEB_SERVER},
-            {msCORE_STRING, TargetTypes::CORE},
-            {msMODULE_MEDIATOR_STRING, TargetTypes::MODULE_MEDIATOR},
-            {msMEDIATOR_STRING, TargetTypes::MODULE_MEDIATOR},
-            {msDATABASE_STRING, TargetTypes::DATABASE}
+            {Constants::Targets::CLI, TargetTypes::CLI},
+            {Constants::Targets::GUI, TargetTypes::GUI},
+            {Constants::Targets::WEB_SERVER, TargetTypes::WEB_SERVER},
+            {Constants::Targets::WEB, TargetTypes::WEB_SERVER},
+            {Constants::Targets::CORE, TargetTypes::CORE},
+            {Constants::Targets::MODULE_MEDIATOR, TargetTypes::MODULE_MEDIATOR},
+            {Constants::Targets::MEDIATOR, TargetTypes::MODULE_MEDIATOR},
+            {Constants::Targets::DATABASE, TargetTypes::DATABASE}
         };
 
         const auto iter = strToTargMap.find(boost::algorithm::to_lower_copy(std::string(value)));
@@ -179,7 +180,7 @@ namespace SmartHome::API {
                     if (!hasMethod && (hasResult || hasError)) {
                         try {
                             ApiResponse response(candidate);
-                            ba::post(Core::Instance().getCoreIoContext(), [connectionId, response] {
+                            ba::post(Core::Instance().coreIoContext(), [connectionId, response] {
                                 Actions::handleIncomingResponse(connectionId, response);
                             });
                             jsonMessage.erase(jsonMessage.begin() + i);
@@ -197,7 +198,7 @@ namespace SmartHome::API {
                 if (!hasMethod && (hasResult || hasError)) {
                     try {
                         auto response = ApiResponse(jsonMessage);
-                        ba::post(Core::Instance().getCoreIoContext(), [connectionId, response] {
+                        ba::post(Core::Instance().coreIoContext(), [connectionId, response] {
                             Actions::handleIncomingResponse(connectionId, response);
                         });
                         return;

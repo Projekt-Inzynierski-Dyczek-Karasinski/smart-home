@@ -4,6 +4,8 @@
 #include "service_manager/service_manager.h"
 #include "async_logger.h"
 #include "api/internal_api.h"
+#include "cache.h"
+#include "scheduler.h"
 
 #include <atomic>
 #include <memory>
@@ -121,26 +123,48 @@ namespace SmartHome {
          */
         bool isRunning() const;
 
+
+        /**
+         * @brief Configuration cache getter.
+         *
+         * @return Reference to configuration cache instance.
+         */
+        ConfigCache &configCache();
+
+        /**
+         * @brief Readings cache getter.
+         *
+         * @return Reference to readings cache instance.
+         */
+        ReadingsCache &readingsCache();
+
+        /**
+         * @brief Scheduler getter.
+         *
+         * @return Reference to scheduler instance.
+         */
+        Scheduler &scheduler() const;
+
         /**
          * @brief Core utility IO context getter.
          *
          * @return Core utility IO context.
          */
-        ba::io_context &getCoreUtilityIoContext();
+        ba::io_context &coreUtilityIoContext();
 
         /**
          * @brief Core worker IO context getter.
          *
          * @return Core worker IO context.
          */
-        ba::io_context &getCoreWorkerIoContext();
+        ba::io_context &coreWorkerIoContext();
 
         /**
          * @brief Core IO context getter.
          *
          * @return Core IO context.
          */
-        ba::io_context &getCoreIoContext();
+        ba::io_context &coreIoContext();
 
         std::shared_ptr<Utils::AsyncLogger> mpLogger; ///< Logger instance
 
@@ -182,13 +206,18 @@ namespace SmartHome {
          */
         static uint getThreadCount(int threadCountConfigValue);
 
-        static constexpr std::string_view ms_ServiceName = "smarthomed";
-
         // Configuration
         Config mConfig;
 
         std::unique_ptr<Utils::ServiceManager> mpService;
         std::shared_ptr<API::InternalApi> mpApi;
+
+        // Cache
+        ConfigCache mConfigCache;
+        ReadingsCache mReadingsCache{mConfigCache};
+
+        // Scheduler
+        std::unique_ptr<Scheduler> mpScheduler;
 
         // Socket server resources
         ba::io_context mSocketServerIoContext;

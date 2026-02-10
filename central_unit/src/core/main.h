@@ -2,6 +2,7 @@
 
 #include "core.h"
 #include "config_manager/config_manager.h"
+#include "constants.h"
 
 #include <boost/process.hpp>
 #include <boost/program_options.hpp>
@@ -11,17 +12,37 @@ namespace bpo = boost::program_options;
 
 namespace SmartHome {
     /**
-     *@brief Configuration for launching and managing mediator service.
+     * @brief Default configuration for launching and managing processes.
      */
-    struct MediatorConfig {
-        /// Enable/Disable mediator launch by Core
+    struct ProcessConfig {
+        /// Enable/Disable process launch by Core
         bool isEnabled = false;
-        /// Mode in which mediator will run
+        /// Mode in which process will run
         Utils::ServiceType serviceType = Utils::ServiceType::AUTO;
-        /// Path to mediator executable for standalone mode
-        std::string execPath = "/usr/local/bin/smarthome-mediator";
-        /// Path to mediator's own YAML config file
-        std::string configPath = "/etc/smarthome/mediator.yaml";
+        /// Path to process executable for standalone mode
+        std::string execPath;
+        /// Path to process's own YAML config file
+        std::string configPath;
+    };
+
+    /**
+     * @brief Configuration for launching and managing mediator service.
+     */
+    struct MediatorConfig : ProcessConfig {
+        MediatorConfig() {
+            execPath = Constants::DefaultPaths::MEDIATOR_EXEC;
+            configPath = Constants::DefaultPaths::MEDIATOR_CONFIG;
+        }
+    };
+
+    /**
+     * @brief Configuration for launching and managing database service.
+     */
+    struct DbServiceConfig : ProcessConfig {
+        DbServiceConfig() {
+            execPath = Constants::DefaultPaths::DB_SERVICE_EXEC;
+            configPath = Constants::DefaultPaths::DB_SERVICE_CONFIG;
+        }
     };
 
     /**
@@ -57,10 +78,12 @@ namespace SmartHome {
      * @param configManager Configuration manager instance for YAML file handling.
      * @param coreConfig Core configuration struct to be updated.
      * @param mediatorConfig Mediator launch configuration struct to be updated.
+     * @param dbServiceConfig Database service launch configuration struct to be updated.
      */
     void loadYamlConfigs(Utils::ConfigManager &configManager,
                          Core::Config &coreConfig,
-                         MediatorConfig &mediatorConfig);
+                         MediatorConfig &mediatorConfig,
+                         DbServiceConfig &dbServiceConfig);
 
     /**
      * @brief Overwrites configurations with command-line options.
@@ -92,6 +115,7 @@ namespace SmartHome {
      * @param logger Logger instance to configure and use for loading messages.
      * @param coreConfig Core configuration struct to fill.
      * @param mediatorConfig Mediator configuration struct to fill.
+     * @param dbServiceConfig Database service configuration struct to fill.
      *
      * @note Priority order: defaults -> YAML -> command-line.
      */
@@ -99,12 +123,23 @@ namespace SmartHome {
                      const bpo::parsed_options &parsed,
                      const std::shared_ptr<Utils::Logger> &logger,
                      Core::Config &coreConfig,
-                     MediatorConfig &mediatorConfig);
+                     MediatorConfig &mediatorConfig,
+                     DbServiceConfig &dbServiceConfig);
 
-
-    /// Default path for smarthome YAML config
-    static constexpr std::string_view s_DEFAULT_CONFIG_PATH = "/etc/smarthome/smart_home.yaml";
-    static constexpr std::string_view s_DEFAULT_LOGFILE_PATH = "/var/log/smarthome/core.log";
+    /**
+     * @brief Runs a process with retry mechanism.
+     *
+     * @param logger Logger instance for logging process launch attempts and errors.
+     * @param processName Name of the process for logging purposes.
+     * @param processConfig Configuration struct containing process launch parameters.
+     * @param process Reference to a boost::process::child object to store the launched process handle.
+     *
+     * @return true if the process was launched successfully, false otherwise.
+     */
+    bool runProcess(const std::shared_ptr<Utils::Logger> &logger,
+                    std::string_view processName,
+                    const ProcessConfig &processConfig,
+                    bp::child &process);
 
     static constexpr auto s_MAX_RETRIES = 10;
     static constexpr auto s_RETRY_DELAY = 250ms;

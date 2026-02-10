@@ -22,7 +22,7 @@ namespace SmartHome::IPC {
     *
     * @details Provides unified interface for TCP and Unix Domain Socket connections.
     *          Supports both synchronous and asynchronous read/write operations.
-    *          Uses CRLF (\r\n) as message delimiter for framing.
+    *          Uses CRLF (\\r\\n) as message delimiter for framing.
     *
     * @warning Not thread-safe for concurrent read/write operations.
     *          Use external synchronization or separate read/write connections.
@@ -46,7 +46,8 @@ namespace SmartHome::IPC {
         *
         * @throw std::invalid_argument if socketType is invalid.
         */
-        explicit SocketConnection(ba::io_context &ioContext, Type socketType, const std::shared_ptr<Utils::Logger> &logger);
+        explicit SocketConnection(ba::io_context &ioContext, Type socketType,
+                                  const std::shared_ptr<Utils::Logger> &logger);
 
         /**
         * @brief Destructor - closes connection if still open.
@@ -78,7 +79,7 @@ namespace SmartHome::IPC {
         /**
         * @brief Synchronously read a message from socket.
         *
-        * @details Blocks until complete message (ending with \r\n) is received.
+        * @details Blocks until complete message (ending with CRLF) is received.
         *          Returns empty string on error or if connection is closed.
         *
         * @return Received message without delimiter, empty string on error.
@@ -142,8 +143,6 @@ namespace SmartHome::IPC {
         std::variant<bai::tcp::socket, bal::stream_protocol::socket> mSocket;
 
     protected:
-        /// Message delimiter
-        static constexpr std::string_view ms_MESSAGE_DELIMITER = "\r\n";
         /// Compiled regex for delimiter matching
         static const boost::regex ms_DELIMITER_REGEX;
 
