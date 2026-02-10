@@ -82,7 +82,8 @@ namespace SmartHome {
      */
     void loadYamlConfigs(Utils::ConfigManager &configManager,
                          Core::Config &coreConfig,
-                         MediatorConfig &mediatorConfig, DbServiceConfig &dbServiceConfig);
+                         MediatorConfig &mediatorConfig,
+                         DbServiceConfig &dbServiceConfig);
 
     /**
      * @brief Overwrites configurations with command-line options.
@@ -122,7 +123,8 @@ namespace SmartHome {
                      const bpo::parsed_options &parsed,
                      const std::shared_ptr<Utils::Logger> &logger,
                      Core::Config &coreConfig,
-                     MediatorConfig &mediatorConfig, DbServiceConfig &dbServiceConfig);
+                     MediatorConfig &mediatorConfig,
+                     DbServiceConfig &dbServiceConfig);
 
     /**
      * @brief Runs a process with retry mechanism.

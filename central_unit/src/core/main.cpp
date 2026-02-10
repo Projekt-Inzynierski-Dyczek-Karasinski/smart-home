@@ -141,45 +141,46 @@ namespace SmartHome {
         switch (processConfig.serviceType) {
             default:
             case Utils::ServiceType::AUTO:
-            case Utils::ServiceType::STANDALONE:
+            case Utils::ServiceType::STANDALONE: {
                 if (std::filesystem::exists(processConfig.execPath)) {
                     logger->infof("[MAIN_CORE] Starting %s in STANDALONE mode", processName.data());
                     process = bp::child(processConfig.execPath.data(), "--config", processConfig.configPath.data());
                     return true;
-                } else {
-                    logger->errorf("[MAIN_CORE] Could not find %s executable", processName.data());
+                }
+
+                logger->errorf("[MAIN_CORE] Could not find %s executable", processName.data());
+                return false;
+            }
+            case Utils::ServiceType::SYSTEMD: {
+                logger->infof("[MAIN_CORE] Starting %s in SYSTEMD mode - waiting for service to be ready",
+                              processName.data());
+                bool isRunning = false;
+
+                for (int attempt = 1; attempt <= s_MAX_RETRIES; ++attempt) {
+                    const int ret = std::system(
+                        ("systemctl is-active --quiet " + std::string(processName) + ".service").c_str());
+                    if (ret == 0) {
+                        logger->infof("[MAIN_CORE] %s service is running", processName.data());
+                        isRunning = true;
+                        break;
+                    }
+
+                    if (attempt < s_MAX_RETRIES) {
+                        logger->debugf("[MAIN_CORE] %s not ready yet, retry %d/%d",
+                                       processName.data(),
+                                       attempt,
+                                       s_MAX_RETRIES);
+                        std::this_thread::sleep_for(s_RETRY_DELAY);
+                    }
+                }
+
+                if (!isRunning) {
+                    logger->warningf("[MAIN_CORE] %s service did not start within timeout", processName.data());
+                    logger->infof("[MAIN_CORE] Check status: sudo systemctl status %s.service", processName.data());
                     return false;
                 }
-            case Utils::ServiceType::SYSTEMD:
-                logger->infof("[MAIN_CORE] Starting %s in SYSTEMD mode - waiting for service to be ready",
-                              processName.data()); {
-                    bool isRunning = false;
-
-                    for (int attempt = 1; attempt <= s_MAX_RETRIES; ++attempt) {
-                        const int ret = std::system(
-                            ("systemctl is-active --quiet " + std::string(processName) + ".service").c_str());
-                        if (ret == 0) {
-                            logger->infof("[MAIN_CORE] %s service is running", processName.data());
-                            isRunning = true;
-                            break;
-                        }
-
-                        if (attempt < s_MAX_RETRIES) {
-                            logger->debugf("[MAIN_CORE] %s not ready yet, retry %d/%d",
-                                           processName.data(),
-                                           attempt,
-                                           s_MAX_RETRIES);
-                            std::this_thread::sleep_for(s_RETRY_DELAY);
-                        }
-                    }
-
-                    if (!isRunning) {
-                        logger->warningf("[MAIN_CORE] %s service did not start within timeout", processName.data());
-                        logger->infof("[MAIN_CORE] Check status: sudo systemctl status %s.service", processName.data());
-                        return false;
-                    }
-                    return true;
-                }
+                return true;
+            }
         }
     }
 }
