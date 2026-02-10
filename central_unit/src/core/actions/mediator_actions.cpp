@@ -332,19 +332,17 @@ namespace SmartHome {
     }
 
     void MediatorActions::sendSleepIfConfigured(uint moduleId, const nlohmann::json &moduleInfo) {
-        Core::Instance().mpLogger->debug("[TEST] SLEEP");
         const auto configOpt = Core::Instance().configCache().getModule(moduleId);
         if (!configOpt.has_value()) return;
-        Core::Instance().mpLogger->debug("[TEST] SLEEP2");
 
         const auto &config = configOpt->config;
         if (!config.contains(cmck::SLEEP_AFTER_SEND) ||
             !config.at(cmck::SLEEP_AFTER_SEND).is_boolean() ||
             !config.at(cmck::SLEEP_AFTER_SEND))
             return;
-        Core::Instance().mpLogger->debug("[TEST] SLEEP3");
 
         uint sleepDurationMs = 0;
+        // Check if there is a scheduled next run time for the module
         const auto nextScheduledRunTimePoint = Core::Instance().scheduler().getNextRunForModule(moduleId);
         if (nextScheduledRunTimePoint.has_value()) {
             sleepDurationMs = static_cast<uint>(
@@ -352,13 +350,14 @@ namespace SmartHome {
                                                                       std::chrono::system_clock::now()).count());
         } else if (config.contains(cmck::DEFAULT_SLEEP_DURATION) &&
                    config.at(cmck::DEFAULT_SLEEP_DURATION).is_number_integer()) {
+            // If no scheduled run time, check for default sleep duration in config
             sleepDurationMs = config.at(cmck::DEFAULT_SLEEP_DURATION).get<uint>();
         } else { return; }
-        Core::Instance().mpLogger->debug("[TEST] SLEEP4");
 
+        // If no sleep duration configured or duration is 0, do not send sleep
         if (sleepDurationMs == 0) return;
-        Core::Instance().mpLogger->debug("[TEST] SLEEP5");
 
+        // Build sleep notification request to mediator
         std::string actionStr = Constants::MediatorTypes::SLEEP.data();
         if (config.contains(cmck::POWER_SAVING) && config.at(cmck::POWER_SAVING).is_boolean() &&
             config.at(cmck::POWER_SAVING)) {
@@ -386,16 +385,16 @@ namespace SmartHome {
             }
         }
 
+        // If no mediator connection found, skip sending sleep notification
         if (!mediatorConnectionId.has_value()) {
             return;
         }
-        Core::Instance().mpLogger->debug("[TEST] SLEEP6");
 
         const auto mediatorId = mediatorConnectionId.value();
 
+        // Post sleep notification to mediator without waiting for response
         ba::post(Core::Instance().coreWorkerIoContext(),
                  [sleepRequest = std::move(sleepNotification), mediatorId]() mutable {
-                     Core::Instance().mpLogger->debug("[TEST] SLEEP7");
                      Actions::handleOutgoingRequest(mediatorId, std::move(sleepRequest), nullptr);
                  });
     }
