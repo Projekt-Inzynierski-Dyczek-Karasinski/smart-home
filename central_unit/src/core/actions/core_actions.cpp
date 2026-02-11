@@ -577,15 +577,9 @@ namespace SmartHome {
 
         nlohmann::json dbQuery = {
             {jp::TABLE, "sensor_readings"},
-            {
-                jp::COLUMNS, nlohmann::json::array(
-                    {"value_text", "value_numeric", "timestamp", "metadata"})
-            },
-            {
-                jp::WHERE, {
-                    {"sensor_id", sensorId.value()}
-                }
-            },
+            {jp::COLUMNS, nlohmann::json::array({"value_text", "value_numeric", "timestamp", "metadata"})},
+            {jp::WHERE, {{"sensor_id", sensorId.value()}}},
+            {jp::ORDER_BY, nlohmann::json::array({{{"column", "timestamp"}, {"order", "DESC"}}})},
             {jp::LIMIT, limit.value()}
         };
 
@@ -640,15 +634,9 @@ namespace SmartHome {
 
         nlohmann::json dbQuery = {
             {jp::TABLE, "logs"},
-            {
-                jp::COLUMNS, nlohmann::json::array(
-                    {"type", "content", "timestamp"})
-            },
-            {
-                jp::WHERE, {
-                    {"module_id", moduleId.value()}
-                }
-            },
+            {jp::COLUMNS, nlohmann::json::array({"type", "content", "timestamp"})},
+            {jp::WHERE, {{"module_id", moduleId.value()}}},
+            {jp::ORDER_BY, nlohmann::json::array({{{"column", "timestamp"}, {"order", "DESC"}}})},
             {jp::LIMIT, limit.value()}
         };
 

@@ -312,7 +312,7 @@ namespace SmartHome {
                 mpLogger->debugf("[SCHEDULER] Action result for sensor [%u]: %s", sensorId, response.c_str());
 
                 try {
-                    const API::ApiResponse apiResponse(response);
+                    const API::ApiResponse apiResponse(nlohmann::json::parse(response));
                     if (apiResponse.error.has_value()) {
                         mpLogger->errorf("[SCHEDULER] Action error for sensor [%u]: %s",
                                          sensorId,
