@@ -12,7 +12,7 @@ namespace UniversalModuleSystem::Transducers {
     std::vector<API::APIParameterVariant> WindowSensor::getApiFormattedReading() {
         using wss = windowSensorStatus;
         xSemaphoreTake(mSensorDataMutex, portMAX_DELAY);
-        const wss windowState = digitalRead(mCommonSensorData.readPin) ? wss::CLOSE : wss::OPEN;
+        const wss windowState = digitalRead(mCommonSensorData.readPin) ? wss::CLOSED : wss::OPEN;
         xSemaphoreGive(mSensorDataMutex);
 
         return std::vector<API::APIParameterVariant>{API::APIParameter<uint8_t>(static_cast<uint8_t>(windowState))};

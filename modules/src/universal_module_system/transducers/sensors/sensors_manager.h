@@ -18,7 +18,7 @@ namespace UniversalModuleSystem::Transducers {
      * @details This class is responsible for maintaining the lifecycle of sensor objects,
      * managing sensor creation based on sensor types, and providing consolidated sensor data reports.
      *
-     * @note To add new sensor class do all steps under Ctrl+F "ADD SENSOR" in this file and sensor_manager.cpp.
+     * @note To add a new sensor class, do all steps under Ctrl+F "ADD SENSOR" in this file and sensor_manager.cpp.
      */
     class SensorsManager {
     public:
@@ -56,12 +56,14 @@ namespace UniversalModuleSystem::Transducers {
          */
         [[nodiscard]] std::vector<API::APIParameterVariant> getSensorsIds() const;
 
-        // TODO !pr add comment
+        /**
+         * @brief Called in PowerManager before the device goes to sleep.
+         */
         void onSleep();
 
     private:
         /**
-         * @brief Get a reading of sensor.
+         * @brief Get a reading of the sensor.
          * @details It is used when sensors readings caching is disabled.
          * @param sensorId Sensor ID.
          * @return Reading of the sensor.

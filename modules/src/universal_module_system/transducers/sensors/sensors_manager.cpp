@@ -211,7 +211,7 @@ namespace UniversalModuleSystem::Transducers {
         using STE = SensorType::SensorTypeEnum;
 
         // ADD SENSOR 5 (final): here add case for new sensor
-        /* eg.:
+        /* e.g.:
             case STE::<NEW_SENSOR>:
                 return std::make_unique<NewSensorClass>(mpLogger);
         */

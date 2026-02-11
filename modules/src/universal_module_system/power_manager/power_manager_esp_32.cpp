@@ -51,11 +51,11 @@ namespace UniversalModuleSystem {
         ota.endOta();
 
         const gpio_num_t buttonPin = static_cast<gpio_num_t>(PairingButton::getButtonPin(mpLogger));
-        // TODO !pr check comment
         // EXT0 is reserved for sensor wake up, but ESP32 WROOM does not support ESP_EXT1_WAKEUP_ANY_LOW, so
-        // waking up ESP by sensor is only available on ESP32 S3
+        // waking up ESP by sensor is only available on ESP32-S3
         #ifdef ESP32_WROOM_BOARD_TYPE
         // button wake up
+
         rtc_gpio_pulldown_dis(buttonPin);
         rtc_gpio_pullup_en(buttonPin);
         esp_sleep_enable_ext0_wakeup(buttonPin, LOW);
@@ -73,6 +73,10 @@ namespace UniversalModuleSystem {
             communication.putRfModuleToSleep();
         }
         #else
+        // handle sensor onSleep
+        auto &sensorManager = Transducers::SensorsManager::getInstance();
+        sensorManager.onSleep();
+
         // rf module wake up
         // TODO add changing FU mode for power saving
         rtc_gpio_pulldown_dis(buttonPin);
@@ -90,10 +94,6 @@ namespace UniversalModuleSystem {
             const auto &communication = Comms::Communication::getInstance(nullptr, nullptr);
             communication.putRfModuleToSleep();
         }
-
-        // handle sensor onSleep
-        auto &sensorManager = Transducers::SensorsManager::getInstance();
-        sensorManager.onSleep();
         #endif
 
         // timer wake up
@@ -130,15 +130,9 @@ namespace UniversalModuleSystem {
             return false;
         }
 
-        if (!level) {
-            rtc_gpio_pulldown_dis(pin);
-            rtc_gpio_pullup_en(pin);
-            esp_sleep_enable_ext0_wakeup(pin, LOW);
-        } else {
-            rtc_gpio_pulldown_dis(pin);
-            rtc_gpio_pullup_en(pin);
-            esp_sleep_enable_ext0_wakeup(pin, HIGH);
-        }
+        rtc_gpio_pulldown_dis(pin);
+        rtc_gpio_pullup_en(pin);
+        esp_sleep_enable_ext0_wakeup(pin, level);
         return true;
     }
 
@@ -173,16 +167,6 @@ namespace UniversalModuleSystem {
 
     void PowerManagerESP32::handleWakeUpReason() const {
         switch (esp_sleep_get_wakeup_cause()) {
-            case ESP_SLEEP_WAKEUP_EXT1: {
-                const uint64_t mask = esp_sleep_get_ext1_wakeup_status();
-                for (int gpio = 0; gpio < 64; gpio++) {
-                    if (mask & (1ULL << gpio)) {
-                        Serial.printf("Module was wake up by by GPIO %d\n", gpio);
-                    }
-                }
-                break;
-            }
-
             case ESP_SLEEP_WAKEUP_TIMER:
                 mpLogger->info("PowerManagerESP32 Class", "Module was wake up by timer.");
                 break;
@@ -190,8 +174,18 @@ namespace UniversalModuleSystem {
                 // macro disabling wake up rf notifications that are annoying during software development
                 #ifdef DISABLE_WAKE_UP_RF_NOTIFICATION
                 #warning "Wake up rf notifications are disabled"
+            case ESP_SLEEP_WAKEUP_EXT1: {
+                const uint64_t mask = esp_sleep_get_ext1_wakeup_status();
+                for (uint8_t gpio = 0; gpio < 64; gpio++) {
+                    if (mask & (1ULL << gpio)) {
+                        mpLogger->infov("PowerManagerESP32 Class", "Module was wake up by by GPIO %d\n", gpio);
+                    }
+                }
+                break;
+            }
+
             case ESP_SLEEP_WAKEUP_EXT0:
-                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
+                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by ESP_SLEEP_WAKEUP_EXT0.");
                 break;
 
             default:
@@ -199,11 +193,14 @@ namespace UniversalModuleSystem {
                 break;
 
                 #else
-                // TODO !pr update logic when notifications should occur (changed esp_sleep_get_wakeup_cause() for button)
             case ESP_SLEEP_WAKEUP_EXT0:
                 try {
                     API::CommandHandler commandHandler(API::commandTypes::NOTIFY);
+                    #ifdef ESP32_WROOM_BOARD_TYPE
                     API::APIParameter notify(static_cast<uint8_t>(API::notifyTypes::MANUAL_WAKE_UP));
+                    #else
+                    API::APIParameter notify(static_cast<uint8_t>(API::notifyTypes::SENSOR_ALERT));
+                    #endif
                     commandHandler.addParameter(notify);
 
                     uint8_t message[MESSAGE_SIZE] = {};
@@ -219,6 +216,33 @@ namespace UniversalModuleSystem {
                 }
                 mpLogger->info("PowerManagerESP32 Class", "Module was wake up by EXT0.");
                 break;
+
+            case ESP_SLEEP_WAKEUP_EXT1: {
+                const uint64_t mask = esp_sleep_get_ext1_wakeup_status();
+                for (uint8_t gpio = 0; gpio < 64; gpio++) {
+                    if (!(mask & (1ULL << gpio))) continue;
+
+                    mpLogger->infov("PowerManagerESP32 Class", "Module was wake up by by GPIO %d\n", gpio);
+                    if (PairingButton::getButtonPin() != gpio) continue;
+
+                    try {
+                        API::CommandHandler commandHandler(API::commandTypes::NOTIFY);
+                        API::APIParameter notify(static_cast<uint8_t>(API::notifyTypes::MANUAL_WAKE_UP));
+                        uint8_t message[MESSAGE_SIZE] = {};
+                        commandHandler.generateMessage(message);
+                        const auto &communication = Comms::Communication::getInstance();
+                        communication.sendMessage(message);
+                    } catch (std::exception &e) {
+                        mpLogger->error(
+                            "PowerManagerESP32 handleWakeUpReason",
+                            "Failed to create notification in case ESP_SLEEP_WAKEUP_EXT1."
+                        );
+                        mpLogger->error("PowerManagerESP32 handleWakeUpReason", e.what());
+                    }
+                    break;
+                }
+                break;
+            }
 
             default:
                 try {

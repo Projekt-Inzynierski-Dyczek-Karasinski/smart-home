@@ -54,7 +54,10 @@ namespace UniversalModuleSystem::Transducers {
          */
         virtual std::vector<API::APIParameterVariant> getApiFormattedReading() = 0;
 
-        // TODO !pr add comments
+        /**
+         * @brief Handles operations that should be executed before ESP goes to sleep.
+         * @details By default this function does nothing.
+         */
         virtual void onSleep();
 
         /**

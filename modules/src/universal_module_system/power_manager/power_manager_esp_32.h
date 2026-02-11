@@ -70,7 +70,16 @@ namespace UniversalModuleSystem {
          */
         [[nodiscard]] bool wasModuleRestarted() const override;
 
-// TODO !pr add comment
+        /**
+         * @brief Configure ESP32 EXT0 wake-up source.
+         * @details Registers an EXT0 wake-up on the given RTC GPIO pin and sets the wake-up level (HIGH/LOW).
+         *
+         * @param pin RTC GPIO pin to use as the EXT0 wake-up source.
+         * @param level Wake-up trigger level: true = HIGH, false = LOW.
+         * @return True if the wake-up source was configured, false otherwise.
+         *
+         * @note Only one EXT0 wake-up source can be active at a time.
+         */
         [[nodiscard]] bool addWakeUpOnEXT0(gpio_num_t pin, bool level) const;
 
     private:
