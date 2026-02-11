@@ -240,7 +240,7 @@ namespace SmartHome::API {
         setValues(json);
     }
 
-    nlohmann::json ApiResponse::to_json() {
+    nlohmann::json ApiResponse::to_json() const {
         nlohmann::json json;
 
         json[JsonRpcStrings::Keys::JSONRPC] = jsonrpc;
@@ -263,7 +263,7 @@ namespace SmartHome::API {
         return json;
     }
 
-    std::string ApiResponse::to_string() {
+    std::string ApiResponse::to_string() const {
         return nlohmann::to_string(to_json());
     }
 

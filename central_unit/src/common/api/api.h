@@ -336,7 +336,7 @@ namespace SmartHome::API {
          * @return JSON object representation of response.
          * @throws std::invalid_argument If neither result nor error is set.
          */
-        [[nodiscard]] nlohmann::json to_json();
+        [[nodiscard]] nlohmann::json to_json() const;
 
         /**
          * @brief Convert response to JSON string.
@@ -344,7 +344,7 @@ namespace SmartHome::API {
          * @return JSON string representation of response.
          * @throws std::invalid_argument If neither result nor error is set.
          */
-        [[nodiscard]] std::string to_string();
+        [[nodiscard]] std::string to_string() const;
 
         /// Update response from JSON object.
         ApiResponse operator()(const nlohmann::json &value);
