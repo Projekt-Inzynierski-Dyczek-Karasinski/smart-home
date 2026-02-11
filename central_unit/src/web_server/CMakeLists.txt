@@ -19,6 +19,7 @@ FetchContent_MakeAvailable(Crow)
 add_executable(smarthome-web-server
         main.cpp
         api_client.cpp
+        web_server.cpp
         routes/routes.cpp
         routes/core_routes.cpp
         routes/module_routes.cpp

@@ -15,6 +15,7 @@ namespace SmartHome::Constants {
 
     namespace DefaultPaths {
         inline constexpr std::string_view UDS = "/var/run/smarthomed.sock";
+        inline constexpr std::string_view WEB_ROOT = "/var/www/smarthome";
 
         inline constexpr std::string_view MEDIATOR_CONFIG = "/etc/smarthome/mediator.yaml";
         inline constexpr std::string_view MEDIATOR_LOGFILE = "/var/log/smarthome/mediator.log";
@@ -24,11 +25,15 @@ namespace SmartHome::Constants {
         inline constexpr std::string_view DB_SERVICE_LOGFILE = "/var/log/smarthome/db-service.log";
         inline constexpr std::string_view DB_SERVICE_EXEC = "/usr/local/bin/smarthome-database";
 
+        inline constexpr std::string_view WEB_SERVER_CONFIG = "/etc/smarthome/web-server.yaml";
+        inline constexpr std::string_view WEB_SERVER_LOGFILE = "/var/log/smarthome/web-server.log";
+
         inline constexpr std::string_view CORE_CONFIG = "/etc/smarthome/smart_home.yaml";
         inline constexpr std::string_view CORE_LOGFILE = "/var/log/smarthome/core.log";
     }
 
     namespace DefaultServiceNames {
+        inline constexpr std::string_view WEB = "smarthome-webd";
         inline constexpr std::string_view MEDIATOR = "smarthome-radiod";
         inline constexpr std::string_view DATABASE = "smarthome-databased";
         inline constexpr std::string_view CORE = "smarthomed";
