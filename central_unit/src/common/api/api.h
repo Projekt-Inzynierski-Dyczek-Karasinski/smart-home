@@ -50,6 +50,10 @@ namespace SmartHome::JsonRpcStrings {
         inline constexpr std::string_view VALUES = "values";
         inline constexpr std::string_view RETURNING = "returning";
 
+        // Common query parameter keys
+        inline constexpr std::string_view TO = "to";
+        inline constexpr std::string_view FROM = "from";
+
         // Result keys for database query responses
         inline constexpr std::string_view AFFECTED_ROWS = "affected_rows";
         inline constexpr std::string_view ROWS = "rows";

@@ -572,13 +572,22 @@ namespace SmartHome {
             }
         }
 
+        nlohmann::json whereClause = {{"sensor_id", sensorId.value()}};
+
+        if (params.contains(jp::FROM) && params.at(jp::FROM).is_string()) {
+            whereClause["timestamp"][">="] = params.at(jp::FROM).get<std::string>();
+        }
+        if (params.contains(jp::TO) && params.at(jp::TO).is_string()) {
+            whereClause["timestamp"]["<="] = params.at(jp::TO).get<std::string>();
+        }
+
         // Delegate to db
         API::ApiRequest request;
 
         nlohmann::json dbQuery = {
             {jp::TABLE, "sensor_readings"},
             {jp::COLUMNS, nlohmann::json::array({"value_text", "value_numeric", "timestamp", "metadata"})},
-            {jp::WHERE, {{"sensor_id", sensorId.value()}}},
+            {jp::WHERE, whereClause},
             {jp::ORDER_BY, nlohmann::json::array({{{"column", "timestamp"}, {"order", "DESC"}}})},
             {jp::LIMIT, limit.value()}
         };

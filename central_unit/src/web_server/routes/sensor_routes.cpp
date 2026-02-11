@@ -18,12 +18,18 @@ namespace SmartHomeWebServer {
         // GET /api/sensors/<id>/readings?limit=N — readings by sensor id
         CROW_ROUTE(app, "/api/sensors/<uint>/readings")(
             [&apiClient](const crow::request &req, unsigned int sensorId) {
-                int limit = 1;
-                if (const auto limitParam = req.url_params.get(sjp::LIMIT.data()))
-                    limit = std::stoi(limitParam);
+                int limit = 10;
+                if (const auto p = req.url_params.get(sjp::LIMIT.data()))
+                    limit = std::stoi(p);
 
                 nlohmann::json params;
-                params[sjp::ARGS.data()] = nlohmann::json::array({sensorId, limit});
+                params[sjp::ARGS] = nlohmann::json::array({sensorId, limit});
+
+                if (const auto p = req.url_params.get(sjp::FROM.data()))
+                    params[sjp::FROM.data()] = std::string(p);
+                if (const auto p = req.url_params.get(sjp::TO.data()))
+                    params[sjp::TO.data()] = std::string(p);
+
                 return coreGet(apiClient, scc::SENSOR_READINGS, params);
             });
 

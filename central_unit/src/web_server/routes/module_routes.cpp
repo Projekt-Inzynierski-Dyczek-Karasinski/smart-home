@@ -39,6 +39,12 @@ void SmartHomeWebServer::registerModuleRoutes(crow::App<crow::CORSHandler> &app,
             nlohmann::json params;
             params[sjp::MODULE_ID] = moduleId;
             params[sjp::ARGS] = nlohmann::json::array({logicId, limit});
+
+            if (const auto p = req.url_params.get(sjp::FROM.data()))
+                params[sjp::FROM.data()] = std::string(p);
+            if (const auto p = req.url_params.get(sjp::TO.data()))
+                params[sjp::TO.data()] = std::string(p);
+
             return coreGet(apiClient, scc::SENSOR_READINGS, params);
         });
 
