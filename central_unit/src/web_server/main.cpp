@@ -2,7 +2,9 @@
 #include "constants.h"
 #include "routes/core_routes.h"
 #include "routes/sensor_routes.h"
+#include "routes/actuator_routes.h"
 #include "routes/module_routes.h"
+#include "routes/database_routes.h"
 #include "routes/static_routes.h"
 
 #include <iostream>
@@ -86,7 +88,9 @@ int main(int argc, char *argv[]) {
     std::string webRoot = "/home/duk/CLionProjects/smart-home/central_unit/src/web_server/static"; //TODO !pr
     registerCoreRoutes(app, apiClient);
     registerSensorRoutes(app, apiClient);
+    registerActuatorRoutes(app, apiClient);
     registerModuleRoutes(app, apiClient);
+    registerDatabaseRoutes(app, apiClient);
     registerStaticRoutes(app, webRoot);
 
 

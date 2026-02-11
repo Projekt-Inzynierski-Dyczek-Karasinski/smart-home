@@ -3,6 +3,7 @@
 #include "../api_client.h"
 
 #include <utility>
+#include <expected>
 
 #include <crow.h>
 #include <crow/middlewares/cors.h>
