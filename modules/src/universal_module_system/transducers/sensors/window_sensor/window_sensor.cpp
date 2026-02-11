@@ -15,6 +15,8 @@ namespace UniversalModuleSystem::Transducers {
         const wss windowState = digitalRead(mCommonSensorData.readPin) ? wss::CLOSED : wss::OPEN;
         xSemaphoreGive(mSensorDataMutex);
 
+        mpLogger->debugv("WindowSensor", "Sensor state: ", static_cast<int>(windowState));
+
         return std::vector<API::APIParameterVariant>{API::APIParameter<uint8_t>(static_cast<uint8_t>(windowState))};
     }
 

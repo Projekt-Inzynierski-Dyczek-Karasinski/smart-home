@@ -11,6 +11,8 @@ namespace UniversalModuleSystem::Transducers {
         OPEN = 1,
     };
 
+    // FIXME WindowSensor sometimes works only after first deep sleep.
+
     /**
      * @brief Sensor that reports whether a window is open or closed.
      * @details If "canAwake" is set to true in base_config.json, WindowSensor will wake up
