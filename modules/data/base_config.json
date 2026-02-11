@@ -1,54 +1,16 @@
 {
-  "buttonPin": 1,
-  "ledPin": 39,
+  "buttonPin": 27,
+  "ledPin": 26,
   "addressing": {
-    "mod": [
-      {
-        "imr": true,
-        "ip": 2,
-        "mac": [
-          176,
-          167,
-          50,
-          241,
-          129,
-          60
-        ],
-        "rfChannel": 2
-      },
-      {
-        "imr": true,
-        "ip": 3,
-        "mac": [
-          1,
-          1,
-          1,
-          1,
-          1,
-          1
-        ],
-        "rfChannel": 3
-      },
-      {
-        "imr": true,
-        "ip": 4,
-        "mac": [
-          1,
-          1,
-          1,
-          1,
-          1,
-          1
-        ],
-        "rfChannel": 4
-      }
-    ],
-    "num": [
-      1,
-      1,
-      1,
-      1
-    ]
+    "ip": 2,
+    "mac": "80:B5:4E:C5:A5:C8",
+    "rfChannel": 2
+  },
+  "hc12": {
+    "rx": 25,
+    "tx": 33,
+    "set": 32,
+    "baudrate": 9600
   },
   "sensorsData": {
     "powerPin": 13,
@@ -58,42 +20,25 @@
         "type": "batterySensor",
         "data": {
           "id": 1,
-          "readPin": 16,
+          "readPin": 12,
           "canAwake": false,
           "additional": {
-            "rVCC": 94000,
-            "rGND": 97000,
+            "rVCC": 50000,
+            "rGND": 50000,
             "Vmin": 4350,
             "Vmax": 4800
           }
         }
-      },
+      }
+    ]
+  },
+  "actuatorsData": {
+    "actuators": [
       {
-        "type": "lightSensor",
+        "type": "relay",
         "data": {
-          "id": 2,
-          "readPin": 17,
-          "canAwake": false,
-          "additional": {
-          }
-        }
-      },
-      {
-        "type": "DHT22",
-        "data": {
-          "id": 3,
-          "readPin": 12,
-          "canAwake": false,
-          "additional": {
-          }
-        }
-      },
-      {
-        "type": "windowSensor",
-        "data": {
-          "id": 4,
-          "readPin": 18,
-          "canAwake": true,
+          "id": 1,
+          "logicPin": 10,
           "additional": {
           }
         }
@@ -101,10 +46,8 @@
     ]
   },
   "otaCheck": 2,
-  "hc12": {
-    "rx": 6,
-    "tx": 7,
-    "set": 5,
-    "baudrate": 9600
+  "idleAutoSleep": {
+    "sleepTime": 86400000,
+    "idleTimeout": 300000
   }
 }

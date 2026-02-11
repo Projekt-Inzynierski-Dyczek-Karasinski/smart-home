@@ -37,12 +37,11 @@ namespace UniversalModuleSystem {
          */
         static bool isButtonPressed();
 
-        // TODO !pr check comment
         /**
-         * @brief Gets pairing button pin.
-         * @details Load pin number from base_config.json if that load fails gets pin number form critical_config.h
+         * @brief Gets the pairing button pin.
+         * @details Loads the pin from base_config.json; if that fails, gets the pin from critical_config.h.
          *
-         * @param logger Shared pointer to the Logger instance, default: nullptr.
+         * @param logger Shared pointer to the Logger instance; default: nullptr.
          * @return Pairing button pin number.
          */
         static uint8_t getButtonPin(std::shared_ptr<ul::Logger> logger = nullptr);

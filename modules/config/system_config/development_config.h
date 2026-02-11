@@ -31,7 +31,6 @@
         #define BUTTON_PIN 2
     #endif
     #else
-    // TODO !mm change pin: this is not RTC pin and can not wake up esp from deep sleep
         #define LED_PIN 26
         #define BUTTON_PIN 27
     #endif

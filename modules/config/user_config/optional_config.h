@@ -1,9 +1,7 @@
 #pragma once
-// TODO !pr check/add comments
-// This is optional config data, that data may be set.
+// This is optional config data; it may be set.
 
-
-// uncomment to enable serial communication (automatically sets LOGGING_LEVEL to INFO if not overwritten below)
+// Uncomment to enable serial communication (automatically sets LOGGING_LEVEL to INFO if not overwritten below)
 // #ifndef DEBUG_MODE
 // #define DEBUG_MODE
 // #endif
@@ -13,7 +11,7 @@
 // #define TERMINAL_BAUD_RATE 115200
 
 /*
-uncomment to override default LOGGING_LEVEL
+Uncomment to override the default LOGGING_LEVEL
 NONE:    0 - default if DEBUG_MODE is not defined
 ERROR:   1
 WARNING: 2
