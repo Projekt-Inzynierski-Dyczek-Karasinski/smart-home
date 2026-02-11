@@ -37,6 +37,16 @@ namespace UniversalModuleSystem {
          */
         static bool isButtonPressed();
 
+        // TODO !pr check comment
+        /**
+         * @brief Gets pairing button pin.
+         * @details Load pin number from base_config.json if that load fails gets pin number form critical_config.h
+         *
+         * @param logger Shared pointer to the Logger instance, default: nullptr.
+         * @return Pairing button pin number.
+         */
+        static uint8_t getButtonPin(std::shared_ptr<ul::Logger> logger = nullptr);
+
     private:
         /**
          * @brief Constructor of PairingButton class. Sets BUTTON_PIN to INPUT_PULLUP and attaches interrupt to it.

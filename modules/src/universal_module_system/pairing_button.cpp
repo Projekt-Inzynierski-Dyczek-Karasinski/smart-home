@@ -18,21 +18,7 @@ namespace UniversalModuleSystem {
     PairingButton::PairingButton(const std::shared_ptr<DebugLED> &debugLED, Comms::Communication *communication,
                                  const std::shared_ptr<ul::Logger> &logger)
         : mpDebugLED(debugLED), mpLogger(logger), mpCommunication(communication) {
-        try {
-            const auto &dataManager = DataManager::getInstance();
-            nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
-            mButtonPin = jsonData[ms_BUTTON_PIN].get<uint8_t>();
-        } catch (...) {
-            mpLogger->error("PairingButton", "Can not load button pin from base_config.json, loading from critical_config.h");
-            mButtonPin = BUTTON_PIN;
-        }
-        if (mButtonPin != BUTTON_PIN) {
-            mpLogger->warning(
-                "PairingButton",
-                "Button pin defined in critical_config.h and base_config.json do not match, loading pin defined in base_config.json"
-            );
-        }
-
+        mButtonPin = getButtonPin(mpLogger);
         pinMode(BUTTON_PIN, INPUT_PULLUP);
 
         attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
@@ -45,21 +31,37 @@ namespace UniversalModuleSystem {
     }
 
     bool PairingButton::isButtonPressed() {
+        const uint8_t buttonPin = getButtonPin();
+        pinMode(buttonPin, INPUT_PULLUP);
+        return !digitalRead(buttonPin);
+    }
+
+    uint8_t PairingButton::getButtonPin(std::shared_ptr<ul::Logger> logger) {
+        if (logger == nullptr) {
+            logger = std::make_shared<ul::Logger>();
+        }
+
         uint8_t buttonPin;
         try {
             const auto &dataManager = DataManager::getInstance();
             nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
             buttonPin = jsonData[ms_BUTTON_PIN].get<uint8_t>();
         } catch (...) {
+            logger->error("PairingButton", "Can not load button pin from base_config.json, loading from critical_config.h");
             buttonPin = BUTTON_PIN;
         }
-        pinMode(buttonPin, INPUT_PULLUP);
-        return !digitalRead(buttonPin);
+        if (buttonPin != BUTTON_PIN) {
+            logger->warning(
+                "PairingButton",
+                "Button pin defined in critical_config.h and base_config.json do not match, loading pin defined in base_config.json"
+            );
+        }
+        return buttonPin;
     }
 
     void PairingButton::buttonISR() {
         const auto pb = &getInstance(nullptr, nullptr, nullptr);
-        detachInterrupt(digitalPinToInterrupt(BUTTON_PIN));
+        detachInterrupt(digitalPinToInterrupt(pb->mButtonPin));
         pb->startButtonPressTimer();
 
         // Force context switch if higher priority task was woken

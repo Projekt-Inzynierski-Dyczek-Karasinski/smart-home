@@ -550,10 +550,11 @@ namespace Comms {
             sendCommand->generateMessage(sendBuffer);
             mpCommunication->sendMessage(sendBuffer);
 
-#ifdef CENTRAL_UNIT
+        // TODO !mm uncomment #ifdef CENTRAL_UNIT
+        // #ifdef CENTRAL_UNIT
             if (sendCommand->getCommandType() == CT::END)
                 endConnection();
-#endif
+        // #endif
         }
     }
 

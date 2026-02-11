@@ -4,12 +4,13 @@
 
 #include "universal_module_system/ota/ota.h"
 
-#define RF_MODULE_WAKE_UP_PIN_BITMASK(gpio_num) 1ULL << gpio_num
+#define PIN_BITMASK(gpio_num) 1ULL << gpio_num
 
 #include "../../../config/system_config/universal_module_system_config.h"
 #include "../config/user_config/critical_config.h"
 
 #include "universal_module_system/data_manager.h"
+#include "universal_module_system/pairing_button.h"
 #include "communication/communication.h"
 #include "communication/api/command_handler.h"
 
@@ -48,10 +49,15 @@ namespace UniversalModuleSystem {
         auto &ota = Ota::getInstance();
         ota.endOta();
 
+        const gpio_num_t buttonPin = static_cast<gpio_num_t>(PairingButton::getButtonPin(mpLogger));
+        // TODO !pr check comment
+        // EXT0 is reserved for sensor wake up, but ESP32 WROOM does not support ESP_EXT1_WAKEUP_ANY_LOW, so
+        // waking up ESP by sensor is only available on ESP32 S3
+        #ifdef ESP32_WROOM_BOARD_TYPE
         // button wake up
-        rtc_gpio_pulldown_dis(static_cast<gpio_num_t>(BUTTON_PIN));
-        rtc_gpio_pullup_en(static_cast<gpio_num_t>(BUTTON_PIN));
-        esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(BUTTON_PIN), LOW);
+        rtc_gpio_pulldown_dis(buttonPin);
+        rtc_gpio_pullup_en(buttonPin);
+        esp_sleep_enable_ext0_wakeup(buttonPin, LOW);
 
         // rf module wake up
         // TODO add changing FU mode for power saving
@@ -59,16 +65,43 @@ namespace UniversalModuleSystem {
             rtc_gpio_pulldown_dis(hc12WakeUpPin);
             rtc_gpio_pullup_en(hc12WakeUpPin);
             // NOTE: ESP_EXT1_WAKEUP_ALL_LOW is deprecated on ESP32-S3 boards, but ESP_EXT1_WAKEUP_ANY_LOW doesn't exist on ESP32-WROOM
-            // For wake up logic it doesn't matter if is all or any, because RF_MODULE_WAKE_UP_PIN_BITMASK have only one pin assigned
-            #ifdef ESP32_WROOM_BOARD_TYPE
-                esp_sleep_enable_ext1_wakeup(RF_MODULE_WAKE_UP_PIN_BITMASK(hc12WakeUpPin), ESP_EXT1_WAKEUP_ALL_LOW);
-            #else
-                esp_sleep_enable_ext1_wakeup(RF_MODULE_WAKE_UP_PIN_BITMASK(hc12WakeUpPin), ESP_EXT1_WAKEUP_ANY_LOW);
-            #endif
+            // For wake up logic it doesn't matter if is all or any, because PIN_BITMASK have only one pin assigned
+            esp_sleep_enable_ext1_wakeup(PIN_BITMASK(hc12WakeUpPin), ESP_EXT1_WAKEUP_ALL_LOW);
         } else {
             const auto &communication = Comms::Communication::getInstance(nullptr, nullptr);
             communication.putRfModuleToSleep();
         }
+        #else
+        // rf module wake up
+        // TODO add changing FU mode for power saving
+        rtc_gpio_pulldown_dis(buttonPin);
+        rtc_gpio_pullup_en(buttonPin);
+        if (enableWakeUpWithRfModule) {
+            rtc_gpio_pulldown_dis(hc12WakeUpPin);
+            rtc_gpio_pullup_en(hc12WakeUpPin);
+            esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON); // TODO consider changing that, due tu potential power consumption increase
+            const uint64_t bitMask = (1ULL << hc12WakeUpPin) | (1ULL << buttonPin);
+            // esp_ext1
+            esp_sleep_enable_ext1_wakeup(bitMask, ESP_EXT1_WAKEUP_ANY_LOW);
+        } else {
+            esp_sleep_enable_ext1_wakeup(PIN_BITMASK(buttonPin), ESP_EXT1_WAKEUP_ANY_LOW);
+            const auto &communication = Comms::Communication::getInstance(nullptr, nullptr);
+            communication.putRfModuleToSleep();
+        }
+
+        // TODO !pr remove
+        // pinMode(18,INPUT_PULLUP);
+        // if (digitalRead(18)) {
+        //     rtc_gpio_pulldown_dis(GPIO_NUM_18);
+        //     rtc_gpio_pullup_en(GPIO_NUM_18);
+        //     esp_sleep_enable_ext0_wakeup(GPIO_NUM_18, LOW);
+        // } else {
+        //     rtc_gpio_pulldown_dis(GPIO_NUM_18);
+        //     rtc_gpio_pullup_en(GPIO_NUM_18);
+        //     esp_sleep_enable_ext0_wakeup(GPIO_NUM_18, HIGH);
+        // }
+
+        #endif
 
         // timer wake up
         esp_sleep_enable_timer_wakeup((uint64_t)milliSeconds * US_TO_MILLISECONDS_FACTOR);
@@ -123,9 +156,15 @@ namespace UniversalModuleSystem {
 
     void PowerManagerESP32::handleWakeUpReason() const {
         switch (esp_sleep_get_wakeup_cause()) {
-            case ESP_SLEEP_WAKEUP_EXT1:
-                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by rf module.");
+            case ESP_SLEEP_WAKEUP_EXT1: {
+                const uint64_t mask = esp_sleep_get_ext1_wakeup_status();
+                for (int gpio = 0; gpio < 64; gpio++) {
+                    if (mask & (1ULL << gpio)) {
+                        Serial.printf("Module was wake up by by GPIO %d\n", gpio);
+                    }
+                }
                 break;
+            }
 
             case ESP_SLEEP_WAKEUP_TIMER:
                 mpLogger->info("PowerManagerESP32 Class", "Module was wake up by timer.");
@@ -143,6 +182,7 @@ namespace UniversalModuleSystem {
                 break;
 
 #else
+                // TODO !pr update logic when notifications should occur (changed esp_sleep_get_wakeup_cause() for button)
             case ESP_SLEEP_WAKEUP_EXT0:
                 try {
                     API::CommandHandler commandHandler(API::commandTypes::NOTIFY);
@@ -157,7 +197,7 @@ namespace UniversalModuleSystem {
                     mpLogger->error("PowerManagerESP32 handleWakeUpReason", "Failed to create notification in case ESP_SLEEP_WAKEUP_EXT0.");
                     mpLogger->error("PowerManagerESP32 handleWakeUpReason", e.what());
                 }
-                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
+                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by EXT0.");
                 break;
 
             default:

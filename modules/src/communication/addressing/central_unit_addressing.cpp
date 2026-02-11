@@ -63,14 +63,14 @@ namespace Comms {
     void CentralUnitAddressing::setProtocolIPAddress(const uint8_t ip) {
         if (ip == NULL_IP) {
             setTmpModuleIp(NULL_IP);
-            mpLogger->info("CentralUnitAddressing Method", "Cleared protocol IP");
+            mpLogger->verbose("CentralUnitAddressing Method", "Cleared protocol IP");
             return;
         }
         ModuleAddressingData moduleData;
         getModuleData(&moduleData, ip);
         if (moduleData.ipAddress != NULL_IP) {
             setTmpModuleIp(ip);
-            mpLogger->infov("CentralUnitAddressing Method", "Changed protocol IP to: ", ip);
+            mpLogger->verbosev("CentralUnitAddressing Method", "Changed protocol IP to: ", ip);
         } else {
             setTmpModuleIp(NULL_IP);
             mpLogger->errorv("CentralUnitAddressing Method", "Not found module of IP address: ", ip);

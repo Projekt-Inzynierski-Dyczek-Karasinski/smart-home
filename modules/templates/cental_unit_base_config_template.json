@@ -1,6 +1,6 @@
 {
-  "buttonPin": 39,
-  "ledPin": 1,
+  "buttonPin": 1,
+  "ledPin": 39,
   "addressing": {
     "mod": [
       {

@@ -1,6 +1,9 @@
 #include <Arduino.h>
 #include <memory>
 
+// TODO !pr change base_config.json 
+#include "../config/system_config/common/smart_home_config.h"
+
 #include "universal_module_system/debug_led.h"
 #include "universal_module_system/pairing_button.h"
 #include "universal_module_system/data_manager.h"
