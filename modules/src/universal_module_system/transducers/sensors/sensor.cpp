@@ -13,6 +13,8 @@ namespace UniversalModuleSystem::Transducers {
         vSemaphoreDelete(mReadingCompleteSemaphore);
     }
 
+    void Sensor::onSleep() {}
+
     uint8_t Sensor::getId() const {
         xSemaphoreTake(mSensorDataMutex, portMAX_DELAY);
         const uint8_t result = mCommonSensorData.id;
@@ -40,13 +42,12 @@ namespace UniversalModuleSystem::Transducers {
         return isLoadedSuccessfully;
     }
 
-    bool Sensor::loadAdditionalData(const nl::json& jsonData) {
+    bool Sensor::loadAdditionalData(const nl::json &jsonData) {
         return true;
     }
 
-    Sensor::CommonSensorData::CommonSensorData(const nl::json &json) :
-        id(json[ms_ID]),
-        readPin(json[ms_READ_PIN]),
-        canAwake(json[ms_CAN_AWAKE]),
-        isLoaded(true) {}
+    Sensor::CommonSensorData::CommonSensorData(const nl::json &json) : id(json[ms_ID]),
+                                                                       readPin(json[ms_READ_PIN]),
+                                                                       canAwake(json[ms_CAN_AWAKE]),
+                                                                       isLoaded(true) {}
 }

@@ -70,6 +70,9 @@ namespace UniversalModuleSystem {
          */
         [[nodiscard]] bool wasModuleRestarted() const override;
 
+// TODO !pr add comment
+        [[nodiscard]] bool addWakeUpOnEXT0(gpio_num_t pin, bool level) const;
+
     private:
         /**
          * @brief Private constructor for singleton pattern.
@@ -122,6 +125,9 @@ namespace UniversalModuleSystem {
         std::shared_ptr<ul::Logger> mpLogger;
 
         TimerHandle_t mIdleTimer = nullptr; ///< FreeRTOS timer handle for managing idle auto-sleep functionality.
+
+        // FreeRTOS semaphore that indicates if EXT0 wake up source is not already taken (semaphore for thread-safety)
+        SemaphoreHandle_t mEspExt0Available = nullptr;
 
         std::atomic<uint32_t> mIdleSleepTime{0};
 

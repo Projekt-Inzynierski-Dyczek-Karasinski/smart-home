@@ -48,6 +48,16 @@
             "I2CAddress": 118
           }
         }
+      },
+      {
+        "type": "windowSensor",
+        "data": {
+          "id": 4,
+          "readPin": 18,
+          "canAwake": true,
+          "additional": {
+          }
+        }
       }
     ]
   }

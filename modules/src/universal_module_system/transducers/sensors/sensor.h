@@ -54,6 +54,9 @@ namespace UniversalModuleSystem::Transducers {
          */
         virtual std::vector<API::APIParameterVariant> getApiFormattedReading() = 0;
 
+        // TODO !pr add comments
+        virtual void onSleep();
+
         /**
          * @brief Get the sensor ID (loaded from JSON config file).
          * @return Sensor ID.

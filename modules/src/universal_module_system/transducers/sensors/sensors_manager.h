@@ -17,6 +17,8 @@ namespace UniversalModuleSystem::Transducers {
      *
      * @details This class is responsible for maintaining the lifecycle of sensor objects,
      * managing sensor creation based on sensor types, and providing consolidated sensor data reports.
+     *
+     * @note To add new sensor class do all steps under Ctrl+F "ADD SENSOR" in this file and sensor_manager.cpp.
      */
     class SensorsManager {
     public:
@@ -28,11 +30,12 @@ namespace UniversalModuleSystem::Transducers {
          *
          * @warning First call must pass a pointer to a logger.
          */
-        static SensorsManager& getInstance(const std::shared_ptr<ul::Logger> &logger = nullptr);
+        static SensorsManager &getInstance(const std::shared_ptr<ul::Logger> &logger = nullptr);
 
         // Delete copy constructor and assignment operator
-        SensorsManager(const SensorsManager&) = delete;
-        SensorsManager& operator = (const SensorsManager&) = delete;
+        SensorsManager(const SensorsManager &) = delete;
+
+        SensorsManager &operator =(const SensorsManager &) = delete;
 
         /**
          * @brief Get a reading of sensor. Automatically handles new reading if needed.
@@ -52,6 +55,9 @@ namespace UniversalModuleSystem::Transducers {
          * @return Sensors IDs.
          */
         [[nodiscard]] std::vector<API::APIParameterVariant> getSensorsIds() const;
+
+        // TODO !pr add comment
+        void onSleep();
 
     private:
         /**
@@ -84,18 +90,21 @@ namespace UniversalModuleSystem::Transducers {
          *
          * @return Unique pointer to the created Sensor instance, or nullptr if type is unknown.
          */
-        std::unique_ptr<Sensor> createSensor(const char* sensorName);
+        std::unique_ptr<Sensor> createSensor(const char *sensorName);
 
         /**
          * @brief Struct used for converting sensor names to sensor objects.
          * @details When adding a new derived sensor class, add new values to the enum and map here.
          */
         struct SensorType {
+            // ADD SENSOR 1: here add enum value for /c createSensor() method
+            // e.g. <NEW_SENSOR>
             enum class SensorTypeEnum : uint8_t {
                 BATTERY,
                 LIGHT,
                 DHT22,
                 BME280,
+                WINDOW,
                 UNKNOWN
             };
 
@@ -103,23 +112,29 @@ namespace UniversalModuleSystem::Transducers {
             * @brief Functor for comparing C-string message identifiers in std::map.
             */
             struct Comparator {
-                bool operator()(const char* a, const char* b) const {
+                bool operator()(const char *a, const char *b) const {
                     return strncmp(a, b, strlen(a)) < 0;
                 }
             };
 
+            // ADD SENSOR 2: here add constexpr with sensor type (must be same as "type" in base_config.json)
+            // e.g. static constexpr char s_<NEW_SENSOR>[] = "<newSensor>";
             // sensor types
             static constexpr char s_BATTERY_SENSOR[] = "batterySensor";
             static constexpr char s_LIGHT_SENSOR[] = "lightSensor";
             static constexpr char s_DHT22_SENSOR[] = "DHT22";
             static constexpr char s_BME280_SENSOR[] = "BME280";
+            static constexpr char s_WINDOW_SENSOR[] = "windowSensor";
 
+            // ADD SENSOR 3: here connect constexpr with sensor type and SensorTypeEnum
+            // e.g. {s_<NEW_SENSOR>, SensorTypeEnum::<NEW_SENSOR>}
             // Lookup table mapping sensor type strings to internal enumerator values.
-            inline static const std::map<const char*, SensorTypeEnum, Comparator> sensorMap {
+            inline static const std::map<const char *, SensorTypeEnum, Comparator> sensorMap{
                 {s_BATTERY_SENSOR, SensorTypeEnum::BATTERY},
                 {s_LIGHT_SENSOR, SensorTypeEnum::LIGHT},
                 {s_DHT22_SENSOR, SensorTypeEnum::DHT22},
                 {s_BME280_SENSOR, SensorTypeEnum::BME280},
+                {s_WINDOW_SENSOR, SensorTypeEnum::WINDOW},
             };
         };
 
@@ -142,7 +157,7 @@ namespace UniversalModuleSystem::Transducers {
          */
         static void sensorTimeoutTimerCallback(TimerHandle_t xTimer);
 
-        std::vector<std::unique_ptr<Sensor>> mSensors;
+        std::vector<std::unique_ptr<Sensor> > mSensors;
 
         std::shared_ptr<ul::Logger> mpLogger;
 

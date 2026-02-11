@@ -1,7 +1,7 @@
 #include <Arduino.h>
 #include <memory>
 
-// TODO !pr change base_config.json 
+// TODO !pr change base_config.json
 #include "../config/system_config/common/smart_home_config.h"
 
 #include "universal_module_system/debug_led.h"
@@ -18,7 +18,8 @@ namespace ul = Utils::Logging;
 namespace ums = UniversalModuleSystem;
 
 void setup() {
-    const auto logger = std::make_shared<ul::Logger>();
+    // TODO !pr change VERBOSE
+    const auto logger = std::make_shared<ul::Logger>(ul::Level::VERBOSE);
 
     auto &dataManager = ums::DataManager::getInstance(logger);
 
@@ -37,6 +38,8 @@ void setup() {
     logger->info("Main", "All components initialized.");
     logger->verbose("Main", "Deleting functions setup() and loop()...");
 
+    vTaskDelay(pdMS_TO_TICKS(5*1000));
+    powerManager.enterSleep(30*1000, true);
     vTaskDelete(nullptr);
 
     // everything below this comment should never be executed

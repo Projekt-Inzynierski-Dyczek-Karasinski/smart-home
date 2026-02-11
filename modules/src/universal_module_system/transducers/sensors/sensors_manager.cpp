@@ -4,10 +4,13 @@
 
 #include "universal_module_system/data_manager.h"
 
-#include "batterySensor/battery_sensor.h"
-#include "lightSensor/light_sensor.h"
+// ADD SENSOR 4: here include sensor class
+// e.g. <new_sensor_class>/<new_sensor_class>.h
+#include "battery_sensor/battery_sensor.h"
+#include "light_sensor/light_sensor.h"
 #include "dht_22_sensor/dht_22_sensor.h"
 #include "bme_280/bme_280.h"
+#include "window_sensor/window_sensor.h"
 
 namespace nl = nlohmann;
 
@@ -27,14 +30,20 @@ namespace UniversalModuleSystem::Transducers {
         const auto &dataManager = DataManager::getInstance();
         nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
         const size_t numOfSensors = jsonData[ms_ALL_SENSORS_DATA][ms_SENSORS_ARRAY].size();
-        const uint32_t sensorReadingsTimeout = jsonData[ms_ALL_SENSORS_DATA][ms_SENSORS_READINGS_TIMEOUT].get<uint32_t>();
+        const uint32_t sensorReadingsTimeout = jsonData[ms_ALL_SENSORS_DATA][ms_SENSORS_READINGS_TIMEOUT].get<
+            uint32_t>();
         const uint8_t powerPin = jsonData[ms_ALL_SENSORS_DATA][ms_POWER_PIN].get<uint8_t>();
 
         mSensorsPowerPin = powerPin;
         pinMode(mSensorsPowerPin, OUTPUT);
 
         if (sensorReadingsTimeout != 0) {
-            if (sensorReadingsTimeout < 5000) mpLogger->warningv("SensorsManager", "Sensors readings timeout is set only to (ms):", (int)sensorReadingsTimeout);
+            if (sensorReadingsTimeout < 5000)
+                mpLogger->warningv(
+                    "SensorsManager",
+                    "Sensors readings timeout is set only to (ms):",
+                    (int) sensorReadingsTimeout
+                );
             mSensorTimeoutTimer = xTimerCreate(
                 "Sensor Timeout",
                 pdMS_TO_TICKS(sensorReadingsTimeout),
@@ -97,10 +106,27 @@ namespace UniversalModuleSystem::Transducers {
 
         std::vector<API::APIParameterVariant> result;
         result.reserve(sensorData.size());
-        for (auto &jsonSensor : sensorData) {
+        for (auto &jsonSensor: sensorData) {
             result.emplace_back(API::APIParameter<uint8_t>(jsonSensor[ms_SENSOR_DATA][ms_SENSOR_ID].get<uint8_t>()));
         }
         return result;
+    }
+
+    void SensorsManager::onSleep() {
+        const auto &dataManager = DataManager::getInstance();
+        nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
+        nl::json &sensorData = jsonData[ms_ALL_SENSORS_DATA][ms_SENSORS_ARRAY];
+
+        for (const auto &jsonSensor: sensorData) {
+            if (
+                const std::unique_ptr<Sensor> sensor = createSensor(
+                    jsonSensor[ms_SENSOR_TYPE].get<std::string>().c_str()
+                );
+                sensor->init(jsonSensor[ms_SENSOR_DATA])
+            ) {
+                sensor->onSleep();
+            }
+        }
     }
 
     std::vector<API::APIParameterVariant> SensorsManager::getSensorCurrentReading(const uint8_t sensorId) {
@@ -113,7 +139,7 @@ namespace UniversalModuleSystem::Transducers {
         if (jsonData.empty())
             return std::vector<API::APIParameterVariant>{API::APIParameter((uint8_t) ET::INTERNAL_ERROR, true)};
 
-        for (auto &jsonSensor : sensorData) {
+        for (auto &jsonSensor: sensorData) {
             if (jsonSensor[ms_SENSOR_DATA][ms_SENSOR_ID].get<uint8_t>() != sensorId) continue;
 
             std::unique_ptr<Sensor> sensor = createSensor(jsonSensor[ms_SENSOR_TYPE].get<std::string>().c_str());
@@ -136,9 +162,11 @@ namespace UniversalModuleSystem::Transducers {
         xSemaphoreTake(mSensorMutex, portMAX_DELAY);
         if (mSensors.empty()) readAllSensors();
 
-        std::vector<API::APIParameterVariant> result = std::vector<API::APIParameterVariant>{API::APIParameter((uint8_t) ET::BAD_ARGUMENT, true)};
+        std::vector<API::APIParameterVariant> result = std::vector<API::APIParameterVariant>{
+            API::APIParameter((uint8_t) ET::BAD_ARGUMENT, true)
+        };
 
-        for (const auto &sensor : mSensors) {
+        for (const auto &sensor: mSensors) {
             if (sensor->getId() == sensorId) {
                 result = sensor->getApiFormattedReading();
                 break;
@@ -161,7 +189,7 @@ namespace UniversalModuleSystem::Transducers {
         vTaskDelay(pdMS_TO_TICKS(ms_DELAY_AFTER_POWERING_ON_SENSORS));
 
         // initialize sensors and start readings
-        for (auto sensorData : sensorsData) {
+        for (auto sensorData: sensorsData) {
             std::unique_ptr<Sensor> sensor = createSensor(sensorData[ms_SENSOR_TYPE].get<std::string>().c_str());
             if (sensor != nullptr && sensor->init(sensorData[ms_SENSOR_DATA])) {
                 sensor->startReading();
@@ -170,7 +198,7 @@ namespace UniversalModuleSystem::Transducers {
         }
 
         // wait until reading ends before powering off sensors
-        for (const auto &sensor : mSensors) {
+        for (const auto &sensor: mSensors) {
             sensor->waitUntilReadEnds();
         }
         digitalWrite(mSensorsPowerPin, LOW);
@@ -182,23 +210,31 @@ namespace UniversalModuleSystem::Transducers {
         using ST = SensorType;
         using STE = SensorType::SensorTypeEnum;
 
+        // ADD SENSOR 5 (final): here add case for new sensor
+        /* eg.:
+            case STE::<NEW_SENSOR>:
+                return std::make_unique<NewSensorClass>(mpLogger);
+        */
         switch (
             const auto it = ST::sensorMap.find(sensorName);
             it != ST::sensorMap.end() ? it->second : STE::UNKNOWN
         ) {
-                case STE::BATTERY:
+            case STE::BATTERY:
                 return std::make_unique<BatterySensor>(mpLogger);
 
-                case STE::LIGHT:
+            case STE::LIGHT:
                 return std::make_unique<LightSensor>(mpLogger);
 
-                case STE::DHT22:
+            case STE::DHT22:
                 return std::make_unique<Dht22Sensor>(mpLogger);
 
-                case STE::BME280:
+            case STE::BME280:
                 return std::make_unique<BME280>(mpLogger);
 
-                default:
+            case STE::WINDOW:
+                return std::make_unique<WindowSensor>(mpLogger);
+
+            default:
                 mpLogger->error("SensorsManager", "Got unknown type of sensor.");
                 return nullptr;
         }

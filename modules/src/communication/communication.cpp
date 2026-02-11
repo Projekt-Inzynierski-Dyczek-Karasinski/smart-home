@@ -13,7 +13,10 @@ namespace uah = Utils::ArrayHandlers;
 
 namespace Comms {
     // ============================ Public ============================
-    Communication &Communication::getInstance(const std::shared_ptr<ums::DebugLED> &debugLED, const std::shared_ptr<ul::Logger> &logger) {
+    Communication &Communication::getInstance(
+        const std::shared_ptr<ums::DebugLED> &debugLED,
+        const std::shared_ptr<ul::Logger> &logger
+    ) {
         static Communication instance(debugLED, logger);
         return instance;
     }
@@ -83,19 +86,24 @@ namespace Comms {
     }
 
     // ================== Constructor and Destructor ==================
-    Communication::Communication(const std::shared_ptr<ums::DebugLED> &debugLED, const std::shared_ptr<ul::Logger> &logger) :
-        mpDebugLED(debugLED),
+    Communication::Communication(
+        const std::shared_ptr<ums::DebugLED> &debugLED,
+        const std::shared_ptr<ul::Logger> &logger
+    ) : mpDebugLED(debugLED),
         mpLogger(logger),
         #ifdef CENTRAL_UNIT
-            mpAddressing(new CentralUnitAddressing(this, logger)),
+        mpAddressing(
+            new CentralUnitAddressing(
+                this, logger)),
         #else
-            mpAddressing(new ModuleAddressing(this, logger)),
+        mpAddressing(
+            new ModuleAddressing(this, logger)),
         #endif
         #ifdef HC12_MODULE
-            mpRfModule(new HC12(this, logger))
-        #else
-            #error "Not implemented"
-        #endif
+        mpRfModule(new HC12(this, logger))
+    #else
+    #error "Not implemented"
+    #endif
     {
         if (mpLogger == nullptr) {
             mpLogger = std::make_shared<ul::Logger>(static_cast<ul::Level>(LOGGING_LEVEL));
@@ -164,15 +172,15 @@ namespace Comms {
     }
 
     // ====================== Communication Main ======================
-    void Communication::receivedMessageDecider() {
+    void Communication::receivedMessageDecider() const {
         uint8_t buffer[MESSAGE_SIZE];
 
         if (xQueueReceive(mReceiveMessageQueue, buffer, 0) == pdTRUE) {
             // if is HC12 command
             #ifdef HC12_MODULE
-                if (buffer[0] == (uint8_t)'H' && buffer[1] == (uint8_t)'C') {
-                    mpRfModule->setupHC12(buffer);
-                }
+            if (buffer[0] == (uint8_t) 'H' && buffer[1] == (uint8_t) 'C') {
+                mpRfModule->setupHC12(buffer);
+            }
             #endif
             else {
                 mpConnection->messageDecider(buffer);
@@ -180,7 +188,7 @@ namespace Comms {
         }
     }
 
-    void Communication::normalOperationHandling() {
+    void Communication::normalOperationHandling() const {
         // extra protection if somehow queues are not empty and corresponding task is suspended
         if (uxQueueMessagesWaiting(mReceiveByteQueue) != 0) {
             mpLogger->debug("Communication Main", "vTaskResume(mDecodeMessageTaskHandle);");
@@ -198,8 +206,8 @@ namespace Comms {
         vTaskDelay(pdMS_TO_TICKS(1));
     }
 
-    void Communication::communicationMainTask(void* parameters) {
-        auto& com = *static_cast<Communication*>(parameters);
+    void Communication::communicationMainTask(void *parameters) {
+        auto &com = *static_cast<Communication *>(parameters);
 
         uint8_t status = DEFAULT_STATUS_NOTIF;
         uint8_t pingAttempts = 0;
@@ -242,7 +250,7 @@ namespace Comms {
                     break;
 
                 default:
-                    com.mpLogger->errorv("Communication Main", "Got unknow status. Received Status:", (int)status);
+                    com.mpLogger->errorv("Communication Main", "Got unknow status. Received Status:", (int) status);
                     break;
             }
         }
@@ -259,9 +267,11 @@ namespace Comms {
                 &mCommunicationMainTaskHandle
             );
         } else {
-            mpLogger->warning("Communication FreeRTOS", "Can't create Communication Main task, because task already exists.");
+            mpLogger->warning("Communication FreeRTOS",
+                              "Can't create Communication Main task, because task already exists.");
         }
     }
+
     void Communication::deleteCommunicationMainTask() {
         if (mCommunicationMainTaskHandle != nullptr) {
             vTaskDelete(mCommunicationMainTaskHandle);
@@ -278,7 +288,10 @@ namespace Comms {
         return checksum % CHECKSUM_MODULO == 0;
     }
 
-    bool Communication::extractMessageFromProtocolBuffer(const uint8_t protocolBuffer[][PROTOCOL_SIZE], uint8_t *messageBuffer) const {
+    bool Communication::extractMessageFromProtocolBuffer(
+        const uint8_t protocolBuffer[][PROTOCOL_SIZE],
+        uint8_t *messageBuffer
+    ) const {
         // prepare received message buffer
         uah::clearBuffer(messageBuffer, MESSAGE_SIZE);
         uint8_t messageIndex = 0;
@@ -286,7 +299,8 @@ namespace Comms {
         uint8_t protoBuffMessageIndex = 0;
 
         do {
-            for (uint8_t i = PROTOCOL_MESSAGE_START_INDEX; i < (PROTOCOL_MESSAGE_START_INDEX + PROTOCOL_MESSAGE_LENGTH); i++) {
+            for (uint8_t i = PROTOCOL_MESSAGE_START_INDEX; i < (PROTOCOL_MESSAGE_START_INDEX + PROTOCOL_MESSAGE_LENGTH);
+                 i++) {
                 messageBuffer[messageIndex] = protocolBuffer[protoBuffMessageIndex][i];
                 messageIndex++;
                 // protection against buffer overload (62 => 63 max buffer index -1 for \0)
@@ -296,18 +310,19 @@ namespace Comms {
             }
 
             // check packet loss
-            if (messagesQuantity != UINT8_MAX && messagesQuantity != protocolBuffer[protoBuffMessageIndex][MESSAGES_QUANTITY_INDEX] + 1) {
+            if (messagesQuantity != UINT8_MAX && messagesQuantity != protocolBuffer[protoBuffMessageIndex][
+                    MESSAGES_QUANTITY_INDEX] + 1) {
                 return false;
             }
 
             messagesQuantity = protocolBuffer[protoBuffMessageIndex][MESSAGES_QUANTITY_INDEX];
             protoBuffMessageIndex++;
-        } while(messagesQuantity != 0);
+        } while (messagesQuantity != 0);
         return true;
     }
 
     void Communication::decodeMessageTask(void *parameters) {
-        const auto& com = *static_cast<Communication*>(parameters);
+        const auto &com = *static_cast<Communication *>(parameters);
 
         // timeout status/cause
         uint32_t timeoutStatus = DEFAULT_STATUS_NOTIF;
@@ -322,7 +337,7 @@ namespace Comms {
         uint8_t protoBuffByteIndex = 0;
 
         auto resetProtocolBuffer = [&]() {
-            for (uint8_t i = 0; i < PROTOCOL_MESSAGE_MAX_NUM; i++){
+            for (uint8_t i = 0; i < PROTOCOL_MESSAGE_MAX_NUM; i++) {
                 uah::clearBuffer(protocolBuffer[i], PROTOCOL_SIZE);
             }
             protoBuffByteIndex = 0;
@@ -360,7 +375,8 @@ namespace Comms {
                         resetProtocolBuffer();
                         xQueueReset(com.mReceiveByteQueue);
                     } else {
-                        com.mpLogger->errorv("Communication Decode", "Got unknow notification status. Received Status: ", (int)timeoutStatus);
+                        com.mpLogger->errorv("Communication Decode",
+                                             "Got unknow notification status. Received Status: ", (int) timeoutStatus);
                     }
                     isRawMessage = false;
                 }
@@ -371,7 +387,7 @@ namespace Comms {
             if (xQueueReceive(com.mReceiveByteQueue, &queueBuffer, pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG)) == pdTRUE) {
                 protocolBuffer[protoBuffMessageIndex][protoBuffByteIndex] = queueBuffer;
                 // if new message start message timeout timer
-                if (protoBuffByteIndex == 0 && protoBuffMessageIndex == 0){
+                if (protoBuffByteIndex == 0 && protoBuffMessageIndex == 0) {
                     xTimerStart(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
                 }
                 // if protocol message is not complete
@@ -386,7 +402,9 @@ namespace Comms {
                     const uint8_t endOfMessage = protocolBuffer[protoBuffMessageIndex][PROTOCOL_SIZE - 1];
                     if (endOfMessage != 0) {
                         handleIncorrectMessage();
-                        com.mpLogger->warningv("Communication Decode", "Bad end of message. Message should end with 0 (\\0 char), but got: ", endOfMessage);
+                        com.mpLogger->warningv("Communication Decode",
+                                               "Bad end of message. Message should end with 0 (\\0 char), but got: ",
+                                               endOfMessage);
                     }
                     // if checksum is incorrect
                     else if (!com.isCheckSumCorrect(protocolBuffer[protoBuffMessageIndex])) {
@@ -404,7 +422,8 @@ namespace Comms {
                     // if IP is incorrect wait for possible rest of message and ignore it
                     else if (!com.mpAddressing->isIpValid(protocolBuffer[protoBuffMessageIndex][PROTOCOL_IP_INDEX])) {
                         xTimerStop(com.mReceiveMessageTimeoutTimer, portMAX_DELAY);
-                        com.mpLogger->debugv("Communication Decode", "Bad IP: ", protocolBuffer[protoBuffMessageIndex][PROTOCOL_IP_INDEX]);
+                        com.mpLogger->debugv("Communication Decode", "Bad IP: ",
+                                             protocolBuffer[protoBuffMessageIndex][PROTOCOL_IP_INDEX]);
                         vTaskDelay(pdMS_TO_TICKS(RECEIVE_MESSAGE_TIMEOUT));
                         resetProtocolBuffer();
                         xQueueReset(com.mReceiveByteQueue);
@@ -430,10 +449,12 @@ namespace Comms {
                         // send decoded message to queue
                         if (isRawMessage) {
                             isRawMessage = false;
-                            com.mpLogger->debuga("Communication Decode", "Received raw message: ", protocolBuffer[0], PROTOCOL_SIZE, false);
+                            com.mpLogger->debuga("Communication Decode", "Received raw message: ", protocolBuffer[0],
+                                                 PROTOCOL_SIZE, false);
                             xQueueSend(com.mReceiveMessageQueue, protocolBuffer[0], portMAX_DELAY);
                         } else {
-                            com.mpLogger->debuga("Communication Decode", "Received message: ", messageBuffer, MESSAGE_SIZE);
+                            com.mpLogger->debuga("Communication Decode", "Received message: ", messageBuffer,
+                                                 MESSAGE_SIZE);
                             xQueueSend(com.mReceiveMessageQueue, messageBuffer, portMAX_DELAY);
                         }
 
@@ -462,6 +483,7 @@ namespace Comms {
             mpLogger->warning("Communication FreeRTOS", "Can't create Decode task, because task already exists.");
         }
     }
+
     void Communication::deleteDecodeMessageTask() {
         if (mDecodeMessageTaskHandle != nullptr) {
             vTaskDelete(mDecodeMessageTaskHandle);
@@ -474,15 +496,15 @@ namespace Comms {
         protocolBuffer[PROTOCOL_CHECKSUM_INDEX] = 0;
         uint16_t checkSum = 0;
         for (uint8_t i = 0; i < PROTOCOL_SIZE; i++) {
-            checkSum += (uint16_t)protocolBuffer[i];
+            checkSum += (uint16_t) protocolBuffer[i];
         }
 
         #ifdef TEST_CHECKSUM
-            // force bad checksum
-            pinMode(18, INPUT_PULLUP);
-            if (digitalRead(18) == LOW) {
-                checkSum++;
-            }
+        // force bad checksum
+        pinMode(18, INPUT_PULLUP);
+        if (digitalRead(18) == LOW) {
+            checkSum++;
+        }
         #endif
 
         checkSum = (CHECKSUM_MODULO - (checkSum % CHECKSUM_MODULO)) % CHECKSUM_MODULO;
@@ -491,7 +513,7 @@ namespace Comms {
     }
 
     void Communication::encodeMessageTask(void *parameters) {
-        auto& com = *static_cast<Communication*>(parameters);
+        auto &com = *static_cast<Communication *>(parameters);
 
         // prepare protocol buffer
         // [0-5{mac}, 6{ip}, 7{messagesQuantity}, 8-13{message}, 14{checksum}, 15{\0}]
@@ -505,7 +527,8 @@ namespace Comms {
         protocolBuffer[PROTOCOL_IP_INDEX] = com.mpAddressing->getIPAddress();
 
         // prepare place for message
-        for (uint8_t i = PROTOCOL_MESSAGE_START_INDEX; i < (PROTOCOL_MESSAGE_START_INDEX + PROTOCOL_MESSAGE_LENGTH); i++) {
+        for (uint8_t i = PROTOCOL_MESSAGE_START_INDEX; i < (PROTOCOL_MESSAGE_START_INDEX + PROTOCOL_MESSAGE_LENGTH); i
+             ++) {
             protocolBuffer[i] = BLANK_CHARACTER;
         }
 
@@ -516,12 +539,13 @@ namespace Comms {
         // task loop
         for (;;) {
             // wait until the message appears in the queue and saveJson message in local messageBuffer
-            if (xQueueReceive(com.mEncodeMessagesQueue, &messageBuffer, pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG)) == pdTRUE) {
+            if (xQueueReceive(com.mEncodeMessagesQueue, &messageBuffer, pdMS_TO_TICKS(SUSPEND_TASK_TIME_LONG)) ==
+                pdTRUE) {
                 com.mpConnection->sendingHandle(messageBuffer);
                 // only for central unit, because modules IP is constant
                 #ifdef CENTRAL_UNIT
-                    // prepare place for IP address
-                    protocolBuffer[PROTOCOL_IP_INDEX] = com.mpAddressing->getIPAddress();
+                // prepare place for IP address
+                protocolBuffer[PROTOCOL_IP_INDEX] = com.mpAddressing->getIPAddress();
                 #endif
 
                 int8_t messagesQuantity = 0;
@@ -542,15 +566,19 @@ namespace Comms {
                 for (messagesQuantity; messagesQuantity >= 0; messagesQuantity--) {
                     protocolBuffer[MESSAGES_QUANTITY_INDEX] = messagesQuantity;
                     for (uint8_t i = 0; i < PROTOCOL_MESSAGE_LENGTH; i++) {
-                        protocolBuffer[PROTOCOL_MESSAGE_START_INDEX + i] = messageBuffer[messageIndex] != 0 ? messageBuffer[messageIndex] : BLANK_CHARACTER;
+                        protocolBuffer[PROTOCOL_MESSAGE_START_INDEX + i] = messageBuffer[messageIndex] != 0
+                                                                               ? messageBuffer[messageIndex]
+                                                                               : BLANK_CHARACTER;
                         messageIndex++;
                     }
                     // calculate and set checksum
                     com.prepareChecksum(protocolBuffer);
                     com.mpRfModule->addMessageToTransmit(protocolBuffer);
 
-                    com.mpLogger->debuga("Communication Encode", "Protocol buffer: ", protocolBuffer, PROTOCOL_SIZE, false);
-                    com.mpLogger->debuga("Communication Encode", "Protocol message: ", &protocolBuffer[PROTOCOL_MESSAGE_START_INDEX], PROTOCOL_MESSAGE_LENGTH);
+                    com.mpLogger->debuga("Communication Encode", "Protocol buffer: ", protocolBuffer, PROTOCOL_SIZE,
+                                         false);
+                    com.mpLogger->debuga("Communication Encode", "Protocol message: ",
+                                         &protocolBuffer[PROTOCOL_MESSAGE_START_INDEX], PROTOCOL_MESSAGE_LENGTH);
                 }
             } else {
                 constexpr uint8_t notificationValue = SUSPEND_ENCODE_MESSAGE_TASK_NOTIF;
@@ -584,17 +612,17 @@ namespace Comms {
     // =================== Terminal Input Message =====================
     #ifdef DEBUG_MODE
     void Communication::terminalInputTask(void *parameters) {
-        const auto& com = *static_cast<Communication*>(parameters);
+        const auto &com = *static_cast<Communication *>(parameters);
 
         // prepare buffer
         uint8_t buffer[MESSAGE_SIZE];
-        for (uint8_t i = 0; i < MESSAGE_SIZE; i++){
+        for (uint8_t i = 0; i < MESSAGE_SIZE; i++) {
             buffer[i] = 0;
         }
         uint8_t index = 0;
 
         // task loop
-        for(;;) {
+        for (;;) {
             if (Serial.available() > 0) {
                 buffer[index] = Serial.read();
                 com.mpLogger->printInputChar(buffer[index]);
@@ -607,7 +635,7 @@ namespace Comms {
                 }
 
                 // send message to Prepare Message To Send (protocol)
-                if (buffer[index - 1] == (uint8_t)'\n') {
+                if (buffer[index - 1] == (uint8_t) '\n') {
                     buffer[index - 1] = 0;
 
                     com.mpLogger->infoa("Communication Input", "Input: ", buffer, MESSAGE_SIZE);
@@ -618,24 +646,24 @@ namespace Comms {
                         xQueueSendToFront(com.mMainNotificationsQueue, &notificationValue, portMAX_DELAY);
                     }
                     #ifdef ESP32_BOARD
-                        else if (uah::areArraysEqual(buffer, "reboot")) {
-                            auto & powerManager = ums::PowerManager::getInstance(com.mpLogger);
-                            powerManager.safeRestart("Communication Input");
-                        }
+                    else if (uah::areArraysEqual(buffer, "reboot")) {
+                        auto &powerManager = ums::PowerManager::getInstance(com.mpLogger);
+                        powerManager.safeRestart("Communication Input");
+                    }
                     #endif
                     else if (uah::areArraysEqual(buffer, "ls")) {
-                        auto & dataManager = ums::DataManager::getInstance();
+                        auto &dataManager = ums::DataManager::getInstance();
                         dataManager.ls();
                     } else if (uah::areArraysEqual(buffer, "cat")) {
-                        auto & dataManager = ums::DataManager::getInstance();
-                        dataManager.cat((char*)&buffer[strlen("cat") + 1]);
+                        auto &dataManager = ums::DataManager::getInstance();
+                        dataManager.cat((char *) &buffer[strlen("cat") + 1]);
                     } else if (uah::areArraysEqual(buffer, "rm")) {
-                        auto & dataManager = ums::DataManager::getInstance();
-                        dataManager.rm((char*)&buffer[strlen("rm") + 1]);
+                        auto &dataManager = ums::DataManager::getInstance();
+                        dataManager.rm((char *) &buffer[strlen("rm") + 1]);
                     } else if (uah::areArraysEqual(buffer, "ip=")) {
                         std::optional<uint8_t> ip;
                         try {
-                            ip = std::stoi((char*)&buffer[3]);
+                            ip = std::stoi((char *) &buffer[3]);
                         } catch (...) {
                             ip.reset();
                         }
@@ -652,7 +680,7 @@ namespace Comms {
                         API::CommandHandler ch(API::commandTypes::GET);
                         std::optional<uint8_t> getType;
                         try {
-                            getType = std::stoi((char*)&buffer[3]);
+                            getType = std::stoi((char *) &buffer[3]);
                         } catch (...) {
                             com.mpLogger->error("Communication Input", "Bad getType");
                         }
@@ -663,17 +691,17 @@ namespace Comms {
                             API::APIParameter getTypeParam(getType.value());
                             ch.addParameter(uid);
                             ch.addParameter(getTypeParam);
-                            if (getType.value() == (uint8_t)API::getTypes::BATTERY_STATE) {
+                            if (getType.value() == (uint8_t) API::getTypes::BATTERY_STATE) {
                                 constexpr uint8_t BATTERY_ID = 1;
                                 ch.addParameter(API::APIParameter(BATTERY_ID));
                             } else if (
-                                getType.value() == (uint8_t)API::getTypes::SENSOR_VALUE ||
-                                getType.value() == (uint8_t)API::getTypes::SENSOR_VALUE_WITH_FORCE_NEW_READING ||
-                                getType.value() == (uint8_t)API::getTypes::ACTUATOR_STATE
+                                getType.value() == (uint8_t) API::getTypes::SENSOR_VALUE ||
+                                getType.value() == (uint8_t) API::getTypes::SENSOR_VALUE_WITH_FORCE_NEW_READING ||
+                                getType.value() == (uint8_t) API::getTypes::ACTUATOR_STATE
                             ) {
                                 std::optional<uint8_t> sensorId;
                                 try {
-                                    sensorId = std::stoi((char*)&buffer[5]);
+                                    sensorId = std::stoi((char *) &buffer[5]);
                                 } catch (...) {
                                     com.mpLogger->error("Communication Input", "Bad sensorId/actuatorId.");
                                 }
@@ -691,7 +719,7 @@ namespace Comms {
                     else if (uah::areArraysEqual(buffer, "sl")) {
                         std::optional<uint32_t> sleepTime;
                         try {
-                            sleepTime = std::stoi((char*)&buffer[2]);
+                            sleepTime = std::stoi((char *) &buffer[2]);
                             com.mpLogger->errorv("Communication Input", "good sleep time:", sleepTime.value());
                         } catch (...) {
                             com.mpLogger->error("Communication Input", "Bad sleep time.");
@@ -710,7 +738,7 @@ namespace Comms {
                     else if (uah::areArraysEqual(buffer, "dsl")) {
                         std::optional<uint32_t> sleepTime;
                         try {
-                            sleepTime = std::stoi((char*)&buffer[3]);
+                            sleepTime = std::stoi((char *) &buffer[3]);
                         } catch (...) {
                             com.mpLogger->error("Communication Input", "Bad sleep time.");
                         }
@@ -734,13 +762,13 @@ namespace Comms {
                         com.sendMessage(message);
                     } else if (uah::areArraysEqual(buffer, "ping")) {
                         API::CommandHandler ch(API::commandTypes::PING);
-                        ch.addParameter(API::APIParameter((uint8_t)12));
-                        ch.addParameter(API::APIParameter((uint8_t)128));
+                        ch.addParameter(API::APIParameter((uint8_t) 12));
+                        ch.addParameter(API::APIParameter((uint8_t) 128));
                         ch.addParameter(API::APIParameter(3.4f));
                         ch.addParameter(API::APIParameter(-456));
                         char charArray[] = "abcdef";
                         ch.addParameter(API::APIParameter(charArray, strlen(charArray)));
-                        uint8_t rawArray[] = {1,2,3,4,5};
+                        uint8_t rawArray[] = {1, 2, 3, 4, 5};
                         ch.addParameter(API::APIParameter(rawArray, sizeof(rawArray)));
 
                         uint8_t message[MESSAGE_SIZE] = {};
@@ -764,8 +792,8 @@ namespace Comms {
                         std::optional<uint8_t> setType;
                         std::optional<uint8_t> actuatorId;
                         try {
-                            setType = std::stoi((char*)&buffer[3]);
-                            actuatorId = std::stoi((char*)&buffer[5]);
+                            setType = std::stoi((char *) &buffer[3]);
+                            actuatorId = std::stoi((char *) &buffer[5]);
                         } catch (...) {
                             com.mpLogger->error("Communication Input", "Bad setType or actuatorId.");
                         }
@@ -775,7 +803,7 @@ namespace Comms {
                             if (setType.value() == static_cast<uint8_t>(API::setTypes::ACTUATOR_OPERATION)) {
                                 std::optional<uint8_t> operation;
                                 try {
-                                    operation = std::stoi((char*)&buffer[7]);
+                                    operation = std::stoi((char *) &buffer[7]);
                                 } catch (...) {
                                     com.mpLogger->error("Communication Input", "Bad operation.");
                                 }
@@ -797,8 +825,7 @@ namespace Comms {
                         uint8_t message[MESSAGE_SIZE] = {};
                         ch.generateMessage(message);
                         xQueueSend(com.mEncodeMessagesQueue, &message, portMAX_DELAY);
-                    }
-                    else if (uah::areArraysEqual(buffer, "otaoff")) {
+                    } else if (uah::areArraysEqual(buffer, "otaoff")) {
                         API::CommandHandler ch(API::commandTypes::SET);
                         ch.addParameter(API::APIParameter(static_cast<uint8_t>(45))); // uid
                         ch.addParameter(API::APIParameter(static_cast<uint8_t>(API::setTypes::OTA)));
@@ -812,15 +839,15 @@ namespace Comms {
                     else {
                         // check if is HC_12 command
                         #ifdef HC12_MODULE
-                            if (buffer[0] == 'A' && buffer[1] == 'T') {
-                                buffer[0] = 'H';
-                                buffer[1] = 'C';
-                                xQueueSend(com.mReceiveMessageQueue, &buffer, portMAX_DELAY);
-                            } else {
-                                com.mpLogger->error("Communication Input", "Unknow command");
-                            }
+                        if (buffer[0] == 'A' && buffer[1] == 'T') {
+                            buffer[0] = 'H';
+                            buffer[1] = 'C';
+                            xQueueSend(com.mReceiveMessageQueue, &buffer, portMAX_DELAY);
+                        } else {
+                            com.mpLogger->error("Communication Input", "Unknow command");
+                        }
                         #else
-                            #error "not implemented"
+                        #error "not implemented"
                         #endif
                     }
                     // reset buffer
@@ -844,7 +871,8 @@ namespace Comms {
                 &mTerminalInputTaskHandle
             );
         } else {
-            mpLogger->warning("Communication FreeRTOS", "Can't create Terminal Input task, because task already exists.");
+            mpLogger->warning("Communication FreeRTOS",
+                              "Can't create Terminal Input task, because task already exists.");
         }
     }
 
@@ -856,13 +884,15 @@ namespace Comms {
     }
 
     #else
-        void Communication::createTerminalInputTask() {}
-        void Communication::deleteTerminalInputTask() {}
+    void Communication::createTerminalInputTask() {
+    }
+    void Communication::deleteTerminalInputTask() {
+    }
     #endif
 
     // ============================ Timers ============================
-    void Communication::communicationTimersCallbacks(TimerHandle_t xTimer){
-        const auto &com = *static_cast<Communication*>(pvTimerGetTimerID(xTimer));
+    void Communication::communicationTimersCallbacks(TimerHandle_t xTimer) {
+        const auto &com = *static_cast<Communication *>(pvTimerGetTimerID(xTimer));
 
         if (xTimer == com.mReceiveMessageTimeoutTimer) {
             com.mpLogger->debug("Communication Timers", "Message timeout.");

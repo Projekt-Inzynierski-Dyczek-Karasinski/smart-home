@@ -145,11 +145,11 @@ namespace Comms {
         /**
          * @brief Decides what to do with incoming messages (both internal and RF).
          */
-        void receivedMessageDecider();
+        void receivedMessageDecider() const;
         /**
          * @brief Handles when main task is in default state.
          */
-        void normalOperationHandling();
+        void normalOperationHandling() const;
         /**
          * @brief Main FreeRTOS task for Communication class.
          * It is responsible for suspending/deleting resuming/creating other communication related tasks.
