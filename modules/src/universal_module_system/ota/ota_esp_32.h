@@ -1,11 +1,12 @@
 #pragma once
 
 #ifndef ESP32_BOARD
-    #error "OtaESP32 class is exclusively for ESP32"
+#error "OtaESP32 class is exclusively for ESP32"
 #endif
 
 #include <string_view>
 #include <memory>
+#include <atomic>
 #include <WiFi.h>
 
 #include <nlohmann/json.hpp>
@@ -37,14 +38,15 @@ namespace UniversalModuleSystem {
          *
          * @warning The first call has to pass pointers to logger and debugLED.
          */
-        static OtaESP32& getInstance(
+        static OtaESP32 &getInstance(
             const std::shared_ptr<ul::Logger> &logger = nullptr,
             const std::shared_ptr<DebugLED> &debugLED = nullptr
         );
 
         // Delete copy constructor and assignment operator
-        OtaESP32(const OtaESP32&) = delete;
-        OtaESP32& operator = (const OtaESP32&) = delete;
+        OtaESP32(const OtaESP32 &) = delete;
+
+        OtaESP32 &operator =(const OtaESP32 &) = delete;
 
         /**
          * @brief Start OTA mode.
@@ -69,9 +71,16 @@ namespace UniversalModuleSystem {
         void toggleOta() override;
 
         /**
+         * @brief Checks if the module is connected to Wi-Fi.
+         *
+         * @return True if the module is connected to Wi-Fi, false otherwise.
+         */
+        bool isConnectedToWifi() const override;
+
+        /**
          * @brief Auto-start OTA under special conditions and halt the rest of the program.
-         * @details Compares "magic numbers" stored in base_config.json and critical_config.h and checks
-         * whether the pairing button is pressed. If "magic numbers" do not match or pairing button
+         * @details Compares version numbers stored in base_config.json and critical_config.h and checks
+         * whether the pairing button is pressed. If version numbers do not match or pairing button
          * is pressed, starts OTA and stops execution rest of the program.
          *
          * @note This may be useful for software updates that are not compatible with an old base_config.json.
@@ -101,7 +110,7 @@ namespace UniversalModuleSystem {
          *
          * @return Array containing the device IPv4 address (4 bytes).
          */
-        [[nodiscard]] std::array<uint8_t, s_IP_ADDRESS_LENGTH> connectToWifi() const;
+        [[nodiscard]] std::array<uint8_t, s_IP_ADDRESS_LENGTH> connectToWifi();
 
         /**
          * @brief Disconnect from Wi-Fi and turn off the Wi-Fi modem.
@@ -122,16 +131,40 @@ namespace UniversalModuleSystem {
          *
          * @param parameters Pointer to the OtaESP32 instance (this).
          */
-        static void otaTask(void * parameters);
+        static void otaTask(void *parameters);
 
-        TaskHandle_t mOtaTaskHandle = nullptr;
-        SemaphoreHandle_t mOtaMutex = nullptr;
+        /**
+         * @brief Creates and starts a FreeRTOS software timer used to signal a Wi-Fi connection timeout.
+         */
+        void createAndStartWifiConnectionTimeoutTimer();
+
+        /**
+         * @brief Stops and deletes the FreeRTOS software timer used to signal a Wi-Fi connection timeout.
+         */
+        void stopAndDeleteWifiConnectionTimeoutTimer();
+
+        /**
+         * @brief Wi-Fi connection timeout timer callback, notifies a task about a connection timeout.
+         * @param xTimer Timer handle with the task handle that started the connection attempt.
+         */
+        static void wifiConnectionTimeoutTimerCallback(TimerHandle_t xTimer);
+
 
         std::shared_ptr<ul::Logger> mpLogger;
         std::shared_ptr<DebugLED> mpDebugLED;
-        std::array<uint8_t, 4> ipAddress{};
+        std::array<uint8_t, 4> mIpAddress{};
+        std::atomic<bool> mIsOtaForced{false};
 
-        // JSON keys
+        // FreeRTOS
+        TaskHandle_t mOtaTaskHandle = nullptr;
+        SemaphoreHandle_t mOtaMutex = nullptr;
+        TimerHandle_t mWifiConnectionTimeoutTimer = nullptr;
+
+        // constants
+        static constexpr TickType_t ms_WIFI_CONNECTION_TIMEOUT_TIME = pdMS_TO_TICKS(1000*10); // 10s
+        static constexpr uint8_t ms_MAX_CONNECTION_ATTEMPTS_WITH_FORCED_OTA = 3;
+
+        // JSON key
         static constexpr std::string_view ms_OTA_DATA = "otaCheck";
     };
 }

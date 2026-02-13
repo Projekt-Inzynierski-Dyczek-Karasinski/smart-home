@@ -123,7 +123,6 @@ namespace UniversalModuleSystem {
             else if (DEBOUNCING_COUNTER_TO_SECONDS(pb.mButtonPressCounter.load()) >= 3 && pb.mButtonMode.load() ==
                      ButtonModes::IDLE) {
                 if (pb.mButtonMode.load() != ButtonModes::PAIR) {
-                    pb.mpDebugLED->createPairingBlinkTask();
                     pb.mpLogger->debug("PairingButton Timer", "ButtonModes::PAIR");
                 }
                 pb.mButtonMode.store(ButtonModes::PAIR);

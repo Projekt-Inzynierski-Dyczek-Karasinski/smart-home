@@ -30,8 +30,8 @@ namespace UniversalModuleSystem::Transducers {
         const auto &dataManager = DataManager::getInstance();
         nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
         const size_t numOfSensors = jsonData[ms_ALL_SENSORS_DATA][ms_SENSORS_ARRAY].size();
-        const uint32_t sensorReadingsTimeout = jsonData[ms_ALL_SENSORS_DATA][ms_SENSORS_READINGS_TIMEOUT].get<
-            uint32_t>();
+        const uint32_t sensorReadingsTimeout =
+                jsonData[ms_ALL_SENSORS_DATA][ms_SENSORS_READINGS_TIMEOUT].get<uint32_t>();
         const uint8_t powerPin = jsonData[ms_ALL_SENSORS_DATA][ms_POWER_PIN].get<uint8_t>();
 
         mSensorsPowerPin = powerPin;

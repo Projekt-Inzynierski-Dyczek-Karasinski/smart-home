@@ -720,7 +720,6 @@ namespace Comms {
                         std::optional<uint32_t> sleepTime;
                         try {
                             sleepTime = std::stoi((char *) &buffer[2]);
-                            com.mpLogger->errorv("Communication Input", "good sleep time:", sleepTime.value());
                         } catch (...) {
                             com.mpLogger->error("Communication Input", "Bad sleep time.");
                         }

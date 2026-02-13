@@ -12,6 +12,9 @@
 // RF module
 #define HC12_MODULE
 
-// Magic number: if it does not match the value in base_config.json, the device will start OTA and disable normal
-// program execution (useful when a code update isn’t compatible with an old base_config.json, or vice versa)
-#define OTA_CHECK 2
+/*
+ Version number indicating which base_config.json is compatible with this code.
+ If it does not match the value in base_config.json, the device will start OTA and disable normal program execution.
+ Useful when a code update isn’t compatible with an older base_config.json, or vice versa.
+*/
+#define CONFIG_COMPAT_VERSION 2

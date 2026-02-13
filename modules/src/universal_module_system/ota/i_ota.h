@@ -50,6 +50,13 @@ namespace UniversalModuleSystem {
         virtual void toggleOta() = 0;
 
         /**
+         * @brief Checks if the module is connected to Wi-Fi.
+         *
+         * @return True if the module is connected to Wi-Fi, false otherwise.
+         */
+        virtual bool isConnectedToWifi() const = 0;
+
+        /**
          * @brief Auto-start OTA under special conditions and halt the rest of the program.
          */
         virtual void autoBeginOta() = 0;

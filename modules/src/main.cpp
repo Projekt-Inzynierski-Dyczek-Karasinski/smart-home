@@ -15,30 +15,31 @@
 
 namespace ul = Utils::Logging;
 namespace ums = UniversalModuleSystem;
+namespace umst = UniversalModuleSystem::Transducers;
 
 void setup() {
+    // Initialize critical system components
     const auto logger = std::make_shared<ul::Logger>();
-
     auto &dataManager = ums::DataManager::getInstance(logger);
-
-    // start Ota if OTA_CHECK and "version" in /data/base_config.json do not match.
     const auto debugLed = std::make_shared<ums::DebugLED>(logger);
+
+    // Initialize Ota if CONFIG_COMPAT_VERSION and "version" in /data/base_config.json do not match.
     auto &ota = ums::Ota::getInstance(logger, debugLed);
     ota.autoBeginOta();
 
+    // Initialize rest of the program
     auto &communication = Comms::Communication::getInstance(debugLed, logger);
     auto &pairingButton = ums::PairingButton::getInstance(debugLed, &communication, logger);
-
     auto &powerManager = ums::PowerManager::getInstance(logger);
-    auto &sensorManager = ums::Transducers::SensorsManager::getInstance(logger);
-    auto &actuatorManager = ums::Transducers::ActuatorsManager::getInstance(logger);
+    auto &sensorManager = umst::SensorsManager::getInstance(logger);
+    auto &actuatorManager = umst::ActuatorsManager::getInstance(logger);
 
+    // Delete Arduino setup task
     logger->info("Main", "All components initialized.");
-    logger->verbose("Main", "Deleting functions setup() and loop()...");
-
+    logger->verbose("Main", "Deleting Arduino setup task...");
     vTaskDelete(nullptr);
 
-    // everything below this comment should never be executed
+    // Everything below this comment should never be executed
     logger->error("Main", "Failed to delete setup().");
 }
 

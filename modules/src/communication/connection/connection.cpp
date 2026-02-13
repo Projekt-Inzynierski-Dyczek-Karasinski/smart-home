@@ -504,7 +504,13 @@ namespace Comms {
                         // on
                         else {
                             const std::array<uint8_t, ums::Ota::s_IP_ADDRESS_LENGTH> ipAddress = ota.beginOta();
-                            sendCommand->addParameter(API::APIParameter<uint8_t*>(ipAddress.data(),  ums::Ota::s_IP_ADDRESS_LENGTH));
+                            if (ota.isConnectedToWifi()) {
+                                sendCommand->addParameter(
+                                    API::APIParameter<uint8_t *>(ipAddress.data(), ums::Ota::s_IP_ADDRESS_LENGTH)
+                                );
+                            } else {
+                                responseWithError(sendCommand, ET::INTERNAL_ERROR, uid);
+                            }
                         }
                         break;
                     }

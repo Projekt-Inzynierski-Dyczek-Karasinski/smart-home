@@ -4,8 +4,6 @@
 
 #include "universal_module_system/ota/ota.h"
 
-#define PIN_BITMASK(gpio_num) 1ULL << gpio_num
-
 #include "../../../config/system_config/universal_module_system_config.h"
 #include "../config/user_config/critical_config.h"
 
@@ -66,8 +64,8 @@ namespace UniversalModuleSystem {
             rtc_gpio_pulldown_dis(hc12WakeUpPin);
             rtc_gpio_pullup_en(hc12WakeUpPin);
             // NOTE: ESP_EXT1_WAKEUP_ALL_LOW is deprecated on ESP32-S3 boards, but ESP_EXT1_WAKEUP_ANY_LOW doesn't exist on ESP32-WROOM
-            // For wake up logic it doesn't matter if is all or any, because PIN_BITMASK have only one pin assigned
-            esp_sleep_enable_ext1_wakeup(PIN_BITMASK(hc12WakeUpPin), ESP_EXT1_WAKEUP_ALL_LOW);
+            // For wake up logic it doesn't matter if is all or any, because pin bitmask have only one pin assigned
+            esp_sleep_enable_ext1_wakeup((1ULL << hc12WakeUpPin), ESP_EXT1_WAKEUP_ALL_LOW);
         } else {
             const auto &communication = Comms::Communication::getInstance(nullptr, nullptr);
             communication.putRfModuleToSleep();
@@ -90,7 +88,7 @@ namespace UniversalModuleSystem {
             // esp_ext1
             esp_sleep_enable_ext1_wakeup(bitMask, ESP_EXT1_WAKEUP_ANY_LOW);
         } else {
-            esp_sleep_enable_ext1_wakeup(PIN_BITMASK(buttonPin), ESP_EXT1_WAKEUP_ANY_LOW);
+            esp_sleep_enable_ext1_wakeup((1ULL << buttonPin), ESP_EXT1_WAKEUP_ANY_LOW);
             const auto &communication = Comms::Communication::getInstance(nullptr, nullptr);
             communication.putRfModuleToSleep();
         }
@@ -171,9 +169,9 @@ namespace UniversalModuleSystem {
                 mpLogger->info("PowerManagerESP32 Class", "Module was wake up by timer.");
                 break;
 
-                // macro disabling wake up rf notifications that are annoying during software development
-                #ifdef DISABLE_WAKE_UP_RF_NOTIFICATION
-                #warning "Wake up rf notifications are disabled"
+            // macro disabling wake up rf notifications that are annoying during software development
+            #ifdef DISABLE_WAKE_UP_RF_NOTIFICATION
+            #warning "Wake up rf notifications are disabled"
             case ESP_SLEEP_WAKEUP_EXT1: {
                 const uint64_t mask = esp_sleep_get_ext1_wakeup_status();
                 for (uint8_t gpio = 0; gpio < 64; gpio++) {
@@ -192,7 +190,7 @@ namespace UniversalModuleSystem {
                 mpLogger->info("PowerManagerESP32 Class", "Module had power loss.");
                 break;
 
-                #else
+            #else
             case ESP_SLEEP_WAKEUP_EXT0:
                 try {
                     API::CommandHandler commandHandler(API::commandTypes::NOTIFY);
@@ -222,7 +220,7 @@ namespace UniversalModuleSystem {
                 for (uint8_t gpio = 0; gpio < 64; gpio++) {
                     if (!(mask & (1ULL << gpio))) continue;
 
-                    mpLogger->infov("PowerManagerESP32 Class", "Module was wake up by by GPIO %d\n", gpio);
+                    mpLogger->infov("PowerManagerESP32 Class", "Module was wake up by by GPIO: ", gpio);
                     if (PairingButton::getButtonPin() != gpio) continue;
 
                     try {
@@ -263,7 +261,7 @@ namespace UniversalModuleSystem {
                 }
                 mpLogger->info("PowerManagerESP32 Class", "Module had power loss.");
                 break;
-                #endif
+            #endif
         }
     }
 
