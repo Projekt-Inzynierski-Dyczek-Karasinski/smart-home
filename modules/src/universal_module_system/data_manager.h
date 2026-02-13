@@ -102,7 +102,6 @@ namespace UniversalModuleSystem {
 
         static constexpr char s_BASE_CONFIG_PATH[] = "/base_config.json"; ///< Path to config uploaded by platformio
 
-
     private:
         /**
          * @brief Private constructor for singleton pattern.

@@ -49,13 +49,25 @@ namespace UniversalModuleSystem {
          */
         void deleteResetBlinkTask();
 
+        /**
+         * @brief Indicate that the module is connected to Wi-Fi.
+         * @details Stops blinking and turns the LED on.
+         */
+        void wifiConnected();
+
+        /**
+         * @brief Indicate that the module is disconnected from Wi-Fi.
+         * @details Stops blinking and turns the LED off.
+         */
+        void wifiDisconnected();
+
     private:
         /**
          * @brief Make LED blink for a given times.
          * @param ledOnDuration Time in milliseconds for which the LED will be on.
          * @param ledOffDuration Time in milliseconds for which the LED will be off.
          */
-        void blink(uint32_t ledOnDuration, uint32_t ledOffDuration);
+        void blink(uint32_t ledOnDuration, uint32_t ledOffDuration) const;
 
         /**
          * @brief FreeRTOS task that blinks LED signalizing pairing process.
@@ -88,6 +100,10 @@ namespace UniversalModuleSystem {
         TaskHandle_t mBlinkHandle = nullptr; ///< FreeRTOS task handle to responsible for blinking LED.
         TimerHandle_t mBlinkTimeout = nullptr; ///< FreeRTOS software timer for automatic deleting <code>mBlinkHandle</code> task when timeout occurs.
 
+        uint8_t mLedPin;
         std::shared_ptr<ul::Logger> mpLogger;
+
+        // JSON key
+        static constexpr char ms_LED_PIN[] = "ledPin";
     };
 }

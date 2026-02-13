@@ -1,9 +1,9 @@
 #pragma once
 
+#define HARDWARE_SERIAL_UART_NR 2
 #define RF_CHANNELS
 #define DEFAULT_CHANNEL 1
-#define MAX_CHANNEL 4 // TODO !mm change back to 127 (saving flash memory)
-// #define MAX_CHANNEL 127
+#define MAX_CHANNEL 127
 
 #define SETUP_COMMAND_SIZE 10
 #define SETUP_MAX_NUM_OF_COMMANDS 5
@@ -11,5 +11,6 @@
 
 #define DELAY_AFTER_SET_PIN_LOW 40 // from HC12 documentation 
 #define DELAY_AFTER_SET_PIN_HIGH 80 // from HC12 documentation
+#define DELAY_BETWEEN_MESSAGES 80
 
 #define FIRST_SETUP_SEMAPHORE_TIMEOUT 100 // 0.1s

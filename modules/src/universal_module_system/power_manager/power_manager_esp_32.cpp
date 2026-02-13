@@ -1,25 +1,27 @@
 #include "power_manager_esp_32.h"
 
 #include <driver/rtc_io.h>
-// TODO !mm uncomment
-// #include <WiFi.h>
-// #include <esp_wifi.h>
 
-#include "../../../config/universal_module_system_config.h"
+#include "universal_module_system/ota/ota.h"
+
+#include "../../../config/system_config/universal_module_system_config.h"
+#include "../config/user_config/critical_config.h"
+
 #include "universal_module_system/data_manager.h"
+#include "universal_module_system/pairing_button.h"
+#include "universal_module_system/transducers/sensors/sensors_manager.h"
 #include "communication/communication.h"
 #include "communication/api/command_handler.h"
+
+#ifdef HC12_MODULE
+#include "communication/hc12.h"
+#endif
 
 namespace nl = nlohmann;
 namespace API = Comms::API;
 
 namespace UniversalModuleSystem {
-    #ifdef AUTO_SLEEP
-        RTC_DATA_ATTR uint32_t PowerManagerESP32::msSleepStart = 0;
-        RTC_DATA_ATTR int64_t PowerManagerESP32::msIntendedSleepTime = 0;
-    #endif
-
-    PowerManagerESP32& PowerManagerESP32::getInstance(const std::shared_ptr<ul::Logger> &logger) {
+    PowerManagerESP32 &PowerManagerESP32::getInstance(const std::shared_ptr<ul::Logger> &logger) {
         static PowerManagerESP32 instance(logger);
         return instance;
     }
@@ -31,59 +33,75 @@ namespace UniversalModuleSystem {
     }
 
     void PowerManagerESP32::enterSleep(const uint32_t milliSeconds, const bool enableWakeUpWithRfModule) {
+        #ifdef HC12_MODULE
+        const auto &dataManager = DataManager::getInstance();
+        using HC12 = Comms::HC12;
+        nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
+        const gpio_num_t hc12WakeUpPin = jsonData[HC12::s_HC12_DATA][HC12::s_RX_PIN].get<gpio_num_t>();
+        #else
+        #error "Not implemented"
+        #endif
+
         constexpr uint16_t US_TO_MILLISECONDS_FACTOR = 1000;
 
-        // disable WiFi
-        // TODO !mm uncomment
-        // WiFi.disconnect(true);
-        // WiFi.mode(WIFI_OFF);
-        // esp_wifi_stop();
+        // disable WiFi and ota
+        auto &ota = Ota::getInstance();
+        ota.endOta();
 
+        const gpio_num_t buttonPin = static_cast<gpio_num_t>(PairingButton::getButtonPin(mpLogger));
+        // EXT0 is reserved for sensor wake up, but ESP32 WROOM does not support ESP_EXT1_WAKEUP_ANY_LOW, so
+        // waking up ESP by sensor is only available on ESP32-S3
+        #ifdef ESP32_WROOM_BOARD_TYPE
         // button wake up
-        rtc_gpio_pulldown_dis(BUTTON_PIN_AS_GPIO);
-        rtc_gpio_pullup_en(BUTTON_PIN_AS_GPIO);
-        esp_sleep_enable_ext0_wakeup(BUTTON_PIN_AS_GPIO, LOW);
+
+        rtc_gpio_pulldown_dis(buttonPin);
+        rtc_gpio_pullup_en(buttonPin);
+        esp_sleep_enable_ext0_wakeup(buttonPin, LOW);
 
         // rf module wake up
+        // TODO add changing FU mode for power saving
         if (enableWakeUpWithRfModule) {
-            rtc_gpio_pulldown_dis(RF_MODULE_WAKE_UP_PIN);
-            rtc_gpio_pullup_en(RF_MODULE_WAKE_UP_PIN);
+            rtc_gpio_pulldown_dis(hc12WakeUpPin);
+            rtc_gpio_pullup_en(hc12WakeUpPin);
             // NOTE: ESP_EXT1_WAKEUP_ALL_LOW is deprecated on ESP32-S3 boards, but ESP_EXT1_WAKEUP_ANY_LOW doesn't exist on ESP32-WROOM
-            // For wake up logic it doesn't matter if is all or any, because RF_MODULE_WAKE_UP_PIN_BITMASK have only one pin assigned
-            #ifdef ESP32_WROOM_BOARD_TYPE
-                esp_sleep_enable_ext1_wakeup(RF_MODULE_WAKE_UP_PIN_BITMASK, ESP_EXT1_WAKEUP_ALL_LOW);
-            #else
-                esp_sleep_enable_ext1_wakeup(RF_MODULE_WAKE_UP_PIN_BITMASK, ESP_EXT1_WAKEUP_ANY_LOW);
-            #endif
+            // For wake up logic it doesn't matter if is all or any, because pin bitmask have only one pin assigned
+            esp_sleep_enable_ext1_wakeup((1ULL << hc12WakeUpPin), ESP_EXT1_WAKEUP_ALL_LOW);
         } else {
             const auto &communication = Comms::Communication::getInstance(nullptr, nullptr);
             communication.putRfModuleToSleep();
         }
+        #else
+        // handle sensor onSleep
+        auto &sensorManager = Transducers::SensorsManager::getInstance();
+        sensorManager.onSleep();
+
+        // rf module wake up
+        // TODO add changing FU mode for power saving
+        rtc_gpio_pulldown_dis(buttonPin);
+        rtc_gpio_pullup_en(buttonPin);
+        if (enableWakeUpWithRfModule) {
+            rtc_gpio_pulldown_dis(hc12WakeUpPin);
+            rtc_gpio_pullup_en(hc12WakeUpPin);
+            esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
+            // TODO consider changing that, due tu potential power consumption increase
+            const uint64_t bitMask = (1ULL << hc12WakeUpPin) | (1ULL << buttonPin);
+            // esp_ext1
+            esp_sleep_enable_ext1_wakeup(bitMask, ESP_EXT1_WAKEUP_ANY_LOW);
+        } else {
+            esp_sleep_enable_ext1_wakeup((1ULL << buttonPin), ESP_EXT1_WAKEUP_ANY_LOW);
+            const auto &communication = Comms::Communication::getInstance(nullptr, nullptr);
+            communication.putRfModuleToSleep();
+        }
+        #endif
 
         // timer wake up
-        esp_sleep_enable_timer_wakeup((uint64_t)milliSeconds * US_TO_MILLISECONDS_FACTOR);
+        esp_sleep_enable_timer_wakeup((uint64_t) milliSeconds * US_TO_MILLISECONDS_FACTOR);
 
         mpLogger->infov("PowerManagerESP32", "Going to sleep for (ms): ", milliSeconds);
 
         waitAndDisableCriticalFeatures();
 
-        #ifdef AUTO_SLEEP
-            msIntendedSleepTime = milliSeconds;
-            msSleepStart = getCurrentTime();
-        #endif
-
         esp_deep_sleep_start();
-    }
-
-    void PowerManagerESP32::disableAutoSleep() {
-        #ifdef AUTO_SLEEP
-            if (mAutoSleepTimer != nullptr) {
-                xTimerDelete(mAutoSleepTimer, portMAX_DELAY);
-                mAutoSleepTimer = nullptr;
-            }
-            msIntendedSleepTime = 0;
-            msSleepStart = 0;
-        #endif
     }
 
     void PowerManagerESP32::restartIdleTimer() {
@@ -104,14 +122,34 @@ namespace UniversalModuleSystem {
         }
     }
 
+    bool PowerManagerESP32::addWakeUpOnEXT0(const gpio_num_t pin, const bool level) const {
+        if (xSemaphoreTake(mEspExt0Available, 0) == pdFALSE) {
+            mpLogger->error("PowerManagerESP32", "Wake up on EXT0 is already assigned.");
+            return false;
+        }
+
+        rtc_gpio_pulldown_dis(pin);
+        rtc_gpio_pullup_en(pin);
+        esp_sleep_enable_ext0_wakeup(pin, level);
+        return true;
+    }
+
     PowerManagerESP32::PowerManagerESP32(const std::shared_ptr<ul::Logger> &logger) : mpLogger(logger) {
+        if (logger == nullptr) {
+            mpLogger = std::make_shared<ul::Logger>();
+            mpLogger->error(
+                "PowerManagerESP32",
+                "PowerManagerESP32's constructor didn't get pointer to logger instance."
+            );
+        }
+        mEspExt0Available = xSemaphoreCreateBinary();
+        xSemaphoreGive(mEspExt0Available);
+
         handleWakeUpReason();
         createIdleTimer();
     }
 
     PowerManagerESP32::~PowerManagerESP32() {
-        if (mAutoSleepTimer != nullptr)
-            xTimerDelete(mAutoSleepTimer, portMAX_DELAY);
         if (mIdleTimer != nullptr)
             xTimerDelete(mIdleTimer, portMAX_DELAY);
     }
@@ -125,36 +163,42 @@ namespace UniversalModuleSystem {
         mpLogger->waitAndDisable();
     }
 
-    void PowerManagerESP32::handleWakeUpReason() {
+    void PowerManagerESP32::handleWakeUpReason() const {
         switch (esp_sleep_get_wakeup_cause()) {
-            case ESP_SLEEP_WAKEUP_EXT1:
-                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by rf module.");
-                enableAutoSleep();
-                break;
-
             case ESP_SLEEP_WAKEUP_TIMER:
                 mpLogger->info("PowerManagerESP32 Class", "Module was wake up by timer.");
-                disableAutoSleep();
                 break;
 
-// macro disabling wake up rf notifications that are annoying during software development
-#ifdef DISABLE_WAKE_UP_RF_NOTIFICATION
-#warning "Wake up rf notifications are disabled"
+            // macro disabling wake up rf notifications that are annoying during software development
+            #ifdef DISABLE_WAKE_UP_RF_NOTIFICATION
+            #warning "Wake up rf notifications are disabled"
+            case ESP_SLEEP_WAKEUP_EXT1: {
+                const uint64_t mask = esp_sleep_get_ext1_wakeup_status();
+                for (uint8_t gpio = 0; gpio < 64; gpio++) {
+                    if (mask & (1ULL << gpio)) {
+                        mpLogger->infov("PowerManagerESP32 Class", "Module was wake up by by GPIO %d\n", gpio);
+                    }
+                }
+                break;
+            }
+
             case ESP_SLEEP_WAKEUP_EXT0:
-                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
-                disableAutoSleep();
+                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by ESP_SLEEP_WAKEUP_EXT0.");
                 break;
 
             default:
                 mpLogger->info("PowerManagerESP32 Class", "Module had power loss.");
-                disableAutoSleep();
                 break;
 
-#else
+            #else
             case ESP_SLEEP_WAKEUP_EXT0:
                 try {
                     API::CommandHandler commandHandler(API::commandTypes::NOTIFY);
+                    #ifdef ESP32_WROOM_BOARD_TYPE
                     API::APIParameter notify(static_cast<uint8_t>(API::notifyTypes::MANUAL_WAKE_UP));
+                    #else
+                    API::APIParameter notify(static_cast<uint8_t>(API::notifyTypes::SENSOR_ALERT));
+                    #endif
                     commandHandler.addParameter(notify);
 
                     uint8_t message[MESSAGE_SIZE] = {};
@@ -162,12 +206,41 @@ namespace UniversalModuleSystem {
                     const auto &communication = Comms::Communication::getInstance();
                     communication.sendMessage(message);
                 } catch (std::exception &e) {
-                    mpLogger->error("PowerManagerESP32 handleWakeUpReason", "Failed to create notification in case ESP_SLEEP_WAKEUP_EXT0.");
+                    mpLogger->error(
+                        "PowerManagerESP32 handleWakeUpReason",
+                        "Failed to create notification in case ESP_SLEEP_WAKEUP_EXT0."
+                    );
                     mpLogger->error("PowerManagerESP32 handleWakeUpReason", e.what());
                 }
-                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by Pairing Button.");
-                disableAutoSleep();
+                mpLogger->info("PowerManagerESP32 Class", "Module was wake up by EXT0.");
                 break;
+
+            case ESP_SLEEP_WAKEUP_EXT1: {
+                const uint64_t mask = esp_sleep_get_ext1_wakeup_status();
+                for (uint8_t gpio = 0; gpio < 64; gpio++) {
+                    if (!(mask & (1ULL << gpio))) continue;
+
+                    mpLogger->infov("PowerManagerESP32 Class", "Module was wake up by by GPIO: ", gpio);
+                    if (PairingButton::getButtonPin() != gpio) continue;
+
+                    try {
+                        API::CommandHandler commandHandler(API::commandTypes::NOTIFY);
+                        API::APIParameter notify(static_cast<uint8_t>(API::notifyTypes::MANUAL_WAKE_UP));
+                        uint8_t message[MESSAGE_SIZE] = {};
+                        commandHandler.generateMessage(message);
+                        const auto &communication = Comms::Communication::getInstance();
+                        communication.sendMessage(message);
+                    } catch (std::exception &e) {
+                        mpLogger->error(
+                            "PowerManagerESP32 handleWakeUpReason",
+                            "Failed to create notification in case ESP_SLEEP_WAKEUP_EXT1."
+                        );
+                        mpLogger->error("PowerManagerESP32 handleWakeUpReason", e.what());
+                    }
+                    break;
+                }
+                break;
+            }
 
             default:
                 try {
@@ -180,39 +253,16 @@ namespace UniversalModuleSystem {
                     const auto &communication = Comms::Communication::getInstance();
                     communication.sendMessage(message);
                 } catch (std::exception &e) {
-                    mpLogger->error("PowerManagerESP32 handleWakeUpReason", "Failed to create notification in default case.");
+                    mpLogger->error(
+                        "PowerManagerESP32 handleWakeUpReason",
+                        "Failed to create notification in default case."
+                    );
                     mpLogger->error("PowerManagerESP32 handleWakeUpReason", e.what());
                 }
                 mpLogger->info("PowerManagerESP32 Class", "Module had power loss.");
-                disableAutoSleep();
                 break;
-#endif
+            #endif
         }
-    }
-
-    void PowerManagerESP32::enableAutoSleep() {
-        #ifdef AUTO_SLEEP
-            // constexpr uint16_t US_TO_MILLISECONDS_FACTOR = 1000;
-            const uint32_t sleepTime = getCurrentTime() - msSleepStart;
-            msIntendedSleepTime -= (sleepTime + (AUTO_SLEEP_WAIT_TIME));
-            if (msIntendedSleepTime > 0) {
-                mAutoSleepTimer = xTimerCreate(
-                    "Auto Sleep Timer",
-                    pdMS_TO_TICKS(AUTO_SLEEP_WAIT_TIME),
-                    pdFALSE,
-                    this,
-                    timerTriggeredSleep
-                );
-                xTimerStart(mAutoSleepTimer, portMAX_DELAY);
-            }
-        #endif
-    }
-
-    void PowerManagerESP32::goToAutoSleep(TimerHandle_t xTimer) {
-        #ifdef AUTO_SLEEP
-            auto &pm = *static_cast<PowerManagerESP32 *>(pvTimerGetTimerID(xTimer));
-            pm.enterSleep(msIntendedSleepTime , true);
-        #endif
     }
 
     uint32_t PowerManagerESP32::getCurrentTime() const {
@@ -222,7 +272,7 @@ namespace UniversalModuleSystem {
     }
 
     void PowerManagerESP32::createIdleTimer() {
-#ifndef CENTRAL_UNIT
+        #ifndef CENTRAL_UNIT
         const auto &dm = DataManager::getInstance();
         nl::json jsonData = dm.loadJson(dm.s_BASE_CONFIG_PATH);
         nl::json &idleTimerData = jsonData[ms_IDLE_TIMER_DATA];
@@ -240,7 +290,7 @@ namespace UniversalModuleSystem {
             );
             xTimerStart(mIdleTimer, portMAX_DELAY);
         }
-#endif
+        #endif
     }
 
     void PowerManagerESP32::idleAutosleep(TimerHandle_t xTimer) {

@@ -1,12 +1,10 @@
 {
+  "buttonPin": 27,
+  "ledPin": 26,
   "addressing": {
     "ip": 2,
     "mac": "80:B5:4E:C5:A5:C8",
     "rfChannel": 2
-  },
-  "wifi": {
-    "ssid": "wifi ssid",
-    "password": "wifi password"
   },
   "hc12": {
     "rx": 25,
@@ -47,10 +45,7 @@
       }
     ]
   },
-  "ota": {
-    "version": 1,
-    "ota_pin": 3
-  },
+  "otaCheck": 2,
   "idleAutoSleep": {
     "sleepTime": 86400000,
     "idleTimeout": 300000

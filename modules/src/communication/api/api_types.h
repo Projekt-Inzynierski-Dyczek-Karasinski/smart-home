@@ -47,8 +47,8 @@ namespace Comms::API {
     enum class setTypes : uint8_t {
         UNKNOWN = 0,
         CHANGE_CONFIG = 1,
-        ACTUATOR_OPERATION = 2,
-        ACTUATOR_TOGGLE = 3,
+        ACTUATOR_TOGGLE = 2,
+        ACTUATOR_OPERATION = 3,
         OTA = 4
     };
 

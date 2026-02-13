@@ -2,6 +2,8 @@
 
 #include "universal_module_system/data_manager.h"
 
+// ADD ACTUATOR 4: here include actuator class
+// e.g. <new_actuator_class>/<new_actuator_class>.h
 #include "relay/relay.h"
 
 namespace UniversalModuleSystem::Transducers {
@@ -109,6 +111,11 @@ namespace UniversalModuleSystem::Transducers {
         using AT = ActuatorType;
         using ATE = ActuatorType::ActuatorTypeEnum;
 
+        // ADD ACTUATOR 5 (final): here add case for new actuator
+        /* e.g.:
+            case STE::<NEW_ACTUATOR>:
+                return std::make_unique<NewActuatorClass>(mpLogger);
+        */
         switch (
             const auto it = AT::actuatorMap.find(actuatorName);
             it != AT::actuatorMap.end() ? it->second : ATE::UNKNOWN

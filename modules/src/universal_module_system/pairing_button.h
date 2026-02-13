@@ -31,6 +31,21 @@ namespace UniversalModuleSystem {
         PairingButton(const PairingButton&) = delete;
         PairingButton& operator=(const PairingButton&) = delete;
 
+        /**
+         * @brief Checks if the pairing button is pressed.
+         * @return True if the button is pressed, false otherwise.
+         */
+        static bool isButtonPressed();
+
+        /**
+         * @brief Gets the pairing button pin.
+         * @details Loads the pin from base_config.json; if that fails, gets the pin from critical_config.h.
+         *
+         * @param logger Shared pointer to the Logger instance; default: nullptr.
+         * @return Pairing button pin number.
+         */
+        static uint8_t getButtonPin(std::shared_ptr<ul::Logger> logger = nullptr);
+
     private:
         /**
          * @brief Constructor of PairingButton class. Sets BUTTON_PIN to INPUT_PULLUP and attaches interrupt to it.
@@ -55,18 +70,29 @@ namespace UniversalModuleSystem {
         static void IRAM_ATTR buttonISR();
 
         /**
-         * @brief FreeRTOS Task handling resting module to factory settings.
+         * @brief FreeRTOS task handling resting module to factory settings.
          * @details This task exists only because features needed to perform a factory reset
-         * cause a "stack canary watchpoint trigger" in <code>buttonPressTimerCallback</code>.
+         * trigger a "stack canary watchpoint trigger" in <code>buttonPressTimerCallback</code>.
          * @param parameters FreeRTOS task parameters.
          */
         static void factoryResetTask(void *parameters);
 
         /**
+         * @brief FreeRTOS task toggling OTA mode.
+         * @details This task exists only because the features needed to toggle OTA mode
+         * trigger a "stack canary watchpoint trigger" in <code>buttonPressTimerCallback</code>.
+         *
+         * @param parameters FreeRTOS task parameters.
+         *
+         * @note The task self-deletes after toggling OTA.
+         */
+        static void toggleOtaTask(void *parameters);
+
+        /**
          * @brief Callback method that is called periodically by the Button Press Timer to handle button debouncing and logic.
          * @details This method:
          * - Increments press counter when button is held down.
-         * - Triggers pairing mode after 3 seconds of continuous press.
+         * - Toggles OTA after 3 seconds of continuous press.
          * - Triggers reset mode after 10 seconds of continuous press (clears data and reboots).
          * @param xTimer FreeRTOS software timer handle.
          * @note Pairing process starts only after releasing button, but LED starts blinking immediately after 3 seconds
@@ -93,11 +119,15 @@ namespace UniversalModuleSystem {
         std::shared_ptr<DebugLED> mpDebugLED;
         std::shared_ptr<ul::Logger> mpLogger;
         Comms::Communication *mpCommunication;
+        uint8_t mButtonPin;
 
         std::atomic<ButtonModes> mButtonMode{ButtonModes::IDLE}; ///< State of button.
         std::atomic<uint8_t> mButtonPressCounter{0}; ///< Counter for how long is button pressed in <code>DEBOUNCING_TIME</code> (0.1) s.
         std::atomic<int8_t> mButtonNotPressedCounter{3}; ///< Counter for how long is not button pressed (for debouncing).
 
         TimerHandle_t mButtonPressTimer = nullptr; ///< FreeRTOS software timer to measure how long is button pressed.
+
+        // JSON key
+        static constexpr char ms_BUTTON_PIN[] = "buttonPin";
     };
 }

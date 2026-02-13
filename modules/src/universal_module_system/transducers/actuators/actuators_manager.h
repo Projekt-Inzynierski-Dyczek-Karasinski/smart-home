@@ -20,6 +20,8 @@ namespace UniversalModuleSystem::Transducers {
      * @brief Singleton responsible for creating and operating actuators based on configuration.
      * @details The manager loads actuator definitions from JSON, creates the correct derived actuator type,
      *          initializes it, and exposes a uniform API to higher layers.
+     *
+     * @note To add a new actuator class, do all steps under Ctrl+F "ADD ACTUATOR" in this file and actuator_manager.cpp.
      */
     class ActuatorsManager {
     public:
@@ -69,6 +71,8 @@ namespace UniversalModuleSystem::Transducers {
          * @details When adding a new derived actuator class, add new values to the enum and map here.
          */
         struct ActuatorType {
+            // ADD ACTUATOR 1: here add enum value for /c createActuator() method
+            // e.g. <NEW_ACTUATOR>
             enum class ActuatorTypeEnum : uint8_t {
                 RELAY,
                 UNKNOWN
@@ -83,8 +87,13 @@ namespace UniversalModuleSystem::Transducers {
                 }
             };
 
+            // ADD ACTUATOR 2: here add constexpr with actuator type (must be same as "type" in base_config.json)
+            // e.g. static constexpr char s_<NEW_ACTUATOR>[] = "<newActuator>";
             // actuator types
             static constexpr char s_RELAY[] = "relay";
+
+            // ADD ACTUATOR 3: here connect constexpr with actuator type and ActuatorTypeEnum
+            // e.g. {s_<NEW_ACTUATOR>, ActuatorTypeEnum::<NEW_ACTUATOR>}
             // Lookup table mapping actuator type strings to internal enumerator values.
             inline static const std::map<const char*, ActuatorTypeEnum, Comparator> actuatorMap {
                 {s_RELAY, ActuatorTypeEnum::RELAY},

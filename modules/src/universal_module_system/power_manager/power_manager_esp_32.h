@@ -26,10 +26,12 @@ namespace UniversalModuleSystem {
         /**
          * @brief Gets the singleton instance of PowerManagerESP32.
          *
-         * @param logger Shared pointer to the logger instance.
+         * @param logger Shared pointer to the logger instance, default: nullptr.
          * @return Reference to the PowerManagerESP32 instance.
+         *
+         *  @warning First call have to pass pointer to logger.
          */
-        static PowerManagerESP32& getInstance(const std::shared_ptr<ul::Logger> &logger);
+        static PowerManagerESP32& getInstance(const std::shared_ptr<ul::Logger> &logger = nullptr);
 
         // Delete copy constructor and assignment operator
         PowerManagerESP32(const PowerManagerESP32&) = delete;
@@ -58,11 +60,6 @@ namespace UniversalModuleSystem {
         void safeRestart(const char *source) const override __attribute__((noreturn));
 
         /**
-         * @brief Disables the automatic sleep (if enabled) after waking up ESP by rf module.
-         */
-        void disableAutoSleep() override;
-
-        /**
          * @brief Restarts idle timer, if the idle timer is enabled.
          */
         void restartIdleTimer() override;
@@ -73,6 +70,18 @@ namespace UniversalModuleSystem {
          */
         [[nodiscard]] bool wasModuleRestarted() const override;
 
+        /**
+         * @brief Configure ESP32 EXT0 wake-up source.
+         * @details Registers an EXT0 wake-up on the given RTC GPIO pin and sets the wake-up level (HIGH/LOW).
+         *
+         * @param pin RTC GPIO pin to use as the EXT0 wake-up source.
+         * @param level Wake-up trigger level: true = HIGH, false = LOW.
+         * @return True if the wake-up source was configured, false otherwise.
+         *
+         * @note Only one EXT0 wake-up source can be active at a time.
+         */
+        [[nodiscard]] bool addWakeUpOnEXT0(gpio_num_t pin, bool level) const;
+
     private:
         /**
          * @brief Private constructor for singleton pattern.
@@ -81,7 +90,7 @@ namespace UniversalModuleSystem {
          *
          * @param logger Shared pointer to the logger instance.
          */
-        explicit PowerManagerESP32(const std::shared_ptr<ul::Logger> &logger);
+        explicit PowerManagerESP32(const std::shared_ptr<ul::Logger> &logger = nullptr);
 
         /**
          * @brief Deletes FreeRTOS resources.
@@ -103,19 +112,7 @@ namespace UniversalModuleSystem {
         /**
          * @brief Logs wake-up reason and, if caused by RF module, starts auto-sleep feature (if enabled).
          */
-        void handleWakeUpReason();
-
-        /**
-         * @brief Enables the automatic sleep functionality.
-         * @note Works only if <code>AUTO_SLEEP</code> is defined in the config.
-         */
-        void enableAutoSleep();
-
-        /**
-        * @brief FreeRTOS timer callback to automatically put ESP in sleep.
-        * @param xTimer Handle to the timer triggering auto-sleep (used for passing pointer to instance of PowerManagerESP32).
-        */
-        static void goToAutoSleep(TimerHandle_t xTimer);
+        void handleWakeUpReason() const;
 
         /**
          * @brief Returns the time passed from powering on ESP.
@@ -136,17 +133,16 @@ namespace UniversalModuleSystem {
 
         std::shared_ptr<ul::Logger> mpLogger;
 
-        // TODO remove?
-        TimerHandle_t mAutoSleepTimer = nullptr; ///< FreeRTOS timer handle for managing auto-sleep functionality.
-
         TimerHandle_t mIdleTimer = nullptr; ///< FreeRTOS timer handle for managing idle auto-sleep functionality.
+
+        // FreeRTOS semaphore that indicates if EXT0 wake up source is not already taken (semaphore for thread-safety)
+        SemaphoreHandle_t mEspExt0Available = nullptr;
 
         std::atomic<uint32_t> mIdleSleepTime{0};
 
         // auto sleep
         static uint32_t msSleepStart; ///< When sleep starts, variable saved in RTC memory.
         static int64_t msIntendedSleepTime; ///< How long sleep should last, variable saved in RTC memory.
-
 
         // JSON keys
         static constexpr char ms_IDLE_TIMER_DATA[] = "idleAutoSleep";

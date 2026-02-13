@@ -1,9 +1,11 @@
 #include "pairing_button.h"
 
-#include "../config/universal_module_system_config.h"
+#include "../../config/system_config/universal_module_system_config.h"
+#include "../config/user_config/critical_config.h"
 
 #include "data_manager.h"
 #include "power_manager/power_manager.h"
+#include "universal_module_system/ota/ota.h"
 
 namespace UniversalModuleSystem {
     PairingButton &PairingButton::getInstance(const std::shared_ptr<DebugLED> &debugLED,
@@ -15,7 +17,8 @@ namespace UniversalModuleSystem {
 
     PairingButton::PairingButton(const std::shared_ptr<DebugLED> &debugLED, Comms::Communication *communication,
                                  const std::shared_ptr<ul::Logger> &logger)
-        : mpDebugLED(debugLED), mpCommunication(communication), mpLogger(logger) {
+        : mpDebugLED(debugLED), mpLogger(logger), mpCommunication(communication) {
+        mButtonPin = getButtonPin(mpLogger);
         pinMode(BUTTON_PIN, INPUT_PULLUP);
 
         attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), buttonISR, FALLING);
@@ -27,10 +30,38 @@ namespace UniversalModuleSystem {
         deleteButtonPressTimer();
     }
 
-    void IRAM_ATTR PairingButton::buttonISR() {
+    bool PairingButton::isButtonPressed() {
+        const uint8_t buttonPin = getButtonPin();
+        pinMode(buttonPin, INPUT_PULLUP);
+        return !digitalRead(buttonPin);
+    }
+
+    uint8_t PairingButton::getButtonPin(std::shared_ptr<ul::Logger> logger) {
+        if (logger == nullptr) {
+            logger = std::make_shared<ul::Logger>();
+        }
+
+        uint8_t buttonPin;
+        try {
+            const auto &dataManager = DataManager::getInstance();
+            nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
+            buttonPin = jsonData[ms_BUTTON_PIN].get<uint8_t>();
+        } catch (...) {
+            logger->error("PairingButton", "Can not load button pin from base_config.json, loading from critical_config.h");
+            buttonPin = BUTTON_PIN;
+        }
+        if (buttonPin != BUTTON_PIN) {
+            logger->warning(
+                "PairingButton",
+                "Button pin defined in critical_config.h and base_config.json do not match, loading pin defined in base_config.json"
+            );
+        }
+        return buttonPin;
+    }
+
+    void PairingButton::buttonISR() {
         const auto pb = &getInstance(nullptr, nullptr, nullptr);
-        detachInterrupt(digitalPinToInterrupt(BUTTON_PIN));
-        pb->mpLogger->debug("PairingButton ISR", "Button pressed.");
+        detachInterrupt(digitalPinToInterrupt(pb->mButtonPin));
         pb->startButtonPressTimer();
 
         // Force context switch if higher priority task was woken
@@ -57,6 +88,19 @@ namespace UniversalModuleSystem {
             vTaskDelay(pdMS_TO_TICKS(1000));
     }
 
+    void PairingButton::toggleOtaTask(void *parameters) {
+        const auto &pb = *static_cast<PairingButton *>(parameters);
+
+        auto &ota = ums::Ota::getInstance();
+        ota.toggleOta();
+        pb.mpLogger->debug("PairingButton", "Ota Toggled");
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
+
+        pb.mpLogger->debug("PairingButton", "ToggleOtaTask delete");
+        vTaskDelete(nullptr);
+    }
+
     void PairingButton::buttonPressTimerCallback(TimerHandle_t xTimer) {
         auto &pb = *static_cast<PairingButton *>(pvTimerGetTimerID(xTimer));
         if (digitalRead(BUTTON_PIN) == LOW) {
@@ -79,7 +123,6 @@ namespace UniversalModuleSystem {
             else if (DEBOUNCING_COUNTER_TO_SECONDS(pb.mButtonPressCounter.load()) >= 3 && pb.mButtonMode.load() ==
                      ButtonModes::IDLE) {
                 if (pb.mButtonMode.load() != ButtonModes::PAIR) {
-                    pb.mpDebugLED->createPairingBlinkTask();
                     pb.mpLogger->debug("PairingButton Timer", "ButtonModes::PAIR");
                 }
                 pb.mButtonMode.store(ButtonModes::PAIR);
@@ -90,8 +133,15 @@ namespace UniversalModuleSystem {
             // if button will not be press for 3*DEBOUNCING_TIME (0.3 seconds) timer will stop
             if (pb.mButtonNotPressedCounter.load() <= 0) {
                 if (pb.mButtonMode.load() == ButtonModes::PAIR) {
-                    pb.mpCommunication->startAddressingAlgorithm();
-                    pb.mpLogger->debug("PairingButton Timer", "startAddressingAlgorithm()");
+                    xTaskCreate(
+                        toggleOtaTask,
+                        "Toggle Ota",
+                        TOGGLE_OTA_TASK_SIZE,
+                        &pb,
+                        HIGH_TASK_PRIORITY,
+                        nullptr
+                    );
+                    pb.mpLogger->debug("PairingButton Timer", "Toggle ota.");
                 }
                 pb.deleteButtonPressTimer();
             }

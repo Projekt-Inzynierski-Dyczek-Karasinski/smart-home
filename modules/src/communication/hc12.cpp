@@ -11,7 +11,7 @@ namespace Comms {
     HC12::HC12(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
         : mpCommunication(communication),
         mpLogger(logger),
-        m_HC12_DATA(ums::DataManager::getInstance().loadJson(ums::DataManager::getInstance().s_BASE_CONFIG_PATH)[ms_HC12_DATA]) {
+        m_HC12_DATA(ums::DataManager::getInstance().loadJson(ums::DataManager::getInstance().s_BASE_CONFIG_PATH)[s_HC12_DATA]) {
         pinMode(m_HC12_DATA.setPin, OUTPUT);
         digitalWrite(m_HC12_DATA.setPin, HIGH);
         vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_HIGH));
@@ -272,11 +272,9 @@ namespace Comms {
 
                 xSemaphoreTake(hc12.mSendingDataMutex, portMAX_DELAY);
 
-                // TODO consider making this delay more "intelligent" (eg. by cooldown timer)
                 // this delay is required for HC12 transmit/receive message properly
                 vTaskDelay(pdMS_TO_TICKS(DELAY_BETWEEN_MESSAGES));
 
-                // TODO remove?
                 uint32_t hc12Respond;
                 // clearing old notification (if exist)
                 xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, 0);
@@ -286,7 +284,6 @@ namespace Comms {
                 // transmitting data
                 hc12.mpSerial->write(transmitBuffer, PROTOCOL_SIZE);
 
-                // TODO change?
                 // wait for confirmation from HC12
                 if (xTaskNotifyWait(0, ULONG_MAX, &hc12Respond, pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
                     hc12.mpLogger->warning("HC12 Transmit", "HC12 module may have insufficient power.");
@@ -406,8 +403,8 @@ namespace Comms {
     }
 
     HC12::HC12Data::HC12Data(const nl::json &data) :
-        txPin(data[ms_TX_PIN]),
-        rxPin(data[ms_RX_PIN]),
-        setPin(data[ms_SET_PIN]),
-        baudrate(data[ms_BAUDRATE]) {}
+        txPin(data[s_TX_PIN]),
+        rxPin(data[s_RX_PIN]),
+        setPin(data[s_SET_PIN]),
+        baudrate(data[s_BAUDRATE]) {}
 }

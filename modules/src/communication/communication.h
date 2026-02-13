@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../config/communication_config.h"
+#include "../../config/system_config/communication_config.h"
 
 #include "universal_module_system/debug_led.h"
 
@@ -144,14 +144,12 @@ namespace Comms {
 
         /**
          * @brief Decides what to do with incoming messages (both internal and RF).
-         * @param isReadingRawMessage Pointer to flag for raw message state.
          */
-        void receivedMessageDecider(bool *isReadingRawMessage);
+        void receivedMessageDecider() const;
         /**
          * @brief Handles when main task is in default state.
-         * @param isReadingRawMessage Pointer to flag for raw message state.
          */
-        void normalOperationHandling(bool *isReadingRawMessage);
+        void normalOperationHandling() const;
         /**
          * @brief Main FreeRTOS task for Communication class.
          * It is responsible for suspending/deleting resuming/creating other communication related tasks.

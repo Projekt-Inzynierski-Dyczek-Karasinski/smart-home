@@ -2,9 +2,8 @@
 
 #include <SPIFFS.h>
 
-#include "../config/universal_module_system_config.h"
-#include "../config/addressing_config.h"
-#include "../config/ota_config.h"
+#include "../../config/system_config/universal_module_system_config.h"
+#include "../../config/system_config/addressing_config.h"
 
 namespace nl = nlohmann;
 
@@ -124,9 +123,6 @@ namespace UniversalModuleSystem {
         // add here other files to create
         if (overrideExistingFiles || !SPIFFS.exists(ADDRESSING_DATA_PATH)) {
             saveJson(ADDRESSING_DATA_PATH, baseConfig["addressing"]);
-        }
-        if (overrideExistingFiles || !SPIFFS.exists(WIFI_DATA_PATH)) {
-            saveJson(WIFI_DATA_PATH, baseConfig["wifi"]);
         }
     }
 

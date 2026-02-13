@@ -2,11 +2,12 @@ Import("env")
 
 from os.path import isfile, join
 
-env_path = join(env.subst("$PROJECT_DIR"), ".env")
+env_path = join(env.subst("$PROJECT_DIR/config/user_config"), ".env")
+
 if not isfile(env_path):
     raise FileNotFoundError(f"Missing required .env file.")
 
-with open(".env", "r", encoding="utf-8") as f:
+with open(env_path, "r", encoding="utf-8") as f:
     flags = []
     for line in f:
         line = line.strip()

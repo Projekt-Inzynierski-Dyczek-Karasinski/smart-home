@@ -4,8 +4,8 @@
 #include <atomic>
 #include <memory>
 
-#include "../config/communication_config.h"
-#include "../config/addressing_config.h"
+#include "../../../config/system_config/communication_config.h"
+#include "../../../config/system_config/addressing_config.h"
 
 #include "utils/logger.h"
 
@@ -183,11 +183,6 @@ namespace Comms {
          * but infinite loop prevents getting to "return" line (because task calling function will be deleted).
          */
         bool isAddressingFailed(const uint8_t *receiveBuffer);
-
-        // TODO add led blinking indicating restart, success and failure of addressing
-        // void restartLedBlink();
-        // void successLedBlink();
-        // void abortLedBlink();
 
         Communication *mpCommunication; ///< Pointer to the Communication class instance (owner class).
 
