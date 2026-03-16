@@ -11,8 +11,6 @@ namespace UniversalModuleSystem::Transducers {
         OPEN = 1,
     };
 
-    // FIXME WindowSensor sometimes works only after first deep sleep.
-
     /**
      * @brief Sensor that reports whether a window is open or closed.
      * @details If "canAwake" is set to true in base_config.json, WindowSensor will wake up
@@ -31,6 +29,9 @@ namespace UniversalModuleSystem::Transducers {
          */
         explicit WindowSensor(const std::shared_ptr<ul::Logger> &logger);
 
+        /**
+        * @brief Clears up FreeRTOS resources.
+        */
         ~WindowSensor() override;
 
         /**
@@ -61,8 +62,19 @@ namespace UniversalModuleSystem::Transducers {
         void waitUntilReadEnds() override;
 
     private:
+        /**
+        * @brief Task function that performs the initial sleep cycle.
+        * @details Waits until the ESP32 finishes booting, then forces a short deep sleep
+        * required for proper WindowSensor operation.
+        *
+        * @param parameters Pointer to the WindowSensor instance.
+        */
         static void firstSleepTask(void * parameters);
 
+        /**
+        * @brief Handles scheduling of the initial sleep cycle.
+        * @details Creates the first-sleep task only once after first startup after powering ESP32 on.
+        */
         void handleFirstSleep();
 
         static bool msIsFirstSleepNeeded;
