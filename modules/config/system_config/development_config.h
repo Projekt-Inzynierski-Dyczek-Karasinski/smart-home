@@ -8,7 +8,7 @@
 
     #ifdef ESP32_S3_BOARD_TYPE
     // change features module specific features to central unit features
-        #define CENTRAL_UNIT
+        // #define CENTRAL_UNIT
     #endif
 
     // ESP32 devboard specific config
@@ -23,13 +23,13 @@
     #endif
 
     #ifdef ESP32_S3_BOARD_TYPE
-    #ifdef CENTRAL_UNIT
+    // #ifdef CENTRAL_UNIT
         #define LED_PIN 39
         #define BUTTON_PIN 1
-    #else
-        #define LED_PIN 48
-        #define BUTTON_PIN 2
-    #endif
+    // #else
+    //     #define LED_PIN 48
+    //     #define BUTTON_PIN 2
+    // #endif
     #else
         #define LED_PIN 26
         #define BUTTON_PIN 27

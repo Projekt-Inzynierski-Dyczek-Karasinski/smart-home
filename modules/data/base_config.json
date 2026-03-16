@@ -1,15 +1,15 @@
 {
-  "buttonPin": 27,
-  "ledPin": 26,
+  "buttonPin": 1,
+  "ledPin": 39,
   "addressing": {
     "ip": 2,
     "mac": "80:B5:4E:C5:A5:C8",
     "rfChannel": 2
   },
   "hc12": {
-    "rx": 25,
-    "tx": 33,
-    "set": 32,
+    "rx": 6,
+    "tx": 7,
+    "set": 5,
     "baudrate": 9600
   },
   "sensorsData": {
@@ -20,13 +20,23 @@
         "type": "batterySensor",
         "data": {
           "id": 1,
-          "readPin": 12,
+          "readPin": 16,
           "canAwake": false,
           "additional": {
-            "rVCC": 50000,
-            "rGND": 50000,
+            "rVCC": 94000,
+            "rGND": 97000,
             "Vmin": 4350,
             "Vmax": 4800
+          }
+        }
+      },
+      {
+        "type": "windowSensor",
+        "data": {
+          "id": 2,
+          "readPin": 18,
+          "canAwake": true,
+          "additional": {
           }
         }
       }
@@ -34,18 +44,9 @@
   },
   "actuatorsData": {
     "actuators": [
-      {
-        "type": "relay",
-        "data": {
-          "id": 1,
-          "logicPin": 10,
-          "additional": {
-          }
-        }
-      }
     ]
   },
-  "otaCheck": 2,
+  "otaCheck": 1,
   "idleAutoSleep": {
     "sleepTime": 86400000,
     "idleTimeout": 300000

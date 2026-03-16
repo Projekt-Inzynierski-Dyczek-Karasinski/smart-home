@@ -31,6 +31,8 @@ namespace UniversalModuleSystem::Transducers {
          */
         explicit WindowSensor(const std::shared_ptr<ul::Logger> &logger);
 
+        ~WindowSensor() override;
+
         /**
          * @brief Get formatted reading (APIParameterVariant).
          * @details Reads the configured pin and returns CLOSED/OPEN status.
@@ -57,5 +59,13 @@ namespace UniversalModuleSystem::Transducers {
          * @details No-op for this sensor.
          */
         void waitUntilReadEnds() override;
+
+    private:
+        static void firstSleepTask(void * parameters);
+
+        void handleFirstSleep();
+
+        static bool msIsFirstSleepNeeded;
+        TaskHandle_t mFirstSleepTaskHandle = nullptr;
     };
 }

@@ -17,4 +17,4 @@
  If it does not match the value in base_config.json, the device will start OTA and disable normal program execution.
  Useful when a code update isn’t compatible with an older base_config.json, or vice versa.
 */
-#define CONFIG_COMPAT_VERSION 2
+#define CONFIG_COMPAT_VERSION 1

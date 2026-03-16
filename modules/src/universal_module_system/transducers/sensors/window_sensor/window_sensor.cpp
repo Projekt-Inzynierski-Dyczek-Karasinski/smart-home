@@ -3,10 +3,21 @@
 #include "universal_module_system/power_manager/power_manager.h"
 
 namespace UniversalModuleSystem::Transducers {
+    RTC_DATA_ATTR bool WindowSensor::msIsFirstSleepNeeded = true;
+
     WindowSensor::WindowSensor(const std::shared_ptr<ul::Logger> &logger) : Sensor(logger) {
         xSemaphoreTake(mSensorDataMutex, portMAX_DELAY);
         pinMode(mCommonSensorData.readPin, INPUT_PULLUP);
         xSemaphoreGive(mSensorDataMutex);
+
+        handleFirstSleep();
+    }
+
+    WindowSensor::~WindowSensor() {
+        if (mFirstSleepTaskHandle != nullptr) {
+            vTaskDelete(mFirstSleepTaskHandle);
+            mFirstSleepTaskHandle = nullptr;
+        }
     }
 
     std::vector<API::APIParameterVariant> WindowSensor::getApiFormattedReading() {
@@ -37,6 +48,36 @@ namespace UniversalModuleSystem::Transducers {
 
         xSemaphoreGive(mSensorDataMutex);
         mpLogger->debug("WindowSensor", "Wake up set on EXT0");
+    }
+
+    void WindowSensor::firstSleepTask(void *parameters) {
+        const auto &ws = *static_cast<WindowSensor *>(parameters);
+
+        // wait until ESP32 fully boots
+        vTaskDelay(pdMS_TO_TICKS(1000));
+
+        // go to deep sleep - ESP32 will instantly wake up (this is needed for the propper WindowSensor operation)
+        ws.mpLogger->info("WindowSensor", "Going to first sleep...");
+        auto &powerManager = PowerManager::getInstance();
+        powerManager.enterSleep(1000, false);
+
+        for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
+    }
+
+    void WindowSensor::handleFirstSleep() {
+        if (msIsFirstSleepNeeded) {
+            msIsFirstSleepNeeded = false;
+            if (mFirstSleepTaskHandle == nullptr) {
+                xTaskCreate(
+                    firstSleepTask,
+                    "First Sleep",
+                    WINDOW_SENSOR_TASK_SIZE,
+                    this,
+                    CRITICAL_TASK_PRIORITY,
+                    &mFirstSleepTaskHandle
+                );
+            }
+        }
     }
 
     void WindowSensor::waitUntilReadEnds() {}
