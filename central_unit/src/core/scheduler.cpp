@@ -322,7 +322,7 @@ namespace SmartHome {
                         if (sensorOpt.has_value()) {
                             DatabaseActions::postLog(sensorOpt.value().moduleId,
                                                      "error",
-                                                     apiResponse.error->to_string());
+                                                     "Scheduled action failed: " + apiResponse.error->data);
                         }
                     }
                 } catch (const std::exception &e) {
