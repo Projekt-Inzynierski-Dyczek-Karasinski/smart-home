@@ -347,7 +347,8 @@ namespace SmartHome {
         if (nextScheduledRunTimePoint.has_value()) {
             sleepDurationMs = static_cast<uint>(
                 std::chrono::duration_cast<std::chrono::milliseconds>(nextScheduledRunTimePoint.value() -
-                                                                      std::chrono::system_clock::now()).count());
+                                                                      std::chrono::system_clock::now()).count()
+                - 30000); // TODO remove 30s buffer after implementing time correction in mediator
         } else if (config.contains(cmck::DEFAULT_SLEEP_DURATION) &&
                    config.at(cmck::DEFAULT_SLEEP_DURATION).is_number_integer()) {
             // If no scheduled run time, check for default sleep duration in config
