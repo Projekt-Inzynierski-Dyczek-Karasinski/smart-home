@@ -127,6 +127,8 @@ namespace SmartHomeMediator {
         ba::serial_port mPort;
         ba::io_context &mIoContext;
 
+        uint mBaudRate;
+
         /// Buffer continuously filled by readLoop
         ba::streambuf mBuffer;
 

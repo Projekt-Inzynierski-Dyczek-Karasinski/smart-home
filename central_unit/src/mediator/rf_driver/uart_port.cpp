@@ -4,6 +4,7 @@ namespace SmartHomeMediator {
     UartPort::UartPort(ba::io_context &ioContext, const std::string_view portName, const uint baudRate)
         : mPort(ioContext, portName.data()),
           mIoContext(ioContext),
+          mBaudRate(baudRate),
           mBuffer(msBUFFER_CAPACITY) {
         // Configure UART with 8N1 format
         mPort.set_option(ba::serial_port::baud_rate(baudRate));
@@ -169,6 +170,7 @@ namespace SmartHomeMediator {
         cancel();
 
         mPort.set_option(ba::serial_port::baud_rate(baudRate));
+        mBaudRate = baudRate;
 
         if (!mIsSyncModeActive.load(std::memory_order::acquire) && !mIsShuttingDown.load(std::memory_order::acquire)) {
             ba::post(mIoContext, [this] {
@@ -178,9 +180,7 @@ namespace SmartHomeMediator {
     }
 
     uint UartPort::getBaudRate() const {
-        ba::serial_port::baud_rate baudRate;
-        mPort.get_option(baudRate);
-        return baudRate.value();
+        return mBaudRate;
     }
 
     void UartPort::cancel() {
