@@ -1,19 +1,19 @@
 {
-  "buttonPin": 27,
-  "ledPin": 26,
+  "buttonPin": 2,
+  "ledPin": 48,
   "addressing": {
-    "ip": 2,
-    "mac": "80:B5:4E:C5:A5:C8",
-    "rfChannel": 2
+    "ip": 3,
+    "mac": "88:A2:9E:3E:A9:A0",
+    "rfChannel": 3
   },
   "hc12": {
-    "rx": 25,
-    "tx": 33,
-    "set": 32,
+    "rx": 17,
+    "tx": 18,
+    "set": 16,
     "baudrate": 9600
   },
   "sensorsData": {
-    "powerPin": 13,
+    "powerPin": 4,
     "readingsTimeout": 60000,
     "sensors": [
     ]
@@ -22,9 +22,9 @@
     "actuators": [
     ]
   },
-  "otaCheck": 2,
+  "otaCheck": 3,
   "idleAutoSleep": {
     "sleepTime": 86400000,
-    "idleTimeout": 60000
+    "idleTimeout": 300000
   }
 }

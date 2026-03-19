@@ -93,9 +93,11 @@ namespace UniversalModuleSystem::Transducers {
     }
 
     actuatorState Relay::getStatePrivate() const {
+        constexpr uint8_t BYTE_SIZE = 8;
+
         // bitmask "overflow" protection
         const uint8_t id = getId();
-        if (id >= sizeof(relayStateBitmask)) {
+        if (id >= sizeof(relayStateBitmask) * BYTE_SIZE) {
             mpLogger->errorv("Relay RTC_DATA_ATTR", "Relay id is bigger than size of relayStateBitmask, relay id: ", id);
             throw std::invalid_argument("Relay id is bigger than the size of relayStateBitmask");
         }

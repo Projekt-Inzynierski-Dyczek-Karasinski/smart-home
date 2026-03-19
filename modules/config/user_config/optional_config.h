@@ -2,9 +2,9 @@
 // This is optional config data; it may be set.
 
 // Uncomment to enable serial communication (automatically sets LOGGING_LEVEL to INFO if not overwritten below)
-// #ifndef DEBUG_MODE
-// #define DEBUG_MODE
-// #endif
+#ifndef DEBUG_MODE
+#define DEBUG_MODE
+#endif
 
 // uncomment to override serial baudrate, default: 115200
 // WARNING: DEBUG_MODE must be defined to enable serial communication

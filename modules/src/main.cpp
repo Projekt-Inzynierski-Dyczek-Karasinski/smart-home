@@ -19,7 +19,7 @@ namespace umst = UniversalModuleSystem::Transducers;
 
 void setup() {
     // Initialize critical system components
-    const auto logger = std::make_shared<ul::Logger>();
+    const auto logger = std::make_shared<ul::Logger>(ul::Level::VERBOSE);
     auto &dataManager = ums::DataManager::getInstance(logger);
     const auto debugLed = std::make_shared<ums::DebugLED>(logger);
 

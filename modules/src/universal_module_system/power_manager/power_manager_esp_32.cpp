@@ -75,6 +75,8 @@ namespace UniversalModuleSystem {
         auto &sensorManager = Transducers::SensorsManager::getInstance();
         sensorManager.onSleep();
 
+        const bool isButtonWakeUpAssigned = addWakeUpOnEXT0(buttonPin, LOW);
+
         // rf module wake up
         // TODO add changing FU mode for power saving
         rtc_gpio_pulldown_dis(buttonPin);
@@ -83,12 +85,14 @@ namespace UniversalModuleSystem {
             rtc_gpio_pulldown_dis(hc12WakeUpPin);
             rtc_gpio_pullup_en(hc12WakeUpPin);
             esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
-            // TODO consider changing that, due tu potential power consumption increase
-            const uint64_t bitMask = (1ULL << hc12WakeUpPin) | (1ULL << buttonPin);
             // esp_ext1
+            const uint64_t bitMask =
+                isButtonWakeUpAssigned ? (1ULL << hc12WakeUpPin) : (1ULL << hc12WakeUpPin) | (1ULL << buttonPin);
             esp_sleep_enable_ext1_wakeup(bitMask, ESP_EXT1_WAKEUP_ANY_LOW);
         } else {
-            esp_sleep_enable_ext1_wakeup((1ULL << buttonPin), ESP_EXT1_WAKEUP_ANY_LOW);
+            if (!isButtonWakeUpAssigned)
+                esp_sleep_enable_ext1_wakeup((1ULL << buttonPin), ESP_EXT1_WAKEUP_ANY_LOW);
+
             const auto &communication = Comms::Communication::getInstance(nullptr, nullptr);
             communication.putRfModuleToSleep();
         }
@@ -124,7 +128,7 @@ namespace UniversalModuleSystem {
 
     bool PowerManagerESP32::addWakeUpOnEXT0(const gpio_num_t pin, const bool level) const {
         if (xSemaphoreTake(mEspExt0Available, 0) == pdFALSE) {
-            mpLogger->error("PowerManagerESP32", "Wake up on EXT0 is already assigned.");
+            mpLogger->verbose("PowerManagerESP32", "Wake up on EXT0 is already assigned.");
             return false;
         }
 
@@ -169,9 +173,9 @@ namespace UniversalModuleSystem {
                 mpLogger->info("PowerManagerESP32 Class", "Module was wake up by timer.");
                 break;
 
-            // macro disabling wake up rf notifications that are annoying during software development
-            #ifdef DISABLE_WAKE_UP_RF_NOTIFICATION
-            #warning "Wake up rf notifications are disabled"
+                // macro disabling wake up rf notifications that are annoying during software development
+                #ifdef DISABLE_WAKE_UP_RF_NOTIFICATION
+                #warning "Wake up rf notifications are disabled"
             case ESP_SLEEP_WAKEUP_EXT1: {
                 const uint64_t mask = esp_sleep_get_ext1_wakeup_status();
                 for (uint8_t gpio = 0; gpio < 64; gpio++) {
@@ -190,7 +194,7 @@ namespace UniversalModuleSystem {
                 mpLogger->info("PowerManagerESP32 Class", "Module had power loss.");
                 break;
 
-            #else
+                #else
             case ESP_SLEEP_WAKEUP_EXT0:
                 try {
                     API::CommandHandler commandHandler(API::commandTypes::NOTIFY);
@@ -261,7 +265,7 @@ namespace UniversalModuleSystem {
                 }
                 mpLogger->info("PowerManagerESP32 Class", "Module had power loss.");
                 break;
-            #endif
+                #endif
         }
     }
 

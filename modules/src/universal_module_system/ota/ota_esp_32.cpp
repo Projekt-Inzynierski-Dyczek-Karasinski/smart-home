@@ -182,11 +182,13 @@ namespace UniversalModuleSystem {
         const auto &ota = *static_cast<OtaESP32 *>(parameters);
 
         ArduinoOTA.begin();
-        auto &powerManager = PowerManager::getInstance(ota.mpLogger);
 
         for (;;) {
             ArduinoOTA.handle();
-            powerManager.restartIdleTimer();
+            if (!ota.mIsOtaForced.load()) {
+                auto &powerManager = PowerManager::getInstance(ota.mpLogger);
+                powerManager.restartIdleTimer();
+            }
             vTaskDelay(pdMS_TO_TICKS(100));
         }
     }
