@@ -105,18 +105,23 @@ namespace SmartHome::IPC {
             return;
         }
 
-        auto onRead = [this](const std::string &message) {
-            constexpr connectionId_t nullConnectionId = 0;
-            handleIncoming(nullConnectionId, message.data());
+        ba::co_spawn(*mpIoContext, [this]() -> ba::awaitable<void> {
+            while (mConnection && mConnection->isOpen()) {
+                std::string message;
 
-            if (mConnection && mConnection->isOpen()) {
-                ba::post(*mpIoContext, [this] {
-                    startReceiving();
-                });
+                try {
+                    message = co_await mConnection->readAsync();
+                } catch (const std::exception &e) {
+                    mpLogger->errorf("[API_CLIENT] Error while reading message: %s", e.what());
+                    continue;
+                }
+
+                if (!message.empty()) {
+                    constexpr connectionId_t nullConnectionId = 0;
+                    handleIncoming(nullConnectionId, std::move(message));
+                }
             }
-        };
-
-        mConnection->readAsync(onRead);
+        }, ba::detached);
     }
 
     void SocketClient::send(const std::string_view message) {
@@ -125,7 +130,11 @@ namespace SmartHome::IPC {
             return;
         }
         if (mConnection && mConnection->isOpen()) {
-            mConnection->writeAsync(message.data());
+            try {
+                mConnection->writeAsync(message.data());
+            } catch (const std::exception &e) {
+                mpLogger->errorf("[API_CLIENT] Error while sending: %s", e.what());
+            }
         } else {
             mpLogger->error("[API_CLIENT] Error while sending message: no connection");
         }

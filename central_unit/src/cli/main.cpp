@@ -54,7 +54,7 @@ namespace SmartHomeCLI {
             }
 
             try {
-                connection.write(input);
+                connection.write(std::move(input));
                 std::string output = connection.read();
                 std::cout << "\r\033[K" << output << std::endl;
             } catch (bs::system_error &e) {

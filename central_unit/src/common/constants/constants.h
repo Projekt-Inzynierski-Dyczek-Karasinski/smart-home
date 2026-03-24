@@ -10,7 +10,6 @@ namespace SmartHome::Constants {
         inline constexpr std::string_view UNDEFINED_BRACKETS = "<undefined>";
         inline constexpr std::string_view NONE_BRACKETS = "<none>";
         inline constexpr std::string_view DEFAULT_UPPER = "DEFAULT";
-        inline constexpr std::string_view CRLF = "\r\n";
     }
 
     namespace DefaultPaths {

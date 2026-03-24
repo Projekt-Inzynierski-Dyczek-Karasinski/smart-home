@@ -114,8 +114,11 @@ namespace SmartHome::IPC {
         /**
          * @brief Start asynchronous message receiving loop.
          *
-         * @details Continuously reads messages from connection and invokes message handler.
-         *          Re-posts itself to continue receiving until connection closes.
+         * @details Spawns a single coroutine on the IO context via \c ba::co_spawn.
+         *          The coroutine loops with \c co_await \c readAsync(),
+         *          dispatching each received message to the registered message handler.
+         *          Exceptions from individual reads are caught and logged, the loop
+         *          exits only when the connection is no longer open.
          */
         void startReceiving();
 
