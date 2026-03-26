@@ -8,15 +8,19 @@
 #include "universal_module_system/ota/ota.h"
 
 namespace UniversalModuleSystem {
-    PairingButton &PairingButton::getInstance(const std::shared_ptr<DebugLED> &debugLED,
-                                              Comms::Communication *communication,
-                                              const std::shared_ptr<ul::Logger> &logger) {
+    PairingButton &PairingButton::getInstance(
+        const std::shared_ptr<DebugLED> &debugLED,
+        Comms::Communication *communication,
+        const std::shared_ptr<ul::Logger> &logger
+    ) {
         static PairingButton instance(debugLED, communication, logger);
         return instance;
     }
 
-    PairingButton::PairingButton(const std::shared_ptr<DebugLED> &debugLED, Comms::Communication *communication,
-                                 const std::shared_ptr<ul::Logger> &logger)
+    PairingButton::PairingButton(
+        const std::shared_ptr<DebugLED> &debugLED, Comms::Communication *communication,
+        const std::shared_ptr<ul::Logger> &logger
+    )
         : mpDebugLED(debugLED), mpLogger(logger), mpCommunication(communication) {
         mButtonPin = getButtonPin(mpLogger);
         pinMode(BUTTON_PIN, INPUT_PULLUP);
@@ -47,7 +51,10 @@ namespace UniversalModuleSystem {
             nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
             buttonPin = jsonData[ms_BUTTON_PIN].get<uint8_t>();
         } catch (...) {
-            logger->error("PairingButton", "Can not load button pin from base_config.json, loading from critical_config.h");
+            logger->error(
+                "PairingButton",
+                "Can not load button pin from base_config.json, loading from critical_config.h"
+            );
             buttonPin = BUTTON_PIN;
         }
         if (buttonPin != BUTTON_PIN) {
@@ -70,7 +77,7 @@ namespace UniversalModuleSystem {
 
     // ====================== Button Press Timer ======================
     void PairingButton::factoryResetTask(void *parameters) {
-        auto& pb = *static_cast<PairingButton*>(parameters);
+        auto &pb = *static_cast<PairingButton *>(parameters);
 
         pb.mButtonMode.store(ButtonModes::RESET);
         pb.mpDebugLED->createResetBlinkTask();
@@ -123,6 +130,7 @@ namespace UniversalModuleSystem {
             else if (DEBOUNCING_COUNTER_TO_SECONDS(pb.mButtonPressCounter.load()) >= 3 && pb.mButtonMode.load() ==
                      ButtonModes::IDLE) {
                 if (pb.mButtonMode.load() != ButtonModes::PAIR) {
+                    pb.mpDebugLED->createPairingBlinkTask();
                     pb.mpLogger->debug("PairingButton Timer", "ButtonModes::PAIR");
                 }
                 pb.mButtonMode.store(ButtonModes::PAIR);

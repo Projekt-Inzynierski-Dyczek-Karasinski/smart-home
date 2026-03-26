@@ -9,3 +9,4 @@ old
 README
 /test
 .env
+/templates/tmp

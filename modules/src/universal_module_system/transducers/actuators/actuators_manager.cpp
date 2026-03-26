@@ -50,6 +50,24 @@ namespace UniversalModuleSystem::Transducers {
         return actuator->doOperation(operation);
     }
 
+    std::vector<API::APIParameterVariant> ActuatorsManager::getActuatorsIds() {
+        using ET = API::errorTypes;
+
+        const auto &dataManager = DataManager::getInstance();
+        nl::json jsonData = dataManager.loadJson(dataManager.s_BASE_CONFIG_PATH);
+        nl::json &sensorData = jsonData[ms_ALL_ACTUATORS_DATA][ms_ACTUATORS_ARRAY];
+        if (jsonData.empty())
+            return std::vector<API::APIParameterVariant>{API::APIParameter(static_cast<uint8_t>(ET::INTERNAL_ERROR), true)};
+
+
+        std::vector<API::APIParameterVariant> result;
+        result.reserve(sensorData.size());
+        for (auto &jsonSensor: sensorData) {
+            result.emplace_back(API::APIParameter<uint8_t>(jsonSensor[ms_ACTUATOR_DATA][ms_ACTUATOR_ID].get<uint8_t>()));
+        }
+        return result;
+    }
+
     void ActuatorsManager::handleActuatorsOnBoot() {
         const auto &dataManager = DataManager::getInstance();
 

@@ -21,6 +21,8 @@ namespace nl = nlohmann;
 namespace API = Comms::API;
 
 namespace UniversalModuleSystem {
+    RTC_DATA_ATTR bool PowerManagerESP32::isSensorUsingExt0 = false;
+
     PowerManagerESP32 &PowerManagerESP32::getInstance(const std::shared_ptr<ul::Logger> &logger) {
         static PowerManagerESP32 instance(logger);
         return instance;
@@ -76,6 +78,7 @@ namespace UniversalModuleSystem {
         sensorManager.onSleep();
 
         const bool isButtonWakeUpAssigned = addWakeUpOnEXT0(buttonPin, LOW);
+        isSensorUsingExt0 = !isButtonWakeUpAssigned;
 
         // rf module wake up
         // TODO add changing FU mode for power saving
@@ -87,7 +90,7 @@ namespace UniversalModuleSystem {
             esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
             // esp_ext1
             const uint64_t bitMask =
-                isButtonWakeUpAssigned ? (1ULL << hc12WakeUpPin) : (1ULL << hc12WakeUpPin) | (1ULL << buttonPin);
+                    isButtonWakeUpAssigned ? (1ULL << hc12WakeUpPin) : (1ULL << hc12WakeUpPin) | (1ULL << buttonPin);
             esp_sleep_enable_ext1_wakeup(bitMask, ESP_EXT1_WAKEUP_ANY_LOW);
         } else {
             if (!isButtonWakeUpAssigned)
@@ -99,7 +102,7 @@ namespace UniversalModuleSystem {
         #endif
 
         // timer wake up
-        esp_sleep_enable_timer_wakeup((uint64_t) milliSeconds * US_TO_MILLISECONDS_FACTOR);
+        esp_sleep_enable_timer_wakeup(static_cast<uint64_t>(milliSeconds) * US_TO_MILLISECONDS_FACTOR);
 
         mpLogger->infov("PowerManagerESP32", "Going to sleep for (ms): ", milliSeconds);
 
@@ -185,8 +188,28 @@ namespace UniversalModuleSystem {
                 }
                 break;
             }
-
+            // TODO add here check notif from window sensor (both here and in #else)
             case ESP_SLEEP_WAKEUP_EXT0:
+                // CHECKME
+                if (isSensorUsingExt0) {
+                    try {
+                        API::CommandHandler commandHandler(API::commandTypes::NOTIFY);
+                        API::APIParameter notify(static_cast<uint8_t>(API::notifyTypes::SENSOR_ALERT));
+                        commandHandler.addParameter(notify);
+
+                        uint8_t message[MESSAGE_SIZE] = {};
+                        commandHandler.generateMessage(message);
+
+                        const auto &communication = Comms::Communication::getInstance();
+                        communication.sendMessage(message);
+                    } catch (std::exception &e) {
+                        mpLogger->error(
+                            "PowerManagerESP32 handleWakeUpReason",
+                            "Failed to create notification in case ESP_SLEEP_WAKEUP_EXT0."
+                        );
+                        mpLogger->error("PowerManagerESP32 handleWakeUpReason", e.what());
+                    }
+                }
                 mpLogger->info("PowerManagerESP32 Class", "Module was wake up by ESP_SLEEP_WAKEUP_EXT0.");
                 break;
 
@@ -196,20 +219,22 @@ namespace UniversalModuleSystem {
 
                 #else
             case ESP_SLEEP_WAKEUP_EXT0:
+                // TODO change logic for #else
                 try {
                     API::CommandHandler commandHandler(API::commandTypes::NOTIFY);
-                    #ifdef ESP32_WROOM_BOARD_TYPE
-                    API::APIParameter notify(static_cast<uint8_t>(API::notifyTypes::MANUAL_WAKE_UP));
-                    #else
-                    API::APIParameter notify(static_cast<uint8_t>(API::notifyTypes::SENSOR_ALERT));
-                    #endif
-                    commandHandler.addParameter(notify);
 
-                    uint8_t message[MESSAGE_SIZE] = {};
-                    commandHandler.generateMessage(message);
-                    const auto &communication = Comms::Communication::getInstance();
-                    communication.sendMessage(message);
-                } catch (std::exception &e) {
+                #ifdef ESP32_WROOM_BOARD_TYPE
+                API::APIParameter notify(static_cast<uint8_t>(API::notifyTypes::MANUAL_WAKE_UP));
+                #else
+                API::APIParameter notify(static_cast<uint8_t>(API::notifyTypes::SENSOR_ALERT));
+                #endif
+                commandHandler.addParameter(notify);
+
+                uint8_t message[MESSAGE_SIZE] = {};
+                commandHandler.generateMessage(message);
+                const auto &communication = Comms::Communication::getInstance();
+                communication.sendMessage(message);
+                } catch (std::exception & e) {
                     mpLogger->error(
                         "PowerManagerESP32 handleWakeUpReason",
                         "Failed to create notification in case ESP_SLEEP_WAKEUP_EXT0."

@@ -347,6 +347,9 @@ namespace Comms {
                             sendCommand->addParameter(API::APIParameter(uid.value()));
                             for (const auto &param: sensorManager.getSensorsIds())
                                 sendCommand->addParameter(param);
+                            // CHECKME
+                            for (const auto &param: ums::Transducers::ActuatorsManager::getActuatorsIds())
+                                sendCommand->addParameter(param);
                         } catch (std::exception &e) {
                             sendCommand.reset();
                             mpLogger->error("MessageDecider GT::SENSOR_LIST", e.what());

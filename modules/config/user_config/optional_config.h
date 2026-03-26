@@ -6,6 +6,12 @@
 #define DEBUG_MODE
 #endif
 
+// Uncomment to disable wake up rf notifications
+#ifndef DISABLE_WAKE_UP_RF_NOTIFICATION
+#define DISABLE_WAKE_UP_RF_NOTIFICATION
+#endif
+
+
 // uncomment to override serial baudrate, default: 115200
 // WARNING: DEBUG_MODE must be defined to enable serial communication
 // #define TERMINAL_BAUD_RATE 115200

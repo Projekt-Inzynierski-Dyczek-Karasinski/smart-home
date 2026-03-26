@@ -64,6 +64,12 @@ namespace UniversalModuleSystem::Transducers {
          * @return Operation result or an error code.
          */
         apiPv actuatorDoOperation(uint8_t actuatorId, const apiPv& operation);
+
+        /**
+         * @brief Get actuators IDs.
+         * @return Actuators IDs.
+         */
+        [[nodiscard]] static std::vector<API::APIParameterVariant> getActuatorsIds();
         
     private:
         /**

@@ -140,9 +140,7 @@ namespace UniversalModuleSystem {
 
         std::atomic<uint32_t> mIdleSleepTime{0};
 
-        // auto sleep
-        static uint32_t msSleepStart; ///< When sleep starts, variable saved in RTC memory.
-        static int64_t msIntendedSleepTime; ///< How long sleep should last, variable saved in RTC memory.
+        static bool isSensorUsingExt0;
 
         // JSON keys
         static constexpr char ms_IDLE_TIMER_DATA[] = "idleAutoSleep";

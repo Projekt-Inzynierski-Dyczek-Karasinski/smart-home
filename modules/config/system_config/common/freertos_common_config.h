@@ -14,8 +14,8 @@
 // #define TESTING_TASK_SIZE 10000 // 10000B round number for easy calculations - only for testing
 
 // DebugLED
-#define PAIRING_BLINK_TASK_SIZE     SMALL_TASK_SIZE
-#define RESET_BLINK_TASK_SIZE       SMALL_TASK_SIZE
+#define PAIRING_BLINK_TASK_SIZE     MEDIUM_TASK_SIZE
+#define RESET_BLINK_TASK_SIZE       MEDIUM_TASK_SIZE
 
 // PairingButton
 #define FACTORY_RESET_TASK_SIZE     BIG_TASK_SIZE
