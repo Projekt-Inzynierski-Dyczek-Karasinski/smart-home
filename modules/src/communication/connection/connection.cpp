@@ -347,7 +347,6 @@ namespace Comms {
                             sendCommand->addParameter(API::APIParameter(uid.value()));
                             for (const auto &param: sensorManager.getSensorsIds())
                                 sendCommand->addParameter(param);
-                            // CHECKME
                             for (const auto &param: ums::Transducers::ActuatorsManager::getActuatorsIds())
                                 sendCommand->addParameter(param);
                         } catch (std::exception &e) {
@@ -559,11 +558,10 @@ namespace Comms {
             sendCommand->generateMessage(sendBuffer);
             mpCommunication->sendMessage(sendBuffer);
 
-        // TODO !mm uncomment #ifdef CENTRAL_UNIT
-        // #ifdef CENTRAL_UNIT
+        #ifdef CENTRAL_UNIT
             if (sendCommand->getCommandType() == CT::END)
                 endConnection();
-        // #endif
+        #endif
         }
     }
 

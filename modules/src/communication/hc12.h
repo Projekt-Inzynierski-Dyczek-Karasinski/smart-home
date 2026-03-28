@@ -10,6 +10,8 @@
 namespace ul = Utils::Logging;
 namespace nl = nlohmann;
 
+
+// TODO !pr add comments
 namespace Comms {
     class Communication;
     /**
@@ -26,6 +28,7 @@ namespace Comms {
          * @param logger Shared pointer to the Logger instance.
          */
         HC12(Communication *communication, const std::shared_ptr<ul::Logger> &logger);
+
         /**
          * @brief Destructor of HC12 class. Deletes all FreeRTOS objects and HardwareSerial. Sets SET_PIN to LOW.
          * @warning Destructor of this class exists only for programming principles. This class should never be deleted.
@@ -77,38 +80,41 @@ namespace Comms {
          */
         void sleep() const;
 
+        void enterPowerSavingMode() const;
+
         // JSON key
         static constexpr char s_HC12_DATA[] = "hc12";
         static constexpr char s_TX_PIN[] = "tx";
         static constexpr char s_RX_PIN[] = "rx";
         static constexpr char s_SET_PIN[] = "set";
-        static constexpr char s_BAUDRATE[] = "baudrate";
 
     private:
         /**
-         * @brief Struct handling unpacking json hc12 data.
+         * @brief Struct handling unpacking JSON hc12 data.
          */
         struct HC12Data {
             explicit HC12Data(const nl::json &data);
 
-            const uint8_t txPin;
-            const uint8_t rxPin;
+            const int8_t txPin;
+            const int8_t rxPin;
             const uint8_t setPin;
-            const uint32_t baudrate;
         };
 
         /**
          * @brief Create a FreeRTOS Queues used in HC12 class.
          */
         void createQueues();
+
         /**
          * @brief Delete a FreeRTOS Queues used in HC12 class.
          */
         void deleteQueues();
+
         /**
          * @brief Create a FreeRTOS Queues for setup HC12.
          */
         void createSetupHC12Queues();
+
         /**
          * @brief Delete a FreeRTOS Queues for setup HC12.
          */
@@ -121,6 +127,7 @@ namespace Comms {
          * @param isWaitingForSendConfirmation Pointer to variable if is being waited for confirmation from HC12.
          */
         void hc12OutputDecider(const uint8_t *hc12Output, bool *isWaitingForSendConfirmation) const;
+
         /**
          * @brief Main HC12 FreeRTOS task. Reads all output from HC12 module and passes it to Communication class.
          * This task is responsible for suspending/deleting resuming/creating other HC12 tasks.
@@ -128,10 +135,12 @@ namespace Comms {
          * @note This task runs continuously in the background.
          */
         static void HC12MainTask(void *parameters);
+
         /**
          * @brief Create Main HC12 task.
          */
         void createHC12MainTask();
+
         /**
          * @brief Delete main HC12 task.
          */
@@ -145,10 +154,12 @@ namespace Comms {
          * is resumed when a new message appear for transmission.
          */
         static void transmitTask(void *parameters);
+
         /**
          * @brief Create a Transmit task.
          */
         void createTransmitTask();
+
         /**
          * @brief Delete a Transmit task.
          */
@@ -160,14 +171,23 @@ namespace Comms {
          * @note This task is created only if setup is needed by Main HC12 task and is deleted when setup is finished.
          */
         static void setupHC12Task(void *parameters);
+
         /**
          * @brief Create a Setup HC12 Task and sets SET_PIN to LOW.
          */
         void createSetupHC12Task();
+
         /**
          * @brief Delete a Setup HC12 Task and sets SET_PIN to HIGH.
          */
         void deleteSetupHC12Task();
+
+        std::array<char, 16> getHC12Response() const;
+
+        // TODO !pr add comments
+        static void onBootSetupTask(void *parameters);
+
+        void createOnBootSetupTask();
 
         Communication *mpCommunication; // pointer to instance of Communication class
         HardwareSerial *mpSerial; // pointer to HardwareSerial
@@ -184,14 +204,21 @@ namespace Comms {
             DELETE_SETUP_HC12_TASK_NOTIF,
         } mHC12MainNotifications;
 
-        SemaphoreHandle_t mSendingDataMutex = nullptr; ///< Handle to FreeRTOS mutex protecting access to UART transmission to HC12 module.
-        SemaphoreHandle_t mFirstSetupSemaphore = nullptr; ///< Handle to FreeRTOS binary semaphore indicating that setup should be done first.
-        SemaphoreHandle_t mSetupWorkingSemaphore = nullptr; ///< Handle to FreeRTOS binary semaphore indicating that setup is in progres.
+        SemaphoreHandle_t mSendingDataMutex = nullptr;
+        ///< Handle to FreeRTOS mutex protecting access to UART transmission to HC12 module.
+        SemaphoreHandle_t mFirstSetupSemaphore = nullptr;
+        ///< Handle to FreeRTOS binary semaphore indicating that setup should be done first.
+        SemaphoreHandle_t mSetupWorkingSemaphore = nullptr;
+        ///< Handle to FreeRTOS binary semaphore indicating that setup is in progres.
 
-        QueueHandle_t mMainNotificationsQueue = nullptr; ///< Handle to FreeRTOS queue for notifications for the Main task, queue length: 5 bytes (uint8_t).
-        QueueHandle_t mTransmitQueue = nullptr; ///< Handle to FreeRTOS queue for (encoded) messages to transmit, queue length: 11x16 bytes (uint8_t).
-        QueueHandle_t mSetupHC12CommandsQueue = nullptr; ///< Handle to FreeRTOS queue for HC12 commands, queue length: 5x10 bytes (uint8_t).
-        QueueHandle_t mSetupHC12ReceiveQueue = nullptr; ///< Handle to FreeRTOS queue for response from HC12 after sending command, queue length: 43 bytes (uint8_t).
+        QueueHandle_t mMainNotificationsQueue = nullptr;
+        ///< Handle to FreeRTOS queue for notifications for the Main task, queue length: 5 bytes (uint8_t).
+        QueueHandle_t mTransmitQueue = nullptr;
+        ///< Handle to FreeRTOS queue for (encoded) messages to transmit, queue length: 11x16 bytes (uint8_t).
+        QueueHandle_t mSetupHC12CommandsQueue = nullptr;
+        ///< Handle to FreeRTOS queue for HC12 commands, queue length: 5x10 bytes (uint8_t).
+        QueueHandle_t mSetupHC12ReceiveQueue = nullptr;
+        ///< Handle to FreeRTOS queue for response from HC12 after sending command, queue length: 43 bytes (uint8_t).
 
         TaskHandle_t mHC12MainTaskHandle = nullptr; ///< Handle to FreeRTOS main HC12 task.
         TaskHandle_t mTransmitTaskHandle = nullptr; ///< Handle to FreeRTOS transmission task.
@@ -199,5 +226,10 @@ namespace Comms {
 
         std::shared_ptr<ul::Logger> mpLogger;
         const HC12Data m_HC12_DATA;
+
+        static constexpr uint8_t ms_DEFAULT_BAUD_RATE_INDEX = 0;
+        static constexpr std::array sm_BAUD_RATES{
+            9600u, 4800u, 1200u, 2400u, 19200u, 38400u, 57600u, 115200u
+        }; ///< Baud rates supported by HC12 (sorted manually from most probable to least)
     };
 }

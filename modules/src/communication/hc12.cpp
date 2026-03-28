@@ -6,29 +6,36 @@
 namespace uah = Utils::ArrayHandlers;
 namespace ums = UniversalModuleSystem;
 
+// TODO !pr add fu mode in base_config.json
 namespace Comms {
     // ============================ Public ============================
     HC12::HC12(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
         : mpCommunication(communication),
-        mpLogger(logger),
-        m_HC12_DATA(ums::DataManager::getInstance().loadJson(ums::DataManager::getInstance().s_BASE_CONFIG_PATH)[s_HC12_DATA]) {
+          mpLogger(logger),
+          m_HC12_DATA(
+              ums::DataManager::getInstance().loadJson(ums::DataManager::getInstance().s_BASE_CONFIG_PATH)[s_HC12_DATA]
+          ) {
         pinMode(m_HC12_DATA.setPin, OUTPUT);
-        digitalWrite(m_HC12_DATA.setPin, HIGH);
-        vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_HIGH));
+
+        // TODO !pr remove
+        mpLogger = std::make_shared<ul::Logger>(ul::Level::DEBUG);
 
         mSendingDataMutex = xSemaphoreCreateMutex();
-        mFirstSetupSemaphore = xSemaphoreCreateBinary();
         mSetupWorkingSemaphore = xSemaphoreCreateBinary();
+        mFirstSetupSemaphore = xSemaphoreCreateBinary();
         xSemaphoreGive(mFirstSetupSemaphore);
 
         createQueues();
 
         mpSerial = new HardwareSerial(HARDWARE_SERIAL_UART_NR);
-        mpSerial->begin(m_HC12_DATA.baudrate, SERIAL_8N1, m_HC12_DATA.rxPin, m_HC12_DATA.txPin);
+        mpSerial->begin(
+            sm_BAUD_RATES[ms_DEFAULT_BAUD_RATE_INDEX],
+            SERIAL_8N1,
+            m_HC12_DATA.rxPin,
+            m_HC12_DATA.txPin
+        );
 
         createSetupHC12Queues();
-        createSetupHC12Task();
-        createTransmitTask();
         createHC12MainTask();
 
         mpLogger->verbose("HC12 Class", "HC12 initialized.");
@@ -60,7 +67,6 @@ namespace Comms {
         if (!(commands[0] == 'H' && commands[1] == 'C')) {
             mpLogger->error("HC12 Method", "HC12 commands passed in setupHC12() must start with 'H', 'C'");
         } else {
-
             // split multiple command in COMMANDS array
             uint8_t commandStartIndex = 0;
             uint8_t commandEndIndex = 0;
@@ -73,8 +79,12 @@ namespace Comms {
                         mpLogger->error("HC12 Method", "Passed too many commands in setupHC12().");
                         break;
                     }
-                    uah::prepareBuffer(commandBuffer, &commands[commandStartIndex],
-                                       (commandEndIndex - commandStartIndex), SETUP_COMMAND_SIZE);
+                    uah::prepareBuffer(
+                        commandBuffer,
+                        &commands[commandStartIndex],
+                        (commandEndIndex - commandStartIndex),
+                        SETUP_COMMAND_SIZE
+                    );
 
                     xQueueSend(mSetupHC12CommandsQueue, commandBuffer, portMAX_DELAY);
                     commandStartIndex = commandEndIndex + 1;
@@ -120,6 +130,11 @@ namespace Comms {
     void HC12::sleep() const {
         setupHC12((uint8_t *) "HC+SLEEP");
     }
+
+    void HC12::enterPowerSavingMode() const {
+        setupHC12((uint8_t *) "HC+FU2");
+    }
+
 
     // ============================ Queues ============================
     void HC12::createQueues() {
@@ -175,18 +190,16 @@ namespace Comms {
     }
 
     void HC12::HC12MainTask(void *parameters) {
-        const auto &hc12 = *static_cast<HC12 *>(parameters);
+        auto &hc12 = *static_cast<HC12 *>(parameters);
 
         uint8_t status = DEFAULT_STATUS_NOTIF;
         bool isWaitingForSendConfirmation = false;
 
-        // clear random hc12 output after powering on
-        vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_HIGH));
-        while (hc12.mpSerial->available() > 0) {
-            hc12.mpSerial->read();
-        }
+        hc12.createOnBootSetupTask();
+        xSemaphoreTake(hc12.mSetupWorkingSemaphore, portMAX_DELAY);
 
-        hc12.firstChangeRFChannel(hc12.mpCommunication->getDefaultRfChannel());
+        hc12.createSetupHC12Task();
+        hc12.createTransmitTask();
 
         for (;;) {
             // change status
@@ -264,7 +277,10 @@ namespace Comms {
             if (xQueueReceive(hc12.mTransmitQueue, transmitBuffer, pdMS_TO_TICKS(SUSPEND_TASK_TIME_SHORT)) == pdTRUE) {
                 // if semaphore is signalizing that setup should be done first, wait until semaphore is back
                 if (uxSemaphoreGetCount(hc12.mFirstSetupSemaphore) == 0) {
-                    if (xSemaphoreTake(hc12.mFirstSetupSemaphore, pdMS_TO_TICKS(FIRST_SETUP_SEMAPHORE_TIMEOUT)) == pdFALSE) {
+                    if (xSemaphoreTake(
+                        hc12.mFirstSetupSemaphore,
+                        pdMS_TO_TICKS(FIRST_SETUP_SEMAPHORE_TIMEOUT)
+                    ) == pdFALSE) {
                         hc12.mpLogger->warning("HC12 FreeRTOS", "mFirstSetupSemaphore timeout");
                     }
                     xSemaphoreGive(hc12.mFirstSetupSemaphore);
@@ -327,17 +343,14 @@ namespace Comms {
         const auto &hc12 = *static_cast<HC12 *>(parameters);
 
         // prepare commandBuffer
-        uint8_t commandBuffer[SETUP_COMMAND_SIZE];
-        for (uint8_t i = 0; i < SETUP_COMMAND_SIZE; i++) {
-            commandBuffer[i] = 0;
-        }
+        uint8_t commandBuffer[SETUP_COMMAND_SIZE] = {};
 
         for (;;) {
             if (xQueueReceive(hc12.mSetupHC12CommandsQueue, commandBuffer, portMAX_DELAY) == pdTRUE) {
                 xSemaphoreTake(hc12.mSendingDataMutex, portMAX_DELAY);
                 xSemaphoreGive(hc12.mSetupWorkingSemaphore);
                 digitalWrite(hc12.m_HC12_DATA.setPin, LOW);
-                vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_LOW*2));
+                vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_LOW));
 
 
                 hc12.mpLogger->verbosea("HC12 Setup", "Received command: ", commandBuffer, SETUP_COMMAND_SIZE);
@@ -355,7 +368,11 @@ namespace Comms {
                     uint8_t index = 0;
                     uah::clearBuffer(hc12Response, SETUP_MAX_LEN_OF_RESPONSE);
 
-                    while (xQueueReceive(hc12.mSetupHC12ReceiveQueue, &hc12Response[index], pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)) == pdTRUE) {
+                    while (xQueueReceive(
+                               hc12.mSetupHC12ReceiveQueue,
+                               &hc12Response[index],
+                               pdMS_TO_TICKS(RECEIVE_BYTE_TIMEOUT)
+                           ) == pdTRUE) {
                         index++;
                     }
 
@@ -402,9 +419,102 @@ namespace Comms {
         deleteSetupHC12Queues();
     }
 
-    HC12::HC12Data::HC12Data(const nl::json &data) :
-        txPin(data[s_TX_PIN]),
-        rxPin(data[s_RX_PIN]),
-        setPin(data[s_SET_PIN]),
-        baudrate(data[s_BAUDRATE]) {}
+    std::array<char, 16> HC12::getHC12Response() const {
+        constexpr uint8_t MAX_RESPONSE_WAIT_TIME = 100;
+
+        mpSerial->flush();
+        for (uint8_t i = 0; i < MAX_RESPONSE_WAIT_TIME; i++) {
+            vTaskDelay(pdMS_TO_TICKS(1));
+            if (mpSerial->available() > 0) break;
+        }
+
+        uint8_t index = 0;
+        std::array<char, 16> receiveBuffer = {};
+        while (mpSerial->available() > 0) {
+            while (mpSerial->available() > 0) {
+                receiveBuffer[index++] = static_cast<char>(mpSerial->read());
+                if (index >= receiveBuffer.size() - 1) break;
+            }
+            if (index >= receiveBuffer.size() - 1) break;
+            vTaskDelay(pdMS_TO_TICKS(5));
+        }
+        return receiveBuffer;
+    }
+
+    void HC12::onBootSetupTask(void *parameters) {
+        constexpr std::string_view EXPECTED_RESPONSE_AT{"OK"};
+
+        const auto &hc12 = *static_cast<HC12 *>(parameters);
+
+        xSemaphoreTake(hc12.mSendingDataMutex, portMAX_DELAY);
+        digitalWrite(hc12.m_HC12_DATA.setPin, LOW);
+        vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_LOW));
+
+        // clear random hc12 output after powering on
+        while (hc12.mpSerial->available() > 0) {
+            hc12.mpSerial->read();
+        }
+
+        // check baud rates
+        bool isHC12NotResponding = true;
+        for (const auto baudRate: sm_BAUD_RATES) {
+            hc12.mpSerial->updateBaudRate(baudRate);
+            hc12.mpSerial->write("AT");
+
+            std::array<char, 16> receiveBuffer = hc12.getHC12Response();
+
+            if (strncmp(receiveBuffer.data(), EXPECTED_RESPONSE_AT.data(), EXPECTED_RESPONSE_AT.size()) == 0) {
+                isHC12NotResponding = false;
+                hc12.mpLogger->verbosev("HC12 onBootSetup", "Found HC12 baud rate: ", static_cast<int>(baudRate));
+
+                vTaskDelay(DELAY_BETWEEN_MESSAGES);
+                hc12.mpSerial->write("AT+DEFAULT");
+                receiveBuffer = hc12.getHC12Response();
+                hc12.mpLogger->debug("HC12 onBootSetup", receiveBuffer.data());
+
+                const uint8_t channel = hc12.mpCommunication->getDefaultRfChannel();
+                char sendBuffer[10] = {};
+                sprintf(sendBuffer, "AT+C%03u", channel);
+                vTaskDelay(DELAY_BETWEEN_MESSAGES);
+                hc12.mpSerial->write(sendBuffer);
+                receiveBuffer = hc12.getHC12Response();
+                hc12.mpLogger->debug("HC12 onBootSetup", receiveBuffer.data());
+
+                break;
+            }
+            vTaskDelay(DELAY_BETWEEN_MESSAGES);
+        }
+        hc12.mpSerial->updateBaudRate(sm_BAUD_RATES[ms_DEFAULT_BAUD_RATE_INDEX]);
+
+        if (isHC12NotResponding) hc12.mpLogger->error("HC12 onBootSetup", "HC12 is not responding");
+
+        digitalWrite(hc12.m_HC12_DATA.setPin, HIGH);
+        vTaskDelay(pdMS_TO_TICKS(DELAY_AFTER_SET_PIN_HIGH));
+        // clear random hc12 output after changing state of SET_PIN
+        while (hc12.mpSerial->available() > 0) {
+            hc12.mpSerial->read();
+        }
+        xSemaphoreGive(hc12.mSendingDataMutex);
+        xSemaphoreGive(hc12.mSetupWorkingSemaphore);
+
+        vTaskDelete(nullptr);
+        for (;;) {
+            vTaskDelay(pdMS_TO_TICKS(1000));
+        }
+    }
+
+    void HC12::createOnBootSetupTask() {
+        xTaskCreate(
+            onBootSetupTask,
+            "HC12 On Boot Setup",
+            ON_BOOT_SETUP_HC12_TASK_SIZE,
+            this,
+            MEDIUM_TASK_PRIORITY,
+            nullptr
+        );
+    }
+
+    HC12::HC12Data::HC12Data(const nl::json &data) : txPin(data[s_TX_PIN]),
+                                                     rxPin(data[s_RX_PIN]),
+                                                     setPin(data[s_SET_PIN]) {}
 }

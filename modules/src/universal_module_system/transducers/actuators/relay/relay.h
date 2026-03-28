@@ -6,8 +6,9 @@
 namespace UniversalModuleSystem::Transducers {
     /// @brief Supported relay operations
     enum class relayOperations : uint8_t {
-        TURN_OFF = 0,
+        UNDEFINED = 0,
         TURN_ON = 1,
+        TURN_OFF = 2,
     };
 
     /**
