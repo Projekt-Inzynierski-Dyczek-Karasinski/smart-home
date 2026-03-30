@@ -50,6 +50,14 @@ namespace UniversalModuleSystem {
         digitalWrite(mLedPin, LOW);
     }
 
+    void DebugLED::powerOnBlink() const {
+        digitalWrite(mLedPin, LOW);
+        vTaskDelay(pdMS_TO_TICKS(100));
+        digitalWrite(mLedPin, HIGH);
+        vTaskDelay(pdMS_TO_TICKS(100));
+        digitalWrite(mLedPin, LOW);
+    }
+
     void DebugLED::blink(const uint32_t ledOnDuration, const uint32_t ledOffDuration) const {
         digitalWrite(mLedPin, HIGH);
         vTaskDelay(pdMS_TO_TICKS(ledOnDuration));

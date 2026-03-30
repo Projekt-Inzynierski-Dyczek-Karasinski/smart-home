@@ -61,6 +61,9 @@ namespace UniversalModuleSystem {
          */
         void wifiDisconnected();
 
+        // TODO !pr add comment
+        void powerOnBlink() const;
+
     private:
         /**
          * @brief Make LED blink for a given times.

@@ -23,8 +23,11 @@ namespace API = Comms::API;
 namespace UniversalModuleSystem {
     RTC_DATA_ATTR bool PowerManagerESP32::isSensorUsingExt0 = false;
 
-    PowerManagerESP32 &PowerManagerESP32::getInstance(const std::shared_ptr<ul::Logger> &logger) {
-        static PowerManagerESP32 instance(logger);
+    PowerManagerESP32 &PowerManagerESP32::getInstance(
+        const std::shared_ptr<ul::Logger> &logger,
+        const std::shared_ptr<DebugLED> &debugLED
+    ) {
+        static PowerManagerESP32 instance(logger, debugLED);
         return instance;
     }
 
@@ -107,7 +110,6 @@ namespace UniversalModuleSystem {
         mpLogger->infov("PowerManagerESP32", "Going to sleep for (ms): ", milliSeconds);
 
         waitAndDisableCriticalFeatures();
-
         esp_deep_sleep_start();
     }
 
@@ -141,7 +143,12 @@ namespace UniversalModuleSystem {
         return true;
     }
 
-    PowerManagerESP32::PowerManagerESP32(const std::shared_ptr<ul::Logger> &logger) : mpLogger(logger) {
+
+    PowerManagerESP32::PowerManagerESP32(
+        const std::shared_ptr<ul::Logger> &logger,
+        const std::shared_ptr<DebugLED> &debugLED
+    ) : mpLogger(logger),
+        mpDebugLED(debugLED) {
         if (logger == nullptr) {
             mpLogger = std::make_shared<ul::Logger>();
             mpLogger->error(
@@ -149,21 +156,41 @@ namespace UniversalModuleSystem {
                 "PowerManagerESP32's constructor didn't get pointer to logger instance."
             );
         }
+        if (debugLED == nullptr) {
+            mpLogger->warning(
+                "PowerManagerESP32",
+                "PowerManagerESP32's constructor didn't get pointer to debugLED instance."
+            );
+        }
+
         mEspExt0Available = xSemaphoreCreateBinary();
         xSemaphoreGive(mEspExt0Available);
 
         handleWakeUpReason();
         createIdleTimer();
+
+        xTaskCreate(
+            handleBootCheckTask,
+            "Boot Check Task",
+            BOOT_CHECK_TASK_SIZE,
+            this,
+            LOW_TASK_PRIORITY,
+            nullptr
+        );
     }
 
     PowerManagerESP32::~PowerManagerESP32() {
-        if (mIdleTimer != nullptr)
+        if (mIdleTimer != nullptr) {
             xTimerDelete(mIdleTimer, portMAX_DELAY);
+            mIdleTimer = nullptr;
+        }
     }
 
     void PowerManagerESP32::waitAndDisableCriticalFeatures() const {
         const auto &communication = Comms::Communication::getInstance(nullptr, nullptr);
         const auto &dataManager = DataManager::getInstance();
+
+        vTaskDelay(pdMS_TO_TICKS(100));
 
         communication.waitAndDisableRfModule();
         dataManager.waitAndDisable();
@@ -192,6 +219,7 @@ namespace UniversalModuleSystem {
             case ESP_SLEEP_WAKEUP_EXT0:
                 // CHECKME
                 if (isSensorUsingExt0) {
+                    #ifndef CENTRAL_UNIT
                     try {
                         API::CommandHandler commandHandler(API::commandTypes::NOTIFY);
                         API::APIParameter notify(static_cast<uint8_t>(API::notifyTypes::SENSOR_ALERT));
@@ -209,6 +237,7 @@ namespace UniversalModuleSystem {
                         );
                         mpLogger->error("PowerManagerESP32 handleWakeUpReason", e.what());
                     }
+                    #endif
                 }
                 mpLogger->info("PowerManagerESP32 Class", "Module was wake up by ESP_SLEEP_WAKEUP_EXT0.");
                 break;
@@ -222,6 +251,8 @@ namespace UniversalModuleSystem {
                 // TODO change logic for #else
                 try {
                     API::CommandHandler commandHandler(API::commandTypes::NOTIFY);
+
+
 
                 #ifdef ESP32_WROOM_BOARD_TYPE
                 API::APIParameter notify(static_cast<uint8_t>(API::notifyTypes::MANUAL_WAKE_UP));
@@ -326,5 +357,14 @@ namespace UniversalModuleSystem {
         auto &pm = *static_cast<PowerManagerESP32 *>(pvTimerGetTimerID(xTimer));
         if (const uint32_t sleepTime = pm.mIdleSleepTime.load(); sleepTime != 0)
             pm.enterSleep(sleepTime, true);
+    }
+
+    void PowerManagerESP32::handleBootCheckTask(void *parameters) {
+        const auto &pm = *static_cast<PowerManagerESP32 *>(parameters);
+
+        if (pm.wasModuleRestarted()) pm.mpDebugLED->powerOnBlink();
+
+        vTaskDelete(nullptr);
+        for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }

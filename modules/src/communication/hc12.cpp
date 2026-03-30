@@ -2,6 +2,7 @@
 
 #include "communication/communication.h"
 #include "universal_module_system/data_manager.h"
+#include "universal_module_system/power_manager/power_manager.h"
 
 namespace uah = Utils::ArrayHandlers;
 namespace ums = UniversalModuleSystem;
@@ -18,7 +19,7 @@ namespace Comms {
         pinMode(m_HC12_DATA.setPin, OUTPUT);
 
         // TODO !pr remove
-        mpLogger = std::make_shared<ul::Logger>(ul::Level::DEBUG);
+        // mpLogger = std::make_shared<ul::Logger>(ul::Level::DEBUG);
 
         mSendingDataMutex = xSemaphoreCreateMutex();
         mSetupWorkingSemaphore = xSemaphoreCreateBinary();

@@ -10,12 +10,13 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 
+#include "universal_module_system/debug_led.h"
+
 #include "../../utils/logger.h"
 
 namespace ul = Utils::Logging;
 
 namespace UniversalModuleSystem {
-
     /**
      * @brief Class responsible for managing power-related operations, including sleep and battery monitoring, on ESP32 boards.
      *
@@ -23,6 +24,7 @@ namespace UniversalModuleSystem {
      */
     class PowerManagerESP32 final : public IPowerManager {
     public:
+        // TODO !pr add update
         /**
          * @brief Gets the singleton instance of PowerManagerESP32.
          *
@@ -31,11 +33,14 @@ namespace UniversalModuleSystem {
          *
          *  @warning First call have to pass pointer to logger.
          */
-        static PowerManagerESP32& getInstance(const std::shared_ptr<ul::Logger> &logger = nullptr);
+        static PowerManagerESP32 &getInstance(
+            const std::shared_ptr<ul::Logger> &logger = nullptr, const std::shared_ptr<DebugLED> &debugLED = nullptr
+        );
 
         // Delete copy constructor and assignment operator
-        PowerManagerESP32(const PowerManagerESP32&) = delete;
-        PowerManagerESP32& operator = (const PowerManagerESP32&) = delete;
+        PowerManagerESP32(const PowerManagerESP32 &) = delete;
+
+        PowerManagerESP32 &operator =(const PowerManagerESP32 &) = delete;
 
         /**
          * @brief Puts the ESP32 into sleep mode for a specified duration.
@@ -83,6 +88,7 @@ namespace UniversalModuleSystem {
         [[nodiscard]] bool addWakeUpOnEXT0(gpio_num_t pin, bool level) const;
 
     private:
+        // TODO !pr add update
         /**
          * @brief Private constructor for singleton pattern.
          * @details Logs wake up reason, starts auto sleep logic (if enabled),
@@ -90,7 +96,9 @@ namespace UniversalModuleSystem {
          *
          * @param logger Shared pointer to the logger instance.
          */
-        explicit PowerManagerESP32(const std::shared_ptr<ul::Logger> &logger = nullptr);
+        explicit PowerManagerESP32(
+            const std::shared_ptr<ul::Logger> &logger = nullptr, const std::shared_ptr<DebugLED> &debugLED = nullptr
+        );
 
         /**
          * @brief Deletes FreeRTOS resources.
@@ -131,7 +139,11 @@ namespace UniversalModuleSystem {
          */
         static void idleAutosleep(TimerHandle_t xTimer);
 
+        // TODO !pr add comment
+        static void handleBootCheckTask(void *parameters);
+
         std::shared_ptr<ul::Logger> mpLogger;
+        std::shared_ptr<DebugLED> mpDebugLED;
 
         TimerHandle_t mIdleTimer = nullptr; ///< FreeRTOS timer handle for managing idle auto-sleep functionality.
 
