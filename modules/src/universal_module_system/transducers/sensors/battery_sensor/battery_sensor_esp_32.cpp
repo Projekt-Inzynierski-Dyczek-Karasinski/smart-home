@@ -16,11 +16,14 @@ namespace UniversalModuleSystem::Transducers {
 
     std::vector<API::APIParameterVariant> BatterySensorESP32::getApiFormattedReading() {
         waitUntilReadEnds();
-        return std::vector<API::APIParameterVariant> {API::APIParameter((uint8_t)mBatteryReadPercentage.load())};;
+        return std::vector<API::APIParameterVariant>{
+            API::APIParameter(static_cast<uint8_t>(mBatteryReadPercentage.load()))
+        };;
     }
 
     void BatterySensorESP32::startReading() {
-        xSemaphoreTake(mReadingCompleteSemaphore, 0); // make sure that semaphore indicates that reading is not completed
+        xSemaphoreTake(mReadingCompleteSemaphore, 0);
+        // make sure that semaphore indicates that reading is not completed
         xTaskCreate(
             batteryReadTask,
             "Battery Read Task",
@@ -42,7 +45,7 @@ namespace UniversalModuleSystem::Transducers {
         result /= mAdditionalData.gndResistor;
         result /= MAX_ANALOG_READ;
 
-        return (uint16_t)result;
+        return static_cast<uint16_t>(result);
     }
 
     int8_t BatterySensorESP32::calculateBatteryChargePercentage(const uint16_t outputVoltage) const {
@@ -54,15 +57,15 @@ namespace UniversalModuleSystem::Transducers {
         result *= 100;
         result /= (mAdditionalData.maxVoltage - mAdditionalData.minVoltage);
 
-        return (int8_t)result;
+        return static_cast<int8_t>(result);
     }
 
 
     void BatterySensorESP32::batteryReadTask(void *parameters) {
-        auto& bs = *static_cast<BatterySensorESP32*>(parameters);
-        constexpr uint16_t TIME_BETWEEN_READS = 50; // ms
-        constexpr uint8_t NUMBER_OF_READS = 5;
-        uint16_t batteryReadSum = 0;
+        auto &bs = *static_cast<BatterySensorESP32 *>(parameters);
+        constexpr uint16_t TIME_BETWEEN_READS = 25; // ms
+        constexpr uint8_t NUMBER_OF_READS = 16;
+        uint32_t batteryReadSum = 0;
 
         xSemaphoreTake(bs.mSensorDataMutex, portMAX_DELAY);
 
@@ -75,8 +78,13 @@ namespace UniversalModuleSystem::Transducers {
         bs.mBatteryReadPercentage.store(bs.calculateBatteryChargePercentage(batteryVoltage));
         xSemaphoreGive(bs.mSensorDataMutex);
 
+        bs.mpLogger->debugv("BatterySensorESP32 Task", "Raw analog read avg: ", (batteryReadSum / NUMBER_OF_READS));
         bs.mpLogger->debugv("BatterySensorESP32 Task", "Battery charge level is (mV): ", batteryVoltage);
-        bs.mpLogger->debugv("BatterySensorESP32 Task", "Battery charge level is (%): ", bs.mBatteryReadPercentage.load());
+        bs.mpLogger->debugv(
+            "BatterySensorESP32 Task",
+            "Battery charge level is (%): ",
+            bs.mBatteryReadPercentage.load()
+        );
         xSemaphoreGive(bs.mReadingCompleteSemaphore);
 
         vTaskDelete(nullptr);
@@ -93,10 +101,10 @@ namespace UniversalModuleSystem::Transducers {
         return isLoadedSuccessfully;
     }
 
-    BatterySensorESP32::AdditionalData::AdditionalData(const nl::json &json) :
-        vccResistor(json[ms_DATA][ms_VCC_RESISTOR_DATA]),
-        gndResistor(json[ms_DATA][ms_GND_RESISTOR_DATA]),
-        minVoltage(json[ms_DATA][ms_V_MIN_DATA]),
-        maxVoltage(json[ms_DATA][ms_V_MAX_DATA]),
-        isLoaded(true) {}
+    BatterySensorESP32::AdditionalData::AdditionalData(const nl::json &json)
+        : vccResistor(json[ms_DATA][ms_VCC_RESISTOR_DATA]),
+          gndResistor(json[ms_DATA][ms_GND_RESISTOR_DATA]),
+          minVoltage(json[ms_DATA][ms_V_MIN_DATA]),
+          maxVoltage(json[ms_DATA][ms_V_MAX_DATA]),
+          isLoaded(true) {}
 }

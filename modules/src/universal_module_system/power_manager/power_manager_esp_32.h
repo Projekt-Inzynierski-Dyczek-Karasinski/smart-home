@@ -24,14 +24,15 @@ namespace UniversalModuleSystem {
      */
     class PowerManagerESP32 final : public IPowerManager {
     public:
-        // TODO !pr add update
         /**
          * @brief Gets the singleton instance of PowerManagerESP32.
          *
          * @param logger Shared pointer to the logger instance, default: nullptr.
+         * @param debugLED Shared pointer to the debugLED instance, default: nullptr.
+         *
          * @return Reference to the PowerManagerESP32 instance.
          *
-         *  @warning First call have to pass pointer to logger.
+         * @warning First call have to pass pointer to logger and debugLED.
          */
         static PowerManagerESP32 &getInstance(
             const std::shared_ptr<ul::Logger> &logger = nullptr, const std::shared_ptr<DebugLED> &debugLED = nullptr
@@ -88,13 +89,13 @@ namespace UniversalModuleSystem {
         [[nodiscard]] bool addWakeUpOnEXT0(gpio_num_t pin, bool level) const;
 
     private:
-        // TODO !pr add update
         /**
          * @brief Private constructor for singleton pattern.
          * @details Logs wake up reason, starts auto sleep logic (if enabled),
          *          initializes FreeRTOS semaphore and task for reading battery.
          *
          * @param logger Shared pointer to the logger instance.
+         * @param debugLED Shared pointer to the debugLED instance, default: nullptr.
          */
         explicit PowerManagerESP32(
             const std::shared_ptr<ul::Logger> &logger = nullptr, const std::shared_ptr<DebugLED> &debugLED = nullptr
@@ -126,7 +127,7 @@ namespace UniversalModuleSystem {
          * @brief Returns the time passed from powering on ESP.
          * @return Time in milliseconds.
          */
-        uint32_t getCurrentTime() const;
+        [[nodiscard]] uint32_t getCurrentTime() const;
 
         /**
          * @brief Creates idle timer, that automatically put ESP32 to sleep, if idle autosleep is enabled.
@@ -138,9 +139,6 @@ namespace UniversalModuleSystem {
          * @param xTimer Handle to the timer triggering auto-sleep (used for passing pointer to instance of PowerManagerESP32).
          */
         static void idleAutosleep(TimerHandle_t xTimer);
-
-        // TODO !pr add comment
-        static void handleBootCheckTask(void *parameters);
 
         std::shared_ptr<ul::Logger> mpLogger;
         std::shared_ptr<DebugLED> mpDebugLED;

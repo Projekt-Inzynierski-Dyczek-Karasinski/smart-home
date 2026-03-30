@@ -50,12 +50,17 @@ namespace UniversalModuleSystem {
         digitalWrite(mLedPin, LOW);
     }
 
-    void DebugLED::powerOnBlink() const {
-        digitalWrite(mLedPin, LOW);
-        vTaskDelay(pdMS_TO_TICKS(100));
-        digitalWrite(mLedPin, HIGH);
-        vTaskDelay(pdMS_TO_TICKS(100));
-        digitalWrite(mLedPin, LOW);
+    void DebugLED::powerOnBlink() {
+        if (mBlinkHandle == nullptr) {
+            xTaskCreate(
+                powerOnBlinkTask,
+                "Power On Blink",
+                BOOT_CHECK_TASK_SIZE,
+                this,
+                LOW_TASK_PRIORITY,
+                nullptr
+            );
+        }
     }
 
     void DebugLED::blink(const uint32_t ledOnDuration, const uint32_t ledOffDuration) const {
@@ -161,5 +166,17 @@ namespace UniversalModuleSystem {
             xTimerDelete(mBlinkTimeout, portMAX_DELAY);
             mBlinkTimeout = nullptr;
         }
+    }
+
+    void DebugLED::powerOnBlinkTask(void *parameters) {
+        const auto &dl = *static_cast<DebugLED *>(parameters);
+        digitalWrite(dl.mLedPin, LOW);
+        vTaskDelay(pdMS_TO_TICKS(100));
+        digitalWrite(dl.mLedPin, HIGH);
+        vTaskDelay(pdMS_TO_TICKS(100));
+        digitalWrite(dl.mLedPin, LOW);
+
+        vTaskDelete(nullptr);
+        for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }

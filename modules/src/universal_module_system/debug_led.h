@@ -61,8 +61,10 @@ namespace UniversalModuleSystem {
          */
         void wifiDisconnected();
 
-        // TODO !pr add comment
-        void powerOnBlink() const;
+        /**
+         * @brief Creates Power on blink FreeRTOS task.
+         */
+        void powerOnBlink();
 
     private:
         /**
@@ -88,6 +90,12 @@ namespace UniversalModuleSystem {
          * @brief Method that is called when the Blink Timeout Timer expires. Deletes Timer and Pairing Blink and Reset Blink tasks if exists.
          */
         static void blinkTimeoutCallback(TimerHandle_t xTimer);
+
+        /**
+         * @brief FreeRTOS task that blinks LED to indicate that the module is powered on.
+         * @param parameters FreeRTOS task parameters.
+         */
+        static void powerOnBlinkTask(void *parameters);
 
         /**
          * @brief Creates and starts Blink Timeout Timer. If timer is already started, it will be restarted.

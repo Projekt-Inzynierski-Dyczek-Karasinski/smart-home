@@ -157,7 +157,7 @@ namespace UniversalModuleSystem {
             );
         }
         if (debugLED == nullptr) {
-            mpLogger->warning(
+            mpLogger->error(
                 "PowerManagerESP32",
                 "PowerManagerESP32's constructor didn't get pointer to debugLED instance."
             );
@@ -168,15 +168,6 @@ namespace UniversalModuleSystem {
 
         handleWakeUpReason();
         createIdleTimer();
-
-        xTaskCreate(
-            handleBootCheckTask,
-            "Boot Check Task",
-            BOOT_CHECK_TASK_SIZE,
-            this,
-            LOW_TASK_PRIORITY,
-            nullptr
-        );
     }
 
     PowerManagerESP32::~PowerManagerESP32() {
@@ -243,6 +234,7 @@ namespace UniversalModuleSystem {
                 break;
 
             default:
+                mpDebugLED->powerOnBlink();
                 mpLogger->info("PowerManagerESP32 Class", "Module had power loss.");
                 break;
 
@@ -319,6 +311,7 @@ namespace UniversalModuleSystem {
                     );
                     mpLogger->error("PowerManagerESP32 handleWakeUpReason", e.what());
                 }
+                mpDebugLED->powerOnBlink();
                 mpLogger->info("PowerManagerESP32 Class", "Module had power loss.");
                 break;
                 #endif
@@ -357,14 +350,5 @@ namespace UniversalModuleSystem {
         auto &pm = *static_cast<PowerManagerESP32 *>(pvTimerGetTimerID(xTimer));
         if (const uint32_t sleepTime = pm.mIdleSleepTime.load(); sleepTime != 0)
             pm.enterSleep(sleepTime, true);
-    }
-
-    void PowerManagerESP32::handleBootCheckTask(void *parameters) {
-        const auto &pm = *static_cast<PowerManagerESP32 *>(parameters);
-
-        if (pm.wasModuleRestarted()) pm.mpDebugLED->powerOnBlink();
-
-        vTaskDelete(nullptr);
-        for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
