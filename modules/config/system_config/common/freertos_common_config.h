@@ -11,7 +11,7 @@
 #define MEDIUM_TASK_SIZE 2048 // 2kB
 #define BIG_TASK_SIZE 4096 // 4kB
 #define HUGE_TASK_SIZE 8192 // 8kB
-// #define TESTING_TASK_SIZE 10000 // 10000B round number for easy calculations - only for testing
+#define TESTING_TASK_SIZE 10000 // 10000B round number for easy calculations - only for testing
 
 // DebugLED
 #define PAIRING_BLINK_TASK_SIZE     MEDIUM_TASK_SIZE
@@ -39,7 +39,8 @@
 #define CENTRAL_UNIT_ADDRESSING_TASK_SIZE   BIG_TASK_SIZE
 
 // PowerManager
-#define POWER_MANAGEMENT_SEMAPHORE_TIMEOUT 10000 // 10s
+#define POWER_MANAGEMENT_SEMAPHORE_TIMEOUT  10000 // 10s
+#define ENTER_SLEEP_TASK_SIZE               TESTING_TASK_SIZE
 
 // Sensors
 #define BATTERY_READ_TASK_SIZE MEDIUM_TASK_SIZE

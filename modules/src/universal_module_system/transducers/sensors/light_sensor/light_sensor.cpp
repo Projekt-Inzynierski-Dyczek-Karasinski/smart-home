@@ -34,7 +34,7 @@ namespace UniversalModuleSystem::Transducers {
     }
 
     int8_t LightSensor::calculateLightPercentage(const uint16_t rawReading) {
-        constexpr uint16_t MAX_ANALOG_READ = 4096;
+        constexpr uint16_t MAX_ANALOG_READ = 4095;
 
         // uint32_t to not exceed overflow in calculations
         uint32_t result = rawReading;

@@ -8,6 +8,7 @@ namespace UniversalModuleSystem::Transducers {
     WindowSensor::WindowSensor(const std::shared_ptr<ul::Logger> &logger) : Sensor(logger) {
         xSemaphoreTake(mSensorDataMutex, portMAX_DELAY);
         pinMode(mCommonSensorData.readPin, INPUT_PULLUP);
+        // attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), windowISR, CHANGE); // TODO !pr add this isr:
         xSemaphoreGive(mSensorDataMutex);
 
         handleFirstSleep();
@@ -79,6 +80,10 @@ namespace UniversalModuleSystem::Transducers {
             }
         }
     }
+
+    // void WindowSensor::windowISR() {
+    //
+    // }
 
     void WindowSensor::waitUntilReadEnds() {}
 

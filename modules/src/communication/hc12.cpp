@@ -61,7 +61,8 @@ namespace Comms {
 
     void HC12::addMessageToTransmit(const uint8_t *message) const {
         xQueueSend(mTransmitQueue, message, portMAX_DELAY);
-        vTaskResume(mTransmitTaskHandle);
+        if (mTransmitTaskHandle != nullptr)
+            vTaskResume(mTransmitTaskHandle);
     }
 
     void HC12::setupHC12(const uint8_t *commands) const {
@@ -221,7 +222,7 @@ namespace Comms {
                     }
 
                     // extra protection if somehow queue is not empty and task is suspended
-                    if (uxQueueMessagesWaiting(hc12.mTransmitQueue) != 0) {
+                    if (uxQueueMessagesWaiting(hc12.mTransmitQueue) != 0 && hc12.mTransmitTaskHandle != nullptr) {
                         vTaskResume(hc12.mTransmitTaskHandle);
                     }
                     break;
@@ -236,7 +237,7 @@ namespace Comms {
 
                 case SUSPEND_TRANSMIT_TASK_NOTIF:
                     hc12.mpLogger->debug("HC12 Main", "vTaskSuspend(hc12.mTransmitTaskHandle)");
-                    vTaskSuspend(hc12.mTransmitTaskHandle);
+                    vTaskSuspend(hc12.mTransmitTaskHandle); // TODO !pr remove this and resume:
                     break;
 
                 default:

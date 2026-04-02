@@ -37,6 +37,8 @@ void setup() {
     // Delete Arduino setup task
     logger->info("Main", "All components initialized.");
     logger->verbose("Main", "Deleting Arduino setup task...");
+    powerManager.setupComplete();
+    
     vTaskDelete(nullptr);
 
     // Everything below this comment should never be executed

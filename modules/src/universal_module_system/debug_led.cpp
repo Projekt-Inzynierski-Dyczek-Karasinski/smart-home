@@ -55,7 +55,7 @@ namespace UniversalModuleSystem {
             xTaskCreate(
                 powerOnBlinkTask,
                 "Power On Blink",
-                BOOT_CHECK_TASK_SIZE,
+                POWER_ON_BLINK_TASK_SIZE,
                 this,
                 LOW_TASK_PRIORITY,
                 nullptr

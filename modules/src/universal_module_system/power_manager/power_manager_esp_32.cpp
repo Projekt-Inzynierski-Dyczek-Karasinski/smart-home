@@ -84,10 +84,12 @@ namespace UniversalModuleSystem {
         isSensorUsingExt0 = !isButtonWakeUpAssigned;
 
         // rf module wake up
-        // TODO add changing FU mode for power saving
+        const auto &communication = Comms::Communication::getInstance(nullptr, nullptr);
         rtc_gpio_pulldown_dis(buttonPin);
         rtc_gpio_pullup_en(buttonPin);
         if (enableWakeUpWithRfModule) {
+            // TODO !pr add check for "hc12": {(...), "isPowerSavingEnabled": true}
+            communication.putRFModuleInPowerSavingMode(); // TODO change name
             rtc_gpio_pulldown_dis(hc12WakeUpPin);
             rtc_gpio_pullup_en(hc12WakeUpPin);
             esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
@@ -98,8 +100,6 @@ namespace UniversalModuleSystem {
         } else {
             if (!isButtonWakeUpAssigned)
                 esp_sleep_enable_ext1_wakeup((1ULL << buttonPin), ESP_EXT1_WAKEUP_ANY_LOW);
-
-            const auto &communication = Comms::Communication::getInstance(nullptr, nullptr);
             communication.putRfModuleToSleep();
         }
         #endif
@@ -141,6 +141,20 @@ namespace UniversalModuleSystem {
         rtc_gpio_pullup_en(pin);
         esp_sleep_enable_ext0_wakeup(pin, level);
         return true;
+    }
+
+    void PowerManagerESP32::setupComplete() {
+        // TODO !pr add check for "idleAutoSleep": {(...), "enterSleepAfterWakeUpByTimer": true}
+        if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_TIMER && false) {
+            xTaskCreate(
+                enterSleepAfterBootTask,
+                "Enter Sleep Task",
+                ENTER_SLEEP_TASK_SIZE,
+                this,
+                BACKGROUND_TASK_PRIORITY,
+                nullptr
+            );
+        }
     }
 
 
@@ -188,7 +202,7 @@ namespace UniversalModuleSystem {
         mpLogger->waitAndDisable();
     }
 
-    void PowerManagerESP32::handleWakeUpReason() const {
+    void PowerManagerESP32::handleWakeUpReason() {
         switch (esp_sleep_get_wakeup_cause()) {
             case ESP_SLEEP_WAKEUP_TIMER:
                 mpLogger->info("PowerManagerESP32 Class", "Module was wake up by timer.");
@@ -350,5 +364,18 @@ namespace UniversalModuleSystem {
         auto &pm = *static_cast<PowerManagerESP32 *>(pvTimerGetTimerID(xTimer));
         if (const uint32_t sleepTime = pm.mIdleSleepTime.load(); sleepTime != 0)
             pm.enterSleep(sleepTime, true);
+    }
+
+    void PowerManagerESP32::enterSleepAfterBootTask(void *parameters) {
+        auto &pm = *static_cast<PowerManagerESP32 *>(parameters);
+        vTaskDelay(pdMS_TO_TICKS(1000));
+
+        const auto &dm = DataManager::getInstance();
+        nl::json jsonData = dm.loadJson(dm.s_BASE_CONFIG_PATH);
+        nl::json &idleTimerData = jsonData[ms_IDLE_TIMER_DATA];
+        const uint32_t sleepTime = idleTimerData[ms_IDLE_TIMER_SLEEP_TIME].get<uint32_t>();
+
+        pm.enterSleep(sleepTime, true);
+        for (;;) vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }

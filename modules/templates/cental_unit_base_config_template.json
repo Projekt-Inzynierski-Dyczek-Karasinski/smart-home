@@ -50,8 +50,14 @@
       1
     ]
   },
+  "hc12": {
+    "rx": 6,
+    "tx": 7,
+    "set": 5,
+    "baudrate": 9600
+  },
   "sensorsData": {
-    "powerPin": 13,
+    "powerPin": 4,
     "readingsTimeout": 60000,
     "sensors": [
       {
@@ -61,40 +67,42 @@
           "readPin": 16,
           "canAwake": false,
           "additional": {
-            "rVCC": 94000,
-            "rGND": 97000,
-            "Vmin": 4350,
-            "Vmax": 4800
+            "rVCC": 99000,
+            "rGND": 98700,
+            "Vmin": 4690,
+            "Vmax": 5100
           }
         }
       },
       {
         "type": "lightSensor",
         "data": {
-          "id": 2,
-          "readPin": 17,
+          "id": 10,
+          "readPin": 18,
           "canAwake": false,
           "additional": {
           }
         }
       },
       {
-        "type": "DHT22",
+        "type": "windowSensor",
         "data": {
-          "id": 3,
-          "readPin": 12,
-          "canAwake": false,
+          "id": 9,
+          "readPin": 9,
+          "canAwake": true,
           "additional": {
           }
         }
       }
     ]
   },
-  "otaCheck": 2,
-  "hc12": {
-    "rx": 6,
-    "tx": 7,
-    "set": 5,
-    "baudrate": 9600
+  "actuatorsData": {
+    "actuators": [
+    ]
+  },
+  "otaCheck": 5,
+  "idleAutoSleep": {
+    "sleepTime": 86400000,
+    "idleTimeout": 300000
   }
 }

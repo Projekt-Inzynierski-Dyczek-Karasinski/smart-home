@@ -88,6 +88,9 @@ namespace UniversalModuleSystem {
          */
         [[nodiscard]] bool addWakeUpOnEXT0(gpio_num_t pin, bool level) const;
 
+        // TODO !pr add comments
+        void setupComplete();
+
     private:
         /**
          * @brief Private constructor for singleton pattern.
@@ -121,7 +124,7 @@ namespace UniversalModuleSystem {
         /**
          * @brief Logs wake-up reason and, if caused by RF module, starts auto-sleep feature (if enabled).
          */
-        void handleWakeUpReason() const;
+        void handleWakeUpReason();
 
         /**
          * @brief Returns the time passed from powering on ESP.
@@ -139,6 +142,9 @@ namespace UniversalModuleSystem {
          * @param xTimer Handle to the timer triggering auto-sleep (used for passing pointer to instance of PowerManagerESP32).
          */
         static void idleAutosleep(TimerHandle_t xTimer);
+
+        // TODO !pr add comments
+        static void enterSleepAfterBootTask(void *parameters);
 
         std::shared_ptr<ul::Logger> mpLogger;
         std::shared_ptr<DebugLED> mpDebugLED;

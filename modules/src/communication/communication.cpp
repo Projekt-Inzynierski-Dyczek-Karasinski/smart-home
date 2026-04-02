@@ -44,16 +44,19 @@ namespace Comms {
 
     void Communication::addByteToDecode(const uint8_t data) const {
         xQueueSend(mReceiveByteQueue, &data, portMAX_DELAY);
+        // TODO remove this:
         vTaskResume(mDecodeMessageTaskHandle);
     }
 
     void Communication::sendMessage(const uint8_t message[MESSAGE_SIZE]) const {
         xQueueSend(mEncodeMessagesQueue, message, portMAX_DELAY);
+        // TODO remove this:
         vTaskResume(mEncodeMessageTaskHandle);
     }
 
     void Communication::sendPriorityMessage(const uint8_t message[MESSAGE_SIZE]) const {
         xQueueSendToFront(mEncodeMessagesQueue, message, portMAX_DELAY);
+        // TODO remove this:
         vTaskResume(mEncodeMessageTaskHandle);
     }
 
@@ -71,6 +74,10 @@ namespace Comms {
 
     void Communication::putRfModuleToSleep() const {
         mpRfModule->sleep();
+    }
+
+    void Communication::putRFModuleInPowerSavingMode() const {
+        mpRfModule->enterPowerSavingMode();
     }
 
     void Communication::endConnection() const {
@@ -189,12 +196,14 @@ namespace Comms {
     }
 
     void Communication::normalOperationHandling() const {
+        // TODO remove this:
         // extra protection if somehow queues are not empty and corresponding task is suspended
-        if (uxQueueMessagesWaiting(mReceiveByteQueue) != 0) {
+        if (uxQueueMessagesWaiting(mReceiveByteQueue) != 0 && mDecodeMessageTaskHandle != nullptr) {
             mpLogger->debug("Communication Main", "vTaskResume(mDecodeMessageTaskHandle);");
             vTaskResume(mDecodeMessageTaskHandle);
         }
-        if (uxQueueMessagesWaiting(mEncodeMessagesQueue) != 0) {
+        // TODO remove this:
+        if (uxQueueMessagesWaiting(mEncodeMessagesQueue) != 0 && mEncodeMessageTaskHandle != nullptr) {
             mpLogger->debug("Communication Main", "vTaskResume(mEncodeMessageTaskHandle);");
             vTaskResume(mEncodeMessageTaskHandle);
         }
@@ -230,11 +239,13 @@ namespace Comms {
                     xTaskNotify(com.mDecodeMessageTaskHandle, MESSAGE_TIMEOUT_NOTIF, eSetValueWithOverwrite);
                     break;
 
+                // TODO remove this:
                 case SUSPEND_DECODE_MESSAGE_TASK_NOTIF:
                     com.mpLogger->debug("Communication Main", "vTaskSuspend(com.mDecodeMessageTaskHandle);");
                     vTaskSuspend(com.mDecodeMessageTaskHandle);
                     break;
 
+                // TODO remove this:
                 case SUSPEND_ENCODE_MESSAGE_TASK_NOTIF:
                     com.mpLogger->debug("Communication Main", "vTaskSuspend(com.mEncodeMessageTaskHandle);");
                     vTaskSuspend(com.mEncodeMessageTaskHandle);

@@ -108,6 +108,9 @@ namespace Comms {
          */
         void putRfModuleToSleep() const;
 
+        // TODO !pr add comment
+        void putRFModuleInPowerSavingMode() const;
+
         /**
          * @brief Sends "end" message and ends connection.
          */

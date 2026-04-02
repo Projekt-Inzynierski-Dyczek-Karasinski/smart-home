@@ -77,6 +77,9 @@ namespace UniversalModuleSystem::Transducers {
         */
         void handleFirstSleep();
 
+        // TODO !pr add comment
+        // static void IRAM_ATTR windowISR();
+
         static bool msIsFirstSleepNeeded;
         TaskHandle_t mFirstSleepTaskHandle = nullptr;
     };
