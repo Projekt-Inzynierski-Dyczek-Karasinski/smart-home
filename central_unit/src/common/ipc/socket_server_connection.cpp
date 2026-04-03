@@ -13,8 +13,18 @@ namespace SmartHome::IPC {
                 std::string message;
                 try {
                     message = co_await readAsync();
-                } catch (std::exception &e) {
-                    mpLogger->errorf("[SOCKET_SERVER_CONNECTION] IPC read failed: %s", e.what());
+                }
+                catch (const bs::system_error &e) {
+                    if (e.code() == ba::error::connection_reset ||
+                        e.code() == ba::error::broken_pipe ) {
+                        mpLogger->errorf("[SOCKET_SERVER_CONNECTION] IPC read failed, connection failed: %s", e.what());
+                    }else {
+                    mpLogger->debug("[SOCKET_SERVER_CONNECTION] IPC read failed, connection closed");
+                    }
+                    continue;
+                }
+                catch (const std::exception &e) {
+                    mpLogger->errorf("[SOCKET_SERVER_CONNECTION] IPC read failed, unexpected error: %s", e.what());
                     continue;
                 }
                 if (!message.empty()) {

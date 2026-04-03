@@ -226,7 +226,7 @@ namespace SmartHome::IPC {
                 break;
             case ba::error::connection_reset:
             case ba::error::broken_pipe:
-                mpLogger->info("[SOCKET_CONNECTION] IPC lost connection");
+                mpLogger->error("[SOCKET_CONNECTION] IPC lost connection");
                 close();
                 break;
             default:
