@@ -22,5 +22,5 @@ namespace SmartHomeWebServer {
      * @param app The Crow application instance to which the routes will be registered.
      * @param apiClient The API client used to communicate with the core service.
      */
-    void registerSensorRoutes(crow::App<crow::CORSHandler> &app, ApiClient &apiClient);
+    void registerDevicesRoutes(crow::App<crow::CORSHandler> &app, ApiClient &apiClient);
 }

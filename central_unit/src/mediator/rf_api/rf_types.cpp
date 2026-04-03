@@ -424,10 +424,11 @@ namespace SmartHomeMediator::RfTypes {
         static const std::unordered_map<std::string_view, GetType> strToGetMap{
             {sc::MediatorTypes::SENSOR_VALUE, GetType::SENSOR_VALUE},
             {sc::MediatorTypes::CONFIG_OPTION, GetType::CONFIG_OPTION},
-            {sc::MediatorTypes::SENSOR_LIST, GetType::SENSOR_LIST},
+            {sc::MediatorTypes::DEVICE_LIST, GetType::DEVICE_LIST},
             {sc::MediatorTypes::MODULE_LOGS, GetType::LOGS},
             {sc::MediatorTypes::BATTERY_LEVEL, GetType::BATTERY_LEVEL},
-            {sc::MediatorTypes::FORCE_READ_SENSOR_VALUE, GetType::FORCE_READ_SENSOR_VALUE}
+            {sc::MediatorTypes::FORCE_READ_SENSOR_VALUE, GetType::FORCE_READ_SENSOR_VALUE},
+            {sc::MediatorTypes::ACTUATOR_STATE, GetType::ACTUATOR_STATE}
         };
 
         const auto iter = strToGetMap.find(boost::algorithm::to_lower_copy(std::string(value)));

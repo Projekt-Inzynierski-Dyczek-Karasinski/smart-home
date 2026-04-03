@@ -23,8 +23,7 @@ add_executable(smarthome-web-server
         routes/routes.cpp
         routes/core_routes.cpp
         routes/module_routes.cpp
-        routes/sensor_routes.cpp
-        routes/actuator_routes.cpp
+        routes/devices_routes.cpp
         routes/database_routes.cpp
         routes/static_routes.cpp
 )

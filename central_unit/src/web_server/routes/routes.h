@@ -67,7 +67,7 @@ namespace SmartHomeWebServer {
      * @brief Helper for GET requests to core with simplified params construction.
      *
      * @param apiClient ApiClient connected to core.
-     * @param type Core type string (e.g. "sensors", "modules").
+     * @param type Core type string (e.g. "devices", "modules").
      * @param params Optional JSON params object.
      *
      * @return crow::response with unwrapped result or error.

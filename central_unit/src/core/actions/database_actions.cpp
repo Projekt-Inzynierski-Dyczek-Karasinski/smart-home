@@ -102,16 +102,16 @@ namespace SmartHome {
     }
 
 
-    void DatabaseActions::postSensorReading(
-        uint sensorId,
+    void DatabaseActions::postDeviceReading(
+        uint deviceId,
         nlohmann::json value, nlohmann::json metadata) {
         API::ApiRequest notification;
 
         nlohmann::json dbQuery = {
-            {jp::TABLE, "sensor_readings"},
+            {jp::TABLE, "device_readings"},
             {
                 jp::VALUES, {
-                    {"sensor_id", sensorId},
+                    {"device_id", deviceId},
                     {value.is_number() ? "value_numeric" : "value_text", value},
                     {"metadata", metadata}
                 }
@@ -229,17 +229,17 @@ namespace SmartHome {
         }
     }
 
-    ba::awaitable<void> DatabaseActions::fetchSensorsConfigs() {
-        // Clear readings cache to avoid stale readings after sensor config changes
+    ba::awaitable<void> DatabaseActions::fetchDevicesConfigs() {
+        // Clear readings cache to avoid stale readings after device config changes
         Core::Instance().readingsCache().clear();
 
         auto &cache = Core::Instance().configCache();
-        cache.clearSensors(); // Clear sensors cache before fetching to avoid stale configs
+        cache.clearDevices(); // Clear devices cache before fetching to avoid stale configs
 
         API::ApiRequest request;
 
         nlohmann::json dbQuery = {
-            {jp::TABLE, "sensors"},
+            {jp::TABLE, "devices"},
             {
                 jp::COLUMNS, nlohmann::json::array(
                     {"id", "logic_id", "module_id", "name", "type", "config"})
@@ -258,7 +258,7 @@ namespace SmartHome {
 
         if (response.error.has_value()) {
             Core::Instance().mpLogger->errorf(
-                "[DATABASE_ACTIONS] [FETCH_SENSORS_CONFIGS] Failed to fetch sensors configs: %s",
+                "[DATABASE_ACTIONS] [FETCH_DEVICES_CONFIGS] Failed to fetch devices configs: %s",
                 response.error.value().data.c_str());
             co_return;
         }
@@ -270,7 +270,7 @@ namespace SmartHome {
                 responseResultJson.contains(jp::ROWS)) {
                 for (const auto &row: responseResultJson[jp::ROWS]) {
                     try {
-                        CachedSensor sensor{
+                        CachedDevice device{
                             .id = row["id"],
                             .logicId = row["logic_id"],
                             .moduleId = row["module_id"],
@@ -278,15 +278,15 @@ namespace SmartHome {
                             .type = row["type"],
                             .config = row["config"]
                         };
-                        cache.setSensor(sensor);
+                        cache.setDevice(device);
                     } catch (const std::exception &e) {
                         Core::Instance().mpLogger->errorf(
-                            "[DATABASE_ACTIONS] [FETCH_SENSORS_CONFIGS] Failed to parse db response: %s", e.what());
+                            "[DATABASE_ACTIONS] [FETCH_DEVICES_CONFIGS] Failed to parse db response: %s", e.what());
                     }
                 }
             } else {
                 Core::Instance().mpLogger->error(
-                    "[DATABASE_ACTIONS] [FETCH_SENSORS_CONFIGS] Invalid db response format");
+                    "[DATABASE_ACTIONS] [FETCH_DEVICES_CONFIGS] Invalid db response format");
             }
         }
     }
@@ -297,7 +297,7 @@ namespace SmartHome {
         Core::Instance().configCache().clear();
 
         co_await fetchModulesConfigs();
-        co_await fetchSensorsConfigs();
+        co_await fetchDevicesConfigs();
     }
 
     void DatabaseActions::sendNotificationToDbService(API::ApiRequest &&notification) {

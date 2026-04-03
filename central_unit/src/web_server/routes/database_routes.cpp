@@ -32,6 +32,7 @@ namespace SmartHomeWebServer {
     }
 
     // TODO replace with more specific routes after core set handler is reworked
+    // TODO !pr
     void registerDatabaseRoutes(crow::App<crow::CORSHandler> &app, ApiClient &apiClient) {
         // POST /api/database/get
         // Body: {"table": "...", "columns": [...], "where": {...}, "order_by": [...], "limit": N}

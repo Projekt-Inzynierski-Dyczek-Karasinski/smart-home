@@ -29,51 +29,51 @@ namespace SmartHome {
         TaskQueue empty;
         std::swap(mTaskQueue, empty);
 
-        for (const auto &sensor: mConfigCache.getAllSensors()) {
-            parseSensorSchedule(sensor.id, sensor.config);
+        for (const auto &device: mConfigCache.getAllDevices()) {
+            parseDeviceSchedule(device.id, device.config);
         }
         mpLogger->infof("[SCHEDULER] Loaded %zu tasks from cache", mTaskQueue.size());
 
         if (mIsRunning) scheduleNextTimer();
     }
 
-    void Scheduler::reloadSensor(const uint sensorId) {
-        removeSensor(sensorId);
+    void Scheduler::reloadDevice(const uint deviceId) {
+        removeDevice(deviceId);
 
         std::scoped_lock lock(mMutex);
 
-        // Reparse sensor schedule from current cache state
-        const auto sensorOpt = mConfigCache.getSensor(sensorId);
-        if (sensorOpt.has_value()) {
-            parseSensorSchedule(sensorId, sensorOpt->config);
+        // Reparse device schedule from current cache state
+        const auto deviceOpt = mConfigCache.getDevice(deviceId);
+        if (deviceOpt.has_value()) {
+            parseDeviceSchedule(deviceId, deviceOpt->config);
         }
 
-        mpLogger->debugf("[SCHEDULER] Reloaded schedule for sensor [%u], queue size: %zu",
-                         sensorId, mTaskQueue.size());
+        mpLogger->debugf("[SCHEDULER] Reloaded schedule for device [%u], queue size: %zu",
+                         deviceId, mTaskQueue.size());
 
         if (mIsRunning) scheduleNextTimer();
     }
 
-    void Scheduler::removeSensor(const uint sensorId) {
+    void Scheduler::removeDevice(const uint deviceId) {
         std::scoped_lock lock(mMutex);
 
         // Clear existing tasks queue by swapping with an empty queue
         TaskQueue tempQueue;
         std::swap(mTaskQueue, tempQueue);
 
-        // Filter out tasks for the sensor and keep the rest, flag removed tasks to avoid dispatching them
+        // Filter out tasks for the device and keep the rest, flag removed tasks to avoid dispatching them
         while (!tempQueue.empty()) {
             auto task = tempQueue.top();
             tempQueue.pop();
-            if (task->sensorId == sensorId) {
+            if (task->deviceId == deviceId) {
                 task->removed = true;
             } else {
                 mTaskQueue.push(std::move(task));
             }
         }
 
-        mpLogger->debugf("[SCHEDULER] Removed tasks for sensor [%u], queue size: %zu",
-                         sensorId, mTaskQueue.size());
+        mpLogger->debugf("[SCHEDULER] Removed tasks for device [%u], queue size: %zu",
+                         deviceId, mTaskQueue.size());
 
         if (mIsRunning) scheduleNextTimer();
     }
@@ -113,8 +113,8 @@ namespace SmartHome {
             const auto &task = queueCopy.top();
 
             if (!task->removed) {
-                const auto sensor = mConfigCache.getSensor(task->sensorId);
-                if (sensor.has_value() && sensor->moduleId == moduleId) {
+                const auto device = mConfigCache.getDevice(task->deviceId);
+                if (device.has_value() && device->moduleId == moduleId) {
                     earliest = task->nextRun;
                     break;
                 }
@@ -157,30 +157,30 @@ namespace SmartHome {
         return std::chrono::system_clock::from_time_t(timestamp);
     }
 
-    void Scheduler::parseSensorSchedule(const uint sensorId, const nlohmann::json &config) {
-        if (!config.contains(c::SensorConfigKeys::SCHEDULE) || !config[c::SensorConfigKeys::SCHEDULE].is_array()) {
+    void Scheduler::parseDeviceSchedule(const uint deviceId, const nlohmann::json &config) {
+        if (!config.contains(c::DeviceConfigKeys::SCHEDULE) || !config[c::DeviceConfigKeys::SCHEDULE].is_array()) {
             return;
         }
 
-        for (const auto &entry: config[c::SensorConfigKeys::SCHEDULE]) {
+        for (const auto &entry: config[c::DeviceConfigKeys::SCHEDULE]) {
             if (!entry.is_object()) {
                 continue;
             }
-            if (entry.contains(c::SensorConfigKeys::ENABLED) &&
-                entry[c::SensorConfigKeys::ENABLED].is_boolean() &&
-                !entry[c::SensorConfigKeys::ENABLED].get<bool>()) {
+            if (entry.contains(c::DeviceConfigKeys::ENABLED) &&
+                entry[c::DeviceConfigKeys::ENABLED].is_boolean() &&
+                !entry[c::DeviceConfigKeys::ENABLED].get<bool>()) {
                 continue;
             }
-            if (!entry.contains(c::SensorConfigKeys::RRULE) || !entry[c::SensorConfigKeys::RRULE].is_string()) {
+            if (!entry.contains(c::DeviceConfigKeys::RRULE) || !entry[c::DeviceConfigKeys::RRULE].is_string()) {
                 continue;
             }
-            if (!entry.contains(c::SensorConfigKeys::ACTION) || !entry[c::SensorConfigKeys::ACTION].is_object()) {
+            if (!entry.contains(c::DeviceConfigKeys::ACTION) || !entry[c::DeviceConfigKeys::ACTION].is_object()) {
                 continue;
             }
 
             icaltimetype dtstart;
-            if (entry.contains(c::SensorConfigKeys::DTSTART) && entry[c::SensorConfigKeys::DTSTART].is_string()) {
-                dtstart = icaltime_from_string(entry[c::SensorConfigKeys::DTSTART].get<std::string>().c_str());
+            if (entry.contains(c::DeviceConfigKeys::DTSTART) && entry[c::DeviceConfigKeys::DTSTART].is_string()) {
+                dtstart = icaltime_from_string(entry[c::DeviceConfigKeys::DTSTART].get<std::string>().c_str());
                 if (icaltime_is_null_time(dtstart)) {
                     dtstart = icaltime_current_time_with_zone(icaltimezone_get_utc_timezone());
                 }
@@ -188,16 +188,16 @@ namespace SmartHome {
                 dtstart = icaltime_current_time_with_zone(icaltimezone_get_utc_timezone());
             }
 
-            const auto &rruleStr = entry[c::SensorConfigKeys::RRULE].get<std::string>();
+            const auto &rruleStr = entry[c::DeviceConfigKeys::RRULE].get<std::string>();
             auto rruleIter = createRRuleIterator(rruleStr, dtstart);
             if (!rruleIter) {
-                mpLogger->errorf("[SCHEDULER] Failed to parse RRULE '%s' for sensor [%u]", rruleStr.c_str(), sensorId);
+                mpLogger->errorf("[SCHEDULER] Failed to parse RRULE '%s' for device [%u]", rruleStr.c_str(), deviceId);
                 continue;
             }
 
             auto task = std::make_shared<ScheduledTask>();
-            task->sensorId = sensorId;
-            task->action = entry[c::SensorConfigKeys::ACTION];
+            task->deviceId = deviceId;
+            task->action = entry[c::DeviceConfigKeys::ACTION];
             task->rruleIterator = std::move(rruleIter);
 
             // Advance to first future occurrence
@@ -209,8 +209,8 @@ namespace SmartHome {
                 }
 
                 if (task->nextRun > now) {
-                    mpLogger->debugf("[SCHEDULER] Enqueued task for sensor [%u], next run in %lld s",
-                                     sensorId,
+                    mpLogger->debugf("[SCHEDULER] Enqueued task for device [%u], next run in %lld s",
+                                     deviceId,
                                      std::chrono::duration_cast<std::chrono::seconds>(task->nextRun - now).count());
                     mTaskQueue.push(std::move(task));
                 }
@@ -271,12 +271,12 @@ namespace SmartHome {
         const auto &action = task->action;
 
         if (!action.contains(jrs::RequestKeys::METHOD) || !action[jrs::RequestKeys::METHOD].is_string()) {
-            mpLogger->errorf("[SCHEDULER] Invalid action for sensor [%u]: missing or invalid method", task->sensorId);
+            mpLogger->errorf("[SCHEDULER] Invalid action for device [%u]: missing or invalid method", task->deviceId);
             return;
         }
 
         if (!action.contains(jrs::RequestKeys::PARAMS) || !action[jrs::RequestKeys::PARAMS].is_object()) {
-            mpLogger->errorf("[SCHEDULER] Invalid action for sensor [%u]: missing or invalid params", task->sensorId);
+            mpLogger->errorf("[SCHEDULER] Invalid action for device [%u]: missing or invalid params", task->deviceId);
             return;
         }
 
@@ -287,7 +287,7 @@ namespace SmartHome {
         try {
             parsedTargetMethod = API::parseTargetMethodString(method);
         } catch (const std::exception &e) {
-            mpLogger->errorf("[SCHEDULER] Invalid method format in action for sensor [%u]: %s", task->sensorId,
+            mpLogger->errorf("[SCHEDULER] Invalid method format in action for device [%u]: %s", task->deviceId,
                              e.what());
             return;
         }
@@ -304,29 +304,29 @@ namespace SmartHome {
         request.isResultStructured = true;
         request.commands.push_back(std::move(command));
 
-        mpLogger->debugf("[SCHEDULER] Dispatching action '%s' for sensor [%u]",
-                         parsedTargetMethod.second.c_str(), task->sensorId);
+        mpLogger->debugf("[SCHEDULER] Dispatching action '%s' for device [%u]",
+                         parsedTargetMethod.second.c_str(), task->deviceId);
 
         Actions::handleIncomingRequest(
-            request, [this, sensorId = task->sensorId](connectionId_t, const std::string &&response) {
-                mpLogger->debugf("[SCHEDULER] Action result for sensor [%u]: %s", sensorId, response.c_str());
+            request, [this, deviceId = task->deviceId](connectionId_t, const std::string &&response) {
+                mpLogger->debugf("[SCHEDULER] Action result for device [%u]: %s", deviceId, response.c_str());
 
                 try {
                     const API::ApiResponse apiResponse(nlohmann::json::parse(response));
                     if (apiResponse.error.has_value()) {
-                        mpLogger->errorf("[SCHEDULER] Action error for sensor [%u]: %s",
-                                         sensorId,
+                        mpLogger->errorf("[SCHEDULER] Action error for device [%u]: %s",
+                                         deviceId,
                                          apiResponse.error->data.c_str());
 
-                        const auto sensorOpt = Core::Instance().configCache().getSensor(sensorId);
-                        if (sensorOpt.has_value()) {
-                            DatabaseActions::postLog(sensorOpt.value().moduleId,
+                        const auto deviceOpt = Core::Instance().configCache().getDevice(deviceId);
+                        if (deviceOpt.has_value()) {
+                            DatabaseActions::postLog(deviceOpt.value().moduleId,
                                                      "error",
                                                      "Scheduled action failed: " + apiResponse.error->data);
                         }
                     }
                 } catch (const std::exception &e) {
-                    mpLogger->errorf("[SCHEDULER] Failed to parse action response for sensor [%u]: %s", sensorId,
+                    mpLogger->errorf("[SCHEDULER] Failed to parse action response for device [%u]: %s", deviceId,
                                      e.what());
                 }
             });

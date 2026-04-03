@@ -84,7 +84,7 @@ namespace SmartHome {
          * @brief Send mediator request to a specific module and await response.
          *
          * @details Prepares mediator request params for module addressing, submits the request,
-         *          and optionally posts sensor reading or error log.
+         *          and optionally posts device reading or error log.
          *
          * @param commandMetadata Command execution metadata.
          * @param moduleId Target module identifier.
@@ -162,16 +162,16 @@ namespace SmartHome {
                                                            std::string &error);
 
         /**
-         * @brief Optionally post sensor reading to database when mediator result applies.
+         * @brief Optionally post device reading to database when mediator result applies.
          *
          * @details Based on parsed params, checks whether the mediator result should be
-         *          recorded as a sensor reading and posts it to the database.
+         *          recorded as a device reading and posts it to the database.
          *
          * @param parsedParams Parsed mediator params.
          * @param result JSON result returned from mediator.
          * @param applicableTypes Set of mediator method types that should trigger posting.
          */
-        static void postSensorReadingIfApplicable(const MediatorRequestParams &parsedParams,
+        static void postDeviceReadingIfApplicable(const MediatorRequestParams &parsedParams,
                                                   const nlohmann::json &result,
                                                   const std::set<std::string_view> &applicableTypes);
 
@@ -184,7 +184,7 @@ namespace SmartHome {
         static void postErrorLog(uint moduleId, const API::ApiResponse &result);
 
         /**
-         * @brief Determine mediator types eligible for sensor reading posting.
+         * @brief Determine mediator types eligible for device reading posting.
          *
          * @param method Originating API method.
          *

@@ -1,7 +1,6 @@
 #include "web_server.h"
 #include "routes/core_routes.h"
-#include "routes/sensor_routes.h"
-#include "routes/actuator_routes.h"
+#include "routes/devices_routes.h"
 #include "routes/module_routes.h"
 #include "routes/database_routes.h"
 #include "routes/static_routes.h"
@@ -237,8 +236,7 @@ namespace SmartHomeWebServer {
 
     void WebServer::registerRoutes() const {
         registerCoreRoutes(*mpApp, *mpApiClient);
-        registerSensorRoutes(*mpApp, *mpApiClient);
-        registerActuatorRoutes(*mpApp, *mpApiClient);
+        registerDevicesRoutes(*mpApp, *mpApiClient);
         registerModuleRoutes(*mpApp, *mpApiClient);
         registerDatabaseRoutes(*mpApp, *mpApiClient);
         registerStaticRoutes(*mpApp, mConfig.http.staticRoot);
