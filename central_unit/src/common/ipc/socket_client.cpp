@@ -62,7 +62,7 @@ namespace SmartHome::IPC {
         // Start timeout timer
         timer.async_wait([this](const bs::error_code &ec) {
             if (!ec) {
-                mpLogger->error("[API_CLIENT] Handshake timeout");
+                mpLogger->error("[SOCKET_CLIENT] Handshake timeout");
                 mConnection->close();
             }
         });
@@ -73,7 +73,7 @@ namespace SmartHome::IPC {
             mConnection->write(request.to_string());
             response = mConnection->read();
         } catch (const std::exception &e) {
-            mpLogger->errorf("[API_CLIENT] Error while handshaking connection: %s", e.what());
+            mpLogger->errorf("[SOCKET_CLIENT] Error while handshaking connection: %s", e.what());
             return false;
         }
         timer.cancel();
@@ -82,24 +82,24 @@ namespace SmartHome::IPC {
 
         API::ApiResponse apiResponse;
         try {
-            mpLogger->debugf("[API_CLIENT] Handshake response: %s", response.c_str());
+            mpLogger->debugf("[SOCKET_CLIENT] Handshake response: %s", response.c_str());
             apiResponse(std::string_view(response));
         } catch (const std::exception &e) {
-            mpLogger->errorf("[API_CLIENT] Error while parsing handshake response: %s", e.what());
+            mpLogger->errorf("[SOCKET_CLIENT] Error while parsing handshake response: %s", e.what());
             return false;
         }
 
         if (apiResponse.error.has_value()) {
-            mpLogger->errorf("[API_CLIENT] Handshake error: %s", apiResponse.error.value().data.c_str());
+            mpLogger->errorf("[SOCKET_CLIENT] Handshake error: %s", apiResponse.error.value().data.c_str());
             return false;
         }
 
-        if (apiResponse.result.has_value() &&nlohmann::json::accept(apiResponse.result.value())) {
+        if (apiResponse.result.has_value() && nlohmann::json::accept(apiResponse.result.value())) {
             nlohmann::json resultJson;
             try {
                 resultJson = nlohmann::json::parse(apiResponse.result.value());
-            }catch (const std::exception &e) {
-                mpLogger->errorf("[API_CLIENT] Error while parsing handshake result: %s", e.what());
+            } catch (const std::exception &e) {
+                mpLogger->errorf("[SOCKET_CLIENT] Error while parsing handshake result: %s", e.what());
                 return false;
             }
 
@@ -115,7 +115,7 @@ namespace SmartHome::IPC {
 
     void SocketClient::startReceiving() {
         if (!mConnection || !mConnection->isOpen()) {
-            mpLogger->error("[API_CLIENT] Error while listening: no connection");
+            mpLogger->error("[SOCKET_CLIENT] Error while listening: no connection");
             return;
         }
 
@@ -125,8 +125,11 @@ namespace SmartHome::IPC {
 
                 try {
                     message = co_await mConnection->readAsync();
+                } catch (const bs::system_error &e) {
+                    mpLogger->debugf("[SOCKET_CLIENT] IPC failed while reading message: %s", e.what());
+                    continue;
                 } catch (const std::exception &e) {
-                    mpLogger->errorf("[API_CLIENT] Error while reading message: %s", e.what());
+                    mpLogger->errorf("[SOCKET_CLIENT] Unexpected error while reading message: %s", e.what());
                     continue;
                 }
 
@@ -140,17 +143,19 @@ namespace SmartHome::IPC {
 
     void SocketClient::send(const std::string_view message) {
         if (message.empty()) {
-            mpLogger->error("[API_CLIENT] Error while sending: empty message");
+            mpLogger->error("[SOCKET_CLIENT] Error while sending: empty message");
             return;
         }
         if (mConnection && mConnection->isOpen()) {
             try {
                 mConnection->writeAsync(message.data());
+            } catch (const bs::system_error &e) {
+                mpLogger->debugf("[SOCKET_CLIENT] IPC failed while sending: %s", e.what());
             } catch (const std::exception &e) {
-                mpLogger->errorf("[API_CLIENT] Error while sending: %s", e.what());
+                mpLogger->errorf("[SOCKET_CLIENT] Unexpected error while sending: %s", e.what());
             }
         } else {
-            mpLogger->error("[API_CLIENT] Error while sending message: no connection");
+            mpLogger->debug("[SOCKET_CLIENT] IPC failed while sending: no connection");
         }
     }
 }
