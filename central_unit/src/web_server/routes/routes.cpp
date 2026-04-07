@@ -84,4 +84,18 @@ namespace SmartHomeWebServer {
                              sa::getTargetMethodString(sc::Targets::CORE, sc::Methods::GET),
                              params);
     }
+
+    crow::response coreSet(ApiClient &apiClient, std::string_view type, nlohmann::json params) {
+        params[sjp::TYPE] = type;
+        return forwardToCore(apiClient,
+                             sa::getTargetMethodString(sc::Targets::CORE, sc::Methods::SET),
+                             params);
+    }
+
+    crow::response coreDelete(ApiClient &apiClient, std::string_view type, nlohmann::json params) {
+        params[sjp::TYPE] = type;
+        return forwardToCore(apiClient,
+                             sa::getTargetMethodString(sc::Targets::CORE, sc::Methods::DELETE),
+                             params);
+    }
 }

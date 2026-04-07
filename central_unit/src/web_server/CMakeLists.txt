@@ -21,6 +21,7 @@ add_executable(smarthome-web-server
         api_client.cpp
         web_server.cpp
         routes/routes.cpp
+        routes/route_helpers.cpp
         routes/core_routes.cpp
         routes/module_routes.cpp
         routes/devices_routes.cpp

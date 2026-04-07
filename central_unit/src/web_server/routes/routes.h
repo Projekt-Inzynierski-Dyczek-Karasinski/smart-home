@@ -18,6 +18,7 @@ namespace SmartHomeWebServer {
     namespace sc = SmartHome::Constants;
     namespace scc = SmartHome::Constants::CoreTypes;
     namespace scmt = SmartHome::Constants::MediatorTypes;
+    namespace scdi= SmartHome::Constants::DatabaseIdentifiers;
 
     /**
      * @brief Map JSON-RPC error code to HTTP status code.
@@ -57,7 +58,7 @@ namespace SmartHomeWebServer {
      * @param method JSON-RPC method string (e.g. "core.get").
      * @param params JSON params object.
      *
-     * @return crow::response with unwrapped result or error.
+     * @return \c crow::response with unwrapped result or error.
      */
     crow::response forwardToCore(ApiClient &apiClient,
                                  std::string_view method,
@@ -70,9 +71,35 @@ namespace SmartHomeWebServer {
      * @param type Core type string (e.g. "devices", "modules").
      * @param params Optional JSON params object.
      *
-     * @return crow::response with unwrapped result or error.
+     * @return \c crow::response with unwrapped result or error.
      */
     crow::response coreGet(ApiClient &apiClient,
                            std::string_view type,
                            nlohmann::json params = nlohmann::json::object());
+
+    /**
+     * @brief Helper for SET requests to core with simplified params construction.
+     *
+     * @param apiClient ApiClient connected to core.
+     * @param type Core type string (e.g. "devices", "modules").
+     * @param params Optional JSON params object.
+     *
+     * @return \c crow::response with unwrapped result or error.
+     */
+    crow::response coreSet(ApiClient &apiClient,
+                           std::string_view type,
+                           nlohmann::json params = nlohmann::json::object());
+
+    /**
+     * @brief Helper for DELETE requests to core with simplified params construction.
+     *
+     * @param apiClient ApiClient connected to core.
+     * @param type Core type string (e.g. "devices", "modules").
+     * @param params Optional JSON params object.
+     *
+     * @return \c crow::response with unwrapped result or error.
+     */
+    crow::response coreDelete(ApiClient &apiClient,
+                          std::string_view type,
+                          nlohmann::json params = nlohmann::json::object());
 }

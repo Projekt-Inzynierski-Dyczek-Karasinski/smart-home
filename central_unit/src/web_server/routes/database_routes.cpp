@@ -1,90 +1,109 @@
 #include "database_routes.h"
+#include "route_helpers.h"
 
 namespace SmartHomeWebServer {
     namespace sc = SmartHome::Constants;
 
-
-    std::expected<nlohmann::json, crow::response> parseBody(const crow::request &req) {
-        if (req.body.empty()) {
-            crow::response res(400, R"({"error":"Request body is required"})");
-            res.set_header("Content-Type", "application/json");
-            return std::unexpected(std::move(res));
-        }
-
-        try {
-            auto body = nlohmann::json::parse(req.body);
-            if (!body.is_object()) {
-                crow::response res(400, R"({"error":"Request body must be a JSON object"})");
-                res.set_header("Content-Type", "application/json");
-                return std::unexpected(std::move(res));
-            }
-            if (!body.contains("table") || !body["table"].is_string()) {
-                crow::response res(400, R"({"error":"'table' field is required"})");
-                res.set_header("Content-Type", "application/json");
-                return std::unexpected(std::move(res));
-            }
-            return body;
-        } catch (...) {
-            crow::response res(400, R"({"error":"Invalid JSON body"})");
-            res.set_header("Content-Type", "application/json");
-            return std::unexpected(std::move(res));
-        }
-    }
-
-    // TODO replace with more specific routes after core set handler is reworked
-    // TODO !pr
+    // TODO Insecure direct database access.
+    //      Consider implementing database set/get handler to limit direct database access,
+    //      or implement admin user authentication
     void registerDatabaseRoutes(crow::App<crow::CORSHandler> &app, ApiClient &apiClient) {
-        // POST /api/database/get
-        // Body: {"table": "...", "columns": [...], "where": {...}, "order_by": [...], "limit": N}
-        CROW_ROUTE(app, "/api/database/get").methods("POST"_method)(
+        // GET /api/database/get
+        // Query: table=<str>&columns=["..."]&where={...}&order_by=[...]&limit=N
+        CROW_ROUTE(app, "/api/database/get").methods("GET"_method)(
             [&apiClient](const crow::request &req) {
-                auto parsed = parseBody(req);
-                if (!parsed.has_value())
-                    return std::move(parsed).error();
+                auto table = req.url_params.get("table");
+                if (!table) return RouteHelpers::badRequest("'table' is required");
+
+                nlohmann::json params;
+                params[sjp::TABLE] = table;
+
+                // Optional JSON params - parse from query string
+                if (const auto columns = req.url_params.get("columns")) {
+                    if (!nlohmann::json::accept(columns))
+                        return RouteHelpers::badRequest("'columns' must be valid JSON");
+                    params[sjp::COLUMNS] = nlohmann::json::parse(columns);
+                }
+
+                if (const auto where = req.url_params.get("where")) {
+                    if (!nlohmann::json::accept(where))
+                        return RouteHelpers::badRequest("'where' must be valid JSON");
+                    params[sjp::WHERE] = nlohmann::json::parse(where);
+                }
+
+                if (const auto orderBy = req.url_params.get("order_by")) {
+                    if (!nlohmann::json::accept(orderBy))
+                        return RouteHelpers::badRequest("'order_by' must be valid JSON");
+                    params[sjp::ORDER_BY] = nlohmann::json::parse(orderBy);
+                }
+
+                if (const auto limit = req.url_params.get("limit")) {
+                    try { params[sjp::LIMIT] = std::stoi(limit); } catch (...) {
+                        return RouteHelpers::badRequest("'limit' must be an integer");
+                    }
+                }
 
                 return forwardToCore(apiClient,
                                      sa::getTargetMethodString(sc::Targets::DATABASE, sc::Methods::GET),
-                                     std::move(parsed).value());
+                                     params);
             });
 
-        // POST /api/database/set
-        // Body: {"table": "...", "values": {...}, "where": {...}} — INSERT (no where) or UPDATE (with where)
-        CROW_ROUTE(app, "/api/database/set").methods("POST"_method)(
-            [&apiClient](const crow::request &req) {
-                auto parsed = parseBody(req);
-                if (!parsed.has_value())
-                    return std::move(parsed).error();
 
-                auto body = std::move(parsed).value();
-                if (!body.contains("values") || !body["values"].is_object()) {
-                    crow::response res(400, R"({"error":"'values' object is required for set operations"})");
-                    res.set_header("Content-Type", "application/json");
-                    return res;
-                }
+        // POST /api/database/insert
+        // Body: {"table": "...", "values": {...}, "returning"?: "*"|[...]}
+        CROW_ROUTE(app, "/api/database/insert").methods("POST"_method)(
+            [&apiClient](const crow::request &req) {
+                auto body = RouteHelpers::requireBody(req);
+                if (!body) return std::move(body.error());
+
+                auto table = RouteHelpers::requireStringField(*body, sjp::TABLE);
+                if (!table) return std::move(table.error());
+
+                auto values = RouteHelpers::requireObjectField(*body, sjp::VALUES);
+                if (!values) return std::move(values.error());
 
                 return forwardToCore(apiClient,
                                      sa::getTargetMethodString(sc::Targets::DATABASE, sc::Methods::SET),
-                                     body);
+                                     *body);
             });
 
-        // POST /api/database/delete
-        // Body: {"table": "...", "where": {...}}
-        CROW_ROUTE(app, "/api/database/delete").methods("POST"_method)(
+        // PATCH /api/database/update
+        // Body: {"table": "...", "values": {...}, "where": {...}, "returning"?: "*"|[...]}
+        CROW_ROUTE(app, "/api/database/update").methods("PATCH"_method)(
             [&apiClient](const crow::request &req) {
-                auto parsed = parseBody(req);
-                if (!parsed.has_value())
-                    return std::move(parsed).error();;
+                auto body = RouteHelpers::requireBody(req);
+                if (!body) return std::move(body.error());
 
-                auto body = std::move(parsed).value();
-                if (!body.contains("where") || !body["where"].is_object()) {
-                    crow::response res(400, R"({"error":"'where' object is required for delete operations"})");
-                    res.set_header("Content-Type", "application/json");
-                    return res;
-                }
+                auto table = RouteHelpers::requireStringField(*body, sjp::TABLE);
+                if (!table) return std::move(table.error());
+
+                auto values = RouteHelpers::requireObjectField(*body, sjp::VALUES);
+                if (!values) return std::move(values.error());
+
+                auto where = RouteHelpers::requireObjectField(*body, sjp::WHERE);
+                if (!where) return std::move(where.error());
 
                 return forwardToCore(apiClient,
-                                     sa::getTargetMethodString(sc::Targets::DATABASE, sc::Methods::DELETE),
-                                     body);
+                                     sa::getTargetMethodString(sc::Targets::DATABASE, sc::Methods::SET),
+                                     *body);
             });
+
+        // DELETE /api/database/delete
+        // Body: {"table": "...", "where": {...}, "columns"?: [...]}
+        CROW_ROUTE(app, "/api/database/delete").methods("DELETE"_method)(
+             [&apiClient](const crow::request &req) {
+                 auto body = RouteHelpers::requireBody(req);
+                 if (!body) return std::move(body.error());
+
+                 auto table = RouteHelpers::requireStringField(*body, sjp::TABLE);
+                 if (!table) return std::move(table.error());
+
+                 auto where = RouteHelpers::requireObjectField(*body, sjp::WHERE);
+                 if (!where) return std::move(where.error());
+
+                 return forwardToCore(apiClient,
+                                      sa::getTargetMethodString(sc::Targets::DATABASE, sc::Methods::DELETE),
+                                      *body);
+             });
     }
 }
