@@ -35,6 +35,9 @@ namespace SmartHome::JsonRpcStrings {
         inline constexpr std::string_view ARGS = "args";
         inline constexpr std::string_view DATA = "data";
         inline constexpr std::string_view FORCE = "force";
+        inline constexpr std::string_view MODE = "mode";
+        inline constexpr std::string_view PATH = "path";
+        inline constexpr std::string_view VALUE = "value";
 
         // Database API specific keys
         // Request parameter keys for database operations
@@ -68,6 +71,9 @@ namespace SmartHome::JsonRpcStrings {
     /// JSON-RPC response-specific keys
     namespace ResponseKeys {
         inline constexpr std::string_view RESULT = "result";
+        inline constexpr std::string_view STATUS = "status";
+        inline constexpr std::string_view MESSAGE = "message";
+
         inline constexpr std::string_view ERROR = "error";
     }
 

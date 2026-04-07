@@ -3,6 +3,7 @@
 
 
 namespace SmartHome {
+    // TODO Update to implement ActionHelpers
     /**
      * @brief Database related command handlers
      *
@@ -10,7 +11,6 @@ namespace SmartHome {
      *          and helpers that post asynchronous notifications.
      */
     class DatabaseActions {
-        using cmdMetaPtr = std::shared_ptr<Actions::CommandMetadata>;
 
     public:
         /**
@@ -23,7 +23,7 @@ namespace SmartHome {
          *
          * @return API response from db-service or error describing validation/dispatch failure.
          */
-        static awaitOptApiResponse databaseRequestHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse databaseRequestHandler(cmdMetaPtr commandMetadata);
 
         /**
          * @brief Retrieve module RF addressing information from database.

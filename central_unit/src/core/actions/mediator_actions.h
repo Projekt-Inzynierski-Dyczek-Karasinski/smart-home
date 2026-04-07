@@ -6,6 +6,7 @@
 #include <nlohmann/json_fwd.hpp>
 
 namespace SmartHome {
+    // TODO Update to implement ActionHelpers
     /**
      * @brief Mediator module command handlers
      *
@@ -16,7 +17,6 @@ namespace SmartHome {
      *          - Ping: Tests module connectivity and measures response time
      */
     class MediatorActions {
-        using cmdMetaPtr = std::shared_ptr<Actions::CommandMetadata>;
 
     public:
         /**
@@ -32,7 +32,7 @@ namespace SmartHome {
          *
          * @note Expected params format: {(optional)module_id: uint, type: <string>, (optional)args: [<any>...]}
          */
-        static awaitOptApiResponse mediatorGetHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse mediatorGetHandler(cmdMetaPtr commandMetadata);
 
 
         /**
@@ -48,7 +48,7 @@ namespace SmartHome {
          *
          * @note Expected params format: {(optional)module_id: uint, type: <string>, args: [<any>...]}
          */
-        static awaitOptApiResponse mediatorSetHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse mediatorSetHandler(cmdMetaPtr commandMetadata);
 
         /**
          * @brief Handle EXECUTE command for mediator/module.
@@ -63,7 +63,7 @@ namespace SmartHome {
          *
          * @note Expected params format: {(optional)module_id: uint, type: <string>, (optional)args: [<any>...]}
          */
-        static awaitOptApiResponse mediatorExecuteHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse mediatorExecuteHandler(cmdMetaPtr commandMetadata);
 
         /**
          * @brief Handle PING command for module connectivity check.
@@ -77,7 +77,7 @@ namespace SmartHome {
          *
          * @note Expected params format: {module_id: uint}
          */
-        static awaitOptApiResponse mediatorPingHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse mediatorPingHandler(cmdMetaPtr commandMetadata);
 
 
         /**
@@ -94,7 +94,7 @@ namespace SmartHome {
          *
          * @return API response from mediator or error.
          */
-        static ba::awaitable<API::ApiResponse> sendToModule(const cmdMetaPtr &commandMetadata,
+        static ba::awaitable<API::ApiResponse> sendToModule(cmdMetaPtr commandMetadata,
                                                             uint moduleId,
                                                             std::string_view type,
                                                             const nlohmann::json &args,

@@ -267,7 +267,7 @@ namespace SmartHome::Constants {
 
     // Utility functions
 
-    constexpr std::string_view setTypeToDbTable(const std::string_view setType) {
+    constexpr std::string_view methodTypeToDbTable(const std::string_view setType) {
         if (setType == CoreTypes::MODULE) return DatabaseIdentifiers::MODULES;
         if (setType == CoreTypes::DEVICE) return DatabaseIdentifiers::DEVICES;
         return "";

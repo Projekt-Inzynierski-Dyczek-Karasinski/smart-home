@@ -7,7 +7,7 @@ namespace SmartHome {
     namespace jmik = JsonRpcStrings::ModuleInfoKeys;
     namespace jp = JsonRpcStrings::ParamsKeys;
 
-    awaitOptApiResponse DatabaseActions::databaseRequestHandler(const cmdMetaPtr &commandMetadata) {
+    awaitOptApiResponse DatabaseActions::databaseRequestHandler(cmdMetaPtr commandMetadata) {
         Core::Instance().mpLogger->debug("[DATABASE_ACTIONS] [REQUEST_HANDLER] called");
         const auto &command = commandMetadata->command;
 
@@ -387,7 +387,7 @@ namespace SmartHome {
 
     ba::awaitable<API::ApiResponse> DatabaseActions::sendRequestToDbService(API::ApiRequest &&request) {
         API::InternalApi::Command command(request);
-        const auto pCmdMeta = std::make_shared<Actions::CommandMetadata>(
+        const auto pCmdMeta = std::make_shared<ActionHelpers::CommandMetadata>(
             command,
             std::make_shared<ba::steady_timer>(Core::Instance().coreUtilityIoContext()),
             Actions::getNextId());

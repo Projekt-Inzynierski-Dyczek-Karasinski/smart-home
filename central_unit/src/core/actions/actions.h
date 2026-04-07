@@ -2,6 +2,7 @@
 
 #include "../api/internal_api.h"
 #include "../core.h"
+#include "action_helpers.h"
 
 #include <unordered_set>
 
@@ -12,12 +13,6 @@ using sai = SmartHome::API::InternalApi;
 
 namespace SmartHome {
     using namespace std::chrono_literals;
-
-    /**
-     * @brief Return type for handlers.
-     */
-    using awaitOptApiResponse = ba::awaitable<std::optional<API::ApiResponse> >;
-
 
     /**
      * @brief Central request/response routing and command execution system.
@@ -38,58 +33,6 @@ namespace SmartHome {
         friend class DatabaseActions;
 
     public:
-        /**
-         * @brief Command execution metadata and state tracking.
-         */
-        struct CommandMetadata {
-            /**
-             * @brief Command execution states.
-             */
-            enum class State : uint8_t {
-                PENDING = 0,
-                COMPLETED = 1,
-                CANCELLED = 2,
-                TIMED_OUT = 3
-            };
-
-
-            /// Command data
-            API::InternalApi::Command command;
-            /// Command-specific timeout timer
-            std::atomic<std::shared_ptr<ba::steady_timer> > commandTimeoutTimer;
-            /// Parent request ID
-            apiId_t requestId;
-            /// Current command state
-            std::atomic<State> state{State::PENDING};
-            /// Helper flag signaling notification command
-            bool isNotification = false;
-
-            /**
-             * @brief Construct command metadata.
-             *
-             * @param command Command to execute.
-             * @param commandTimeoutTimer Timer for command timeout.
-             * @param requestId Parent request identifier.
-             */
-            CommandMetadata(API::InternalApi::Command command,
-                            std::shared_ptr<ba::steady_timer> commandTimeoutTimer,
-                            apiId_t requestId);
-
-            /**
-             * @brief Cancel command execution.
-             *
-             * @return true if successfully cancelled, false if already completed.
-             */
-            bool cancel();
-
-            /**
-             * @brief Check if command is still pending.
-             *
-             * @return true if command state is PENDING, false otherwise.
-             */
-            bool isPending() const;
-        };
-
         struct OutgoingRequestMetadata {
             std::mutex metadataMutex;
             /// Outgoing requests
@@ -177,7 +120,7 @@ namespace SmartHome {
          *
          * @param commandMetadata Command to set timeout for.
          */
-        static void startCommandTimeoutTimer(const std::shared_ptr<CommandMetadata> &commandMetadata);
+        static void startCommandTimeoutTimer(cmdMetaPtr commandMetadata);
 
         /**
          * @brief Cleanup handler for core shutdown.
@@ -224,9 +167,6 @@ namespace SmartHome {
             std::size_t operator()(const CommandKey &key) const;
         };
 
-
-        using cmdMetaPtr = std::shared_ptr<CommandMetadata>;
-
         /**
          * @brief Request metadata containing all commands and state.
          */
@@ -268,7 +208,7 @@ namespace SmartHome {
          *
          * @details Handlers receive command metadata and return API response asynchronously.
          */
-        using CommandHandler = std::function<awaitOptApiResponse(const cmdMetaPtr &)>;
+        using CommandHandler = std::function<awaitOptApiResponse(cmdMetaPtr)>;
 
         /**
          * @brief Lookup command handler from registry.
@@ -392,7 +332,6 @@ namespace SmartHome {
          * @param commandMetadata Command execution metadata.
          * @return API response with result or error.
          */
-        static awaitOptApiResponse placeholderHandler(
-            const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse placeholderHandler(cmdMetaPtr commandMetadata);
     };
 }

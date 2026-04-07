@@ -9,7 +9,7 @@ namespace SmartHome {
     namespace jr = JsonRpcStrings::ResponseKeys;
     namespace cmck = Constants::ModuleConfigKeys;
 
-    awaitOptApiResponse MediatorActions::mediatorGetHandler(const cmdMetaPtr &commandMetadata) {
+    awaitOptApiResponse MediatorActions::mediatorGetHandler(cmdMetaPtr commandMetadata) {
         Core::Instance().mpLogger->debug("[MEDIATOR_ACTIONS] [GET] called");
         const auto &command = commandMetadata->command;
 
@@ -54,7 +54,7 @@ namespace SmartHome {
         co_return commandResult;
     }
 
-    awaitOptApiResponse MediatorActions::mediatorSetHandler(const cmdMetaPtr &commandMetadata) {
+    awaitOptApiResponse MediatorActions::mediatorSetHandler(cmdMetaPtr commandMetadata) {
         Core::Instance().mpLogger->debug("[MEDIATOR_ACTIONS] [SET] called");
         const auto &command = commandMetadata->command;
 
@@ -100,7 +100,7 @@ namespace SmartHome {
     }
 
 
-    awaitOptApiResponse MediatorActions::mediatorExecuteHandler(const cmdMetaPtr &commandMetadata) {
+    awaitOptApiResponse MediatorActions::mediatorExecuteHandler(cmdMetaPtr commandMetadata) {
         Core::Instance().mpLogger->debug("[MEDIATOR_ACTIONS] [EXECUTE] called");
         const auto &command = commandMetadata->command;
 
@@ -167,7 +167,7 @@ namespace SmartHome {
         co_return commandResult;
     }
 
-    awaitOptApiResponse MediatorActions::mediatorPingHandler(const cmdMetaPtr &commandMetadata) {
+    awaitOptApiResponse MediatorActions::mediatorPingHandler(cmdMetaPtr commandMetadata) {
         Core::Instance().mpLogger->debug("[MEDIATOR_ACTIONS] [PING] called");
         const auto &command = commandMetadata->command;
 
@@ -218,7 +218,7 @@ namespace SmartHome {
         co_return commandResult;
     }
 
-    ba::awaitable<API::ApiResponse> MediatorActions::sendToModule(const cmdMetaPtr &commandMetadata,
+    ba::awaitable<API::ApiResponse> MediatorActions::sendToModule(cmdMetaPtr commandMetadata,
                                                                   uint moduleId,
                                                                   std::string_view type,
                                                                   const nlohmann::json &args,
