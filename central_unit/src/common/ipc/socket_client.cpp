@@ -50,7 +50,10 @@ namespace SmartHome::IPC {
         API::ApiRequest request;
         nlohmann::json jsonParams;
         request.method = API::getTargetMethodString(Constants::Targets::CORE, Constants::Methods::SET);
-        jsonParams[Constants::CoreTypes::CONNECTION_TYPE] = mTargetTypeOfClient;
+        jsonParams = {
+            {JsonRpcStrings::ParamsKeys::TYPE, Constants::CoreTypes::CONNECTION_TYPE},
+            {JsonRpcStrings::ParamsKeys::VALUE, mTargetTypeOfClient}
+        };
         request.params.emplace(jsonParams);
         request.id = API::getNextApiId();
 
@@ -91,9 +94,20 @@ namespace SmartHome::IPC {
             return false;
         }
 
-        if (apiResponse.result.has_value() &&
-            apiResponse.result.value() == jsonParams.dump()) {
-            return true;
+        if (apiResponse.result.has_value() &&nlohmann::json::accept(apiResponse.result.value())) {
+            nlohmann::json resultJson;
+            try {
+                resultJson = nlohmann::json::parse(apiResponse.result.value());
+            }catch (const std::exception &e) {
+                mpLogger->errorf("[API_CLIENT] Error while parsing handshake result: %s", e.what());
+                return false;
+            }
+
+            if (resultJson.contains(JsonRpcStrings::ResponseKeys::STATUS) &&
+                resultJson.at(JsonRpcStrings::ResponseKeys::STATUS).is_string() &&
+                resultJson.at(JsonRpcStrings::ResponseKeys::STATUS).get<std::string_view>() == Constants::Common::OK) {
+                return true;
+            }
         }
 
         return false;
