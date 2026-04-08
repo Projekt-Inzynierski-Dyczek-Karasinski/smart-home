@@ -220,29 +220,11 @@ namespace UniversalModuleSystem {
                 }
                 break;
             }
-            // TODO add here check notif from window sensor (both here and in #else)
+
             case ESP_SLEEP_WAKEUP_EXT0:
                 // CHECKME
                 if (isSensorUsingExt0) {
-                    #ifndef CENTRAL_UNIT
-                    try {
-                        API::CommandHandler commandHandler(API::commandTypes::NOTIFY);
-                        API::APIParameter notify(static_cast<uint8_t>(API::notifyTypes::SENSOR_ALERT));
-                        commandHandler.addParameter(notify);
-
-                        uint8_t message[MESSAGE_SIZE] = {};
-                        commandHandler.generateMessage(message);
-
-                        const auto &communication = Comms::Communication::getInstance();
-                        communication.sendMessage(message);
-                    } catch (std::exception &e) {
-                        mpLogger->error(
-                            "PowerManagerESP32 handleWakeUpReason",
-                            "Failed to create notification in case ESP_SLEEP_WAKEUP_EXT0."
-                        );
-                        mpLogger->error("PowerManagerESP32 handleWakeUpReason", e.what());
-                    }
-                    #endif
+                    Transducers::SensorsManager::sendSensorNotification();
                 }
                 mpLogger->info("PowerManagerESP32 Class", "Module was wake up by ESP_SLEEP_WAKEUP_EXT0.");
                 break;

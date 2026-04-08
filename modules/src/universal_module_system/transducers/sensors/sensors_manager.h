@@ -61,6 +61,11 @@ namespace UniversalModuleSystem::Transducers {
          */
         void onSleep();
 
+        /**
+         * @brief Sends RF notification about important sensor reading.
+         */
+        static void sendSensorNotification();
+
     private:
         /**
          * @brief Get a reading of the sensor.

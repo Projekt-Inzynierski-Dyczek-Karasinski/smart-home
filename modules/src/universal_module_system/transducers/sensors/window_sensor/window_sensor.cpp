@@ -1,16 +1,14 @@
 #include "window_sensor.h"
 
 #include "universal_module_system/power_manager/power_manager.h"
+#include "universal_module_system/transducers/sensors/sensors_manager.h"
 
 namespace UniversalModuleSystem::Transducers {
     RTC_DATA_ATTR bool WindowSensor::msIsFirstSleepNeeded = true;
+    uint8_t WindowSensor::msISRPin = 0;
+    TaskHandle_t WindowSensor::msNotifyTaskHandle = nullptr;
 
     WindowSensor::WindowSensor(const std::shared_ptr<ul::Logger> &logger) : Sensor(logger) {
-        xSemaphoreTake(mSensorDataMutex, portMAX_DELAY);
-        pinMode(mCommonSensorData.readPin, INPUT_PULLUP);
-        // attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), windowISR, CHANGE); // TODO !pr add this isr:
-        xSemaphoreGive(mSensorDataMutex);
-
         handleFirstSleep();
     }
 
@@ -34,6 +32,12 @@ namespace UniversalModuleSystem::Transducers {
 
     void WindowSensor::onSleep() {
         xSemaphoreTake(mSensorDataMutex, portMAX_DELAY);
+        if (msNotifyTaskHandle != nullptr) {
+            detachInterrupt(digitalPinToInterrupt(msISRPin));
+            vTaskDelete(msNotifyTaskHandle);
+            msNotifyTaskHandle = nullptr;
+            msISRPin = 0;
+        }
 
         // if waking up ESP32 is disabled in config
         if (!mCommonSensorData.canAwake) {
@@ -72,7 +76,7 @@ namespace UniversalModuleSystem::Transducers {
                 xTaskCreate(
                     firstSleepTask,
                     "First Sleep",
-                    WINDOW_SENSOR_TASK_SIZE,
+                    WINDOW_SENSOR_FIRST_SLEEP_TASK_SIZE,
                     this,
                     CRITICAL_TASK_PRIORITY,
                     &mFirstSleepTaskHandle
@@ -81,9 +85,45 @@ namespace UniversalModuleSystem::Transducers {
         }
     }
 
-    // void WindowSensor::windowISR() {
-    //
-    // }
+    bool WindowSensor::loadAdditionalData(const nl::json &jsonData) {
+        pinMode(mCommonSensorData.readPin, INPUT_PULLUP);
+        if (msISRPin == 0 && msNotifyTaskHandle == nullptr) {
+            msISRPin = mCommonSensorData.readPin;
+            xTaskCreate(
+                notifyTask,
+                "Window Notify Task",
+                WINDOW_SENSOR_NOTIFY_TASK_SIZE,
+                this,
+                CRITICAL_TASK_PRIORITY,
+                &msNotifyTaskHandle
+            );
+        }
+
+        return true;
+    }
+
+    void WindowSensor::windowISR() {
+        if (msISRPin != 0) {
+            detachInterrupt(digitalPinToInterrupt(msISRPin));
+        }
+        BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+        if (msNotifyTaskHandle != nullptr) {
+            xTaskNotifyFromISR(msNotifyTaskHandle, 0, eNoAction, &xHigherPriorityTaskWoken);
+        }
+        portYIELD_FROM_ISR(xHigherPriorityTaskWoken);
+    }
+
+    void WindowSensor::notifyTask(void *parameters) {
+        for (;;) {
+            vTaskDelay(ms_DEBOUNCE_TIME);
+            if (msISRPin != 0) {
+                attachInterrupt(msISRPin, windowISR, CHANGE);
+            }
+
+            ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+            SensorsManager::sendSensorNotification();
+        }
+    }
 
     void WindowSensor::waitUntilReadEnds() {}
 

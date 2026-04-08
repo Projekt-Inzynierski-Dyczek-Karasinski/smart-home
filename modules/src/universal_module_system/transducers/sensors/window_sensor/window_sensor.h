@@ -14,7 +14,7 @@ namespace UniversalModuleSystem::Transducers {
     /**
      * @brief Sensor that reports whether a window is open or closed.
      * @details If "canAwake" is set to true in base_config.json, WindowSensor will wake up
-     * the ESP32 when the window state changes.
+     * the ESP32 when the window state changes. Uses ISR to monitor changes of WindowSensor logic state.
      *
      * @warning Due to limitations of the ESP32's EXT0 and EXT1 wake-up sources,
      * only one sensor is allowed to wake up the ESP32.
@@ -61,6 +61,19 @@ namespace UniversalModuleSystem::Transducers {
          */
         void waitUntilReadEnds() override;
 
+    protected:
+        /**
+         * @brief Handles WindowSensor configuration, that can not be done in the constructor.
+         * @details Configures sensor read pin and creates FreeRTOS task responsible for handling ISR and RF notification.
+         *
+         * @param jsonData Additional sensor configuration data (not used).
+         * @return True.
+         *
+         * @note This method does not load any data from JSON (unlike the typical usage of this method),
+         * but is used for compatibility with rest of the program.
+         */
+        bool loadAdditionalData(const nl::json &jsonData) override;
+
     private:
         /**
         * @brief Task function that performs the initial sleep cycle.
@@ -69,7 +82,7 @@ namespace UniversalModuleSystem::Transducers {
         *
         * @param parameters Pointer to the WindowSensor instance.
         */
-        static void firstSleepTask(void * parameters);
+        static void firstSleepTask(void *parameters);
 
         /**
         * @brief Handles scheduling of the initial sleep cycle.
@@ -77,9 +90,26 @@ namespace UniversalModuleSystem::Transducers {
         */
         void handleFirstSleep();
 
-        // TODO !pr add comment
-        // static void IRAM_ATTR windowISR();
+        /**
+        * @brief ISR for window state changes. Sends FreeRTOS notification to notifyTask, when state of window sensor changes.
+        * @note ISR-safe.
+        */
+        static void IRAM_ATTR windowISR();
 
+        /**
+         * @brief Task that handles window change notifications outside ISR context.
+         * @details After receiving FreeRTOS notification sends RF notification about important sensor state. Reattaches ISR after ms_DEBOUNCE_TIME.
+         *
+         * @param parameters FreeRTOS task parameters (not used).
+         */
+        static void notifyTask(void *parameters);
+
+        // sensor notify
+        static uint8_t msISRPin;
+        static TaskHandle_t msNotifyTaskHandle;
+        static constexpr TickType_t ms_DEBOUNCE_TIME = pdMS_TO_TICKS(1000);
+
+        // handle first boot after power on
         static bool msIsFirstSleepNeeded;
         TaskHandle_t mFirstSleepTaskHandle = nullptr;
     };

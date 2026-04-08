@@ -3,6 +3,8 @@
 #include <nlohmann/json.hpp>
 
 #include "universal_module_system/data_manager.h"
+#include "communication/communication.h"
+#include "communication/api/command_handler.h"
 
 // ADD SENSOR 4: here include sensor class
 // e.g. <new_sensor_class>/<new_sensor_class>.h
@@ -129,6 +131,27 @@ namespace UniversalModuleSystem::Transducers {
         }
     }
 
+    void SensorsManager::sendSensorNotification() {
+        try {
+            API::CommandHandler commandHandler(API::commandTypes::NOTIFY);
+            API::APIParameter notify(static_cast<uint8_t>(API::notifyTypes::SENSOR_ALERT));
+            commandHandler.addParameter(notify);
+
+            uint8_t message[MESSAGE_SIZE] = {};
+            commandHandler.generateMessage(message);
+
+            const auto &communication = Comms::Communication::getInstance();
+            communication.sendMessage(message);
+        } catch (std::exception &e) {
+            const auto &sm = getInstance();
+            sm.mpLogger->error(
+                "SensorsManager",
+                "Failed to send SENSOR_ALERT notification in sendSensorNotificationTask"
+            );
+            sm.mpLogger->error("SensorsManager", e.what());
+        }
+    }
+
     std::vector<API::APIParameterVariant> SensorsManager::getSensorCurrentReading(const uint8_t sensorId) {
         using ET = API::errorTypes;
         mpLogger->debug("SensorsManager", "getSensorCurrentReading");
@@ -152,7 +175,7 @@ namespace UniversalModuleSystem::Transducers {
             }
         }
 
-        return std::vector<API::APIParameterVariant>{API::APIParameter((uint8_t) ET::BAD_ARGUMENT, true)};
+        return std::vector<API::APIParameterVariant>{API::APIParameter(static_cast<uint8_t>(ET::BAD_ARGUMENT), true)};
     }
 
     std::vector<API::APIParameterVariant> SensorsManager::getSensorCachedReading(const uint8_t sensorId) {
