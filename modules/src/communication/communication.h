@@ -75,6 +75,7 @@ namespace Comms {
          * @param message Message to transmit.
          */
         void sendMessage(const uint8_t message[MESSAGE_SIZE]) const;
+
         /**
          * @brief Add a message that needs to be transmitted to the <b>front of</b> the encoding queue.
          * @details This method works same as <code>sendMessage()</code>,
@@ -103,13 +104,16 @@ namespace Comms {
         void waitAndDisableRfModule() const;
 
         /**
-         * @brief Puts the rf module to sleep.
-         * @details Calls rf module's <code>sleep()</code> method.
+         * @brief Handles rf module onSleep setup.
+         * @details Called from PowerManager::enterSleep(). Puts the RF module into sleep mode or enables
+         * power-saving mode, if enabled.
+         *
+         * @param turnOffRFModule If true, puts the RF module into sleep mode.
+         *
+         * @warning This method handles only onSleep setup. Disabling communication with rf module must be done
+         * separately by waitAndDisableRfModule method right before entering sleep.
          */
-        void putRfModuleToSleep() const;
-
-        // TODO !pr add comment
-        void putRFModuleInPowerSavingMode() const;
+        void rfModuleOnSleep(bool turnOffRFModule) const;
 
         /**
          * @brief Sends "end" message and ends connection.
@@ -129,7 +133,10 @@ namespace Comms {
          * @param debugLED Shared pointer to DebugLED instance.
          * @param logger Shared pointer to the Logger instance.
          */
-        explicit Communication(const std::shared_ptr<ums::DebugLED> &debugLED, const std::shared_ptr<ul::Logger> &logger);
+        explicit Communication(
+            const std::shared_ptr<ums::DebugLED> &debugLED, const std::shared_ptr<ul::Logger> &logger
+        );
+
         /**
          * @brief Destructor. Cleans up FreeRTOS resources used by the class.
          * @warning Destructor of this class exists only for programming principles. This class should never be deleted.
@@ -140,6 +147,7 @@ namespace Comms {
          * @brief Create all required queues for Communication class.
          */
         void createCommunicationQueues();
+
         /**
          * @brief Delete all queues for Communication class.
          */
@@ -149,10 +157,12 @@ namespace Comms {
          * @brief Decides what to do with incoming messages (both internal and RF).
          */
         void receivedMessageDecider() const;
+
         /**
          * @brief Handles when main task is in default state.
          */
         void normalOperationHandling() const;
+
         /**
          * @brief Main FreeRTOS task for Communication class.
          * It is responsible for suspending/deleting resuming/creating other communication related tasks.
@@ -163,10 +173,12 @@ namespace Comms {
          * @note This task runs continuously in the background.
          */
         static void communicationMainTask(void *parameters);
+
         /**
          * @brief Create the main communication FreeRTOS task.
          */
         void createCommunicationMainTask();
+
         /**
          * @brief Delete the main communication FreeRTOS task.
          */
@@ -185,7 +197,9 @@ namespace Comms {
          * @param messageBuffer Buffer to save extracted message.
          * @return True if successfully extracts a message (without packet loss), false otherwise.
          */
-        bool extractMessageFromProtocolBuffer(const uint8_t protocolBuffer[][PROTOCOL_SIZE], uint8_t *messageBuffer) const;
+        bool extractMessageFromProtocolBuffer(
+            const uint8_t protocolBuffer[][PROTOCOL_SIZE], uint8_t *messageBuffer
+        ) const;
 
         /**
          * @brief FreeRTOS task for decoding incoming messages from the byte queue.
@@ -194,10 +208,12 @@ namespace Comms {
          * is resumed by when a new byte appear.
          */
         static void decodeMessageTask(void *parameters);
+
         /**
          * @brief Create the decode FreeRTOS task.
          */
         void createDecodeMessageTask();
+
         /**
          * @brief Delete the decode FreeRTOS task.
          */
@@ -208,6 +224,7 @@ namespace Comms {
          * @param protocolBuffer Buffer for which to calculate and set checksum.
          */
         void prepareChecksum(uint8_t protocolBuffer[PROTOCOL_SIZE]);
+
         /**
          * @brief FreeRTOS task responsible for encoding outgoing messages and adding them to the transmit queue.
          *        Formats messages according to protocol before transmission.
@@ -216,10 +233,12 @@ namespace Comms {
          * is resumed by when a new message appear.
          */
         static void encodeMessageTask(void *parameters);
+
         /**
          * @brief Create the encode FreeRTOS task.
          */
         void createEncodeMessageTask();
+
         /**
          * @brief Delete the encode FreeRTOS task.
          */
@@ -232,10 +251,12 @@ namespace Comms {
          * @note This task runs continuously in the background, but with big delay in main loop to minimize impact to other background tasks.
          */
         static void terminalInputTask(void *parameters);
+
         /**
          * @brief Create the terminal input FreeRTOS task.
          */
         void createTerminalInputTask();
+
         /**
          * @brief Delete the terminal input FreeRTOS task.
          */
@@ -246,10 +267,12 @@ namespace Comms {
          * @param xTimer Handle to the expired FreeRTOS timer.
          */
         static void communicationTimersCallbacks(TimerHandle_t xTimer);
+
         /**
          * @brief Create all required communication timers.
          */
         void createCommunicationTimers();
+
         /**
          * @brief Delete all required communication timers.
          */
@@ -260,15 +283,16 @@ namespace Comms {
         Connection *mpConnection; ///< Pointer to Connection class instance.
 
         #ifdef HC12_MODULE
-            std::shared_ptr<HC12> mpRfModule; ///< Pointer to class instance responsible for transmitting and receiving RF messages.
+        std::shared_ptr<HC12> mpRfModule;
+        ///< Pointer to class instance responsible for transmitting and receiving RF messages.
         #else
-            #error "Not implemented"
+        #error "Not implemented"
         #endif
 
         #ifdef CENTRAL_UNIT
-            std::shared_ptr<CentralUnitAddressing> mpAddressing; ///< Pointer to CentralUnitAddressing class instance.
+        std::shared_ptr<CentralUnitAddressing> mpAddressing; ///< Pointer to CentralUnitAddressing class instance.
         #else
-            std::shared_ptr<ModuleAddressing> mpAddressing; ///< Pointer to ModuleAddressing class instance.
+        std::shared_ptr<ModuleAddressing> mpAddressing; ///< Pointer to ModuleAddressing class instance.
         #endif
 
         typedef enum : uint8_t {
@@ -284,19 +308,27 @@ namespace Comms {
             STOP_ADDRESSING_ALGORITHM_NOTIF,
         } mCommunicationMainNotifications; ///< Enum with main communication task notifications.
 
-        portMUX_TYPE mCriticalSectionMutex = portMUX_INITIALIZER_UNLOCKED; ///< FreeRTOS critical section mutex (used only for resetting encode task).
+        portMUX_TYPE mCriticalSectionMutex = portMUX_INITIALIZER_UNLOCKED;
+        ///< FreeRTOS critical section mutex (used only for resetting encode task).
 
-        QueueHandle_t mMainNotificationsQueue = nullptr; ///< Handle to FreeRTOS queue for notifications for the Main task, queue length: 5 bytes (uint8_t).
-        QueueHandle_t mReceiveMessageQueue = nullptr; ///< Handle to FreeRTOS queue for received (decoded and internal) messages, queue length: 10x64 bytes (uint8_t).
-        QueueHandle_t mReceiveByteQueue = nullptr; ///< Handle to FreeRTOS queue for bytes to decode get from RF transmission, queue length: 128 bytes (uint8_t).
-        QueueHandle_t mEncodeMessagesQueue = nullptr; ///< Handle to FreeRTOS queue for messages to encode and RF transmission, queue length: 10x64 bytes (uint8_t).
+        QueueHandle_t mMainNotificationsQueue = nullptr;
+        ///< Handle to FreeRTOS queue for notifications for the Main task, queue length: 5 bytes (uint8_t).
+        QueueHandle_t mReceiveMessageQueue = nullptr;
+        ///< Handle to FreeRTOS queue for received (decoded and internal) messages, queue length: 10x64 bytes (uint8_t).
+        QueueHandle_t mReceiveByteQueue = nullptr;
+        ///< Handle to FreeRTOS queue for bytes to decode get from RF transmission, queue length: 128 bytes (uint8_t).
+        QueueHandle_t mEncodeMessagesQueue = nullptr;
+        ///< Handle to FreeRTOS queue for messages to encode and RF transmission, queue length: 10x64 bytes (uint8_t).
 
         TaskHandle_t mCommunicationMainTaskHandle = nullptr; ///< Handle to FreeRTOS main communication task.
         TaskHandle_t mDecodeMessageTaskHandle = nullptr; ///< Handle to FreeRTOS decode task.
         TaskHandle_t mEncodeMessageTaskHandle = nullptr; ///< Handle to FreeRTOS encode task.
-        TaskHandle_t mTerminalInputTaskHandle = nullptr; ///< Handle to FreeRTOS task for handling custom messages sent via Serial.
+        TaskHandle_t mTerminalInputTaskHandle = nullptr;
+        ///< Handle to FreeRTOS task for handling custom messages sent via Serial.
 
-        TimerHandle_t mReceiveMessageTimeoutTimer = nullptr; ///< Handle to FreeRTOS software timer indicating timeout of the message.
-        TimerHandle_t mReceiveByteTimeoutTimer = nullptr; ///< Handle to FreeRTOS software timer indicating timeout of the receiving byte for decode task.
+        TimerHandle_t mReceiveMessageTimeoutTimer = nullptr;
+        ///< Handle to FreeRTOS software timer indicating timeout of the message.
+        TimerHandle_t mReceiveByteTimeoutTimer = nullptr;
+        ///< Handle to FreeRTOS software timer indicating timeout of the receiving byte for decode task.
     };
 }

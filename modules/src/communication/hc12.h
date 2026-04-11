@@ -76,17 +76,22 @@ namespace Comms {
         void waitAndDisable() const;
 
         /**
-         * @brief Sends a command to the HC12 to put the RF module to sleep.
-         */
-        void sleep() const;
-
-        void enterPowerSavingMode() const;
+        * @brief Handles HC12 module onSleep setup.
+        * @details Puts the HC12 module into sleep or enables FU2 (power-saving) mode, if enabled.
+        *
+        * @param turnOffRFModule If true, puts the RF module into sleep mode, enters in FU2 mode if enabled.
+        *
+        * @warning This method handles only onSleep setup. Disabling communication with rf module must be done
+        * separately.
+        */
+        void onSleep(bool turnOffRFModule) const;
 
         // JSON key
         static constexpr char s_HC12_DATA[] = "hc12";
         static constexpr char s_TX_PIN[] = "tx";
         static constexpr char s_RX_PIN[] = "rx";
         static constexpr char s_SET_PIN[] = "set";
+        static constexpr char s_IS_POWER_SAVING_ENABLED[] = "isPowerSavingEnabled";
 
     private:
         /**
@@ -98,6 +103,7 @@ namespace Comms {
             const int8_t txPin;
             const int8_t rxPin;
             const uint8_t setPin;
+            const bool isPowerSavingEnabled;
         };
 
         /**

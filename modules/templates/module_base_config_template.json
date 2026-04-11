@@ -10,7 +10,7 @@
     "rx": 17,
     "tx": 18,
     "set": 16,
-    "baudrate": 9600
+    "isPowerSavingEnabled": false
   },
   "sensorsData": {
     "powerPin": 4,

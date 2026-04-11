@@ -49,7 +49,7 @@ namespace UniversalModuleSystem {
 
         constexpr uint16_t US_TO_MILLISECONDS_FACTOR = 1000;
 
-        // disable WiFi and ota
+        // disable Wi-Fi and OTA
         auto &ota = Ota::getInstance();
         ota.endOta();
 
@@ -73,34 +73,34 @@ namespace UniversalModuleSystem {
             esp_sleep_enable_ext1_wakeup((1ULL << hc12WakeUpPin), ESP_EXT1_WAKEUP_ALL_LOW);
         } else {
             const auto &communication = Comms::Communication::getInstance(nullptr, nullptr);
-            communication.putRfModuleToSleep();
+            communication.rfModuleOnSleep();
         }
         #else
         // handle sensor onSleep
         auto &sensorManager = Transducers::SensorsManager::getInstance();
         sensorManager.onSleep();
 
+        // rf module onSleep
+        const auto &communication = Comms::Communication::getInstance(nullptr, nullptr);
+        communication.rfModuleOnSleep(!enableWakeUpWithRfModule);
+
+        // ext0 wake up
         const bool isButtonWakeUpAssigned = addWakeUpOnEXT0(buttonPin, LOW);
         isSensorUsingExt0 = !isButtonWakeUpAssigned;
 
-        // rf module wake up
-        const auto &communication = Comms::Communication::getInstance(nullptr, nullptr);
+        // ext1 wake up
         rtc_gpio_pulldown_dis(buttonPin);
         rtc_gpio_pullup_en(buttonPin);
         if (enableWakeUpWithRfModule) {
-            // TODO !pr add check for "hc12": {(...), "isPowerSavingEnabled": true}
-            communication.putRFModuleInPowerSavingMode(); // TODO change name
             rtc_gpio_pulldown_dis(hc12WakeUpPin);
             rtc_gpio_pullup_en(hc12WakeUpPin);
             esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
-            // esp_ext1
             const uint64_t bitMask =
                     isButtonWakeUpAssigned ? (1ULL << hc12WakeUpPin) : (1ULL << hc12WakeUpPin) | (1ULL << buttonPin);
             esp_sleep_enable_ext1_wakeup(bitMask, ESP_EXT1_WAKEUP_ANY_LOW);
         } else {
             if (!isButtonWakeUpAssigned)
                 esp_sleep_enable_ext1_wakeup((1ULL << buttonPin), ESP_EXT1_WAKEUP_ANY_LOW);
-            communication.putRfModuleToSleep();
         }
         #endif
 
@@ -109,6 +109,7 @@ namespace UniversalModuleSystem {
 
         mpLogger->infov("PowerManagerESP32", "Going to sleep for (ms): ", milliSeconds);
 
+        // go to sleep
         waitAndDisableCriticalFeatures();
         esp_deep_sleep_start();
     }

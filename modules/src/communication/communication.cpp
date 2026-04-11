@@ -72,12 +72,8 @@ namespace Comms {
         mpRfModule->waitAndDisable();
     }
 
-    void Communication::putRfModuleToSleep() const {
-        mpRfModule->sleep();
-    }
-
-    void Communication::putRFModuleInPowerSavingMode() const {
-        mpRfModule->enterPowerSavingMode();
+    void Communication::rfModuleOnSleep(const bool turnOffRFModule) const {
+        mpRfModule->onSleep(turnOffRFModule);
     }
 
     void Communication::endConnection() const {

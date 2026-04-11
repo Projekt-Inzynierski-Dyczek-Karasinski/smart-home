@@ -18,9 +18,6 @@ namespace Comms {
           ) {
         pinMode(m_HC12_DATA.setPin, OUTPUT);
 
-        // TODO !pr remove
-        // mpLogger = std::make_shared<ul::Logger>(ul::Level::DEBUG);
-
         mSendingDataMutex = xSemaphoreCreateMutex();
         mSetupWorkingSemaphore = xSemaphoreCreateBinary();
         mFirstSetupSemaphore = xSemaphoreCreateBinary();
@@ -129,14 +126,17 @@ namespace Comms {
         xSemaphoreTake(mSendingDataMutex, pdMS_TO_TICKS(POWER_MANAGEMENT_SEMAPHORE_TIMEOUT));
     }
 
-    void HC12::sleep() const {
-        setupHC12((uint8_t *) "HC+SLEEP");
+    void HC12::onSleep(const bool turnOffRFModule) const {
+        if (turnOffRFModule) {
+            mpLogger->debug("HC12 onSleep", "HC12 sleep");
+            setupHC12((uint8_t *) "HC+SLEEP");
+        } else if (m_HC12_DATA.isPowerSavingEnabled) {
+            mpLogger->debug("HC12 onSleep", "HC12 power saving");
+            setupHC12((uint8_t *) "HC+FU2");
+        } else {
+            mpLogger->debug("HC12 onSleep", "HC12 none");
+        }
     }
-
-    void HC12::enterPowerSavingMode() const {
-        setupHC12((uint8_t *) "HC+FU2");
-    }
-
 
     // ============================ Queues ============================
     void HC12::createQueues() {
@@ -237,7 +237,7 @@ namespace Comms {
 
                 case SUSPEND_TRANSMIT_TASK_NOTIF:
                     hc12.mpLogger->debug("HC12 Main", "vTaskSuspend(hc12.mTransmitTaskHandle)");
-                    vTaskSuspend(hc12.mTransmitTaskHandle); // TODO !pr remove this and resume:
+                    vTaskSuspend(hc12.mTransmitTaskHandle);
                     break;
 
                 default:
@@ -518,5 +518,6 @@ namespace Comms {
 
     HC12::HC12Data::HC12Data(const nl::json &data) : txPin(data[s_TX_PIN]),
                                                      rxPin(data[s_RX_PIN]),
-                                                     setPin(data[s_SET_PIN]) {}
+                                                     setPin(data[s_SET_PIN]),
+                                                     isPowerSavingEnabled(data[s_IS_POWER_SAVING_ENABLED]) {}
 }
