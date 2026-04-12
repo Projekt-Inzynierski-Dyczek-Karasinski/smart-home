@@ -7,7 +7,6 @@
 namespace uah = Utils::ArrayHandlers;
 namespace ums = UniversalModuleSystem;
 
-// TODO !pr add fu mode in base_config.json
 namespace Comms {
     // ============================ Public ============================
     HC12::HC12(Communication *communication, const std::shared_ptr<ul::Logger> &logger)
@@ -124,6 +123,7 @@ namespace Comms {
 
     void HC12::waitAndDisable() const {
         xSemaphoreTake(mSendingDataMutex, pdMS_TO_TICKS(POWER_MANAGEMENT_SEMAPHORE_TIMEOUT));
+        while(mpSerial->available() > 0) mpSerial->read();
     }
 
     void HC12::onSleep(const bool turnOffRFModule) const {

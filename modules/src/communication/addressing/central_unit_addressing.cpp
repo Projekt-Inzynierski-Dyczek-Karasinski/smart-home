@@ -21,13 +21,6 @@ namespace Comms {
         xSemaphoreTake(mModulesAddressingDataMutex, portMAX_DELAY);
         uah::clearBuffer(mNumOfModulesOnRfChannel, MAX_CHANNEL);
         mNumOfModulesOnRfChannel[0] = 1;
-        // TODO !pr remove
-        // mProtocolMACAddress[0] = 0x88;
-        // mProtocolMACAddress[1] = 0xA2;
-        // mProtocolMACAddress[2] = 0x9E;
-        // mProtocolMACAddress[3] = 0x3E;
-        // mProtocolMACAddress[4] = 0xA9;
-        // mProtocolMACAddress[5] = 0xA0;
 
         xSemaphoreGive(mModulesAddressingDataMutex);
 

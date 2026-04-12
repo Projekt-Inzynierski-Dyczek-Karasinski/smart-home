@@ -96,7 +96,7 @@ namespace UniversalModuleSystem {
             rtc_gpio_pullup_en(hc12WakeUpPin);
             esp_sleep_pd_config(ESP_PD_DOMAIN_RTC_PERIPH, ESP_PD_OPTION_ON);
             const uint64_t bitMask =
-                    isButtonWakeUpAssigned ? (1ULL << hc12WakeUpPin) : (1ULL << hc12WakeUpPin) | (1ULL << buttonPin);
+                isButtonWakeUpAssigned ? (1ULL << hc12WakeUpPin) : (1ULL << hc12WakeUpPin) | (1ULL << buttonPin);
             esp_sleep_enable_ext1_wakeup(bitMask, ESP_EXT1_WAKEUP_ANY_LOW);
         } else {
             if (!isButtonWakeUpAssigned)
@@ -145,8 +145,17 @@ namespace UniversalModuleSystem {
     }
 
     void PowerManagerESP32::setupComplete() {
-        // TODO !pr add check for "idleAutoSleep": {(...), "enterSleepAfterWakeUpByTimer": true}
-        if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_TIMER && false) {
+        const auto &dataManager = DataManager::getInstance();
+
+        std::optional<bool> enterSleepAfterWakeUpByTimer;
+        try {
+            nl::json data = dataManager.loadJson(DataManager::s_BASE_CONFIG_PATH)[ms_IDLE_AUTO_SLEEP_DATA];
+            enterSleepAfterWakeUpByTimer.emplace(data[ms_ENTER_SLEEP_AFTER_WAKE_UP_BY_TIMER].get<bool>());
+        } catch (...) {
+            mpLogger->error("PowerManagerESP32", "Can not read value of enterSleepAfterWakeUpByTimer");
+        }
+
+        if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_TIMER && enterSleepAfterWakeUpByTimer.value_or(false)) {
             xTaskCreate(
                 enterSleepAfterBootTask,
                 "Enter Sleep Task",
@@ -325,7 +334,7 @@ namespace UniversalModuleSystem {
         #ifndef CENTRAL_UNIT
         const auto &dm = DataManager::getInstance();
         nl::json jsonData = dm.loadJson(dm.s_BASE_CONFIG_PATH);
-        nl::json &idleTimerData = jsonData[ms_IDLE_TIMER_DATA];
+        nl::json &idleTimerData = jsonData[ms_IDLE_AUTO_SLEEP_DATA];
         const uint32_t sleepTime = idleTimerData[ms_IDLE_TIMER_SLEEP_TIME].get<uint32_t>();
         const uint32_t timeout = idleTimerData[ms_IDLE_TIMER_TIMEOUT].get<uint32_t>();
 
@@ -355,7 +364,7 @@ namespace UniversalModuleSystem {
 
         const auto &dm = DataManager::getInstance();
         nl::json jsonData = dm.loadJson(dm.s_BASE_CONFIG_PATH);
-        nl::json &idleTimerData = jsonData[ms_IDLE_TIMER_DATA];
+        nl::json &idleTimerData = jsonData[ms_IDLE_AUTO_SLEEP_DATA];
         const uint32_t sleepTime = idleTimerData[ms_IDLE_TIMER_SLEEP_TIME].get<uint32_t>();
 
         pm.enterSleep(sleepTime, true);

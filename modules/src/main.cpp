@@ -23,7 +23,7 @@ void setup() {
     auto &dataManager = ums::DataManager::getInstance(logger);
     const auto debugLed = std::make_shared<ums::DebugLED>(logger);
 
-    // Initialize Ota if CONFIG_COMPAT_VERSION and "version" in /data/base_config.json do not match.
+    // Initialize OTA if CONFIG_COMPAT_VERSION and "version" in /data/base_config.json do not match.
     auto &ota = ums::Ota::getInstance(logger, debugLed);
     ota.autoBeginOta();
 
@@ -34,11 +34,12 @@ void setup() {
     auto &sensorManager = umst::SensorsManager::getInstance(logger);
     auto &actuatorManager = umst::ActuatorsManager::getInstance(logger);
 
+    powerManager.setupComplete();
+
     // Delete Arduino setup task
     logger->info("Main", "All components initialized.");
     logger->verbose("Main", "Deleting Arduino setup task...");
-    powerManager.setupComplete();
-    
+
     vTaskDelete(nullptr);
 
     // Everything below this comment should never be executed

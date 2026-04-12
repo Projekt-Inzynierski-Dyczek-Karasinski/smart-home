@@ -188,7 +188,7 @@ namespace Comms {
          */
         void deleteSetupHC12Task();
 
-        std::array<char, 16> getHC12Response() const;
+        [[nodiscard]] std::array<char, 16> getHC12Response() const;
 
         // TODO !pr add comments
         static void onBootSetupTask(void *parameters);

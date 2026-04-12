@@ -40,7 +40,6 @@ namespace UniversalModuleSystem {
 
         // Delete copy constructor and assignment operator
         PowerManagerESP32(const PowerManagerESP32 &) = delete;
-
         PowerManagerESP32 &operator =(const PowerManagerESP32 &) = delete;
 
         /**
@@ -88,7 +87,13 @@ namespace UniversalModuleSystem {
          */
         [[nodiscard]] bool addWakeUpOnEXT0(gpio_num_t pin, bool level) const;
 
-        // TODO !pr add comments
+        /**
+         * @brief Handles PowerManager features at the end of the setup function in main.cpp.
+         * @details Checks the wake-up reason. If the ESP was woken up by a timer and power saving is enabled,
+         * creates a FreeRTOS task that will put the ESP into sleep with enabled wake up by RF module.
+         *
+         * @note This method should be called at the end of the setup function in main.cpp.
+         */
         void setupComplete();
 
     private:
@@ -143,7 +148,11 @@ namespace UniversalModuleSystem {
          */
         static void idleAutosleep(TimerHandle_t xTimer);
 
-        // TODO !pr add comments
+        /**
+         * @brief FreeRTOS task function. Puts the ESP into sleep after a timer wake-up.
+         *
+         * @param parameters FreeRTOS task parameters (this).
+         */
         static void enterSleepAfterBootTask(void *parameters);
 
         std::shared_ptr<ul::Logger> mpLogger;
@@ -159,8 +168,9 @@ namespace UniversalModuleSystem {
         static bool isSensorUsingExt0;
 
         // JSON keys
-        static constexpr char ms_IDLE_TIMER_DATA[] = "idleAutoSleep";
+        static constexpr char ms_IDLE_AUTO_SLEEP_DATA[] = "idleAutoSleep";
         static constexpr char ms_IDLE_TIMER_TIMEOUT[] = "idleTimeout";
         static constexpr char ms_IDLE_TIMER_SLEEP_TIME[] = "sleepTime";
+        static constexpr char ms_ENTER_SLEEP_AFTER_WAKE_UP_BY_TIMER[] = "enterSleepAfterWakeUpByTimer";
     };
 }

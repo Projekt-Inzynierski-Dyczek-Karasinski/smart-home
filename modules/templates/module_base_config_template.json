@@ -57,6 +57,7 @@
   "otaCheck": 3,
   "idleAutoSleep": {
     "sleepTime": 86400000,
-    "idleTimeout": 300000
+    "idleTimeout": 300000,
+    "enterSleepAfterWakeUpByTimer": true
   }
 }

@@ -1,8 +1,6 @@
 #pragma once
 // This is critical config data; it must be set
 
-// TODO consider moving here more constant config like hc12 pins
-
 // BUTTON_PIN must be RTC_GPIO (pins 0 - 21), excluding GPIO0 and GPIO3.
 #define BUTTON_PIN 2
 
