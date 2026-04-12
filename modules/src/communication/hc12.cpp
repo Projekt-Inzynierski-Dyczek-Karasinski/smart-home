@@ -123,7 +123,7 @@ namespace Comms {
 
     void HC12::waitAndDisable() const {
         xSemaphoreTake(mSendingDataMutex, pdMS_TO_TICKS(POWER_MANAGEMENT_SEMAPHORE_TIMEOUT));
-        while(mpSerial->available() > 0) mpSerial->read();
+        while (mpSerial->available() > 0) mpSerial->read();
     }
 
     void HC12::onSleep(const bool turnOffRFModule) const {

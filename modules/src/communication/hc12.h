@@ -11,7 +11,6 @@ namespace ul = Utils::Logging;
 namespace nl = nlohmann;
 
 
-// TODO !pr add comments
 namespace Comms {
     class Communication;
     /**
@@ -126,7 +125,6 @@ namespace Comms {
          */
         void deleteSetupHC12Queues();
 
-
         /**
          * @brief Decides what to do with output from HC12 module.
          * @param hc12Output Pointer to variable storing output from HC12 module.
@@ -190,9 +188,21 @@ namespace Comms {
 
         [[nodiscard]] std::array<char, 16> getHC12Response() const;
 
-        // TODO !pr add comments
+        /**
+         * @brief FreeRTOS task function. Handles the first connection after boot and restores the default HC12 configuration.
+         * @details Attempts to connect to the HC12 on different baud rates. Once the correct baud rate is found,
+         * restores the default settings and switches to the module's default RF channel.
+         *
+         * @param parameters FreeRTOS task parameters (this).
+         *
+         * @note Self-deletes upon completion.
+         */
         static void onBootSetupTask(void *parameters);
 
+        /**
+         * @brief Creates a FreeRTOS task that handles the first connection after boot
+         * and restores the default HC12 configuration.
+         */
         void createOnBootSetupTask();
 
         Communication *mpCommunication; // pointer to instance of Communication class
