@@ -10,7 +10,7 @@
     "rx": 17,
     "tx": 18,
     "set": 16,
-    "baudrate": 9600
+    "isPowerSavingEnabled": false
   },
   "sensorsData": {
     "powerPin": 4,
@@ -22,9 +22,10 @@
     "actuators": [
     ]
   },
-  "otaCheck": 3,
+  "otaCheck": 6,
   "idleAutoSleep": {
     "sleepTime": 86400000,
-    "idleTimeout": 300000
+    "idleTimeout": 300000,
+    "enterSleepAfterWakeUpByTimer": false
   }
 }

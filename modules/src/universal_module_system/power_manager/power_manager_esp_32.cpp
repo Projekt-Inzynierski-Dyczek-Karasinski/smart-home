@@ -232,7 +232,6 @@ namespace UniversalModuleSystem {
             }
 
             case ESP_SLEEP_WAKEUP_EXT0:
-                // CHECKME
                 if (isSensorUsingExt0) {
                     Transducers::SensorsManager::sendSensorNotification();
                 }

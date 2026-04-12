@@ -8,7 +8,7 @@
 
     #ifdef ESP32_S3_BOARD_TYPE
     // change features module specific features to central unit features
-        #define CENTRAL_UNIT
+        // #define CENTRAL_UNIT
     #endif
 
     // ESP32 devboard specific config
