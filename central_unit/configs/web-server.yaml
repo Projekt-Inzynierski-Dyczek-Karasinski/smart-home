@@ -21,7 +21,7 @@ web_server:
       enabled: true
       create_new: true
       archive_old: true
-      path: "/var/log/smarthome/db-service.log"
+      path: "/var/log/smarthome/web-server.log"
   ipc:
     tcp:
       enabled: true
