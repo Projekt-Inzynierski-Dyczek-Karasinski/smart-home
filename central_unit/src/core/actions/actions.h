@@ -317,8 +317,11 @@ namespace SmartHome {
 
         /// After not adding new messages to send for timeout duration, send aggregated batch message.
         static constexpr auto msAGGREGATE_OUTGOING_TIMEOUT = 10ms;
-        static constexpr auto msREQUEST_TIMEOUT = 30000ms; ///< Request timeout timer duration in ms
-        static constexpr auto msCOMMAND_TIMEOUT = 15000ms; ///< Command timeout timer duration in ms
+        // TODO temporary solution for timeouts when queueing get actions for few modules,
+        //      caused by mediator RF communication sessions lasting ~2-5s each
+        // TODO consider adding special timeout values for RF communication with modules
+        static constexpr auto msREQUEST_TIMEOUT = 5 * 60 * 1000ms; ///< Request timeout timer duration in ms
+        static constexpr auto msCOMMAND_TIMEOUT = 60 * 1000ms; ///< Command timeout timer duration in ms
         static constexpr auto msCLEANUP_TIMEOUT = 5000ms; ///< Timeout duration used in onCoreShutdown in ms
 
         // ======================================== CommandHandler functions ========================================
