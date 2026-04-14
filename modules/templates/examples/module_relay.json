@@ -58,6 +58,6 @@
   "idleAutoSleep": {
     "sleepTime": 86400000,
     "idleTimeout": 300000,
-    "enterSleepAfterWakeUpByTimer": false
+    "enterSleepAfterWakeUpByTimer": true
   }
 }

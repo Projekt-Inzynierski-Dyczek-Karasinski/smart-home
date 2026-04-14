@@ -3,6 +3,7 @@
 #include <Arduino.h>
 #include <memory>
 #include <map>
+#include <atomic>
 
 #include "utils/logger.h"
 #include "sensor.h"
@@ -65,6 +66,12 @@ namespace UniversalModuleSystem::Transducers {
          * @brief Sends RF notification about important sensor reading.
          */
         static void sendSensorNotification();
+
+        /**
+         * @brief Enables sending sensor alert RF notification. The armed state
+         * is retained in RTC memory across reboots.
+         */
+        static void armSensorNotification();
 
     private:
         /**
@@ -174,6 +181,8 @@ namespace UniversalModuleSystem::Transducers {
         uint8_t mSensorsPowerPin;
 
         static constexpr uint16_t ms_DELAY_AFTER_POWERING_ON_SENSORS = 100; // ms
+
+        static std::atomic<bool> msIsSensorNotificationArmed; ///< Saved in RTC memory
 
         // JSON keys
         static constexpr char ms_SENSORS_ARRAY[] = "sensors";

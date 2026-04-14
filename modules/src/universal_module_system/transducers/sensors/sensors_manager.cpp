@@ -17,6 +17,8 @@
 namespace nl = nlohmann;
 
 namespace UniversalModuleSystem::Transducers {
+    RTC_DATA_ATTR std::atomic<bool> SensorsManager::msIsSensorNotificationArmed{false};
+
     SensorsManager &SensorsManager::getInstance(const std::shared_ptr<ul::Logger> &logger) {
         static SensorsManager instance(logger);
         return instance;
@@ -132,6 +134,11 @@ namespace UniversalModuleSystem::Transducers {
     }
 
     void SensorsManager::sendSensorNotification() {
+        ul::Logger logger;
+        logger.error("TMP", "sendSensorNotification");
+        if (!msIsSensorNotificationArmed.load(std::memory_order_relaxed)) return;
+        logger.error("TMP", "sendSensorNotification true");
+
         try {
             API::CommandHandler commandHandler(API::commandTypes::NOTIFY);
             API::APIParameter notify(static_cast<uint8_t>(API::notifyTypes::SENSOR_ALERT));
@@ -150,6 +157,12 @@ namespace UniversalModuleSystem::Transducers {
             );
             sm.mpLogger->error("SensorsManager", e.what());
         }
+    }
+
+    void SensorsManager::armSensorNotification() {
+        ul::Logger logger;
+        logger.error("TMP", "armSensorNotification");
+        msIsSensorNotificationArmed.store(true, std::memory_order_relaxed);
     }
 
     std::vector<API::APIParameterVariant> SensorsManager::getSensorCurrentReading(const uint8_t sensorId) {

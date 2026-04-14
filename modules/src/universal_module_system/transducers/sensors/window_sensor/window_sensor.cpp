@@ -82,6 +82,8 @@ namespace UniversalModuleSystem::Transducers {
                     &mFirstSleepTaskHandle
                 );
             }
+        } else {
+            SensorsManager::armSensorNotification();
         }
     }
 
