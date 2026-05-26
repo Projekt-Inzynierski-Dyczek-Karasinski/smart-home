@@ -46,6 +46,17 @@ namespace SmartHome {
     };
 
     /**
+     * @brief Configuration for launching and managing web server.
+     */
+    struct WebServerConfig : ProcessConfig {
+        WebServerConfig() {
+            execPath = Constants::DefaultPaths::WEB_SERVER_EXEC;
+            configPath = Constants::DefaultPaths::WEB_SERVER_CONFIG;
+        }
+    };
+
+
+    /**
      * @brief Temporary storage for logger command-line options.
      *
      * @details Holds logger settings parsed from program options before they are merged with YAML configuration.
@@ -79,11 +90,13 @@ namespace SmartHome {
      * @param coreConfig Core configuration struct to be updated.
      * @param mediatorConfig Mediator launch configuration struct to be updated.
      * @param dbServiceConfig Database service launch configuration struct to be updated.
+     * @param webServerConfig Web server launch configuration struct to be updated.
      */
     void loadYamlConfigs(Utils::ConfigManager &configManager,
                          Core::Config &coreConfig,
                          MediatorConfig &mediatorConfig,
-                         DbServiceConfig &dbServiceConfig);
+                         DbServiceConfig &dbServiceConfig,
+                         WebServerConfig &webServerConfig);
 
     /**
      * @brief Overwrites configurations with command-line options.
@@ -116,6 +129,7 @@ namespace SmartHome {
      * @param coreConfig Core configuration struct to fill.
      * @param mediatorConfig Mediator configuration struct to fill.
      * @param dbServiceConfig Database service configuration struct to fill.
+     * @param webServerConfig Web server configuration struct to fill.
      *
      * @note Priority order: defaults -> YAML -> command-line.
      */
@@ -124,7 +138,8 @@ namespace SmartHome {
                      const std::shared_ptr<Utils::Logger> &logger,
                      Core::Config &coreConfig,
                      MediatorConfig &mediatorConfig,
-                     DbServiceConfig &dbServiceConfig);
+                     DbServiceConfig &dbServiceConfig,
+                     WebServerConfig &webServerConfig);
 
     /**
      * @brief Runs a process with retry mechanism.
