@@ -25,6 +25,16 @@ namespace SmartHomeWebServer {
         // Initialize service manager
         mpService = su::ServiceManager::create(logger, config.serviceName, su::ServiceType::AUTO);
 
+        mpService->setIoContext(mUtilityIoContext);
+
+        if (!mpService->onInitialize()) {
+            logger->error("[WEB_SEVER] Failed to initialize service");
+            return false;
+        }
+
+        // Enable file logging after service init to avoid overwriting logs of already running instance
+        logger->enableFileLoggingIfConfigured();
+
         // Utility thread (signals, logger)
         mUtilityGuard.emplace(ba::make_work_guard(mUtilityIoContext));
         mUtilityThread = std::thread([this] {
