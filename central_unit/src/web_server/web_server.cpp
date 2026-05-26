@@ -57,6 +57,7 @@ namespace SmartHomeWebServer {
         // Initialize Crow app
         mpApp = std::make_unique<crow::App<crow::CORSHandler> >();
         mpApp->signal_clear(); // Disable Crow's signal handling
+        mpApp->loglevel(crow::LogLevel::CRITICAL); // Limit Crow logging to critical errors
 
         // Configure CORS
         auto &cors = mpApp->get_middleware<crow::CORSHandler>();
