@@ -8,6 +8,9 @@ namespace SmartHome::Constants {
         inline constexpr std::string_view UNKNOWN = "unknown";
         inline constexpr std::string_view TYPE = "type";
         inline constexpr std::string_view OK = "ok";
+        inline constexpr std::string_view VALUE = "value";
+        inline constexpr std::string_view ERROR = "error";
+        inline constexpr std::string_view STATUS = "status";
 
         // Special
         inline constexpr std::string_view UNDEFINED_BRACKETS = "<undefined>";
@@ -29,6 +32,7 @@ namespace SmartHome::Constants {
 
         inline constexpr std::string_view WEB_SERVER_CONFIG = "/etc/smarthome/web-server.yaml";
         inline constexpr std::string_view WEB_SERVER_LOGFILE = "/var/log/smarthome/web-server.log";
+        inline constexpr std::string_view WEB_SERVER_EXEC = "/usr/local/bin/smarthome-web-server";
 
         inline constexpr std::string_view CORE_CONFIG = "/etc/smarthome/smart_home.yaml";
         inline constexpr std::string_view CORE_LOGFILE = "/var/log/smarthome/core.log";
