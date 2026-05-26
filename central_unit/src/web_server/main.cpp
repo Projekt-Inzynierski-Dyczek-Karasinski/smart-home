@@ -30,7 +30,7 @@ namespace SmartHomeWebServer {
         configManager.getValue(root + ".static_root", webServerConfig.http.staticRoot);
 
         root = "web_server.cors";
-        configManager.getValue(root + ".allow_origin", webServerConfig.cors.allowOrigin);
+        configManager.getValue(root + ".allowed_origin", webServerConfig.cors.allowedOrigin);
 
         root = "web_server.ipc.tcp";
         configManager.getValue(root + ".enabled", webServerConfig.apiClient.tcp.isEnabled);
@@ -40,6 +40,10 @@ namespace SmartHomeWebServer {
         root = "web_server.ipc.uds";
         configManager.getValue(root + ".enabled", webServerConfig.apiClient.uds.isEnabled);
         configManager.getValue(root + ".socket_path", webServerConfig.apiClient.uds.endpointPath);
+    }
+
+    void overwriteConfigsWithEnvironmentVariables(WebServer::Config &webServerConfig) {
+        if (const char *envVar = std::getenv("SH_ALLOWED_ORIGIN")) webServerConfig.cors.allowedOrigin = envVar;
     }
 
     void overwriteConfigsWithProgramOptions(const bpo::variables_map &vm,
@@ -57,6 +61,7 @@ namespace SmartHomeWebServer {
         // WebServer config
         if (vm.contains("http-port")) webServerConfig.http.port = vm["http-port"].as<int>();
         if (vm.contains("static-root")) webServerConfig.http.staticRoot = vm["static-root"].as<std::string>();
+        if (vm.contains("allowed-origin")) webServerConfig.cors.allowedOrigin = vm["allowed-origin"].as<std::string>();
         if (vm.contains("port")) webServerConfig.apiClient.tcp.endpointPort = vm["port"].as<int>();
         if (vm.contains("ipv4")) webServerConfig.apiClient.tcp.endpointAddress = vm["ipv4"].as<std::string>();
     }
@@ -107,6 +112,8 @@ namespace SmartHomeWebServer {
             pLogger->warning("[MAIN_WEB-SERVER] Could not load YAML config, using defaults");
         }
 
+        overwriteConfigsWithEnvironmentVariables(webServerConfig);
+
         overwriteConfigsWithProgramOptions(vm, logTmpOpt, webServerConfig, loggerConfig);
 
         pLogger->applyConfig(loggerConfig);
@@ -142,8 +149,9 @@ int main(int argc, char *argv[]) {
 
     bpo::options_description http("HTTP server options");
     http.add_options()
-            ("http-port", bpo::value<int>(), "HTTP server port (default: 8080)")
-            ("static-root", bpo::value<std::string>(), "Path to static web files directory");
+            ("http-port", bpo::value<int>(), "HTTP server port (default: 80)")
+            ("static-root", bpo::value<std::string>(), "Path to static web files directory")
+            ("allowed-origin", bpo::value<std::string>(), "Allowed CORS origin");
 
     bpo::options_description allOptions;
     allOptions.add(generic).add(logging).add(network).add(http);

@@ -36,6 +36,17 @@ namespace SmartHomeWebServer {
     void loadYamlConfigs(su::ConfigManager &configManager, WebServer::Config &webServerConfig);
 
     /**
+     * @brief Read and apply environment overrides for web server configuration.
+     *
+     * @details Checks environment variables and overwrites corresponding fields in \p webServerConfig when present.
+     *          Recognized variables:
+     *              - `SH_ALLOWED_ORIGIN` -> allowedOrigin
+     *
+     * @param webServerConfig Configuration struct to modify with environment values.
+     */
+    void overwriteConfigsWithEnvironmentVariables(WebServer::Config &webServerConfig);
+
+    /**
      * @brief Overwrite configurations with command-line options.
      *
      * @param vm Parsed command-line variables.

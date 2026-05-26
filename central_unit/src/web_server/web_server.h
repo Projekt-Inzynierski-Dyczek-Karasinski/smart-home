@@ -40,7 +40,7 @@ namespace SmartHomeWebServer {
 
             /// CORS config
             struct Cors {
-                std::string allowOrigin = "*";
+                std::string allowedOrigin = "*";
             } cors;
         };
 

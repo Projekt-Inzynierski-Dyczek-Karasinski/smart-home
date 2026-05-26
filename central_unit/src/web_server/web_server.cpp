@@ -51,11 +51,10 @@ namespace SmartHomeWebServer {
         // Configure CORS
         auto &cors = mpApp->get_middleware<crow::CORSHandler>();
         cors.global()
-                .origin(config.cors.allowOrigin)
-                .methods("GET"_method, "POST"_method, "PUT"_method, "DELETE"_method, "OPTIONS"_method)
-                .headers("*");
+                .origin(config.cors.allowedOrigin)
+                .methods("GET"_method, "POST"_method, "PATCH"_method, "PUT"_method, "DELETE"_method, "OPTIONS"_method);
 
-        // Register routes
+
         registerRoutes();
 
         mIsInitialized.store(true, std::memory_order_release);
