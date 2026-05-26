@@ -6,7 +6,7 @@ namespace SmartHomeWebServer {
         try {
             json = nlohmann::json::parse(jsonRpcResponse);
         } catch (const nlohmann::json::exception &e) {
-            crow::response res(500, R"({sjp::ERROR:"Invalid JSON response from core"})");
+            crow::response res(500, nlohmann::json({{scc::ERROR, "Invalid JSON response from core"}}));
             res.set_header("Content-Type", "application/json");
             return res;
         }
@@ -55,7 +55,7 @@ namespace SmartHomeWebServer {
             return res;
         }
 
-        crow::response res(500, R"({sjp::ERROR:"Empty response"})");
+        crow::response res(500, nlohmann::json({{scc::ERROR, "Empty response"}}));
         res.set_header("Content-Type", "application/json");
         return res;
     }
@@ -72,7 +72,7 @@ namespace SmartHomeWebServer {
             auto response = apiClient.sendRequest(request).get();
             return unwrapResponse(response);
         } catch (const std::exception &e) {
-            crow::response res(504, nlohmann::json({{sjp::ERROR, e.what()}}).dump());
+            crow::response res(504, nlohmann::json({{scc::ERROR, e.what()}}).dump());
             res.set_header("Content-Type", "application/json");
             return res;
         }

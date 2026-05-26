@@ -46,13 +46,13 @@ namespace SmartHomeWebServer::RouteHelpers {
     }
 
     crow::response badRequest(const std::string_view message) {
-        crow::response res(400, nlohmann::json({{"error", message}}).dump());
+        crow::response res(400, nlohmann::json({{scc::ERROR, message}}).dump());
         res.set_header("Content-Type", "application/json");
         return res;
     }
 
     crow::response gatewayTimeout(const std::string_view message) {
-        crow::response res(504, nlohmann::json({{"error", message}}).dump());
+        crow::response res(504, nlohmann::json({{scc::ERROR, message}}).dump());
         res.set_header("Content-Type", "application/json");
         return res;
     }

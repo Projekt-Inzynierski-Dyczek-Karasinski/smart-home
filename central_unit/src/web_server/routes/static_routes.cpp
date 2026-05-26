@@ -2,49 +2,59 @@
 
 namespace SmartHomeWebServer {
     void registerStaticRoutes(crow::App<crow::CORSHandler> &app, const std::string &webRoot) {
-        // Serve index.html for root path
-        CROW_ROUTE(app, "/")([webRoot](crow::response &res) {
-            res.set_static_file_info_unsafe(webRoot + "/index.html");
+        auto serveFile = [webRoot](const std::string &relativePath, crow::response &res) {
+            const auto resolvedRoot = std::filesystem::weakly_canonical(webRoot);
+            const auto resolvedPath = std::filesystem::weakly_canonical(webRoot + "/" + relativePath);
+
+            const std::string rootStr = resolvedRoot.string();
+            const std::string pathStr = resolvedPath.string();
+            if (!pathStr.starts_with(rootStr) ||
+                (pathStr.size() > rootStr.size() && pathStr[rootStr.size()] != '/')) {
+                res.code = 403;
+                res.body = nlohmann::json({{sjp::ERROR, "Forbidden"}});
+                res.set_header("Content-Type", "application/json");
+                res.end();
+                return;
+                }
+
+            if (!std::filesystem::exists(resolvedPath)) {
+                res.code = 404;
+                res.body = nlohmann::json({{sjp::ERROR, "File not found"}});
+                res.set_header("Content-Type", "application/json");
+                res.end();
+                return;
+            }
+
+            // Sanitized by weakly_canonical and path checks
+            res.set_static_file_info_unsafe(resolvedPath.string());
             res.end();
+        };
+
+        // Special route for next.js files
+        CROW_ROUTE(app, "/_next/<path>")
+        ([serveFile](const crow::request &, crow::response &res, const std::string &path) {
+            serveFile("_next/" + path, res);
         });
 
-        // Catch-all route for static files and SPA routing
-        CROW_CATCHALL_ROUTE(app)([webRoot](const crow::request &req, crow::response &res) {
-            // Ignore API routes
+        // Special route for favicon
+        CROW_ROUTE(app, "/favicon.ico")
+        ([serveFile](crow::response &res) {
+            serveFile("favicon.ico", res);
+        });
+
+        // SPA fallback route - serve index.html for all non-API routes
+        CROW_CATCHALL_ROUTE(app)
+        ([webRoot](const crow::request &req, crow::response &res) {
             if (req.url.starts_with("/api/")) {
                 res.code = 404;
+                res.body = nlohmann::json({{sjp::ERROR, "Invalid endpoint"}});
+                res.set_header("Content-Type", "application/json");
                 res.end();
                 return;
             }
 
-            std::string rel = req.url;
-            // Remove leading slash if present
-            if (!rel.empty() && rel.front() == '/') rel.erase(0, 1);
-
-            // Resolve the requested path against the web root and ensure it doesn't escape the directory
-            const auto resolvedPath = std::filesystem::weakly_canonical(webRoot + "/" + rel);
-            const auto resolvedRoot = std::filesystem::weakly_canonical(webRoot);
-
-            // Check if the resolved path starts with the resolved web root path to prevent directory traversal
-            if (resolvedPath.string().rfind(resolvedRoot.string(), 0) != 0) {
-                res.code = 403;
-                res.end();
-                return;
-            }
-
-            // If the path is empty (path was '/'), serve index.html
-            if (rel.empty()) rel = "index.html";
-
-            const std::string path = webRoot + "/" + rel;
-
-            // Check if file exists, if not serve index.html for SPA routing
-            if (!std::filesystem::exists(path)) {
-                res.set_static_file_info_unsafe(webRoot + "/index.html");
-                res.end();
-                return;
-            }
-
-            res.set_static_file_info_unsafe(path);
+            // No sanitization for hardcoded index path
+            res.set_static_file_info_unsafe(webRoot + "/index.html");
             res.end();
         });
     }

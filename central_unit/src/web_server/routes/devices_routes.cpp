@@ -7,14 +7,14 @@ namespace SmartHomeWebServer {
     void registerDevicesRoutes(crow::App<crow::CORSHandler> &app, ApiClient &apiClient) {
         // GET /api/devices — all devices
         CROW_ROUTE(app, "/api/devices")([&apiClient] {
-            return coreGet(apiClient, scc::DEVICES);
+            return coreGet(apiClient, scct::DEVICES);
         });
 
         // GET /api/devices/<id> — single device by device id
         CROW_ROUTE(app, "/api/devices/<uint>")([&apiClient](unsigned int sensorId) {
             nlohmann::json params;
             params[sjp::ARGS.data()] = nlohmann::json::array({sensorId});
-            return coreGet(apiClient, scc::DEVICE, params);
+            return coreGet(apiClient, scct::DEVICE, params);
         });
 
         // GET /api/devices/<id>/readings?limit=<int> — readings by device id
@@ -32,7 +32,7 @@ namespace SmartHomeWebServer {
                 if (const auto p = req.url_params.get(sjp::TO.data()))
                     params[sjp::TO.data()] = std::string(p);
 
-                return coreGet(apiClient, scc::DEVICE_READINGS, params);
+                return coreGet(apiClient, scct::DEVICE_READINGS, params);
             });
 
         // GET /api/devices/<id>/value?force=<bool> — live device value
@@ -45,7 +45,7 @@ namespace SmartHomeWebServer {
                     if (std::string_view(p) == "true")
                         params[sjp::FORCE] = true;
 
-                return coreGet(apiClient, scc::DEVICE_VALUE, params);
+                return coreGet(apiClient, scct::DEVICE_VALUE, params);
             });
 
         // POST /api/devices — create new device
@@ -63,7 +63,7 @@ namespace SmartHomeWebServer {
                 if (const auto ret = RouteHelpers::optionalField(*body, sjp::RETURNING))
                     params[sjp::RETURNING] = *ret;
 
-                return coreSet(apiClient, scc::DEVICE, params);
+                return coreSet(apiClient, scct::DEVICE, params);
             });
 
         // PATCH /api/devices/<id> — update device field
@@ -90,7 +90,7 @@ namespace SmartHomeWebServer {
                 if (const auto ret = RouteHelpers::optionalField(*body, sjp::RETURNING))
                     params[sjp::RETURNING] = *ret;
 
-                return coreSet(apiClient, scc::DEVICE, params);
+                return coreSet(apiClient, scct::DEVICE, params);
             });
 
         // DELETE /api/devices/<id> — delete device record or JSONB value
@@ -107,7 +107,7 @@ namespace SmartHomeWebServer {
                         params[sjp::PATH] = *path;
                 }
 
-                return coreDelete(apiClient, scc::DEVICE, params);
+                return coreDelete(apiClient, scct::DEVICE, params);
             });
 
         // POST /api/modules/<id>/actuators/toggle

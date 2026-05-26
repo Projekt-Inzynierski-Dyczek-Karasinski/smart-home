@@ -16,7 +16,8 @@ namespace SmartHomeWebServer {
     namespace sjp = SmartHome::JsonRpcStrings::ParamsKeys;
 
     namespace sc = SmartHome::Constants;
-    namespace scc = SmartHome::Constants::CoreTypes;
+    namespace scc = SmartHome::Constants::Common;
+    namespace scct = SmartHome::Constants::CoreTypes;
     namespace scmt = SmartHome::Constants::MediatorTypes;
     namespace scdi= SmartHome::Constants::DatabaseIdentifiers;
 

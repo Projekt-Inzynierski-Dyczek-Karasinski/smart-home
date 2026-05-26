@@ -4,7 +4,7 @@
 
 namespace SmartHomeWebServer {
     /**
-     * TODO update
+     * TODO update or remove
      * @brief Registers core API routes for the web server.
      *
      * @param app The Crow application instance to which the routes will be registered.

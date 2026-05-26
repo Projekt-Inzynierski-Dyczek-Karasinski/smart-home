@@ -4,21 +4,21 @@
 void SmartHomeWebServer::registerModuleRoutes(crow::App<crow::CORSHandler> &app, ApiClient &apiClient) {
     // GET /api/modules — all modules
     CROW_ROUTE(app, "/api/modules")([&apiClient] {
-        return coreGet(apiClient, scc::MODULES);
+        return coreGet(apiClient, scct::MODULES);
     });
 
     // GET /api/modules/<id> — single module
     CROW_ROUTE(app, "/api/modules/<uint>")([&apiClient](unsigned int moduleId) {
         nlohmann::json params;
         params[sjp::MODULE_ID] = moduleId;
-        return coreGet(apiClient, scc::MODULE, params);
+        return coreGet(apiClient, scct::MODULE, params);
     });
 
     // GET /api/modules/<id>/devices — devices for module
     CROW_ROUTE(app, "/api/modules/<uint>/devices")([&apiClient](unsigned int moduleId) {
         nlohmann::json params;
         params[sjp::MODULE_ID] = moduleId;
-        return coreGet(apiClient, scc::MODULE_DEVICES, params);
+        return coreGet(apiClient, scct::MODULE_DEVICES, params);
     });
 
     // GET /api/modules/<mid>/devices/<lid> — device by module + logic id
@@ -27,7 +27,7 @@ void SmartHomeWebServer::registerModuleRoutes(crow::App<crow::CORSHandler> &app,
             nlohmann::json params;
             params[sjp::MODULE_ID] = moduleId;
             params[sjp::ARGS] = nlohmann::json::array({logicId});
-            return coreGet(apiClient, scc::DEVICE, params);
+            return coreGet(apiClient, scct::DEVICE, params);
         });
 
     // GET /api/modules/<mid>/sensors/<lid>/readings?limit=N — readings by module + logic id
@@ -46,7 +46,7 @@ void SmartHomeWebServer::registerModuleRoutes(crow::App<crow::CORSHandler> &app,
             if (const auto p = req.url_params.get(sjp::TO.data()))
                 params[sjp::TO] = std::string(p);
 
-            return coreGet(apiClient, scc::DEVICE_READINGS, params);
+            return coreGet(apiClient, scct::DEVICE_READINGS, params);
         });
 
     // GET /api/modules/<mid>/sensors/<lid>/value?force=bool — current value by module + logic id
@@ -76,7 +76,7 @@ void SmartHomeWebServer::registerModuleRoutes(crow::App<crow::CORSHandler> &app,
             nlohmann::json params;
             params[sjp::MODULE_ID] = moduleId;
             params[sjp::ARGS] = nlohmann::json::array({limit});
-            return coreGet(apiClient, scc::LOGS, params);
+            return coreGet(apiClient, scct::LOGS, params);
         });
 
     // GET /api/modules/<id>/battery — battery level via mediator
@@ -108,7 +108,7 @@ void SmartHomeWebServer::registerModuleRoutes(crow::App<crow::CORSHandler> &app,
             if (const auto ret = RouteHelpers::optionalField(*body, sjp::RETURNING))
                 params[sjp::RETURNING] = *ret;
 
-            return coreSet(apiClient, scc::MODULE, params);
+            return coreSet(apiClient, scct::MODULE, params);
         });
 
     // PATCH /api/modules/<id> — update module field
@@ -135,7 +135,7 @@ void SmartHomeWebServer::registerModuleRoutes(crow::App<crow::CORSHandler> &app,
             if (const auto ret = RouteHelpers::optionalField(*body, sjp::RETURNING))
                 params[sjp::RETURNING] = *ret;
 
-            return coreSet(apiClient, scc::MODULE, params);
+            return coreSet(apiClient, scct::MODULE, params);
         });
 
     // DELETE /api/modules/<id> — delete module record or column/JSONB value
@@ -152,6 +152,6 @@ void SmartHomeWebServer::registerModuleRoutes(crow::App<crow::CORSHandler> &app,
                     params[sjp::PATH] = *path;
             }
 
-            return coreDelete(apiClient, scc::MODULE, params);
+            return coreDelete(apiClient, scct::MODULE, params);
         });
 }

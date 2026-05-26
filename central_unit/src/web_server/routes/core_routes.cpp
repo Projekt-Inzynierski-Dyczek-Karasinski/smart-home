@@ -3,9 +3,10 @@
 namespace SmartHomeWebServer {
     namespace sc = SmartHome::Constants;
 
+    // TODO Add more endpoints if more Core actions should be handled by web API or consider removing
     void registerCoreRoutes(crow::App<crow::CORSHandler> &app, ApiClient &apiClient) {
         CROW_ROUTE(app, "/api/status")([] {
-            return nlohmann::json({{"status", "ok"}}).dump();
+            return nlohmann::json({{scc::STATUS, scc::OK}}).dump();
         });
 
 
@@ -22,7 +23,7 @@ namespace SmartHomeWebServer {
             try {
                 return apiClient.sendRequest(request).get();
             } catch (const std::exception &e) {
-                return nlohmann::json({{"error", e.what()}}).dump();
+                return nlohmann::json({{scc::ERROR, e.what()}}).dump();
             }
         });
     }
