@@ -279,9 +279,7 @@ namespace SmartHome::IPC {
              */
             static bool isFlagIndexValid(uint8_t index);
         };
-
-        //__attribute__((packed));
-
+        
         /**
          * @brief Encapsulates a header-payload pair ready for transmission or reception.
          */
