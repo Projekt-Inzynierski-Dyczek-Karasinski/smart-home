@@ -31,7 +31,7 @@ namespace SmartHomeWebServer {
 
             /// HTTP server config
             struct Http {
-                int port = 8080;
+                int port = 80;
                 std::string staticRoot = sc::DefaultPaths::WEB_ROOT.data();
             } http;
 
@@ -40,7 +40,7 @@ namespace SmartHomeWebServer {
 
             /// CORS config
             struct Cors {
-                std::string allowedOrigin = "*";
+                std::string allowedOrigin = "http://localhost";
             } cors;
         };
 
