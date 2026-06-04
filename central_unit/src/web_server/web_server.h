@@ -83,8 +83,14 @@ namespace SmartHomeWebServer {
         std::shared_ptr<su::AsyncLogger> pLogger;
 
     private:
+        /**
+         * @brief Private constructor for singleton pattern.
+         */
         WebServer() = default;
 
+        /**
+         * @brief Private destructor for singleton pattern, starts graceful shutdown.
+         */
         ~WebServer();
 
         /**

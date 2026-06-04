@@ -30,9 +30,9 @@ namespace SmartHome {
         bool stale = false; ///< Module object has changed, update pending
 
         /**
-         * @brief TODO !pr
+         * @brief Check if the module configuration is up to date.
          *
-         * @return
+         * @return true when module is not marked stale.
          */
         [[nodiscard]] bool isFresh() const;
 
@@ -73,9 +73,9 @@ namespace SmartHome {
         [[nodiscard]] std::chrono::seconds cacheTTL() const;
 
         /**
-         * @brief TODO !pr
+         * @brief Check if the device configuration is up to date.
          *
-         * @return
+         * @return true when device is not marked stale.
          */
         [[nodiscard]] bool isFresh() const;
 
@@ -124,9 +124,9 @@ namespace SmartHome {
          * @brief Fetch cached module by module id.
          *
          * @param moduleId Module identifier.
-         * @param isFresh TODO !pr
+         * @param isFresh When true, returns std::nullopt if module is stale.
          *
-         * @return Cached module or std::nullopt if missing.
+         * @return Cached module or std::nullopt if missing or stale.
          */
         [[nodiscard]] std::optional<CachedModule> getModule(uint moduleId, bool isFresh = false) const;
 
@@ -174,9 +174,9 @@ namespace SmartHome {
          * @brief Fetch cached device by device id.
          *
          * @param deviceId Device identifier.
-         * @param isFresh TODO !pr
+         * @param isFresh When true, returns std::nullopt if device is stale.
          *
-         * @return Cached device or std::nullopt if missing.
+         * @return Cached device or std::nullopt if missing or stale.
          */
         [[nodiscard]] std::optional<CachedDevice> getDevice(uint deviceId, bool isFresh = false) const;
 
