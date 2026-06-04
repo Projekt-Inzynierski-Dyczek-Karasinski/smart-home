@@ -12,7 +12,7 @@ namespace SmartHome {
     /**
      * @brief Scheduled task execution engine using iCalendar RRULE recurrence.
      *
-     * @details Maintains a priority queue of scheduled tasks parsed from sensor configurations.
+     * @details Maintains a priority queue of scheduled tasks parsed from device configurations.
      *          A single system_timer fires for the nearest task,
      *          dispatches the action through the existing Actions command pipeline,
      *          advances the RRULE iterator, and re-enqueues the task.
@@ -25,7 +25,7 @@ namespace SmartHome {
          * @brief Construct scheduler bound to an io_context and config cache.
          *
          * @param ioContext Boost.Asio context for timer operations.
-         * @param configCache Configuration cache for sensor schedule lookup.
+         * @param configCache Configuration cache for device schedule lookup.
          * @param logger Logger instance.
          */
         Scheduler(ba::io_context &ioContext,
@@ -39,32 +39,32 @@ namespace SmartHome {
         Scheduler &operator=(const Scheduler &) = delete;
 
         /**
-         * @brief Load schedule entries from all sensors in config cache.
+         * @brief Load schedule entries from all devices in config cache.
          *
          * @details Clears existing tasks and rebuilds the queue from current cache state.
          *
-         * @pre Cache must be populated with sensor configurations containing "schedule" entries.
+         * @pre Cache must be populated with device configurations containing "schedule" entries.
          */
         void loadFromCache();
 
         // TODO Unused for now, use after db trigger rework (adding payload with changed ids)
         /**
-         * @brief Reload schedule entries for a specific sensor.
+         * @brief Reload schedule entries for a specific device.
          *
-         * @details Removes existing tasks for the sensor and reparses its schedule config.
+         * @details Removes existing tasks for the device and reparses its schedule config.
          *
          * @note Used after LISTEN/NOTIFY config changes.
          *
-         * @param sensorId Sensor identifier to reload.
+         * @param deviceId Device identifier to reload.
          */
-        void reloadSensor(uint sensorId);
+        void reloadDevice(uint deviceId);
 
         /**
-         * @brief Remove all scheduled tasks for a sensor.
+         * @brief Remove all scheduled tasks for a device.
          *
-         * @param sensorId Sensor identifier.
+         * @param deviceId Device identifier.
          */
-        void removeSensor(uint sensorId);
+        void removeDevice(uint deviceId);
 
         /**
          * @brief Start the scheduling timer chain.
@@ -109,7 +109,7 @@ namespace SmartHome {
          * @brief Single scheduled task with RRULE iterator state.
          */
         struct ScheduledTask {
-            uint sensorId; ///< Owning sensor
+            uint deviceId; ///< Owning device
             nlohmann::json action; ///< Action definition from config
             std::chrono::system_clock::time_point nextRun; ///< Next scheduled execution time
             IcalIterPtr rruleIterator; ///< libical recurrence iterator
@@ -153,12 +153,12 @@ namespace SmartHome {
         static std::chrono::system_clock::time_point icalToTimePoint(const icaltimetype &time);
 
         /**
-         * @brief Parse sensor config \b schedule array and enqueue tasks.
+         * @brief Parse device config \b schedule array and enqueue tasks.
          *
-         * @param sensorId Sensor identifier.
-         * @param config Sensor configuration JSON containing \b schedule key.
+         * @param deviceId Device identifier.
+         * @param config Device configuration JSON containing \b schedule key.
          */
-        void parseSensorSchedule(uint sensorId, const nlohmann::json &config);
+        void parseDeviceSchedule(uint deviceId, const nlohmann::json &config);
 
         /**
          * @brief Set timer to fire at the earliest task's nextRun.

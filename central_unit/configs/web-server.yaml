@@ -1,0 +1,33 @@
+preset_values:
+  log_levels:
+    none: &none 0
+    critical: &critical 1
+    error: &error 2
+    warning: &warning 3
+    info: &info 4
+    debug: &debug 5
+
+web_server:
+  service_name: "smarthome-webd"
+  http:
+    port: 80
+    static_root: "/var/www/smarthome"
+  cors:
+    # Expected format: "[SCHEME]://[HOST]:[PORT](optional)" eg. "http://127.0.0.1:8080"
+    allowed_origin: "http://localhost" # Overwritten by env var "SH_ALLOWED_ORIGIN"
+  logging:
+    log_level: *info
+    enable_console_log_output: true
+    log_file:
+      enabled: true
+      create_new: true
+      archive_old: true
+      path: "/var/log/smarthome/web-server.log"
+  ipc:
+    tcp:
+      enabled: true
+      address: "127.0.0.1"
+      port: 43321
+    uds:
+      enabled: true
+      socket_path: "/var/run/smarthomed.sock"

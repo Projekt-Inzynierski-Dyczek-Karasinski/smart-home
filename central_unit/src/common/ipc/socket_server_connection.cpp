@@ -8,15 +8,30 @@ namespace SmartHome::IPC {
     void SocketServerConnection::asyncReadLoop(const std::function<void(const std::string &message)> &handleMessage) {
         auto self = shared_from_this();
 
-        readAsync([this, self, handleMessage](const std::string &message) {
-            handleMessage(message);
-
-            if (isOpen()) {
-                ba::post(mStrand, [this, self, handleMessage] {
-                    asyncReadLoop(handleMessage);
-                });
+        ba::co_spawn(mStrand, [this, self, handleMessage]() -> ba::awaitable<void> {
+            while (isOpen()) {
+                std::string message;
+                try {
+                    message = co_await readAsync();
+                }
+                catch (const bs::system_error &e) {
+                    if (e.code() == ba::error::connection_reset ||
+                        e.code() == ba::error::broken_pipe ) {
+                        mpLogger->errorf("[SOCKET_SERVER_CONNECTION] IPC read failed, connection failed: %s", e.what());
+                    }else {
+                    mpLogger->debug("[SOCKET_SERVER_CONNECTION] IPC read failed, connection closed");
+                    }
+                    continue;
+                }
+                catch (const std::exception &e) {
+                    mpLogger->errorf("[SOCKET_SERVER_CONNECTION] IPC read failed, unexpected error: %s", e.what());
+                    continue;
+                }
+                if (!message.empty()) {
+                    handleMessage(message);
+                }
             }
-        });
+        }, ba::detached);
     }
 
     void SocketServerConnection::close() {

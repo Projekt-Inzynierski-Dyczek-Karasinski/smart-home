@@ -25,6 +25,8 @@ option(BUILD_MEDIATOR "Build module mediator" ON)
 
 option(BUILD_DB_SERVICE "Build SmartHome database daemon" ON)
 
+option(BUILD_WEB_SERVER "Build SmartHome web server" ON)
+
 option(BUILD_CLI "Build SmartHome CLI" ON)
 
 option(BUILD_GUI "Build SmartHome GUI" ON)
@@ -66,6 +68,10 @@ if (BUILD_DB_SERVICE)
     add_subdirectory(src/db-service)
 endif ()
 
+if (BUILD_WEB_SERVER)
+    add_subdirectory(src/web_server)
+endif ()
+
 if (BUILD_CLI)
     add_subdirectory(src/cli)
 endif ()
@@ -99,9 +105,7 @@ else ()
             -ffunction-sections
             -fdata-sections
     )
-    add_link_options(-Wl,--gc-sections)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -s")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -s")
+    add_link_options(-Wl,--gc-sections, -s)
 endif ()
 
 message(STATUS "======================[ Feature summary ]=======================")

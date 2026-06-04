@@ -35,6 +35,9 @@ namespace SmartHome::JsonRpcStrings {
         inline constexpr std::string_view ARGS = "args";
         inline constexpr std::string_view DATA = "data";
         inline constexpr std::string_view FORCE = "force";
+        inline constexpr std::string_view MODE = "mode";
+        inline constexpr std::string_view PATH = "path";
+        inline constexpr std::string_view VALUE = "value";
 
         // Database API specific keys
         // Request parameter keys for database operations
@@ -50,6 +53,10 @@ namespace SmartHome::JsonRpcStrings {
         inline constexpr std::string_view VALUES = "values";
         inline constexpr std::string_view RETURNING = "returning";
 
+        // Common query parameter keys
+        inline constexpr std::string_view TO = "to";
+        inline constexpr std::string_view FROM = "from";
+
         // Result keys for database query responses
         inline constexpr std::string_view AFFECTED_ROWS = "affected_rows";
         inline constexpr std::string_view ROWS = "rows";
@@ -64,6 +71,9 @@ namespace SmartHome::JsonRpcStrings {
     /// JSON-RPC response-specific keys
     namespace ResponseKeys {
         inline constexpr std::string_view RESULT = "result";
+        inline constexpr std::string_view STATUS = "status";
+        inline constexpr std::string_view MESSAGE = "message";
+
         inline constexpr std::string_view ERROR = "error";
     }
 
@@ -336,7 +346,7 @@ namespace SmartHome::API {
          * @return JSON object representation of response.
          * @throws std::invalid_argument If neither result nor error is set.
          */
-        [[nodiscard]] nlohmann::json to_json();
+        [[nodiscard]] nlohmann::json to_json() const;
 
         /**
          * @brief Convert response to JSON string.
@@ -344,7 +354,7 @@ namespace SmartHome::API {
          * @return JSON string representation of response.
          * @throws std::invalid_argument If neither result nor error is set.
          */
-        [[nodiscard]] std::string to_string();
+        [[nodiscard]] std::string to_string() const;
 
         /// Update response from JSON object.
         ApiResponse operator()(const nlohmann::json &value);

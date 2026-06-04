@@ -244,6 +244,42 @@ namespace SmartHomeDB {
         static DatabaseClient::DbQuery buildDeleteQuery(const std::string &table, const nlohmann::json &params);
 
         /**
+         * @brief Build a single SET assignment fragment for UPDATE.
+         *
+         * @details For plain columns generates "column = $N".
+         * @details For dot-separated paths (e.g. "config.key") generates a
+         *          jsonb_set() expression targeting the nested JSONB field,
+         *          with an appropriate type cast derived from the value type.
+         *
+         * @param key Column name or dot-separated JSONB path.
+         * @param value JSON value to assign.
+         * @param params pqxx params container (modified).
+         * @param paramIndex Next parameter index (modified).
+         *
+         * @return SQL fragment suitable for use in a SET clause.
+         */
+        static std::string buildSetPart(const std::string &key,
+                                 const nlohmann::json &value,
+                                 pqxx::params &params,
+                                 int &paramIndex);
+
+        /**
+         * @brief Build a SET assignment fragment that removes a value.
+         *
+         * @details For plain column paths generates "column = NULL".
+         * @details For dot-separated JSONB paths ("e.g. config.key") generates a
+         *          "column = column #- $N::text[]" expression using the PostgreSQL #- operator
+         *          to remove the nested key.
+         *
+         * @param path Column name or dot-separated JSONB path to the field to remove.
+         * @param params pqxx params container (modified).
+         * @param paramIndex Next parameter index (modified).
+         *
+         * @return SQL fragment suitable for use in a SET clause.
+         */
+        static std::string buildDeleteSetPart(const std::string &path, pqxx::params &params, int &paramIndex);
+
+        /**
          * @brief Build SQL fragment for a subselect.
          *
          * @param subSelect JSON defining the subselect (table, columns, where, order_by, limit).
@@ -302,6 +338,21 @@ namespace SmartHomeDB {
           * @return SQL fragment containing RETURNING.
           */
         static std::string buildReturning(const nlohmann::json &returning);
+
+        /**
+         * @brief Convert a dot-separated JSON path to a PostgreSQL text[] parameter.
+         *
+         * @details Splits \p jsonPath on '.' and appends it as a text[] array literal
+         *          to \p params, then returns the placeholder "$N::text[]" for use in
+         *          jsonb_set() or #- expressions.
+         *
+         * @param jsonPath Dot-separated path (e.g. "schedule.enabled").
+         * @param params pqxx params container (modified).
+         * @param paramIndex Next parameter index (modified).
+         *
+         * @return Placeholder string with cast (e.g. "$2::text[]").
+         */
+        static std::string buildJsonbPathParam(const std::string &jsonPath, pqxx::params &params, int &paramIndex);
 
         /**
          * @brief Append a parameter to pqxx::params and return its placeholder.

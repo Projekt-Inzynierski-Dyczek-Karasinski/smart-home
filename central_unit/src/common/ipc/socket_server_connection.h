@@ -27,13 +27,15 @@ namespace SmartHome::IPC {
         /**
         * @brief Start asynchronous read loop for continuous message reception.
         *
-        * @param handleMessage Callback invoked for each received message.
+        * @details Spawns a coroutine on the internal strand via \c ba::co_spawn.
+        *          The coroutine loops with \c co_await \c readAsync(),
+        *          passing each received message to \c handleMessage.
+        *          Per-read exceptions are caught and logged, the loop exits only when \c isOpen() returns false.
         *
-        * @details Automatically restarts read operation after each message.
-        *          Loop continues until connection is closed or error occurs.
+        * @param handleMessage Callback invoked for each successfully received message.
         *
-        * @warning Must be called on shared_ptr instance.
-        * @note Thread-safe with internal synchronization.
+        * @warning Must be called on a \c shared_ptr instance — uses \c shared_from_this internally.
+        * @note Serialized through the internal strand, thread-safe with respect to concurrent writes.
         */
         void asyncReadLoop(const std::function<void(const std::string &message)> &handleMessage);
 

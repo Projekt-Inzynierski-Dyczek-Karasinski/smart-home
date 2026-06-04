@@ -3,6 +3,9 @@
 #include "constants.h"
 
 #include <set>
+#include <boost/algorithm/string/replace.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/classification.hpp>
 
 
 namespace SmartHomeDB {
@@ -461,8 +464,7 @@ namespace SmartHomeDB {
 
         std::vector<std::string> setParts;
         for (const auto &[key, value]: values.items()) {
-            std::string placeholder = addParam(value, query.params, paramIndex);
-            setParts.push_back(sqlIdentifier(key) + " " + sk::EQUAL.data() + " " + placeholder);
+            setParts.push_back(buildSetPart(key, value, query.params, paramIndex));
         }
 
         query.sql = toUpper(sk::UPDATE) + " " + sqlIdentifier(table) + " " + toUpper(sk::SET) + " ";
@@ -487,6 +489,29 @@ namespace SmartHomeDB {
         DatabaseClient::DbQuery query;
         int paramIndex = 1;
 
+        // With columns parameter - generate UPDATE (set NULL or remove from JSONB)
+        if (params.contains(sjp::COLUMNS)) {
+            if (!params[sjp::COLUMNS].is_array() || params[sjp::COLUMNS].empty()) {
+                throw std::runtime_error("DELETE 'columns' must be a non-empty array");
+            }
+
+            std::vector<std::string> setParts;
+            for (const auto &col: params[sjp::COLUMNS]) {
+                if (!col.is_string()) throw std::runtime_error("DELETE column paths must be strings");
+                setParts.push_back(buildDeleteSetPart(col.get<std::string>(), query.params, paramIndex));
+            }
+
+            query.sql = toUpper(sk::UPDATE) + " " + sqlIdentifier(table) + " " + toUpper(sk::SET) + " ";
+            query.sql += joinStrings(setParts, ", ");
+            query.sql += " " + toUpper(sk::WHERE) + " ";
+            query.sql += buildWhereClause(params[sjp::WHERE], query.params, paramIndex);
+
+            const auto pLogger = DatabaseService::Instance().pLogger;
+            pLogger->debugf("[DB_API] [BUILD_DELETE] SQL: %s", query.sql.c_str());
+            return query;
+        }
+
+        // Without columns parameter - standard 'DELETE FROM' sql query
         query.sql = toUpper(sk::DELETE) + " " + toUpper(sk::FROM) + " " + sqlIdentifier(table);
         query.sql += " " + toUpper(sk::WHERE);
         query.sql += " " + buildWhereClause(params[sjp::WHERE], query.params, paramIndex);
@@ -498,6 +523,48 @@ namespace SmartHomeDB {
         const auto pLogger = DatabaseService::Instance().pLogger;
         pLogger->debugf("[DB_API] [BUILD_DELETE] SQL: %s", query.sql.c_str());
         return query;
+    }
+
+    std::string DatabaseApi::buildSetPart(const std::string &key,
+                                          const nlohmann::json &value,
+                                          pqxx::params &params,
+                                          int &paramIndex) {
+        const auto dotPos = key.find('.');
+        if (dotPos == std::string::npos) {
+            const std::string placeholder = addParam(value, params, paramIndex);
+            return sqlIdentifier(key) + " " + sk::EQUAL.data() + " " + placeholder;
+        }
+
+        // JSONB path: config.cache_ttl -> config = jsonb_set(config, '{cache_ttl}', to_jsonb($1))
+        const std::string column = sqlIdentifier(key.substr(0, dotPos));
+        const std::string jsonPath = key.substr(dotPos + 1);
+        const std::string pathPlaceholder = buildJsonbPathParam(jsonPath, params, paramIndex);
+        const std::string valuePlaceholder = addParam(value, params, paramIndex);
+
+        // TODO consider adding cast argument to addParam
+        std::string cast;
+        if (value.is_number_integer()) cast = "::bigint";
+        else if (value.is_number_float()) cast = "::double precision";
+        else if (value.is_boolean()) cast = "::boolean";
+        else if (value.is_object() || value.is_array()) cast = "::jsonb";
+        else cast = "::text";
+
+        return column + " = jsonb_set(" + column + ", " + pathPlaceholder + ", to_jsonb("
+               + valuePlaceholder + cast + "))";
+    }
+
+    std::string DatabaseApi::buildDeleteSetPart(const std::string &path, pqxx::params &params, int &paramIndex) {
+        const auto dotPos = path.find('.');
+        if (dotPos == std::string::npos) {
+            return sqlIdentifier(path) + " = " + toUpper(sk::NULL_STR);
+        }
+
+        // Handle json delete with '#-' postgresql operator
+        const std::string column = sqlIdentifier(path.substr(0, dotPos));
+        const std::string jsonPath = path.substr(dotPos + 1);
+        const std::string pathPlaceholder = buildJsonbPathParam(jsonPath, params, paramIndex);
+
+        return column + " = " + column + " #- " + pathPlaceholder;
     }
 
     std::string DatabaseApi::buildSubSelect(const nlohmann::json &subSelect, pqxx::params &params, int &paramIndex) {
@@ -693,6 +760,21 @@ namespace SmartHomeDB {
         }
 
         return result;
+    }
+
+    std::string DatabaseApi::buildJsonbPathParam(const std::string &jsonPath, pqxx::params &params, int &paramIndex) {
+        std::vector<std::string> segments;
+        boost::split(segments, jsonPath, boost::is_any_of("."));
+
+        std::string arrayLiteral = "{";
+        for (size_t i = 0; i < segments.size(); i++) {
+            if (i > 0) arrayLiteral += ",";
+            arrayLiteral += "\"" + segments[i] + "\"";
+        }
+        arrayLiteral += "}";
+
+        params.append(arrayLiteral);
+        return "$" + std::to_string(paramIndex++) + "::text[]";
     }
 
     std::string DatabaseApi::addParam(const nlohmann::json &value, pqxx::params &params, int &paramIndex) {

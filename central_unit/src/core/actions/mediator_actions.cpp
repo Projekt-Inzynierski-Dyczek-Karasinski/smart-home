@@ -9,7 +9,7 @@ namespace SmartHome {
     namespace jr = JsonRpcStrings::ResponseKeys;
     namespace cmck = Constants::ModuleConfigKeys;
 
-    awaitOptApiResponse MediatorActions::mediatorGetHandler(const cmdMetaPtr &commandMetadata) {
+    awaitOptApiResponse MediatorActions::mediatorGetHandler(cmdMetaPtr commandMetadata) {
         Core::Instance().mpLogger->debug("[MEDIATOR_ACTIONS] [GET] called");
         const auto &command = commandMetadata->command;
 
@@ -54,7 +54,7 @@ namespace SmartHome {
         co_return commandResult;
     }
 
-    awaitOptApiResponse MediatorActions::mediatorSetHandler(const cmdMetaPtr &commandMetadata) {
+    awaitOptApiResponse MediatorActions::mediatorSetHandler(cmdMetaPtr commandMetadata) {
         Core::Instance().mpLogger->debug("[MEDIATOR_ACTIONS] [SET] called");
         const auto &command = commandMetadata->command;
 
@@ -100,7 +100,7 @@ namespace SmartHome {
     }
 
 
-    awaitOptApiResponse MediatorActions::mediatorExecuteHandler(const cmdMetaPtr &commandMetadata) {
+    awaitOptApiResponse MediatorActions::mediatorExecuteHandler(cmdMetaPtr commandMetadata) {
         Core::Instance().mpLogger->debug("[MEDIATOR_ACTIONS] [EXECUTE] called");
         const auto &command = commandMetadata->command;
 
@@ -167,7 +167,7 @@ namespace SmartHome {
         co_return commandResult;
     }
 
-    awaitOptApiResponse MediatorActions::mediatorPingHandler(const cmdMetaPtr &commandMetadata) {
+    awaitOptApiResponse MediatorActions::mediatorPingHandler(cmdMetaPtr commandMetadata) {
         Core::Instance().mpLogger->debug("[MEDIATOR_ACTIONS] [PING] called");
         const auto &command = commandMetadata->command;
 
@@ -218,7 +218,7 @@ namespace SmartHome {
         co_return commandResult;
     }
 
-    ba::awaitable<API::ApiResponse> MediatorActions::sendToModule(const cmdMetaPtr &commandMetadata,
+    ba::awaitable<API::ApiResponse> MediatorActions::sendToModule(cmdMetaPtr commandMetadata,
                                                                   uint moduleId,
                                                                   std::string_view type,
                                                                   const nlohmann::json &args,
@@ -253,7 +253,7 @@ namespace SmartHome {
             try {
                 auto parsed = nlohmann::json::parse(resultResponse.result.value());
                 MediatorRequestParams mrp{moduleId, std::string(type), args};
-                postSensorReadingIfApplicable(mrp, parsed, getApplicableTypes(method));
+                postDeviceReadingIfApplicable(mrp, parsed, getApplicableTypes(method));
             } catch (const std::exception &e) {
                 Core::Instance().mpLogger->errorf("[MEDIATOR_ACTIONS] [SET] Failed to parse result as JSON: %s",
                                                   e.what());
@@ -347,7 +347,8 @@ namespace SmartHome {
         if (nextScheduledRunTimePoint.has_value()) {
             sleepDurationMs = static_cast<uint>(
                 std::chrono::duration_cast<std::chrono::milliseconds>(nextScheduledRunTimePoint.value() -
-                                                                      std::chrono::system_clock::now()).count());
+                                                                      std::chrono::system_clock::now()).count()
+                - 30000); // TODO remove 30s buffer after implementing time correction in mediator
         } else if (config.contains(cmck::DEFAULT_SLEEP_DURATION) &&
                    config.at(cmck::DEFAULT_SLEEP_DURATION).is_number_integer()) {
             // If no scheduled run time, check for default sleep duration in config
@@ -451,7 +452,7 @@ namespace SmartHome {
         co_return true;
     }
 
-    void MediatorActions::postSensorReadingIfApplicable(const MediatorRequestParams &parsedParams,
+    void MediatorActions::postDeviceReadingIfApplicable(const MediatorRequestParams &parsedParams,
                                                         const nlohmann::json &result,
                                                         const std::set<std::string_view> &applicableTypes) {
         if (!parsedParams.args.has_value() ||
@@ -460,37 +461,37 @@ namespace SmartHome {
             return;
 
         const int value = parsedParams.args.value().front().get<uint>();
-        uint sensorIdCandidate = value >= 0 ? static_cast<uint>(value) : 0;
+        uint deviceIdCandidate = value >= 0 ? static_cast<uint>(value) : 0;
 
-        std::optional<uint> sensorIdOpt;
-        // Parse first arg as sensor ID when module_id is not provided
+        std::optional<uint> deviceIdOpt;
+        // Parse first arg as device ID when module_id is not provided
         if (!parsedParams.moduleId.has_value()) {
-            sensorIdOpt = sensorIdCandidate;
+            deviceIdOpt = deviceIdCandidate;
         } else {
-            sensorIdOpt = Core::Instance().configCache().findSensorId(parsedParams.moduleId.value(),
-                                                                      sensorIdCandidate);
+            deviceIdOpt = Core::Instance().configCache().findDeviceId(parsedParams.moduleId.value(),
+                                                                      deviceIdCandidate);
         }
 
         if (!parsedParams.type.has_value() || !applicableTypes.contains(parsedParams.type.value())) return;
 
 
-        if (sensorIdOpt.has_value()) {
+        if (deviceIdOpt.has_value()) {
             Core::Instance().mpLogger->debugf(
-                "[MEDIATOR_ACTIONS] [POST_READING] Saving sensor reading to cache and database for sensor ID [%u]",
-                sensorIdOpt.value());
+                "[MEDIATOR_ACTIONS] [POST_READING] Saving device reading to cache and database for device ID [%u]",
+                deviceIdOpt.value());
 
             const nlohmann::json readingMetadata = {{jp::TYPE, parsedParams.type.value()}};
 
-            Core::Instance().readingsCache().set(sensorIdOpt.value(), result, readingMetadata);
+            Core::Instance().readingsCache().set(deviceIdOpt.value(), result, readingMetadata);
 
-            DatabaseActions::postSensorReading(sensorIdOpt.value(),
+            DatabaseActions::postDeviceReading(deviceIdOpt.value(),
                                                result,
                                                readingMetadata);
             return;
         }
         Core::Instance().mpLogger->warningf(
-            "[MEDIATOR_ACTIONS] [POST_READING] Could not find sensor ID for module [%u] "
-            "and logic sensor ID [%u] in cache. Skipping saving reading to cache and database.",
+            "[MEDIATOR_ACTIONS] [POST_READING] Could not find device ID for module [%u] "
+            "and logic device ID [%u] in cache. Skipping saving reading to cache and database.",
             parsedParams.moduleId.value(),
             parsedParams.args.value().front().dump().c_str());
     }
@@ -506,7 +507,7 @@ namespace SmartHome {
         static const std::set getTypes = {
             Constants::MediatorTypes::SENSOR_VALUE,
             Constants::MediatorTypes::FORCE_READ_SENSOR_VALUE,
-            Constants::MediatorTypes::ACTUATOR_VALUE
+            Constants::MediatorTypes::ACTUATOR_STATE
         };
         static const std::set setTypes = {
             Constants::MediatorTypes::TOGGLE_ACTUATOR,

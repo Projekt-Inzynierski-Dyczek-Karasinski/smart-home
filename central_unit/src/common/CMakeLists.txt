@@ -1,6 +1,8 @@
 # Fetching yaml-cpp from github for static build
 include(FetchContent)
 
+find_package(ZLIB REQUIRED)
+
 FetchContent_Declare(
         yaml-cpp
         GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
@@ -18,6 +20,7 @@ FetchContent_MakeAvailable(yaml-cpp)
 find_package(Boost 1.74 REQUIRED COMPONENTS
         system
         regex
+        iostreams
 )
 
 if (ENABLE_SYSTEMD)
@@ -72,8 +75,10 @@ target_include_directories(smarthome_ipc PUBLIC
 target_link_libraries(smarthome_ipc PRIVATE
         Boost::system
         Boost::regex
+        Boost::iostreams
         smarthome::logger
         smarthome::api
+        ZLIB::ZLIB
 )
 
 # SMARTHOME UTILITY

@@ -6,6 +6,7 @@
 #include <nlohmann/json_fwd.hpp>
 
 namespace SmartHome {
+    // TODO Update to implement ActionHelpers
     /**
      * @brief Mediator module command handlers
      *
@@ -16,7 +17,6 @@ namespace SmartHome {
      *          - Ping: Tests module connectivity and measures response time
      */
     class MediatorActions {
-        using cmdMetaPtr = std::shared_ptr<Actions::CommandMetadata>;
 
     public:
         /**
@@ -32,7 +32,7 @@ namespace SmartHome {
          *
          * @note Expected params format: {(optional)module_id: uint, type: <string>, (optional)args: [<any>...]}
          */
-        static awaitOptApiResponse mediatorGetHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse mediatorGetHandler(cmdMetaPtr commandMetadata);
 
 
         /**
@@ -48,7 +48,7 @@ namespace SmartHome {
          *
          * @note Expected params format: {(optional)module_id: uint, type: <string>, args: [<any>...]}
          */
-        static awaitOptApiResponse mediatorSetHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse mediatorSetHandler(cmdMetaPtr commandMetadata);
 
         /**
          * @brief Handle EXECUTE command for mediator/module.
@@ -63,7 +63,7 @@ namespace SmartHome {
          *
          * @note Expected params format: {(optional)module_id: uint, type: <string>, (optional)args: [<any>...]}
          */
-        static awaitOptApiResponse mediatorExecuteHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse mediatorExecuteHandler(cmdMetaPtr commandMetadata);
 
         /**
          * @brief Handle PING command for module connectivity check.
@@ -77,14 +77,14 @@ namespace SmartHome {
          *
          * @note Expected params format: {module_id: uint}
          */
-        static awaitOptApiResponse mediatorPingHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse mediatorPingHandler(cmdMetaPtr commandMetadata);
 
 
         /**
          * @brief Send mediator request to a specific module and await response.
          *
          * @details Prepares mediator request params for module addressing, submits the request,
-         *          and optionally posts sensor reading or error log.
+         *          and optionally posts device reading or error log.
          *
          * @param commandMetadata Command execution metadata.
          * @param moduleId Target module identifier.
@@ -94,7 +94,7 @@ namespace SmartHome {
          *
          * @return API response from mediator or error.
          */
-        static ba::awaitable<API::ApiResponse> sendToModule(const cmdMetaPtr &commandMetadata,
+        static ba::awaitable<API::ApiResponse> sendToModule(cmdMetaPtr commandMetadata,
                                                             uint moduleId,
                                                             std::string_view type,
                                                             const nlohmann::json &args,
@@ -162,16 +162,16 @@ namespace SmartHome {
                                                            std::string &error);
 
         /**
-         * @brief Optionally post sensor reading to database when mediator result applies.
+         * @brief Optionally post device reading to database when mediator result applies.
          *
          * @details Based on parsed params, checks whether the mediator result should be
-         *          recorded as a sensor reading and posts it to the database.
+         *          recorded as a device reading and posts it to the database.
          *
          * @param parsedParams Parsed mediator params.
          * @param result JSON result returned from mediator.
          * @param applicableTypes Set of mediator method types that should trigger posting.
          */
-        static void postSensorReadingIfApplicable(const MediatorRequestParams &parsedParams,
+        static void postDeviceReadingIfApplicable(const MediatorRequestParams &parsedParams,
                                                   const nlohmann::json &result,
                                                   const std::set<std::string_view> &applicableTypes);
 
@@ -184,7 +184,7 @@ namespace SmartHome {
         static void postErrorLog(uint moduleId, const API::ApiResponse &result);
 
         /**
-         * @brief Determine mediator types eligible for sensor reading posting.
+         * @brief Determine mediator types eligible for device reading posting.
          *
          * @param method Originating API method.
          *

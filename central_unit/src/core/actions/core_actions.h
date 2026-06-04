@@ -5,9 +5,6 @@
 #include <memory>
 #include <expected>
 
-
-namespace ba = boost::asio;
-
 namespace SmartHome {
     /**
      * @brief Core system command handlers.
@@ -21,17 +18,10 @@ namespace SmartHome {
      * @details Manages connection type registration and cleanup of stale connections.
      */
     class CoreActions {
-        using cmdMetaPtr = std::shared_ptr<Actions::CommandMetadata>;
-        using getTypeHandler = std::function<awaitOptApiResponse(const cmdMetaPtr &, const nlohmann::json &params)>;
+        using coreCommandHandler = std::function<awaitOptApiResponse(cmdMetaPtr, jsonPtr)>;
 
     public:
-        /**
-         * @brief Set keys supported by core SET handler.
-         */
-        enum class SetKeys {
-            UNDEFINED = 0,
-            CONNECTION_TYPE,
-        };
+        // Method handlers
 
         /**
          * @brief Handle ECHO command for testing/debugging.
@@ -39,23 +29,23 @@ namespace SmartHome {
          * @details Returns received parameters back to caller with "Core Echo response:" prefix.
          *          Used for connection and parameter passing verification.
          *
-         * @param commandMetadata Command execution metadata.
+         * @param pCommandMetadata Command execution metadata.
          *
          * @return API response with echoed parameters.
          */
-        static awaitOptApiResponse coreEchoHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse coreEchoHandler(cmdMetaPtr pCommandMetadata);
 
         /**
          * @brief Handle GET command for core data retrieval.
          *
          * @details Parses request params and dispatches to specific GET handlers
-         *          (modules, sensors, readings, logs, or debug cache).
+         *          (modules, devices, readings, logs, or debug cache).
          *
-         * @param commandMetadata Command execution metadata.
+         * @param pCommandMetadata Command execution metadata.
          *
          * @return API response with requested data or error.
          */
-        static awaitOptApiResponse coreGetHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse coreGetHandler(cmdMetaPtr pCommandMetadata);
 
         /**
          * @brief Handle SET command for core configuration.
@@ -63,46 +53,42 @@ namespace SmartHome {
          * @details Sets core configuration values like connection types.
          *          Validates key-value pairs and delegates to specific setters.
          *
-         * @param commandMetadata Command execution metadata.
+         * @param pCommandMetadata Command execution metadata.
          *
          * @return API response with confirmation or error.
          *
          * @note Expected params format: {key: value}
          */
-        static awaitOptApiResponse coreSetHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse coreSetHandler(cmdMetaPtr pCommandMetadata);
+
+        /**
+         * @brief Handle DELETE command for core data removal.
+         *
+         * @details Parses request params, resolves entity type (module or device),
+         *          and delegates to \c deleteDatabaseValue.
+         *          Supports deleting entire records or specific JSONB field values via path.
+         *
+         * @param pCommandMetadata Command execution metadata.
+         *
+         * @return API response with status confirmation or error.
+         */
+        static awaitOptApiResponse coreDeleteHandler(cmdMetaPtr pCommandMetadata);
 
         /**
          * @brief Handle NOTIFY command for core notifications.
          *
          * @details Processes incoming notifications to core system.
          *
-         * @param commandMetadata Command execution metadata.
+         * @param pCommandMetadata Command execution metadata.
          *
          * @return std::nullopt (notifications don't return responses).
          *
          * @warning Not yet implemented - TODO implement notify logic.
          */
-        static awaitOptApiResponse coreNotifyHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse coreNotifyHandler(cmdMetaPtr pCommandMetadata);
 
-        /**
-         * @brief Convert SetKeys enum to string representation.
-         *
-         * @param setKey SetKeys enum value.
-         *
-         * @return String representation or "undefined" for unknown values.
-         */
-        static std::string_view setKeyToString(SetKeys setKey);
 
-        /**
-         * @brief Convert string to SetKeys enum.
-         *
-         * @details Case-insensitive string matching.
-         *
-         * @param setKey String representation of set key.
-         *
-         * @return SetKeys enum value or SetKeys::UNDEFINED for unknown strings.
-         */
-        static SetKeys stringToSetKey(std::string_view setKey);
+        // Utility
 
         /**
          * @brief Find active connections by connection type string.
@@ -118,21 +104,190 @@ namespace SmartHome {
             std::string_view connectionTypeString);
 
     private:
+        // Core type handlers
+
         /**
-         * @brief Set connection type for specific connection.
+         * @brief Fetch list of modules from database.
          *
-         * @details Registers connection with specified target type, clearing stale connections first.
-         *          Updates both connection-to-type and type-to-connections maps.
+         * @param pCommandMetadata Command execution metadata.
+         * @param pParams Request params JSON. (unused)
          *
-         * @param pMetadata Command metadata containing request ID for connection lookup.
-         * @param connectionTypeString Target type as string (e.g., "module_mediator", "core").
-         *
-         * @return true if connection type set successfully, false on error.
-         *
-         * @note Thread-safe via mutex locks.
+         * @return API response with modules list or error.
          */
-        static bool setConnectionType(const cmdMetaPtr &pMetadata,
-                                      std::string_view connectionTypeString);
+        static awaitOptApiResponse getModules(cmdMetaPtr pCommandMetadata, jsonPtr pParams);
+
+        /**
+         * @brief Fetch a single module by id.
+         *
+         * @param pCommandMetadata Command execution metadata.
+         * @param pParams Request params JSON (expects module_id).
+         *
+         * @return API response with module data or error.
+         */
+        static awaitOptApiResponse getModule(cmdMetaPtr pCommandMetadata, jsonPtr pParams);
+
+        /**
+         * @brief Fetch devices for a module.
+         *
+         * @param pCommandMetadata Command execution metadata.
+         * @param pParams Request params JSON (expects module_id).
+         *
+         * @return API response with module devices or error.
+         */
+        static awaitOptApiResponse getModuleDevices(cmdMetaPtr pCommandMetadata, jsonPtr pParams);
+
+        /**
+         * @brief Fetch all devices.
+         *
+         * @param pCommandMetadata Command execution metadata.
+         * @param pParams Request params JSON. (unused)
+         *
+         * @return API response with devices list or error.
+         */
+        static awaitOptApiResponse getDevices(cmdMetaPtr pCommandMetadata, jsonPtr pParams);
+
+        /**
+         * @brief Fetch a single device by id.
+         *
+         * @param pCommandMetadata Command execution metadata.
+         * @param pParams Request params JSON (expects device_id or module_id + device_logic_id).
+         *
+         * @return API response with device data or error.
+         */
+        static awaitOptApiResponse getDevice(cmdMetaPtr pCommandMetadata, jsonPtr pParams);
+
+        /**
+         * @brief Fetch readings for a device.
+         *
+         * @param pCommandMetadata Command execution metadata.
+         * @param pParams Request params JSON (expects device_id or module_id + device_logic_id).
+         *
+         * @return API response with readings list or error.
+         */
+        static awaitOptApiResponse getDeviceReadings(cmdMetaPtr pCommandMetadata, jsonPtr pParams);
+
+        /**
+         * @brief Fetch log entries for a module.
+         *
+         * @param pCommandMetadata Command execution metadata.
+         * @param pParams Request params JSON (expects module_id, limit).
+         *
+         * @return API response with logs or error.
+         */
+        static awaitOptApiResponse getLogs(cmdMetaPtr pCommandMetadata, jsonPtr pParams);
+
+        /**
+         * @brief Fetch debug view of caches.
+         *
+         * @param pCommandMetadata Command execution metadata.
+         * @param pParams Request params JSON. (unused)
+         *
+         * @return API response with cache dump or error.
+         */
+        static awaitOptApiResponse getDebugCache(cmdMetaPtr pCommandMetadata, jsonPtr pParams);
+
+        /**
+         * @brief Delete a database record or JSONB field value.
+         *
+         * @details Resolves entity ID from params (module_id or device_id/logic_id).
+         *          If \c path param is present, removes the specified JSONB field using the
+         *          PostgreSQL \c #- operator. Otherwise deletes the entire entity record.
+         *
+         * @param pCommandMetadata Command execution metadata.
+         * @param pParams Request params JSON (expects type, module_id or device_id, optional path).
+         *
+         * @return API response with status confirmation or error.
+         */
+        static awaitOptApiResponse deleteDatabaseValue(cmdMetaPtr pCommandMetadata, jsonPtr pParams);
+
+
+        // Mediator type handlers
+
+        /**
+         * @brief Fetch a reading value from mediator or cache.
+         *
+         * @param pCommandMetadata Command execution metadata.
+         * @param pParams Request params JSON.
+         *
+         * @return API response with current reading value or error.
+         */
+        static awaitOptApiResponse getReadingValue(cmdMetaPtr pCommandMetadata, jsonPtr pParams);
+
+        /**
+         * @brief Fetch module info from mediator.
+         *
+         * @param pCommandMetadata Command execution metadata.
+         * @param pParams Request params JSON.
+         *
+         * @return API response with module info or error.
+         */
+        static awaitOptApiResponse getModuleInfo(cmdMetaPtr pCommandMetadata, jsonPtr pParams);
+
+        /**
+         * @brief Fetch module logs from mediator.
+         *
+         * @param pCommandMetadata Command execution metadata.
+         * @param pParams Request params JSON.
+         *
+         * @return API response with module logs or error.
+         */
+        static awaitOptApiResponse getModuleLogs(cmdMetaPtr pCommandMetadata, jsonPtr pParams);
+
+        /**
+         * @brief Register connection type for the current connection.
+         *
+         * @details Reads \c value param as connection type string, clears stale connections,
+         *          then registers the current connection ID in the connection type maps.
+         *
+         * @param pCommandMetadata Command execution metadata.
+         * @param pParams Request params JSON (expects value with connection type string).
+         *
+         * @return API response with status confirmation or error.
+         */
+        static awaitOptApiResponse setConnectionType(cmdMetaPtr pCommandMetadata, jsonPtr pParams);
+
+        /**
+         * @brief Create or update a database record value.
+         *
+         * @details If \c values param is present, inserts a new record.
+         *          Otherwise requires \c mode, \c path, and \c value params to update an existing
+         *          module or device record via \c updateModule or \c updateDevice.
+         *
+         * @param pCommandMetadata Command execution metadata.
+         * @param pParams Request params JSON (expects type and either values or mode+path+value).
+         *
+         * @return API response with status confirmation or error.
+         */
+        static awaitOptApiResponse setDatabaseValue(cmdMetaPtr pCommandMetadata, jsonPtr pParams);
+
+        /**
+         * @brief Delegate a SET command directly to a module via mediator.
+         *
+         * @details Resolves module_id and device_id from params, then forwards the
+         *          command with its args to \c MediatorActions::sendToModule.
+         *
+         * @param pCommandMetadata Command execution metadata.
+         * @param pParams Request params JSON (expects module_id, device_id/logic_id, type, args).
+         *
+         * @return API response with result from mediator or error.
+         */
+        static awaitOptApiResponse setModuleValue(cmdMetaPtr pCommandMetadata, jsonPtr pParams);
+
+
+        // Command handler-type registers
+
+        /**
+         * @brief Registry of GET type handlers.
+         */
+        static std::unordered_map<std::string_view, coreCommandHandler> msGetTypeHandlersRegistry;
+
+        /**
+         * @brief Registry of SET type handlers.
+         */
+        static std::unordered_map<std::string_view, coreCommandHandler> msSetTypeHandlersRegistry;
+
+
+        // Utility
 
         /**
          * @brief Remove stale connection type mappings.
@@ -144,175 +299,111 @@ namespace SmartHome {
          */
         static void clearStaleConnectionTypes();
 
-        // Handler helpers
-        template<typename T>
-        using ValidationResult = std::expected<T, API::ApiError>;
 
         /**
-         * @brief Require module_id in params.
+         * @brief Update a module record in the database.
          *
-         * @param params Request params JSON.
+         * @details Validates module existence in cache, then builds \c EntityUpdateContext
+         *          and delegates to \c updateEntity.
          *
-         * @return Module id on success, API error on validation failure.
+         * @param pParams Request params JSON (expects module_id).
+         * @param mode Update mode (e.g. overwrite or append).
+         * @param path Dot-separated path to the field being updated.
+         * @param value New value to set.
+         *
+         * @return Serialized result string on success, API error on failure.
          */
-        static ValidationResult<uint> requireModuleId(const nlohmann::json &params);
+        static ba::awaitable<std::expected<std::string, API::ApiError> > updateModule(jsonPtr pParams,
+            std::string &&mode,
+            std::string &&path,
+            nlohmann::json &&value);
 
         /**
-         * @brief Require limit argument in params.
+         * @brief Update a device record in the database.
          *
-         * @param params Request params JSON.
+         * @details Validates device existence in cache, then builds \c EntityUpdateContext
+         *          and delegates to \c updateEntity.
          *
-         * @return Limit value on success, API error on validation failure.
+         * @param pParams Request params JSON (expects device_id or module_id + device_logic_id).
+         * @param mode Update mode (e.g. overwrite or append).
+         * @param path Dot-separated path to the field being updated.
+         * @param value New value to set.
+         *
+         * @return Serialized result string on success, API error on failure.
          */
-        static ValidationResult<uint> requireLimitArg(const nlohmann::json &params);
+        static ba::awaitable<std::expected<std::string, API::ApiError> > updateDevice(jsonPtr pParams,
+            std::string &&mode,
+            std::string &&path,
+            nlohmann::json &&value);
+
+        /// Variant holding either a cached module or device entity.
+        using CachedEntity = std::variant<CachedModule, CachedDevice>;
 
         /**
-         * @brief Require sensor logic id argument in params.
-         *
-         * @param params Request params JSON.
-         *
-         * @return Sensor logic id on success, API error on validation failure.
+         * @brief Context for generic entity update operations.
          */
-        static ValidationResult<uint> requireSensorLogicIdArg(const nlohmann::json &params);
+        struct EntityUpdateContext {
+            /// Request params JSON
+            jsonPtr pParams;
+            /// Database table name for this entity type
+            std::string_view tableName;
+            /// Human-readable entity name used in error messages
+            std::string_view entityName;
+            /// Entity identifier
+            uint id;
+            /// Returns cached entity, or nullopt if not in cache
+            std::function<std::optional<CachedEntity>()> getCache;
+            /// Atomically compares and exchanges the freshness flag; returns the previous value
+            std::function<std::optional<bool>(bool, bool)> compareExchangeFresh;
+            /// Refreshes entity cache from the database
+            std::function<ba::awaitable<void>()> refreshCache;
+        };
 
         /**
-         * @brief Resolve sensor id from params.
+         * @brief Resolve a JSONB field value from a cached entity.
          *
-         * @details Resolves from either sensor_id or module_id + sensor_logic_id.
+         * @details Visits the entity variant and returns the field matching \c fieldName.
+         *          Currently only supports the \c config field.
          *
-         * @param params Request params JSON.
+         * @param entity Cached module or device entity.
+         * @param fieldName Name of the JSONB field to resolve.
          *
-         * @return Resolved sensor id on success, API error on failure.
+         * @return JSON field value if found, std::nullopt otherwise.
          */
-        static ValidationResult<uint> resolveSensorId(const nlohmann::json &params);
+        static std::optional<nlohmann::json> resolveJsonbField(CachedEntity &entity, std::string_view fieldName);
 
         /**
-         * @brief Execute database query for core GET handlers.
+         * @brief Retrieve a fresh entity from cache, refreshing if stale.
          *
-         * @param dbQuery JSON query payload for db-service.
+         * @details Uses \c compareExchangeFresh to check freshness atomically.
+         *          If stale, calls \c refreshCache and verifies freshness again before returning.
          *
-         * @return JSON response on success, API error on failure.
+         * @param ctx Entity update context with cache access callbacks.
+         *
+         * @return Cached entity on success, API error if cache is unavailable or refresh fails.
          */
-        static ba::awaitable<ValidationResult<nlohmann::json> >
-        queryDatabase(const nlohmann::json &dbQuery);
-
-        // Core type handlers
+        static ba::awaitable<std::expected<CachedEntity, API::ApiError> > resolveEntityCache(
+            const EntityUpdateContext &ctx);
 
         /**
-         * @brief Fetch list of modules from database.
+         * @brief Apply a field update to a database entity.
          *
-         * @param cmdMetadata Command execution metadata.
-         * @param params Request params JSON.
+         * @details Resolves the current entity from cache, then builds a db query
+         *          according to \c mode:
+         *          - \c append: reads the cached JSONB field, merges/pushes \c value, then overwrites.
+         *          - \c overwrite: sets the field at \c path directly in the database.
          *
-         * @return API response with modules list or error.
+         * @param ctx Entity update context.
+         * @param mode Update mode (\c append or \c overwrite).
+         * @param path Dot-separated path to the target field.
+         * @param value New value to apply.
+         *
+         * @return Serialized database response on success, API error on failure.
          */
-        static awaitOptApiResponse getModules(const cmdMetaPtr &cmdMetadata, const nlohmann::json &params);
-
-        /**
-         * @brief Fetch a single module by id.
-         *
-         * @param cmdMetadata Command execution metadata.
-         * @param params Request params JSON (expects module_id).
-         *
-         * @return API response with module data or error.
-         */
-        static awaitOptApiResponse getModule(const cmdMetaPtr &cmdMetadata, const nlohmann::json &params);
-
-        /**
-         * @brief Fetch sensors for a module.
-         *
-         * @param cmdMetadata Command execution metadata.
-         * @param params Request params JSON (expects module_id).
-         *
-         * @return API response with module sensors or error.
-         */
-        static awaitOptApiResponse getModuleSensors(const cmdMetaPtr &cmdMetadata, const nlohmann::json &params);
-
-        /**
-         * @brief Fetch all sensors.
-         *
-         * @param cmdMetadata Command execution metadata.
-         * @param params Request params JSON.
-         *
-         * @return API response with sensors list or error.
-         */
-        static awaitOptApiResponse getSensors(const cmdMetaPtr &cmdMetadata, const nlohmann::json &params);
-
-        /**
-         * @brief Fetch a single sensor by id.
-         *
-         * @param cmdMetadata Command execution metadata.
-         * @param params Request params JSON (expects sensor_id or module_id + sensor_logic_id).
-         *
-         * @return API response with sensor data or error.
-         */
-        static awaitOptApiResponse getSensor(const cmdMetaPtr &cmdMetadata, const nlohmann::json &params);
-
-        /**
-         * @brief Fetch readings for a sensor.
-         *
-         * @param cmdMetadata Command execution metadata.
-         * @param params Request params JSON (expects sensor_id or module_id + sensor_logic_id).
-         *
-         * @return API response with readings list or error.
-         */
-        static awaitOptApiResponse getSensorReadings(const cmdMetaPtr &cmdMetadata, const nlohmann::json &params);
-
-        /**
-         * @brief Fetch log entries for a module.
-         *
-         * @param cmdMetadata Command execution metadata.
-         * @param params Request params JSON (expects module_id, limit).
-         *
-         * @return API response with logs or error.
-         */
-        static awaitOptApiResponse getLogs(const cmdMetaPtr &cmdMetadata, const nlohmann::json &params);
-
-        /**
-         * @brief Fetch debug view of caches.
-         *
-         * @param cmdMetadata Command execution metadata.
-         * @param params Request params JSON.
-         *
-         * @return API response with cache dump or error.
-         */
-        static awaitOptApiResponse getDebugCache(const cmdMetaPtr &cmdMetadata, const nlohmann::json &params);
-
-        // Mediator type handlers
-
-        /**
-         * @brief Fetch a reading value from mediator or cache.
-         *
-         * @param cmdMetadata Command execution metadata.
-         * @param params Request params JSON.
-         *
-         * @return API response with current reading value or error.
-         */
-        static awaitOptApiResponse getReadingValue(const cmdMetaPtr &cmdMetadata, const nlohmann::json &params);
-
-        /**
-         * @brief Fetch module info from mediator.
-         *
-         * @param cmdMetadata Command execution metadata.
-         * @param params Request params JSON.
-         *
-         * @return API response with module info or error.
-         */
-        static awaitOptApiResponse getModuleInfo(const cmdMetaPtr &cmdMetadata, const nlohmann::json &params);
-
-        /**
-         * @brief Fetch module logs from mediator.
-         *
-         * @param cmdMetadata Command execution metadata.
-         * @param params Request params JSON.
-         *
-         * @return API response with module logs or error.
-         */
-        static awaitOptApiResponse getModuleLogs(const cmdMetaPtr &cmdMetadata, const nlohmann::json &params);
-
-        /**
-         * @brief Registry of GET type handlers.
-         */
-        static std::unordered_map<std::string_view, getTypeHandler> msGetTypeHandlersRegistry;
+        static ba::awaitable<std::expected<std::string, API::ApiError> > updateEntity(EntityUpdateContext &&ctx,
+            std::string &&mode,
+            std::string &&path,
+            nlohmann::json &&value);
     };
+
 }

@@ -66,11 +66,12 @@ namespace SmartHomeMediator::RfTypes {
         SENSOR_VALUE,
         // Config values
         CONFIG_OPTION,
-        SENSOR_LIST,
+        DEVICE_LIST,
         // Debug/Status values
         LOGS,
         BATTERY_LEVEL,
         FORCE_READ_SENSOR_VALUE,
+        ACTUATOR_STATE
     };
 
     /**

@@ -157,3 +157,33 @@ namespace SmartHomeMediator {
  */
 namespace SmartHomeMediator::RfTypes {
 }
+
+/**
+  * @namespace SmartHomeWebServer
+  * @brief HTTP web server exposing a REST API for the Smart Home system.
+  *
+  * @details Separate namespace for the web server application that:
+  * - Is an independent program communicating with Core via IPC (UDS preferred, TCP fallback)
+  * - Translates HTTP REST requests to JSON-RPC calls forwarded to Core
+  * - Serves a static Single Page Application alongside the API
+  *
+  * Components:
+  * - WebServer - singleton managing the Crow HTTP server lifecycle
+  * - ApiClient - promise/future based JSON-RPC client over SocketClient
+  * - Route modules - per-domain handlers (core, devices, modules, database, static)
+  *
+  * @note This is a separate program, not part of Core.
+  */
+namespace SmartHomeWebServer {
+}
+
+/**
+ * @namespace SmartHomeWebServer::RouteHelpers
+ * @brief Request validation and error response utilities for route handlers.
+ *
+ * @details Provides composable helpers for JSON body/field validation and building standard HTTP error responses.
+ * All validation functions return \c std::expected<T, crow::response> to allow clean early-exit chaining
+ * in route handlers.
+ */
+namespace SmartHomeWebServer::RouteHelpers {
+}

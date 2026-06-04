@@ -291,13 +291,17 @@ namespace SmartHome::API {
     void InternalApi::handleOutgoing(const apiId_t connectionId, std::string &&message) {
         Core::Instance().mpLogger->debug("[INTERNAL_API] handle outgoing called");
         Core::Instance().mpLogger->debug("[INTERNAL_API] outgoing: " + message);
-        ba::post(*IPC::SocketServer::Instance().getIoContext(), [connectionId, message = std::string(message)] {
+        ba::post(*IPC::SocketServer::Instance().getIoContext(), [connectionId, message = std::move(message)] mutable {
             auto &socketServer = IPC::SocketServer::Instance();
             if (!socketServer.isRunning()) return;
 
             const auto connection = socketServer.getConnection(connectionId);
             if (connection != nullptr && connection->isOpen()) {
-                connection->writeAsync(message);
+                try {
+                    connection->writeAsync(std::move(message));
+                } catch (const std::exception &e) {
+                    Core::Instance().mpLogger->errorf("[INTERNAL_API] [HANDLE_OUTGOING] async write failed: %s", e.what());
+                }
             }
         });
     }

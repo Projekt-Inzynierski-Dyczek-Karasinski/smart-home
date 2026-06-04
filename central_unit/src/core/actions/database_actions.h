@@ -3,6 +3,7 @@
 
 
 namespace SmartHome {
+    // TODO Update to implement ActionHelpers
     /**
      * @brief Database related command handlers
      *
@@ -10,7 +11,6 @@ namespace SmartHome {
      *          and helpers that post asynchronous notifications.
      */
     class DatabaseActions {
-        using cmdMetaPtr = std::shared_ptr<Actions::CommandMetadata>;
 
     public:
         /**
@@ -23,7 +23,7 @@ namespace SmartHome {
          *
          * @return API response from db-service or error describing validation/dispatch failure.
          */
-        static awaitOptApiResponse databaseRequestHandler(const cmdMetaPtr &commandMetadata);
+        static awaitOptApiResponse databaseRequestHandler(cmdMetaPtr commandMetadata);
 
         /**
          * @brief Retrieve module RF addressing information from database.
@@ -39,16 +39,16 @@ namespace SmartHome {
         static ba::awaitable<nlohmann::json> getModuleAddressingInfo(uint moduleId);
 
         /**
-         * @brief Post a sensor reading notification to db-service.
+         * @brief Post a device reading notification to db-service.
          *
-         * @details Builds a SET notification which inserts a \c 'sensor_readings' row using a
-         *          subselect to resolve sensor id and sends it as an asynchronous notification.
+         * @details Builds a SET notification which inserts a \c 'device_readings' row using a
+         *          subselect to resolve device id and sends it as an asynchronous notification.
          *
-         * @param sensorId Sensor id for the reading.
-         * @param value Sensor value (numeric or textual) to store.
+         * @param deviceId Device id for the reading.
+         * @param value Device value (numeric or textual) to store.
          * @param metadata Additional JSON metadata to store alongside the reading.
          */
-        static void postSensorReading(uint sensorId, nlohmann::json value, nlohmann::json metadata);
+        static void postDeviceReading(uint deviceId, nlohmann::json value, nlohmann::json metadata);
 
         /**
          * @brief Post a log entry to the database for a module.
@@ -81,17 +81,17 @@ namespace SmartHome {
         static ba::awaitable<void> fetchModulesConfigs();
 
         /**
-         * @brief Fetch sensor configuration rows into config cache.
+         * @brief Fetch device configuration rows into config cache.
          *
-         * @details Clears readings and sensor cache, queries db-service for all sensors,
+         * @details Clears readings and device cache, queries db-service for all devices,
          *          then populates \c ConfigCache with returned rows.
          */
-        static ba::awaitable<void> fetchSensorsConfigs();
+        static ba::awaitable<void> fetchDevicesConfigs();
 
         /**
-         * @brief Fetch module and sensor configurations.
+         * @brief Fetch module and device configurations.
          *
-         * @details Clears caches and sequentially fetches modules and sensors from db-service.
+         * @details Clears caches and sequentially fetches modules and devices from db-service.
          */
         static ba::awaitable<void> fetchAllConfigs();
 

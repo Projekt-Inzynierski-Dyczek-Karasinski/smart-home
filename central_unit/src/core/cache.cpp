@@ -5,6 +5,10 @@
 
 
 namespace SmartHome {
+    bool CachedModule::isFresh() const {
+        return !stale;
+    }
+
     nlohmann::json CachedModule::to_json() const {
         nlohmann::json json;
         json["id"] = id;
@@ -19,21 +23,25 @@ namespace SmartHome {
         return json;
     }
 
-    bool CachedSensor::useCache() const {
+    bool CachedDevice::useCache() const {
         if (config.contains("use_cache") && config["use_cache"].is_boolean()) {
             return config["use_cache"].get<bool>();
         }
         return true; // Default to using cache if not specified
     }
 
-    std::chrono::seconds CachedSensor::cacheTTL() const {
+    std::chrono::seconds CachedDevice::cacheTTL() const {
         if (config.contains("cache_ttl") && config["cache_ttl"].is_number_unsigned()) {
             return std::chrono::seconds(config["cache_ttl"].get<uint64_t>());
         }
         return 60s; // Default TTL of 60 seconds
     }
 
-    nlohmann::json CachedSensor::to_json() const {
+    bool CachedDevice::isFresh() const {
+        return !stale;
+    }
+
+    nlohmann::json CachedDevice::to_json() const {
         nlohmann::json json;
         json["id"] = id;
         json["logic_id"] = logicId;
@@ -46,7 +54,7 @@ namespace SmartHome {
 
     nlohmann::json CachedReading::to_json() const {
         nlohmann::json json;
-        json["sensor_id"] = sensorId;
+        json["device_id"] = deviceId;
         json["value"] = value;
         json["timestamp"] = Utils::timePointToTimestampTz(timestamp);
         json["metadata"] = metadata;
@@ -67,13 +75,32 @@ namespace SmartHome {
         addToModulesIndex(module);
     }
 
-    std::optional<CachedModule> ConfigCache::getModule(const uint moduleId) const {
+    std::optional<CachedModule> ConfigCache::getModule(const uint moduleId, const bool isFresh) const {
         std::shared_lock lock(mMutex);
 
         const auto iter = mModules.find(moduleId);
         if (iter == mModules.end()) return std::nullopt;
-        return iter->second;
+        const auto &module = iter->second;
+
+        if (isFresh && !module.isFresh()) return std::nullopt;
+        return module;
     }
+
+    std::optional<bool> ConfigCache::compareExchangeIsModuleFresh(const uint moduleId,
+                                                                  const bool expected,
+                                                                  const bool desired) {
+        std::unique_lock lock(mMutex);
+
+        const auto iter = mModules.find(moduleId);
+        if (iter == mModules.end()) return std::nullopt;
+        auto &module = iter->second;
+
+        const bool result = expected == module.isFresh();
+        module.stale = !desired; // Inverses isFresh and stale logic - desired isFresh = false means module is stale
+
+        return result;
+    }
+
 
     std::vector<CachedModule> ConfigCache::getAllModules() const {
         std::shared_lock lock(mMutex);
@@ -86,19 +113,19 @@ namespace SmartHome {
         return modules;
     }
 
-    std::vector<CachedSensor> ConfigCache::getModuleSensors(const uint moduleId) const {
-        const auto sensorsIds = getSensorIdsForModule(moduleId);
+    std::vector<CachedDevice> ConfigCache::getModuleDevices(const uint moduleId) const {
+        const auto devicesIds = getDeviceIdsForModule(moduleId);
 
-        std::vector<CachedSensor> sensors;
-        sensors.reserve(sensorsIds.size());
-        for (const auto sensorId: sensorsIds) {
-            const auto sensorOpt = getSensor(sensorId);
-            if (sensorOpt.has_value()) {
-                sensors.push_back(sensorOpt.value());
+        std::vector<CachedDevice> devices;
+        devices.reserve(devicesIds.size());
+        for (const auto deviceId: devicesIds) {
+            const auto deviceOpt = getDevice(deviceId);
+            if (deviceOpt.has_value()) {
+                devices.push_back(deviceOpt.value());
             }
         }
 
-        return sensors;
+        return devices;
     }
 
     void ConfigCache::eraseModule(const uint moduleId) {
@@ -120,46 +147,64 @@ namespace SmartHome {
         iter->second.lastOnline = timestamp;
     }
 
-    void ConfigCache::setSensor(const CachedSensor &sensor) {
+    void ConfigCache::setDevice(const CachedDevice &device) {
         std::unique_lock lock(mMutex);
 
-        // Remove old entry if sensor with same ID already exists
-        const auto iter = mSensors.find(sensor.id);
-        if (iter != mSensors.end()) {
-            removeFromSensorsIndex(iter->second.moduleId, iter->second.logicId);
+        // Remove old entry if device with same ID already exists
+        const auto iter = mDevices.find(device.id);
+        if (iter != mDevices.end()) {
+            removeFromDevicesIndex(iter->second.moduleId, iter->second.logicId);
         }
 
-        mSensors.insert_or_assign(sensor.id, sensor);
-        addToSensorsIndex(sensor);
+        mDevices.insert_or_assign(device.id, device);
+        addToDevicesIndex(device);
     }
 
-    std::optional<CachedSensor> ConfigCache::getSensor(const uint sensorId) const {
+    std::optional<CachedDevice> ConfigCache::getDevice(const uint deviceId, const bool isFresh) const {
         std::shared_lock lock(mMutex);
 
-        const auto iter = mSensors.find(sensorId);
-        if (iter == mSensors.end()) return std::nullopt;
-        return iter->second;
+        const auto iter = mDevices.find(deviceId);
+        if (iter == mDevices.end()) return std::nullopt;
+        auto device = iter->second;
+
+        if (isFresh && !device.isFresh()) return std::nullopt;
+        return device;
     }
 
-    std::vector<CachedSensor> ConfigCache::getAllSensors() const {
-        std::shared_lock lock(mMutex);
-
-        std::vector<CachedSensor> sensors;
-        sensors.reserve(mSensors.size());
-        for (const auto &sensor: mSensors | std::views::values) {
-            sensors.push_back(sensor);
-        }
-        return sensors;
-    }
-
-    void ConfigCache::eraseSensor(const uint sensorId) {
+    std::optional<bool> ConfigCache::compareExchangeIsDeviceFresh(const uint deviceId,
+                                                                  const bool expected,
+                                                                  const bool desired) {
         std::unique_lock lock(mMutex);
 
-        const auto iter = mSensors.find(sensorId);
-        if (iter == mSensors.end()) return;
+        const auto iter = mDevices.find(deviceId);
+        if (iter == mDevices.end()) return std::nullopt;
+        auto &device = iter->second;
 
-        mSensors.erase(iter);
-        removeFromSensorsIndex(iter->second.moduleId, iter->second.logicId);
+        const bool result = expected == device.isFresh();
+        device.stale = !desired; // Inverses isFresh and stale logic - desired (isFresh) = false means module is stale
+
+        return result;
+    }
+
+    std::vector<CachedDevice> ConfigCache::getAllDevices() const {
+        std::shared_lock lock(mMutex);
+
+        std::vector<CachedDevice> devices;
+        devices.reserve(mDevices.size());
+        for (const auto &device: mDevices | std::views::values) {
+            devices.push_back(device);
+        }
+        return devices;
+    }
+
+    void ConfigCache::eraseDevice(const uint deviceId) {
+        std::unique_lock lock(mMutex);
+
+        const auto iter = mDevices.find(deviceId);
+        if (iter == mDevices.end()) return;
+
+        mDevices.erase(iter);
+        removeFromDevicesIndex(iter->second.moduleId, iter->second.logicId);
     }
 
     std::optional<uint> ConfigCache::findModuleId(const uint logicAddress) const {
@@ -170,39 +215,39 @@ namespace SmartHome {
         return iter->second;
     }
 
-    std::optional<uint> ConfigCache::findSensorId(const uint moduleId, const uint logicId) const {
+    std::optional<uint> ConfigCache::findDeviceId(const uint moduleId, const uint logicId) const {
         std::shared_lock lock(mMutex);
 
-        const auto iter = mSensorsIndex.find({moduleId, logicId});
-        if (iter == mSensorsIndex.end()) return std::nullopt;
+        const auto iter = mDevicesIndex.find({moduleId, logicId});
+        if (iter == mDevicesIndex.end()) return std::nullopt;
         return iter->second;
     }
 
-    std::optional<uint> ConfigCache::findSensorIdByLogicAddress(const uint moduleLogicAddress,
-                                                                const uint sensorLogicId) const {
+    std::optional<uint> ConfigCache::findDeviceIdByLogicAddress(const uint moduleLogicAddress,
+                                                                const uint deviceLogicId) const {
         std::shared_lock lock(mMutex);
 
         const auto moduleIter = mModulesIndex.find(moduleLogicAddress);
         if (moduleIter == mModulesIndex.end()) return std::nullopt;
 
-        const int moduleId = moduleIter->second;
-        const auto sensorIter = mSensorsIndex.find({moduleId, sensorLogicId});
-        if (sensorIter == mSensorsIndex.end()) return std::nullopt;
+        const auto moduleId = moduleIter->second;
+        const auto deviceIter = mDevicesIndex.find({moduleId, deviceLogicId});
+        if (deviceIter == mDevicesIndex.end()) return std::nullopt;
 
-        return sensorIter->second;
+        return deviceIter->second;
     }
 
-    std::vector<uint> ConfigCache::getSensorIdsForModule(const uint moduleId) const {
+    std::vector<uint> ConfigCache::getDeviceIdsForModule(const uint moduleId) const {
         std::shared_lock lock(mMutex);
 
-        std::vector<uint> sensorIds;
+        std::vector<uint> deviceIds;
 
-        for (const auto &[key, sensorId]: mSensorsIndex) {
+        for (const auto &[key, deviceId]: mDevicesIndex) {
             if (key.first == moduleId) {
-                sensorIds.push_back(sensorId);
+                deviceIds.push_back(deviceId);
             }
         }
-        return sensorIds;
+        return deviceIds;
     }
 
     void ConfigCache::clearModules() {
@@ -211,18 +256,18 @@ namespace SmartHome {
         mModulesIndex.clear();
     }
 
-    void ConfigCache::clearSensors() {
+    void ConfigCache::clearDevices() {
         std::unique_lock lock(mMutex);
-        mSensors.clear();
-        mSensorsIndex.clear();
+        mDevices.clear();
+        mDevicesIndex.clear();
     }
 
     void ConfigCache::clear() {
         std::unique_lock lock(mMutex);
         mModules.clear();
-        mSensors.clear();
+        mDevices.clear();
         mModulesIndex.clear();
-        mSensorsIndex.clear();
+        mDevicesIndex.clear();
     }
 
     size_t ConfigCache::modulesSize() const {
@@ -230,9 +275,9 @@ namespace SmartHome {
         return mModules.size();
     }
 
-    size_t ConfigCache::sensorsSize() const {
+    size_t ConfigCache::devicesSize() const {
         std::shared_lock lock(mMutex);
-        return mSensors.size();
+        return mDevices.size();
     }
 
 
@@ -244,30 +289,30 @@ namespace SmartHome {
         mModulesIndex.erase(logicAddress);
     }
 
-    void ConfigCache::addToSensorsIndex(const CachedSensor &sensor) {
-        mSensorsIndex[{sensor.moduleId, sensor.logicId}] = sensor.id;
+    void ConfigCache::addToDevicesIndex(const CachedDevice &device) {
+        mDevicesIndex[{device.moduleId, device.logicId}] = device.id;
     }
 
-    void ConfigCache::removeFromSensorsIndex(const uint moduleId, const uint logicId) {
-        mSensorsIndex.erase({moduleId, logicId});
+    void ConfigCache::removeFromDevicesIndex(const uint moduleId, const uint logicId) {
+        mDevicesIndex.erase({moduleId, logicId});
     }
 
 
     ReadingsCache::ReadingsCache(const ConfigCache &configCache) : mConfigCache(configCache) {
     }
 
-    std::optional<CachedReading> ReadingsCache::get(const uint sensorId) const {
+    std::optional<CachedReading> ReadingsCache::get(const uint deviceId) const {
         std::shared_lock lock(mMutex);
 
-        const auto iter = mReadings.find(sensorId);
+        const auto iter = mReadings.find(deviceId);
         if (iter == mReadings.end()) return std::nullopt;
 
         // Copy reading before releasing lock
         auto reading = iter->second;
         lock.unlock();
 
-        // Check if reading is fresh based on sensor's TTL
-        const auto ttl = getTTL(sensorId);
+        // Check if reading is fresh based on device's TTL
+        const auto ttl = getTTL(deviceId);
         if (!isFresh(reading, ttl)) {
             reading.stale = true;
         }
@@ -275,18 +320,18 @@ namespace SmartHome {
         return reading;
     }
 
-    std::optional<CachedReading> ReadingsCache::getFresh(const uint sensorId) const {
+    std::optional<CachedReading> ReadingsCache::getFresh(const uint deviceId) const {
         std::shared_lock lock(mMutex);
 
-        const auto iter = mReadings.find(sensorId);
+        const auto iter = mReadings.find(deviceId);
         if (iter == mReadings.end()) return std::nullopt;
 
         // Copy reading before releasing lock
         const auto &reading = iter->second;
         lock.unlock();
 
-        // Check if reading is fresh based on sensor's TTL
-        const auto ttl = getTTL(sensorId);
+        // Check if reading is fresh based on device's TTL
+        const auto ttl = getTTL(deviceId);
         if (!isFresh(reading, ttl)) return std::nullopt; // Not fresh, treat as not found
 
         return reading;
@@ -303,21 +348,21 @@ namespace SmartHome {
         return readings;
     }
 
-    void ReadingsCache::set(const uint sensorId, const nlohmann::json &value, const nlohmann::json &metadata) {
+    void ReadingsCache::set(const uint deviceId, const nlohmann::json &value, const nlohmann::json &metadata) {
         CachedReading reading{
-            .sensorId = sensorId,
+            .deviceId = deviceId,
             .value = value,
             .timestamp = std::chrono::system_clock::now(),
             .metadata = metadata,
             .stale = false
         };
         std::unique_lock lock(mMutex);
-        mReadings.insert_or_assign(sensorId, std::move(reading));
+        mReadings.insert_or_assign(deviceId, std::move(reading));
     }
 
-    void ReadingsCache::erase(const uint sensorId) {
+    void ReadingsCache::erase(const uint deviceId) {
         std::unique_lock lock(mMutex);
-        mReadings.erase(sensorId);
+        mReadings.erase(deviceId);
     }
 
     void ReadingsCache::clear() {
@@ -330,12 +375,12 @@ namespace SmartHome {
         return mReadings.size();
     }
 
-    std::chrono::seconds ReadingsCache::getTTL(const uint sensorId) const {
-        const auto sensor = mConfigCache.getSensor(sensorId);
-        if (sensor.has_value() && sensor->useCache()) {
-            return sensor->cacheTTL();
+    std::chrono::seconds ReadingsCache::getTTL(const uint deviceId) const {
+        const auto device = mConfigCache.getDevice(deviceId);
+        if (device.has_value() && device->useCache()) {
+            return device->cacheTTL();
         }
-        return 0s; // 0 TTL if sensor not found or caching disabled
+        return 0s; // 0 TTL if device not found or caching disabled
     }
 
     bool ReadingsCache::isFresh(const CachedReading &reading, const std::chrono::seconds ttl) {

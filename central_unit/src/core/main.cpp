@@ -25,7 +25,8 @@ namespace SmartHome {
     void loadYamlConfigs(Utils::ConfigManager &configManager,
                          Core::Config &coreConfig,
                          MediatorConfig &mediatorConfig,
-                         DbServiceConfig &dbServiceConfig) {
+                         DbServiceConfig &dbServiceConfig,
+                         WebServerConfig &webServerConfig) {
         // Mediator config
         std::string root = "services.mediator";
         configManager.getValue(root + ".enabled", mediatorConfig.isEnabled);
@@ -41,6 +42,14 @@ namespace SmartHome {
             configManager.getValue<std::string>(root + ".service_type").value());
         configManager.getValue(root + ".exec_path", dbServiceConfig.execPath);
         configManager.getValue(root + ".config_path", dbServiceConfig.configPath);
+
+        // Web-server config
+        root = "services.web_server";
+        configManager.getValue(root + ".enabled", webServerConfig.isEnabled);
+        webServerConfig.serviceType = Utils::resolveServiceType(
+            configManager.getValue<std::string>(root + ".service_type").value());
+        configManager.getValue(root + ".exec_path", webServerConfig.execPath);
+        configManager.getValue(root + ".config_path", webServerConfig.configPath);
 
         // Core config
         root = "core";
@@ -83,7 +92,8 @@ namespace SmartHome {
                      const std::shared_ptr<Utils::Logger> &logger,
                      Core::Config &coreConfig,
                      MediatorConfig &mediatorConfig,
-                     DbServiceConfig &dbServiceConfig) {
+                     DbServiceConfig &dbServiceConfig,
+                     WebServerConfig &webServerConfig) {
         loggerTemporaryOptions logTmpOpt;
 
         // Set temporary logger config based on program options and default values before reading YAML config
@@ -122,7 +132,7 @@ namespace SmartHome {
             loadLoggerYamlConfig(configManager, loggerConfig);
 
             logger->debug("[MAIN_CORE] Loading YAML core config");
-            loadYamlConfigs(configManager, coreConfig, mediatorConfig, dbServiceConfig);
+            loadYamlConfigs(configManager, coreConfig, mediatorConfig, dbServiceConfig, webServerConfig);
         } else {
             logger->error("[MAIN_CORE] Could not load YAML config");
         }
@@ -233,8 +243,9 @@ int main(int argc, char *argv[]) {
     Core::Config coreConfig;
     MediatorConfig mediatorConfig;
     DbServiceConfig dbServiceConfig;
+    WebServerConfig webServerConfig;
 
-    loadConfigs(vm, parsed, logger, coreConfig, mediatorConfig, dbServiceConfig);
+    loadConfigs(vm, parsed, logger, coreConfig, mediatorConfig, dbServiceConfig, webServerConfig);
 
     // Initialize Core
     logger->debug("[MAIN_CORE] Initializing Core...");
@@ -247,22 +258,31 @@ int main(int argc, char *argv[]) {
 
     // TODO launch gui if in gui mode
 
-    // Launch mediator if enabled
+    // Run sub-processes
+    bp::child dbService;
+    if (dbServiceConfig.isEnabled) {
+        if (runProcess(logger, Constants::DefaultServiceNames::DATABASE, dbServiceConfig, dbService)) {
+            logger->info("[MAIN_CORE] Database service launched successfully");
+        } else {
+            logger->error("[MAIN_CORE] Failed to launch database service");
+        }
+    }
+
     bp::child mediator;
     if (mediatorConfig.isEnabled) {
-        if (runProcess(logger, "smarthome-radiod", mediatorConfig, mediator)) {
+        if (runProcess(logger, Constants::DefaultServiceNames::MEDIATOR, mediatorConfig, mediator)) {
             logger->info("[MAIN_CORE] Mediator launched successfully");
         } else {
             logger->error("[MAIN_CORE] Failed to launch mediator");
         }
     }
 
-    bp::child dbService;
-    if (dbServiceConfig.isEnabled) {
-        if (runProcess(logger, "smarthome-databased", dbServiceConfig, dbService)) {
-            logger->info("[MAIN_CORE] Database service launched successfully");
+    bp::child webServer;
+    if (webServerConfig.isEnabled) {
+        if (runProcess(logger, Constants::DefaultServiceNames::WEB, webServerConfig, webServer)) {
+            logger->info("[MAIN_CORE] Web server launched successfully");
         } else {
-            logger->error("[MAIN_CORE] Failed to launch database service");
+            logger->error("[MAIN_CORE] Failed to launch web server");
         }
     }
 
@@ -272,7 +292,20 @@ int main(int argc, char *argv[]) {
     logger->debug("[MAIN_CORE] Core stopped running");
 
 
-    // Wait for mediator to exit if enabled
+    // Wait for processes to exit if enabled
+    if (webServer) {
+        logger->debug("[MAIN_CORE] Waiting for web server shutdown");
+        if (webServerConfig.serviceType == Utils::ServiceType::STANDALONE) {
+            webServer.terminate(); //SIGTERM
+            if (!webServer.wait_for(15s)) {
+                kill(webServer.id(), SIGKILL);
+                webServer.wait();
+            }
+        } else if (webServerConfig.serviceType == Utils::ServiceType::SYSTEMD) {
+            logger->debug("[MAIN_CORE] Web server in SYSTEMD mode - not stopping (managed by systemd)");
+        }
+    }
+
     if (mediator) {
         logger->debug("[MAIN_CORE] Waiting for mediator shutdown");
         if (mediatorConfig.serviceType == Utils::ServiceType::STANDALONE) {
@@ -285,6 +318,7 @@ int main(int argc, char *argv[]) {
             logger->debug("[MAIN_CORE] Mediator in SYSTEMD mode - not stopping (managed by systemd)");
         }
     }
+
     if (dbService) {
         logger->debug("[MAIN_CORE] Waiting for db-service shutdown");
         if (dbServiceConfig.serviceType == Utils::ServiceType::STANDALONE) {

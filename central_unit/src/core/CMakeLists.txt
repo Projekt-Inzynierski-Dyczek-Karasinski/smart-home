@@ -36,6 +36,7 @@ add_executable(smarthomed
         scheduler.cpp
         api/internal_api.cpp
         actions/actions.cpp
+        actions/action_helpers.cpp
         actions/core_actions.cpp
         actions/mediator_actions.cpp
         actions/database_actions.cpp

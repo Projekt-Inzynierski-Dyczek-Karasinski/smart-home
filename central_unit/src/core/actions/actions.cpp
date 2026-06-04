@@ -7,27 +7,6 @@
 
 
 namespace SmartHome {
-    Actions::CommandMetadata::CommandMetadata(API::InternalApi::Command command,
-                                              std::shared_ptr<ba::steady_timer> commandTimeoutTimer,
-                                              const apiId_t requestId)
-        : command(std::move(command)),
-          commandTimeoutTimer(std::move(commandTimeoutTimer)),
-          requestId(requestId) {
-        isNotification = this->command.isNotification;
-    }
-
-    bool Actions::CommandMetadata::cancel() {
-        if (const auto timer = commandTimeoutTimer.exchange(nullptr)) timer->cancel();
-        auto expected = State::PENDING;
-        if (state.compare_exchange_strong(expected, State::CANCELLED)) return true;
-        return false;
-    }
-
-    bool Actions::CommandMetadata::isPending() const {
-        return state.load(std::memory_order::relaxed) == State::PENDING;
-    }
-
-
     void Actions::handleIncomingRequest(const API::InternalApi::Request &request, const RequestCallback &callback) {
         Core::Instance().mpLogger->debug("[ACTIONS] [HANDLE_INCOMING_REQUEST] called");
         if (!Core::Instance().isRunning()) return;
@@ -327,7 +306,7 @@ namespace SmartHome {
         return API::getNextApiId();
     }
 
-    void Actions::startCommandTimeoutTimer(const cmdMetaPtr &commandMetadata) {
+    void Actions::startCommandTimeoutTimer(cmdMetaPtr commandMetadata) {
         // Notifications do not require timeout
         if (commandMetadata->isNotification) {
             return;
@@ -364,7 +343,7 @@ namespace SmartHome {
             }
         });
 
-        // Requests mutex block, cancel active request and add command cancelled error result to responses
+        // Requests mutex block, cancel active request and add command canceled error result to responses
         {
             std::scoped_lock lock(msActiveRequestsLock);
             for (auto &request: msActiveRequests | std::views::values) {
@@ -374,7 +353,7 @@ namespace SmartHome {
                 for (auto &commandMD: request.commands) {
                     constexpr bool lockMutex = false;
                     if (cleanupTimeoutCalled) break;
-                    if (commandMD && commandMD->state == CommandMetadata::State::CANCELLED
+                    if (commandMD && commandMD->state == ActionHelpers::CommandMetadata::State::CANCELLED
                         && commandMD->command.commandId.hasValue()) {
                         API::ApiResponse timeoutResult;
                         timeoutResult.id = commandMD->command.commandId;
@@ -444,7 +423,7 @@ namespace SmartHome {
     void Actions::executeCommandAsync(const CommandHandler &handler,
                                       const API::InternalApi::Command &newCommand,
                                       apiId_t requestId) {
-        const auto commandMetadata = std::make_shared<CommandMetadata>(
+        const auto commandMetadata = std::make_shared<ActionHelpers::CommandMetadata>(
             newCommand,
             std::make_shared<ba::steady_timer>(Core::Instance().coreUtilityIoContext()),
             requestId
@@ -541,8 +520,9 @@ namespace SmartHome {
                                       API::ApiResponse &&commandResult) {
         if (const auto timer = commandMetadata->commandTimeoutTimer.exchange(nullptr)) timer->cancel();
 
-        auto expected = CommandMetadata::State::PENDING;
-        if (!commandMetadata->state.compare_exchange_strong(expected, CommandMetadata::State::COMPLETED)) {
+        auto expected = ActionHelpers::CommandMetadata::State::PENDING;
+        if (!commandMetadata->state.
+            compare_exchange_strong(expected, ActionHelpers::CommandMetadata::State::COMPLETED)) {
             return;
         }
 
@@ -556,8 +536,9 @@ namespace SmartHome {
     void Actions::handleCommandTimeout(const cmdMetaPtr &commandMetadata) {
         if (const auto timer = commandMetadata->commandTimeoutTimer.exchange(nullptr)) timer->cancel();
 
-        auto expected = CommandMetadata::State::PENDING;
-        if (!commandMetadata->state.compare_exchange_strong(expected, CommandMetadata::State::TIMED_OUT)) return;
+        auto expected = ActionHelpers::CommandMetadata::State::PENDING;
+        if (!commandMetadata->state.compare_exchange_strong(expected, ActionHelpers::CommandMetadata::State::TIMED_OUT))
+            return;
 
         if (commandMetadata->command.commandId.hasValue()) {
             API::ApiResponse timeoutResponse;
@@ -624,7 +605,7 @@ namespace SmartHome {
         }
 
         for (auto &commandMD: commandsMD) {
-            if (commandMD && commandMD->state == CommandMetadata::State::CANCELLED
+            if (commandMD && commandMD->state == ActionHelpers::CommandMetadata::State::CANCELLED
                 && commandMD->command.commandId.hasValue()) {
                 API::ApiResponse timeoutResult;
                 timeoutResult.id = commandMD->command.commandId;
@@ -669,6 +650,7 @@ namespace SmartHome {
         //Core
         {{sai::TargetTypes::CORE, sai::MethodTypes::GET}, CoreActions::coreGetHandler},
         {{sai::TargetTypes::CORE, sai::MethodTypes::SET}, CoreActions::coreSetHandler},
+        {{sai::TargetTypes::CORE, sai::MethodTypes::DELETE}, CoreActions::coreDeleteHandler},
         {{sai::TargetTypes::CORE, sai::MethodTypes::EXECUTE}, placeholderHandler},
         {{sai::TargetTypes::CORE, sai::MethodTypes::NOTIFY}, CoreActions::coreNotifyHandler},
         {{sai::TargetTypes::CORE, sai::MethodTypes::ECHO_REQUEST}, CoreActions::coreEchoHandler},
@@ -719,8 +701,7 @@ namespace SmartHome {
     // ======================================== CommandHandler functions ========================================
 
     // THIS PLACEHOLDER IS AN EXAMPLE AND IT SHOULD BE USED AS A TEMPLATE FOR OTHER COMMAND HANDLERS.
-    awaitOptApiResponse Actions::placeholderHandler(
-        const cmdMetaPtr &commandMetadata) {
+    awaitOptApiResponse Actions::placeholderHandler(cmdMetaPtr commandMetadata) {
         // Optional debug log
         Core::Instance().mpLogger->debug("[ACTIONS] [PLACEHOLDER_HANDLER] called");
         // Universal command variables' definition.
