@@ -27,6 +27,15 @@ namespace SmartHomeDB {
 
     class DatabaseClient;
 
+    /**
+     * @brief Database service singleton bridging IPC requests to PostgreSQL.
+     *
+     * @details Manages database connection pool, handles incoming IPC messages via DatabaseApi
+     *          and forwards query results back over the socket.
+     *          Listens to configured database triggers for event-driven notifications.
+     *          Runs separate IO contexts for socket client communication, database API workers and utility tasks.
+     *          Implements graceful shutdown with configurable timeout.
+     */
     class DatabaseService {
     public:
         /**

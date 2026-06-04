@@ -24,6 +24,15 @@ namespace SmartHomeWebServer {
 
     using namespace std::chrono_literals;
 
+    /**
+     * @brief HTTP server singleton exposing smart home REST API and static content.
+     *
+     * @details Wraps a Crow HTTP application with CORS middleware and routes for module, device,
+     *          database and core operations.
+     *          Connects to Core process via IPC socket (ApiClient) for data exchange.
+     *          Runs separate IO contexts for socket communication and utility tasks.
+     *          Implements graceful shutdown with configurable timeout.
+     */
     class WebServer {
     public:
         struct Config {
