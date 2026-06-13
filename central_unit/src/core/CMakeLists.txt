@@ -34,6 +34,7 @@ add_executable(smarthomed
         core.cpp
         cache.cpp
         scheduler.cpp
+        event_handler.cpp
         api/internal_api.cpp
         actions/actions.cpp
         actions/action_helpers.cpp
