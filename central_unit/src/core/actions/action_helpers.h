@@ -212,6 +212,14 @@ namespace SmartHome {
          * @return API response from mediator handler.
          */
         static awaitOptApiResponse delegateToMediator(cmdMetaPtr pCommandMetadata, jsonPtr params);
+
+        static void dispatchAutomatedDeviceAction(std::string_view actionName,
+                                                  uint deviceId,
+                                                  const nlohmann::json &action);
+
+        static void dispatchAutomatedModuleAction(std::string_view actionName,
+                                                  uint moduleId,
+                                                  const nlohmann::json &action);
     };
 
     // Share cmdMetaPtr in SmartHome namespace

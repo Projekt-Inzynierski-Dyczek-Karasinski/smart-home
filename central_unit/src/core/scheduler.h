@@ -191,6 +191,6 @@ namespace SmartHome {
         TaskQueue mTaskQueue;
         mutable std::mutex mMutex;
         std::atomic_bool mIsRunning{false};
-        std::atomic_bool mIsStoping{false};
+        std::atomic_bool mIsStopping{false};
     };
 };
