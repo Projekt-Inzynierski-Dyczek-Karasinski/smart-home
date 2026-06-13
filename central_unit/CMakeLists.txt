@@ -53,33 +53,6 @@ message(STATUS "CMAKE_CXX_COMPILER: ${CMAKE_CXX_COMPILER}")
 message(STATUS "Target Device: ${TARGET_DEVICE}")
 message(STATUS "==============================================================")
 
-
-add_subdirectory(src/common)
-
-if (BUILD_CORE)
-    add_subdirectory(src/core)
-endif ()
-
-if (BUILD_MEDIATOR)
-    add_subdirectory(src/mediator)
-endif ()
-
-if (BUILD_DB_SERVICE)
-    add_subdirectory(src/db-service)
-endif ()
-
-if (BUILD_WEB_SERVER)
-    add_subdirectory(src/web_server)
-endif ()
-
-if (BUILD_CLI)
-    add_subdirectory(src/cli)
-endif ()
-
-if (BUILD_GUI)
-    add_subdirectory(src/gui)
-endif ()
-
 # Platform based compile config
 if (CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
     add_compile_options(-march=armv8-a)
@@ -105,7 +78,34 @@ else ()
             -ffunction-sections
             -fdata-sections
     )
-    add_link_options(-Wl,--gc-sections, -s)
+    add_link_options(-Wl,--gc-sections,-s)
+endif ()
+
+# Add subdirectories
+add_subdirectory(src/common)
+
+if (BUILD_CORE)
+    add_subdirectory(src/core)
+endif ()
+
+if (BUILD_MEDIATOR)
+    add_subdirectory(src/mediator)
+endif ()
+
+if (BUILD_DB_SERVICE)
+    add_subdirectory(src/db-service)
+endif ()
+
+if (BUILD_WEB_SERVER)
+    add_subdirectory(src/web_server)
+endif ()
+
+if (BUILD_CLI)
+    add_subdirectory(src/cli)
+endif ()
+
+if (BUILD_GUI)
+    add_subdirectory(src/gui)
 endif ()
 
 message(STATUS "======================[ Feature summary ]=======================")
