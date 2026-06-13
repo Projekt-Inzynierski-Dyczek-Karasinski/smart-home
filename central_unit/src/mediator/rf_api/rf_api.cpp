@@ -118,7 +118,7 @@ namespace SmartHomeMediator {
         mMessageHandler(message);
     }
 
-    std::string RfApi::toApiString(RfTypes::RfCommand rfCommand) {
+    std::string RfApi::toApiString(RfTypes::RfCommand rfCommand, uint8_t logicAddress) {
         // Handle response format
         if (rfCommand.rfCommandType == RfTypes::RfCommandType::RESPONSE ||
             rfCommand.rfCommandType == RfTypes::RfCommandType::REPING) {
@@ -187,6 +187,7 @@ namespace SmartHomeMediator {
 
             auto notificationType = std::get<RfTypes::NotificationType>(rfCommand.requestType.value());
             params[sj::ParamsKeys::TYPE] = notificationTypeToString(notificationType);
+            params[sj::ParamsKeys::MODULE_INFO][sj::ModuleInfoKeys::LOGIC_ADDRESS] = logicAddress;
 
             return notify.to_string();
         }

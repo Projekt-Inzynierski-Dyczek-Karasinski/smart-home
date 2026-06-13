@@ -90,10 +90,11 @@ namespace SmartHomeMediator {
          * @brief Convert RF command to SmartHome::API JSON-RPC format.
          *
          * @param rfCommand RF command type.
+         * @param logicAddress Optional logic address used for notifications send to core.
          *
          * @return SmartHome::API JSON-RPC formated string.
          */
-        static std::string toApiString(RfTypes::RfCommand rfCommand);
+        static std::string toApiString(RfTypes::RfCommand rfCommand, uint8_t logicAddress = 0);
 
     private:
         /**

@@ -416,7 +416,7 @@ namespace SmartHomeMediator {
 
                 // Try parsing to SmartHome::API format
                 try {
-                    const auto apiString = RfApi::toApiString(*ctx.pCommandResponse);
+                    const auto apiString = RfApi::toApiString(*ctx.pCommandResponse, mMetadata.targetLogicAddress);
                     if (!apiString.empty()) ctx.resultsVector.push_back(apiString);
                 } catch (const std::exception &e) {
                     mpLogger->debugf("[SESSION] [EXECUTE] [AWAIT_NOTIFICATION] parse to api response failed: %s",
