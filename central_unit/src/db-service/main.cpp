@@ -7,6 +7,7 @@
 #include <boost/asio.hpp>
 #include <boost/program_options.hpp>
 
+// TODO change db-service directory to db_service to match naming convention
 
 namespace ba = boost::asio;
 namespace bai = boost::asio::ip;
@@ -68,7 +69,7 @@ namespace SmartHomeDB {
         configManager.getValue(root + ".socket_path", databaseServiceConfig.uds.endpointPath);
     }
 
-    void overWriteConfigsWithEnvironmentVariables(DatabaseService::Config &databaseServiceConfig,
+    void overwriteConfigsWithEnvironmentVariables(DatabaseService::Config &databaseServiceConfig,
                                                   const std::shared_ptr<su::Logger> &pLogger) {
         if (const char *envVar = std::getenv("SH_DB_HOST")) databaseServiceConfig.dbConnConfig.dbHost = envVar;
         if (const char *envVar = std::getenv("SH_DB_PORT")) {
@@ -154,7 +155,7 @@ namespace SmartHomeDB {
             pLogger->warning("[MAIN_DB-SERVICE] Could not load YAML config");
         }
 
-        overWriteConfigsWithEnvironmentVariables(databaseServiceConfig, pLogger);
+        overwriteConfigsWithEnvironmentVariables(databaseServiceConfig, pLogger);
 
         overwriteConfigsWithProgramOptions(vm, logTmpOpt, databaseServiceConfig, loggerConfig);
 

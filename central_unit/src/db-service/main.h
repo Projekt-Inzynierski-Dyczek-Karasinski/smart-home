@@ -86,7 +86,7 @@ namespace SmartHomeDB {
      * @param databaseServiceConfig Configuration struct to modify with environment values.
      * @param pLogger Logger used to report parse errors and informational messages.
      */
-    void overWriteConfigsWithEnvironmentVariables(DatabaseService::Config &databaseServiceConfig,
+    void overwriteConfigsWithEnvironmentVariables(DatabaseService::Config &databaseServiceConfig,
                                                   const std::shared_ptr<su::Logger> &pLogger);
 
     /**

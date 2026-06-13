@@ -259,9 +259,9 @@ namespace SmartHomeDB {
          * @return SQL fragment suitable for use in a SET clause.
          */
         static std::string buildSetPart(const std::string &key,
-                                 const nlohmann::json &value,
-                                 pqxx::params &params,
-                                 int &paramIndex);
+                                        const nlohmann::json &value,
+                                        pqxx::params &params,
+                                        int &paramIndex);
 
         /**
          * @brief Build a SET assignment fragment that removes a value.
