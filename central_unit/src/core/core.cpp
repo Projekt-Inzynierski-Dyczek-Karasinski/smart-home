@@ -159,6 +159,7 @@ namespace SmartHome {
             // Delay before first check to allow database service to start and register connection
             retryTimer.expires_after(5s);
             co_await retryTimer.async_wait(ba::use_awaitable);
+            if (!mIsRunning) co_return;
 
             if (!CoreActions::findConnections(target.to_string()).has_value()) {
                 mpLogger->warning("[CORE] No database service connection found on startup, entering retry loop...");
@@ -173,10 +174,16 @@ namespace SmartHome {
 
             co_await DatabaseActions::fetchAllConfigs();
 
-            // Start scheduler after populating cache
+            if (!mIsRunning) co_return;
+
+            // Start scheduler and event handler after populating cache
             mpScheduler = std::make_unique<Scheduler>(mCoreIoContext, mConfigCache, mpLogger);
             mpScheduler->loadFromCache();
             mpScheduler->start();
+
+            mpEventHandler = std::make_unique<EventHandler>(mCoreIoContext, mConfigCache, mpLogger);
+            mpEventHandler->loadFromCache();
+            mpEventHandler->start();
 
             co_return;
         }, ba::detached);
@@ -232,8 +239,9 @@ namespace SmartHome {
         auto &ipcServer = IPC::SocketServer::Instance();
         ipcServer.stopAcceptors();
 
-        // Stop scheduler
+        // Stop scheduler and event handler
         mpScheduler.reset();
+        mpEventHandler.reset();
 
         // Cancel active requests/commands
         Actions::onCoreShutdown();
@@ -295,6 +303,10 @@ namespace SmartHome {
 
     Scheduler &Core::scheduler() const {
         return *mpScheduler;
+    }
+
+    EventHandler &Core::eventHandler() const {
+        return *mpEventHandler;
     }
 
     ba::io_context &Core::coreUtilityIoContext() {
