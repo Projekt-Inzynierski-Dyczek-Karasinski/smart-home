@@ -226,7 +226,16 @@ namespace SmartHome::Constants {
 
         inline constexpr std::string_view EVENTS = "events";
         // Event keys
+        inline constexpr std::string_view TRIGGER = "trigger";
         inline constexpr std::string_view CONDITION = "condition";
+        // -----------------
+
+        // Triggers
+        inline constexpr std::string_view EDGE = "edge";
+        inline constexpr std::string_view LEVEL = "level";
+        inline const std::set TRIGGER_TYPES = {
+            EDGE, LEVEL
+        };
         // -----------------
 
         inline constexpr std::string_view SCHEDULE = "schedule";
@@ -254,8 +263,10 @@ namespace SmartHome::Constants {
         inline constexpr std::string_view POWER_SAVING = "power_saving";
         inline constexpr std::string_view DEFAULT_SLEEP_DURATION = "default_sleep_duration";
 
+        inline constexpr std::string_view ON_NOTIFICATION = "on_notification";
+
         inline const std::set CONFIG_KEYS = {
-            CONNECTION, RF_CHANNEL, SLEEP_AFTER_SEND, POWER_SAVING, DEFAULT_SLEEP_DURATION
+            CONNECTION, RF_CHANNEL, SLEEP_AFTER_SEND, POWER_SAVING, DEFAULT_SLEEP_DURATION, ON_NOTIFICATION
         };
     }
 
