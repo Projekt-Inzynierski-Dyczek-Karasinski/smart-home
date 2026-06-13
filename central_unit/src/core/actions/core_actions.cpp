@@ -12,6 +12,9 @@
 namespace SmartHome {
     using namespace std::string_literals;
 
+    namespace cdi = Constants::DatabaseIdentifiers;
+    // TODO !pr change strings to constatns
+
     // Method handlers
 
     awaitOptApiResponse CoreActions::coreEchoHandler(const cmdMetaPtr pCommandMetadata) {
@@ -172,33 +175,29 @@ namespace SmartHome {
         // Handle default db trigger notification
         if (type.value() == Constants::DatabaseTypes::MODULES_CHANGED) {
             co_await DatabaseActions::fetchModulesConfigs();
+            Core::Instance().eventHandler().loadModulesNotifications();
             co_return std::nullopt;
         }
 
         if (type.value() == Constants::DatabaseTypes::DEVICES_CHANGED) {
             co_await DatabaseActions::fetchDevicesConfigs();
             Core::Instance().scheduler().loadFromCache();
+            Core::Instance().eventHandler().loadDevicesEvents();
             co_return std::nullopt;
         }
 
-        // TODO implement handling module mediator notifications
         // Module mediator notifications
-        if (type.value() == Constants::MediatorTypes::MANUAL_TRIGGER) {
+        if (type.value() == Constants::MediatorTypes::MANUAL_TRIGGER ||
+            type.value() == Constants::MediatorTypes::POWER_LOSS ||
+            type.value() == Constants::MediatorTypes::ALERT) {
             Core::Instance().mpLogger->infof(
-                "[CORE_ACTIONS] [NOTIFY] Manual trigger notification received with data: %s",
-                pParams->dump().c_str());
-        }
+                "[CORE_ACTIONS] [NOTIFY] Module notification '%s' received",
+                type.value().data());
 
-        if (type.value() == Constants::MediatorTypes::POWER_LOSS) {
-            Core::Instance().mpLogger->infof(
-                "[CORE_ACTIONS] [NOTIFY] Power loss notification received with data: %s",
-                pParams->dump().c_str());
-        }
-
-        if (type.value() == Constants::MediatorTypes::ALERT) {
-            Core::Instance().mpLogger->infof(
-                "[CORE_ACTIONS] [NOTIFY] Alert notification received with data: %s",
-                pParams->dump().c_str());
+            const auto logicAddress = pParams
+                    ->value(JsonRpcStrings::ParamsKeys::MODULE_INFO, nlohmann::json{})
+                    .value(JsonRpcStrings::ModuleInfoKeys::LOGIC_ADDRESS, 0u);
+            Core::Instance().eventHandler().handleNotification(logicAddress, type.value());
         }
 
         co_return std::nullopt;
@@ -423,11 +422,19 @@ namespace SmartHome {
         nlohmann::json readingsJsonArray = nlohmann::json::array();
         for (const auto &row: dbResponse.value().at(jp::ROWS)) {
             try {
+                nlohmann::json value;
+                if (const auto &numField = row[cdi::VALUE_NUMERIC]; !numField.is_null()) {
+                    value = numField;
+                } else if (const auto &txtField = row[cdi::VALUE_TEXT]; txtField.is_string()) {
+                    const auto &text = txtField.get<std::string_view>();
+                    value = nlohmann::json::accept(text) ? nlohmann::json::parse(text) : text;
+                } else throw std::runtime_error("Unknown value type");
+
                 nlohmann::json reading = {
-                    {"device_id", deviceId.value()},
-                    {"value", row["value_numeric"].is_null() ? row["value_text"] : row["value_numeric"]},
-                    {"timestamp", row["timestamp"]},
-                    {"metadata", row["metadata"]}
+                    {cdi::DEVICE_ID, deviceId.value()},
+                    {Constants::Common::VALUE, value},
+                    {cdi::TIMESTAMP, row[cdi::TIMESTAMP]},
+                    {cdi::METADATA, row[cdi::METADATA]}
                 };
 
                 readingsJsonArray.push_back(reading);
@@ -891,7 +898,12 @@ namespace SmartHome {
                         "Faield to parse JSON response: "s + e.what());
                     co_return handlerResult;
                 }
-                responseJson[jr::STATUS] = cc::OK;
+
+                if (!responseJson.is_object()) {
+                    responseJson = nlohmann::json::object({{jr::STATUS, cc::OK}, {"value", responseJson}});
+                } else {
+                    responseJson[jr::STATUS] = cc::OK;
+                }
 
                 handlerResult.result = to_string(responseJson);
             } else {
