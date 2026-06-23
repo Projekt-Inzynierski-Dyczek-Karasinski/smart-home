@@ -13,7 +13,16 @@
       "displayName": "Native Debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "TARGET_DEVICE": "Native"
+        "TARGET_DEVICE": "NATIVE",
+        "BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "native_debug_coverage",
+      "inherits": "native_debug",
+      "displayName": "Native Debug With Coverage",
+      "cacheVariables": {
+        "ENABLE_COVERAGE": "ON"
       }
     },
     {
@@ -22,7 +31,8 @@
       "displayName": "Native",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "TARGET_DEVICE": "Native"
+        "TARGET_DEVICE": "NATIVE",
+        "BUILD_TESTS": "ON"
       }
     },
     {

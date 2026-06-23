@@ -108,6 +108,16 @@ if (BUILD_GUI)
     add_subdirectory(src/gui)
 endif ()
 
+if (BUILD_TESTS AND CMAKE_CROSSCOMPILING)
+    message(WARNING "Tests are not built when cross-compiling, forcing BUILD_TESTS=OFF")
+    set(BUILD_TESTS OFF)
+endif ()
+
+if (BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
+endif ()
+
 message(STATUS "======================[ Feature summary ]=======================")
 include(FeatureSummary)
 feature_summary(WHAT ALL)

@@ -9,6 +9,8 @@
 
 namespace SmartHome {
     class EventHandler {
+        friend class EventHandlerTest;
+
     public:
         EventHandler(ba::io_context &ioContext,
                      const ConfigCache &configCache,
