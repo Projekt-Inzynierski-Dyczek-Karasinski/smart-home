@@ -551,7 +551,7 @@ namespace SmartHomeMediator {
         mIsReceivedBufferReady.store(false, std::memory_order::release);
 
         // TODO remove before merging with main - left for debug
-        if (mpLogger->getLevel() == SmartHome::Utils::LogLevels::Level::DEBUG) {
+        if (mpLogger->getLevel() == SmartHome::Utils::LogLevels::Level::Debug) {
             std::string tmp;
             for (const auto &e: result) {
                 tmp += std::to_string(e) + ",";

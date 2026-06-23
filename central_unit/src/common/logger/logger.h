@@ -15,21 +15,23 @@ namespace SmartHome::Utils {
     struct LogLevels {
         /**
          * @brief Enumeration of available log levels.
+         *
+         * @note This enum does not follow normal naming convention to avoid problems with macros.
          */
         enum class Level :uint8_t {
-            NONE = 0,
-            CRITICAL = 1,
-            ERROR = 2,
-            WARNING = 3,
-            INFO = 4,
-            DEBUG = 5
+            None = 0,
+            Critical = 1,
+            Error = 2,
+            Warning = 3,
+            Info = 4,
+            Debug = 5
         };
 
-        static constexpr auto minLevel = Level::NONE;
+        static constexpr auto minLevel = Level::None;
 
-        static constexpr auto maxLevel = Level::DEBUG;
+        static constexpr auto maxLevel = Level::Debug;
 
-        static constexpr auto defaultLevel = Level::ERROR;
+        static constexpr auto defaultLevel = Level::Error;
 
         /**
          * @brief Convert log level to string representation.
@@ -39,12 +41,12 @@ namespace SmartHome::Utils {
          */
         static constexpr std::string_view toString(const Level level) {
             switch (level) {
-                case Level::NONE: return "INVALID";
-                case Level::CRITICAL: return "CRITICAL";
-                case Level::ERROR: return "ERROR";
-                case Level::WARNING: return "WARNING";
-                case Level::INFO: return "INFO";
-                case Level::DEBUG: return "DEBUG";
+                case Level::None: return "INVALID";
+                case Level::Critical: return "CRITICAL";
+                case Level::Error: return "ERROR";
+                case Level::Warning: return "WARNING";
+                case Level::Info: return "INFO";
+                case Level::Debug: return "DEBUG";
                 default: return "UNDEFINED";
             }
         }
@@ -284,6 +286,7 @@ namespace SmartHome::Utils {
          * @return True if file stream is open and logging, false otherwise.
          */
         bool isFileLoggingEnabled() const;
+
         /**
          * @brief Check if console logging is enabled.
          *

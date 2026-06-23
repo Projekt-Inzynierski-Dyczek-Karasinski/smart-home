@@ -120,23 +120,23 @@ namespace SmartHome::Utils {
     }
 
     void Logger::critical(const std::string &message) {
-        log(LL::Level::CRITICAL, message);
+        log(LL::Level::Critical, message);
     }
 
     void Logger::error(const std::string &message) {
-        log(LL::Level::ERROR, message);
+        log(LL::Level::Error, message);
     }
 
     void Logger::warning(const std::string &message) {
-        log(LL::Level::WARNING, message);
+        log(LL::Level::Warning, message);
     }
 
     void Logger::info(const std::string &message) {
-        log(LL::Level::INFO, message);
+        log(LL::Level::Info, message);
     }
 
     void Logger::debug(const std::string &message) {
-        log(LL::Level::DEBUG, message);
+        log(LL::Level::Debug, message);
     }
 
     bool Logger::isFileLoggingEnabled() const {
@@ -169,9 +169,9 @@ namespace SmartHome::Utils {
         std::string preparedMessage = prepareLogMessage(level, message);
 
         if (mEnableConsoleLogOutput) {
-            if (level == LL::Level::CRITICAL || level == LL::Level::ERROR) {
+            if (level == LL::Level::Critical || level == LL::Level::Error) {
                 std::cerr << preparedMessage << std::flush;
-            } else if (level == LogLevels::Level::WARNING || level == LL::Level::INFO || level == LL::Level::DEBUG) {
+            } else if (level == LogLevels::Level::Warning || level == LL::Level::Info || level == LL::Level::Debug) {
                 std::cout << preparedMessage << std::flush;
             }
         }
