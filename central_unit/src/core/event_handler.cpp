@@ -146,10 +146,9 @@ namespace SmartHome {
 
         const auto &deviceExpectedValuesFormat = deviceConfig.at(cdck::VALUES);
 
-        // FIXME !pr notif is send when condition is invalid (works properly when condition is not met)
         for (auto &event: events) {
             if (shouldEventTrigger(event, readingValue, deviceExpectedValuesFormat))
-                dispatchAction(deviceId, event.action);;
+                dispatchAction(deviceId, event.action);
         }
     }
 
@@ -233,7 +232,7 @@ namespace SmartHome {
             throw std::invalid_argument("Event must have object 'condition' field");
         }
 
-        condition = event.at(cdck::CONDITION).get<nlohmann::json>();
+        conditions = event.at(cdck::CONDITION).get<nlohmann::json>();
 
         if (!event.contains(cdck::ACTION) ||
             !event.at(cdck::ACTION).is_object()) {
@@ -259,8 +258,8 @@ namespace SmartHome {
         action = notification.at(cdck::ACTION).get<nlohmann::json>();
     }
 
-    std::vector<EventHandler::Event>
-    EventHandler::parseDeviceEvents(const uint deviceId, const nlohmann::json &events) const {
+    std::vector<EventHandler::Event> EventHandler::parseDeviceEvents(const uint deviceId,
+                                                                     const nlohmann::json &events) const {
         if (!events.is_array()) {
             mpLogger->errorf("[EVENT_HANDLER] Device [%zu] events parsing failed: 'events' field must be an array",
                              deviceId);
@@ -318,14 +317,46 @@ namespace SmartHome {
     bool EventHandler::shouldEventTrigger(Event &event,
                                           const nlohmann::json &reading,
                                           const nlohmann::json::array_t &deviceExpectedValuesFormat) const {
+        if (!event.enabled) return false;
+
+        const auto checkCondition = [this, event](const nlohmann::json &condition,
+                                                  const nlohmann::json &rawReading,
+                                                  const nlohmann::json &valueFormatting) -> bool {
+            nlohmann::json formattedReadingValue = rawReading;
+
+            if (valueFormatting.contains(cdck::PRECISION) && rawReading.is_number_float()) {
+                if (!valueFormatting.at(cdck::PRECISION).is_number_integer()) {
+                    mpLogger->errorf("[EVENT_HANDLER] Error while formating reading: "
+                                     "'precision' field value must be an integer, check device [%zu] config",
+                                     event.deviceId);
+                    return false;
+                }
+                const int precision = valueFormatting.at(cdck::PRECISION).get<int>();
+                const double factor = std::pow(10.0, precision);
+                formattedReadingValue = std::round(rawReading.get<double>() * factor) / factor;
+            }
+
+            try {
+                return isConditionMet(formattedReadingValue, condition);
+            } catch (const std::exception &e) {
+                mpLogger->errorf(
+                    "[EVENT_HANDLER] Condition evaluation failed for device [%zu] when handling event: %s \n"
+                    "Defaulting evaluation to false.", event.deviceId, e.what());
+            }
+            return false;
+        };
+
+
         const bool isReadingAnArray = reading.is_array();
 
         if (isReadingAnArray && reading.size() != deviceExpectedValuesFormat.size()) {
-            mpLogger->error("[EVENT_HANDLER] Reading is not in expected format, check device config 'values' field");
+            mpLogger->errorf(
+                "[EVENT_HANDLER] Reading is not in expected format, check device [%zu] config 'values' field",
+                event.deviceId);
             return false;
         }
 
-        auto condition = event.condition;
+        auto conditions = event.conditions;
         bool result = false;
 
         if (isReadingAnArray) {
@@ -336,39 +367,24 @@ namespace SmartHome {
 
             for (const auto &readingRawValue: reading) {
                 const auto valueConditionKey = "$" + std::to_string(index);
-                index++; // TODO !pr check if correct
 
                 // Check for condition
-                if (!condition.contains(valueConditionKey)) continue; // No condition for value
-                if (!condition.at(valueConditionKey).is_object()) {
+                if (!conditions.contains(valueConditionKey)) continue; // No condition for value
+                if (!conditions.at(valueConditionKey).is_object()) {
                     mpLogger->errorf("[EVENT_HANDLER] Condition must be an object, check device [%zu] config",
                                      event.deviceId);
                     continue;
                 }
                 containsValidCondition = true;
 
-                // Check formatting
-                auto readingFormattedValue = readingRawValue;
-                const auto &valueFormatting = deviceExpectedValuesFormat[index];
-
-                if (valueFormatting.contains(cdck::PRECISION) &&
-                    readingRawValue.is_number_float()) {
-                    if (valueFormatting.at(cdck::PRECISION).is_number_integer()) {
-                        readingFormattedValue = std::round(readingRawValue.get<double>());
-                    } else {
-                        mpLogger->errorf("[EVENT_HANDLER] Error while formating reading: "
-                                         "'precision' field value must be an integer, check device [%zu] config",
-                                         event.deviceId);
-                    }
-                }
-
                 // Check if condition is met
-                if (!isConditionMet(readingFormattedValue, condition.at(valueConditionKey))) {
+                const auto &valueFormatting = deviceExpectedValuesFormat[index++];
+                if (!checkCondition(conditions.at(valueConditionKey), readingRawValue, valueFormatting)) {
                     result = false;
                     break;
                 }
                 // Delete handled conditions to check later for invalid ones
-                condition.erase(valueConditionKey);
+                conditions.erase(valueConditionKey);
             }
 
             if (result && !containsValidCondition) {
@@ -378,19 +394,18 @@ namespace SmartHome {
                     event.deviceId);
             }
 
-            if (result && !condition.empty()) {
+            if (result && !conditions.empty()) {
                 mpLogger->warningf(
-                    "[EVENT_HANDLER] Invalid conditions not handled, check device [%zu] config. JSON dump: %s",
-                    event.deviceId, condition.dump().c_str());
+                    "[EVENT_HANDLER] Invalid conditions not handled, check device [%zu] config.",
+                    event.deviceId);
             }
-        } else if (condition.contains("$0") && condition.at("$0").is_object()) {
+        } else if (conditions.contains("$0") && conditions.at("$0").is_object()) {
             // Handle single value reading with condition in '$0' field in conditions object
-            result = isConditionMet(reading, condition.at("$0"));
+            result = checkCondition(conditions.at("$0"), reading, deviceExpectedValuesFormat.front());
         } else {
             // Handle single value reading with condition directly in conditions object
-            result = isConditionMet(reading, condition);
+            result = checkCondition(conditions, reading, deviceExpectedValuesFormat.front());
         }
-
 
         if (result) {
             // Ignore continuous triggers if trigger is set to edge
@@ -409,18 +424,17 @@ namespace SmartHome {
 
     bool EventHandler::isConditionMet(const nlohmann::json &value, const nlohmann::json &condition) const {
         if (!value.is_number() && !value.is_string()) {
-            mpLogger->error("[EVENT_HANDLER] Unsupported value type for condition evaluation");
-            return false;
+            throw std::invalid_argument("Unsupported value type for condition evaluation");
         }
 
         if (value.is_number()) return compareNumeric(value, condition);
         if (value.is_string()) return compareString(value, condition);
 
-        mpLogger->error("[EVENT_HANDLER] Unexpected condition");
-        return false;
+        throw std::logic_error("Unexpected error in condition evaluation");
     }
 
     bool EventHandler::compareNumeric(const nlohmann::json &value, const nlohmann::json &condition) const {
+        // TODO consider adding support for OR conditions
         static const std::unordered_map<std::string, std::function<bool(double, double)> > numericalOperators = {
             {">", [](const double a, const double b) { return a > b; }},
             {"<", [](const double a, const double b) { return a < b; }},
@@ -430,30 +444,34 @@ namespace SmartHome {
             {"<=", [](const double a, const double b) { return a <= b; }},
         };
 
+        if (condition.empty()) {
+            throw std::invalid_argument("Empty condition provided");
+        }
+
         const double numValue = value.get<double>();
+        bool conditionResult = false;
 
         for (const auto &[op, threshold]: condition.items()) {
             if (!threshold.is_number()) {
-                mpLogger->errorf("[EVENT_HANDLER] Threshold for operator '%s' must be a number", op.c_str());
-                return false;
+                throw std::invalid_argument("Threshold for operator '" + op + "' must be a number");
             }
             const auto iter = numericalOperators.find(op);
             if (iter == numericalOperators.end()) {
                 mpLogger->errorf("[EVENT_HANDLER] Unknown operator '%s'", op.c_str());
-                return false;
+                throw std::invalid_argument("Unknown operator '" + op + "'");
             }
 
             mpLogger->debugf("[EVENT_HANDLER] [TEST] %s %s %s = %b", to_string(value).c_str(), op.c_str(),
                              to_string(threshold).c_str(), iter->second(numValue, threshold.get<double>()));
 
-            return iter->second(numValue, threshold.get<double>()); // TODO !pr check if correct
+            conditionResult = iter->second(numValue, threshold.get<double>());
+            if (!conditionResult) return false; // Return false immediately if any condition fails (AND condition logic)
         }
-
-        mpLogger->debug("[EVENT_HANDLER] No operators found in condition");
-        return false;
+        return true;
     }
 
     bool EventHandler::compareString(const nlohmann::json &value, const nlohmann::json &condition) const {
+        // TODO consider adding support for OR conditions
         static const std::unordered_map<std::string, std::function<bool(const std::string &, const std::string &)> >
                 stringOperators = {
                     {"=", [](const std::string &a, const std::string &b) { return a == b; }},
@@ -461,27 +479,29 @@ namespace SmartHome {
                     {"contains", [](const std::string &a, const std::string &b) { return a.contains(b); }}
                 };
 
+        if (condition.empty()) {
+            throw std::invalid_argument("Empty condition provided");
+        }
+
         const auto stringValue = value.get<std::string>();
+        bool conditionResult = false;
 
         for (const auto &[op, target]: condition.items()) {
             if (!target.is_string()) {
-                mpLogger->errorf("[EVENT_HANDLER] Target for operator '%s' must be a string", op.c_str());
-                return false;
+                throw std::invalid_argument("Target for operator '" + op + "' must be a string");
             }
             const auto iter = stringOperators.find(op);
             if (iter == stringOperators.end()) {
-                mpLogger->errorf("[EVENT_HANDLER] Unknown operator '%s'", op.c_str());
-                return false;
+                throw std::invalid_argument("Unknown operator '" + op + "'");
             }
 
             mpLogger->debugf("[EVENT_HANDLER] [TEST] %s %s %s = %b", to_string(value).c_str(), op.c_str(),
                              to_string(target).c_str(), iter->second(stringValue, target.get<std::string>()));
 
-            return iter->second(stringValue, target.get<std::string>()); // TODO !pr check if correct
+            conditionResult = iter->second(stringValue, target.get<std::string>());
+            if (!conditionResult) return false; // Return false immediately if any condition fails (AND condition logic)
         }
-
-        mpLogger->debug("[EVENT_HANDLER] No operators found in condition");
-        return false;
+        return true;
     }
 
     void EventHandler::dispatchAction(uint deviceId, const nlohmann::json &action) const {
@@ -490,7 +510,7 @@ namespace SmartHome {
 
         boost::asio::post(mIoContext, [action = action, deviceId, this] {
             if (!mIsRunning) return;
-            const std::string_view actionName = "Conditional event";
+            constexpr std::string_view actionName = "Conditional event";
             ActionHelpers::dispatchAutomatedDeviceAction(actionName, deviceId, action);
         });
     }
@@ -501,7 +521,7 @@ namespace SmartHome {
 
         boost::asio::post(mIoContext, [action = action, moduleId, this] {
             if (!mIsRunning) return;
-            const std::string_view actionName = "Module notification";
+            constexpr std::string_view actionName = "Module notification";
             ActionHelpers::dispatchAutomatedModuleAction(actionName, moduleId, action);
         });
     }

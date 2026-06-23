@@ -46,7 +46,7 @@ namespace SmartHome {
         struct Event {
             // Main structure, stored in device config
             TriggerType trigger;
-            nlohmann::json condition;
+            nlohmann::json conditions;
             nlohmann::json action;
             uint deviceId;
             bool enabled;
@@ -79,9 +79,9 @@ namespace SmartHome {
 
         bool compareString(const nlohmann::json &value, const nlohmann::json &condition) const;
 
-        void dispatchAction(uint deviceId, const nlohmann::json& action) const;
+        void dispatchAction(uint deviceId, const nlohmann::json &action) const;
 
-        void dispatchModuleAction(uint moduleId, const nlohmann::json& action) const;
+        void dispatchModuleAction(uint moduleId, const nlohmann::json &action) const;
 
         mutable std::shared_mutex mMutex;
 
@@ -90,10 +90,10 @@ namespace SmartHome {
         std::shared_ptr<Utils::AsyncLogger> mpLogger;
 
         /// Device ID: events
-        std::map<uint, std::vector<Event>> mDeviceEvents;
+        std::map<uint, std::vector<Event> > mDeviceEvents;
 
         /// Module ID: {notification type: notifications}
-        std::map<uint, std::unordered_map<std::string, std::vector<Notification>>> mModuleNotifications;
+        std::map<uint, std::unordered_map<std::string, std::vector<Notification> > > mModuleNotifications;
         std::map<uint, uint> mLogicAddressToModuleId;
 
         std::atomic_bool mIsRunning{false};
