@@ -187,9 +187,7 @@ namespace SmartHome {
         }
 
         // Module mediator notifications
-        if (type.value() == Constants::MediatorTypes::MANUAL_TRIGGER ||
-            type.value() == Constants::MediatorTypes::POWER_LOSS ||
-            type.value() == Constants::MediatorTypes::ALERT) {
+        if (Constants::MediatorTypes::MODULE_TO_CORE_NOTIFICATION_TYPES.contains(type.value())) {
             Core::Instance().mpLogger->infof(
                 "[CORE_ACTIONS] [NOTIFY] Module notification '%s' received",
                 type.value().data());

@@ -243,19 +243,19 @@ namespace SmartHome {
     }
 
     EventHandler::Notification::Notification(const nlohmann::json &notification) {
-        if (!notification.contains(cdck::ENABLED) ||
-            !notification.at(cdck::ENABLED).is_boolean()) {
+        if (!notification.contains(cmck::ENABLED) ||
+            !notification.at(cmck::ENABLED).is_boolean()) {
             throw std::invalid_argument("Notification must have boolean 'enabled' field");
         }
 
-        enabled = notification.at(cdck::ENABLED).get<bool>();
+        enabled = notification.at(cmck::ENABLED).get<bool>();
 
-        if (!notification.contains(cdck::ACTION) ||
-            !notification.at(cdck::ACTION).is_object()) {
+        if (!notification.contains(cmck::ACTION) ||
+            !notification.at(cmck::ACTION).is_object()) {
             throw std::invalid_argument("Notification must have object 'action' field");
         }
 
-        action = notification.at(cdck::ACTION).get<nlohmann::json>();
+        action = notification.at(cmck::ACTION).get<nlohmann::json>();
     }
 
     std::vector<EventHandler::Event> EventHandler::parseDeviceEvents(const uint deviceId,
