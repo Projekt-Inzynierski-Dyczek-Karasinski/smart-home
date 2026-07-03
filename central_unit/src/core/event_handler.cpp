@@ -24,7 +24,7 @@ namespace SmartHome {
 
         mDeviceEvents.clear();
 
-        const auto cachedDevices = Core::Instance().configCache().getAllDevices();
+        const auto cachedDevices = mConfigCache.getAllDevices();
         if (cachedDevices.empty()) {
             mpLogger->warning("[EVENT_HANDLER] [LOAD_DEVICES_EVENTS] No cached devices found");
             return;
@@ -33,11 +33,12 @@ namespace SmartHome {
         uint devicesWithEvents = 0;
         for (const auto &device: cachedDevices) {
             if (!device.config.contains(cdck::EVENTS)) continue; // Ignore devices without events
-            if (!device.config.at(cdck::EVENTS).is_object()) {
+            if (!device.config.at(cdck::EVENTS).is_array()) {
                 mpLogger->errorf(
-                    "[EVENT_HANDLER] [LOAD_DEVICES_EVENTS] Device [%u] has invalid 'events' field in config, "
-                    "it must be an object",
-                    device.id);
+                    "[EVENT_HANDLER] [LOAD_DEVICES_EVENTS] Device [%u] has invalid '%s' field in config, "
+                    "it must be an array",
+                    device.id,
+                    cdck::EVENTS);
                 continue;
             }
 
@@ -65,9 +66,8 @@ namespace SmartHome {
         std::unique_lock lock(mMutex);
 
         mModuleNotifications.clear();
-        mLogicAddressToModuleId.clear();
 
-        const auto cachedModules = Core::Instance().configCache().getAllModules();
+        const auto cachedModules = mConfigCache.getAllModules();
         if (cachedModules.empty()) {
             mpLogger->warning("[EVENT_HANDLER] [LOAD_MODULES_NOTIFICATIONS] No cached modules found");
             return;
@@ -75,12 +75,12 @@ namespace SmartHome {
 
         uint modulesWithNotifications = 0;
         for (const auto &module: cachedModules) {
-            mLogicAddressToModuleId.emplace(module.logicAddress, module.id);
-
             if (!module.config.contains(cmck::ON_NOTIFICATION)) continue; // Ignore modules without notifications
             if (!module.config.at(cmck::ON_NOTIFICATION).is_object()) {
                 mpLogger->errorf("[EVENT_HANDLER] [LOAD_MODULES_NOTIFICATIONS] Module [%u] has invalid "
-                                 "'on_notifications' field in config, it must be an object", module.id);
+                                 "'%s' field in config, it must be an object",
+                                 module.id,
+                                 cmck::ON_NOTIFICATION.data());
                 continue;
             }
 
@@ -90,6 +90,15 @@ namespace SmartHome {
             std::unordered_map<std::string, std::vector<Notification> > notificationsOfType;
 
             for (const auto &[notificationsType, notifications]: onNotification.items()) {
+                if (!Constants::MediatorTypes::MODULE_TO_CORE_NOTIFICATION_TYPES.contains(notificationsType)) {
+                    mpLogger->errorf("[EVENT_HANDLER] [LOAD_MODULES_NOTIFICATIONS] Module [%u] has invalid "
+                                     "notification type ('%s') in '%s' field",
+                                     module.id,
+                                     notificationsType.c_str(),
+                                     cmck::ON_NOTIFICATION.data());
+                    continue;
+                }
+
                 auto moduleNotificationsOfType = parseModuleNotifications(module.id, notifications);
 
                 if (moduleNotificationsOfType.empty()) continue;
@@ -115,26 +124,26 @@ namespace SmartHome {
     void EventHandler::handleEvents(const uint deviceId) {
         mpLogger->debug("[EVENT_HANDLER] [HANDLE_EVENTS] Called");
         if (!mIsRunning) return;
-        std::shared_lock lock(mMutex);
+        std::unique_lock lock(mMutex); //Required by shouldEventTrigger
 
         const auto iter = mDeviceEvents.find(deviceId);
         if (iter == mDeviceEvents.end()) return;
 
         auto &events = iter->second;
 
-        const auto cachedReading = Core::Instance().readingsCache().get(deviceId);
+        const auto cachedReading = mReadingsCache.get(deviceId);
         if (!cachedReading) {
             mpLogger->error("[EVENT_HANDLER] [HANDLE_EVENTS] Could not find device reading in cache");
             return;
         }
-        const auto readingValue = cachedReading.value().value;
+        const auto &readingValue = cachedReading.value().value;
 
-        const auto cachedDeviceConfig = Core::Instance().configCache().getDevice(deviceId);
+        const auto cachedDeviceConfig = mConfigCache.getDevice(deviceId);
         if (!cachedDeviceConfig) {
             mpLogger->error("[EVENT_HANDLER] [HANDLE_EVENTS] Could not find device config in cache");
             return;
         }
-        const auto deviceConfig = cachedDeviceConfig.value().config;
+        const auto &deviceConfig = cachedDeviceConfig.value().config;
 
         if (!deviceConfig.contains(cdck::VALUES) ||
             !deviceConfig.at(cdck::VALUES).is_array() ||
@@ -158,23 +167,40 @@ namespace SmartHome {
                          notificationType.data(), logicAddress);
         std::shared_lock lock(mMutex);
 
-        // Find module ID
-        const auto logicAddressIt = mLogicAddressToModuleId.find(logicAddress);
-        if (logicAddressIt == mLogicAddressToModuleId.end()) {
+        const auto moduleIdOpt = mConfigCache.findModuleId(logicAddress);
+        if (!moduleIdOpt) {
             mpLogger->warningf(
                 "[EVENT_HANDLER] [HANDLE_NOTIFICATION] No module found for logicAddress=%u", logicAddress);
             return;
         }
-        const auto moduleId = logicAddressIt->second;
+        const auto moduleId = moduleIdOpt.value();
 
         // Find all notifications of module
         const auto moduleNotificationsIt = mModuleNotifications.find(moduleId);
-        if (moduleNotificationsIt == mModuleNotifications.end()) return;
+        if (moduleNotificationsIt == mModuleNotifications.end()) {
+            mpLogger->warningf(
+                "[EVENT_HANDLER] [HANDLE_NOTIFICATION] Module (ID [%u], logic address [%u]) sent a '%s' notification, "
+                "but no notification actions are configured for it in its '%s' config field",
+                moduleId,
+                logicAddress,
+                notificationType.data(),
+                cmck::ON_NOTIFICATION.data());
+            return;
+        }
         const auto &moduleNotifications = moduleNotificationsIt->second;
 
         // Find notifications of type matching "notificationType"
         const auto notificationsOfTypeIt = moduleNotifications.find(std::string(notificationType));
-        if (notificationsOfTypeIt == moduleNotifications.end()) return;
+        if (notificationsOfTypeIt == moduleNotifications.end()) {
+            mpLogger->warningf(
+                "[EVENT_HANDLER] [HANDLE_NOTIFICATION] Module (ID [%u], logic address [%u]) sent a '%s' notification, "
+                "but no action is configured for this type in its '%s' config field",
+                moduleId,
+                logicAddress,
+                notificationType.data(),
+                cmck::ON_NOTIFICATION.data());
+            return;
+        }
         const auto &moduleNotificationsOfType = notificationsOfTypeIt->second;
 
         // Dispatch enabled notifications
@@ -190,7 +216,6 @@ namespace SmartHome {
     }
 
     void EventHandler::stop() {
-        if (mIsStopping.exchange(true, std::memory_order_acq_rel)) return;
         if (!mIsRunning.exchange(false, std::memory_order_acq_rel)) return;
 
         mpLogger->info("[EVENT_HANDLER] Stopping event handler");
@@ -201,14 +226,14 @@ namespace SmartHome {
 
         if (!event.contains(cdck::ENABLED) ||
             !event.at(cdck::ENABLED).is_boolean()) {
-            throw std::invalid_argument("Event must have boolean 'enabled' field");
+            throw std::invalid_argument("Event must have boolean '"s + cdck::ENABLED.data() + "' field");
         }
 
         enabled = event.at(cdck::ENABLED).get<bool>();
 
         if (!event.contains(cdck::TRIGGER) ||
             !event.at(cdck::TRIGGER).is_string()) {
-            throw std::invalid_argument("Event must have string 'trigger' field");
+            throw std::invalid_argument("Event must have string '"s + cdck::TRIGGER.data() + "' field");
         }
 
         const auto &triggerStr = event.at(cdck::TRIGGER).get<std::string>();
@@ -221,7 +246,8 @@ namespace SmartHome {
                 first = false;
             }
 
-            throw std::invalid_argument("Invalid 'trigger' field value, accepted values: " + acceptedTriggerTypes);
+            throw std::invalid_argument(
+                "Invalid '"s + cdck::TRIGGER.data() + "' field value, accepted values: " + acceptedTriggerTypes);
         }
 
         if (triggerStr == cdck::EDGE) trigger = TriggerType::EDGE;
@@ -229,14 +255,14 @@ namespace SmartHome {
 
         if (!event.contains(cdck::CONDITION) ||
             !event.at(cdck::CONDITION).is_object()) {
-            throw std::invalid_argument("Event must have object 'condition' field");
+            throw std::invalid_argument("Event must have object '"s + cdck::CONDITION.data() + "' field");
         }
 
         conditions = event.at(cdck::CONDITION).get<nlohmann::json>();
 
         if (!event.contains(cdck::ACTION) ||
             !event.at(cdck::ACTION).is_object()) {
-            throw std::invalid_argument("Event must have object 'action' field");
+            throw std::invalid_argument("Event must have object '"s + cdck::ACTION.data() + "' field");
         }
 
         action = event.at(cdck::ACTION).get<nlohmann::json>();
@@ -245,14 +271,14 @@ namespace SmartHome {
     EventHandler::Notification::Notification(const nlohmann::json &notification) {
         if (!notification.contains(cmck::ENABLED) ||
             !notification.at(cmck::ENABLED).is_boolean()) {
-            throw std::invalid_argument("Notification must have boolean 'enabled' field");
+            throw std::invalid_argument("Notification must have boolean '"s + cmck::ENABLED.data() + "' field");
         }
 
         enabled = notification.at(cmck::ENABLED).get<bool>();
 
         if (!notification.contains(cmck::ACTION) ||
             !notification.at(cmck::ACTION).is_object()) {
-            throw std::invalid_argument("Notification must have object 'action' field");
+            throw std::invalid_argument("Notification must have object '"s + cmck::ACTION.data() + "' field");
         }
 
         action = notification.at(cmck::ACTION).get<nlohmann::json>();
@@ -261,8 +287,9 @@ namespace SmartHome {
     std::vector<EventHandler::Event> EventHandler::parseDeviceEvents(const uint deviceId,
                                                                      const nlohmann::json &events) const {
         if (!events.is_array()) {
-            mpLogger->errorf("[EVENT_HANDLER] Device [%zu] events parsing failed: 'events' field must be an array",
-                             deviceId);
+            mpLogger->errorf("[EVENT_HANDLER] Device [%u] events parsing failed: '%s' field must be an array",
+                             deviceId,
+                             cdck::EVENTS.data());
             return {};
         }
 
@@ -275,11 +302,11 @@ namespace SmartHome {
             try {
                 parsedEvents.emplace_back(deviceId, event);
             } catch (const std::exception &e) {
-                mpLogger->errorf("[EVENT_HANDLER] Device [%zu] event parsing failed: %s", deviceId, e.what());
+                mpLogger->errorf("[EVENT_HANDLER] Device [%u] event parsing failed: %s", deviceId, e.what());
             }
         }
 
-        mpLogger->debugf("[EVENT_HANDLER] Device [%zu] events parsed successfully: %zu/%zu",
+        mpLogger->debugf("[EVENT_HANDLER] Device [%u] events parsed successfully: %zu/%zu",
                          deviceId,
                          parsedEvents.size(),
                          events.size());
@@ -289,8 +316,8 @@ namespace SmartHome {
     std::vector<EventHandler::Notification> EventHandler::parseModuleNotifications(const uint moduleId,
         const nlohmann::json &notifications) const {
         if (!notifications.is_array()) {
-            mpLogger->errorf("[EVENT_HANDLER] Module [%zu] notifications parsing failed: "
-                             "[notification_type] field must be an array",
+            mpLogger->errorf("[EVENT_HANDLER] Module [%u] notifications parsing failed: "
+                             "'<notification_type>' field must be an array",
                              moduleId);
             return {};
         }
@@ -302,11 +329,11 @@ namespace SmartHome {
 
         for (const auto &notification: notifications) {
             try { parsedNotifications.emplace_back(notification); } catch (const std::exception &e) {
-                mpLogger->errorf("[EVENT_HANDLER] Module [%zu] notification parsing failed: %s", moduleId, e.what());
+                mpLogger->errorf("[EVENT_HANDLER] Module [%u] notification parsing failed: %s", moduleId, e.what());
             }
         }
 
-        mpLogger->debugf("[EVENT_HANDLER] Device [%zu] events parsed successfully: %zu/%zu",
+        mpLogger->debugf("[EVENT_HANDLER] Module [%u] notification parsed successfully: %zu/%zu",
                          moduleId,
                          parsedNotifications.size(),
                          notifications.size());
@@ -316,18 +343,23 @@ namespace SmartHome {
 
     bool EventHandler::shouldEventTrigger(Event &event,
                                           const nlohmann::json &reading,
-                                          const nlohmann::json::array_t &deviceExpectedValuesFormat) const {
-        if (!event.enabled) return false;
+                                          const nlohmann::json::array_t &deviceExpectedValuesFormat) {
+        if (!event.enabled) {
+            mpLogger->debugf("[EVENT_HANDLER] [SHOULD_EVENT_TRIGGER] Skipping disabled event for device [%u]",
+                             event.deviceId);
+            return false;
+        }
 
-        const auto checkCondition = [this, event](const nlohmann::json &condition,
-                                                  const nlohmann::json &rawReading,
-                                                  const nlohmann::json &valueFormatting) -> bool {
+        const auto checkCondition = [this, &event](const nlohmann::json &condition,
+                                                   const nlohmann::json &rawReading,
+                                                   const nlohmann::json &valueFormatting) -> bool {
             nlohmann::json formattedReadingValue = rawReading;
 
             if (valueFormatting.contains(cdck::PRECISION) && rawReading.is_number_float()) {
                 if (!valueFormatting.at(cdck::PRECISION).is_number_integer()) {
                     mpLogger->errorf("[EVENT_HANDLER] Error while formating reading: "
-                                     "'precision' field value must be an integer, check device [%zu] config",
+                                     "'%s' field value must be an integer, check device [%u] config",
+                                     cdck::PRECISION.data(),
                                      event.deviceId);
                     return false;
                 }
@@ -340,7 +372,7 @@ namespace SmartHome {
                 return isConditionMet(formattedReadingValue, condition);
             } catch (const std::exception &e) {
                 mpLogger->errorf(
-                    "[EVENT_HANDLER] Condition evaluation failed for device [%zu] when handling event: %s \n"
+                    "[EVENT_HANDLER] Condition evaluation failed for device [%u] when handling event: %s \n"
                     "Defaulting evaluation to false.", event.deviceId, e.what());
             }
             return false;
@@ -351,8 +383,9 @@ namespace SmartHome {
 
         if (isReadingAnArray && reading.size() != deviceExpectedValuesFormat.size()) {
             mpLogger->errorf(
-                "[EVENT_HANDLER] Reading is not in expected format, check device [%zu] config 'values' field",
-                event.deviceId);
+                "[EVENT_HANDLER] Reading is not in expected format, check device [%u] config '%s' field",
+                event.deviceId,
+                cdck::VALUES.data());
             return false;
         }
 
@@ -369,10 +402,14 @@ namespace SmartHome {
                 const auto valueConditionKey = "$" + std::to_string(index);
 
                 // Check for condition
-                if (!conditions.contains(valueConditionKey)) continue; // No condition for value
+                if (!conditions.contains(valueConditionKey)) {
+                    index++;
+                    continue; // No condition for value
+                }
                 if (!conditions.at(valueConditionKey).is_object()) {
-                    mpLogger->errorf("[EVENT_HANDLER] Condition must be an object, check device [%zu] config",
+                    mpLogger->errorf("[EVENT_HANDLER] Condition must be an object, check device [%u] config",
                                      event.deviceId);
+                    index++;
                     continue;
                 }
                 containsValidCondition = true;
@@ -390,18 +427,19 @@ namespace SmartHome {
             if (result && !containsValidCondition) {
                 result = false;
                 mpLogger->warningf(
-                    "[EVENT_HANDLER] Event does not contain any valid conditions, check device [%zu] config",
+                    "[EVENT_HANDLER] Event does not contain any valid conditions, check device [%u] config",
                     event.deviceId);
             }
 
             if (result && !conditions.empty()) {
                 mpLogger->warningf(
-                    "[EVENT_HANDLER] Invalid conditions not handled, check device [%zu] config.",
+                    "[EVENT_HANDLER] Invalid conditions not handled, check device [%u] config.",
                     event.deviceId);
             }
-        } else if (conditions.contains("$0") && conditions.at("$0").is_object()) {
-            // Handle single value reading with condition in '$0' field in conditions object
-            result = checkCondition(conditions.at("$0"), reading, deviceExpectedValuesFormat.front());
+        } else if (constexpr std::string_view defaultConditionStr = "$0";
+            conditions.contains(defaultConditionStr) && conditions.at(defaultConditionStr).is_object()) {
+            // Handle single value reading with condition in field with defaultConditionStr key in conditions object
+            result = checkCondition(conditions.at(defaultConditionStr), reading, deviceExpectedValuesFormat.front());
         } else {
             // Handle single value reading with condition directly in conditions object
             result = checkCondition(conditions, reading, deviceExpectedValuesFormat.front());
@@ -410,7 +448,7 @@ namespace SmartHome {
         if (result) {
             // Ignore continuous triggers if trigger is set to edge
             if (event.trigger == TriggerType::EDGE && event.triggered) {
-                mpLogger->debugf("[EVENT_HANDLER] Event with edge ignored for device [%zu]", event.deviceId);
+                mpLogger->debugf("[EVENT_HANDLER] Event with edge ignored for device [%u]", event.deviceId);
                 return false;
             }
             event.triggered = true;
@@ -419,10 +457,13 @@ namespace SmartHome {
             event.triggered = false;
         }
 
+        mpLogger->debugf("[EVENT_HANDLER] [SHOULD_EVENT_TRIGGER] returned %s for device [%u]",
+                         result ? "true" : "false",
+                         event.deviceId);
         return result;
     }
 
-    bool EventHandler::isConditionMet(const nlohmann::json &value, const nlohmann::json &condition) const {
+    bool EventHandler::isConditionMet(const nlohmann::json &value, const nlohmann::json &condition) {
         if (!value.is_number() && !value.is_string()) {
             throw std::invalid_argument("Unsupported value type for condition evaluation");
         }
@@ -433,7 +474,7 @@ namespace SmartHome {
         throw std::logic_error("Unexpected error in condition evaluation");
     }
 
-    bool EventHandler::compareNumeric(const nlohmann::json &value, const nlohmann::json &condition) const {
+    bool EventHandler::compareNumeric(const nlohmann::json &value, const nlohmann::json &condition) {
         // TODO consider adding support for OR conditions
         static const std::unordered_map<std::string, std::function<bool(double, double)> > numericalOperators = {
             {">", [](const double a, const double b) { return a > b; }},
@@ -457,12 +498,8 @@ namespace SmartHome {
             }
             const auto iter = numericalOperators.find(op);
             if (iter == numericalOperators.end()) {
-                mpLogger->errorf("[EVENT_HANDLER] Unknown operator '%s'", op.c_str());
                 throw std::invalid_argument("Unknown operator '" + op + "'");
             }
-
-            mpLogger->debugf("[EVENT_HANDLER] [TEST] %s %s %s = %b", to_string(value).c_str(), op.c_str(),
-                             to_string(threshold).c_str(), iter->second(numValue, threshold.get<double>()));
 
             conditionResult = iter->second(numValue, threshold.get<double>());
             if (!conditionResult) return false; // Return false immediately if any condition fails (AND condition logic)
@@ -470,7 +507,7 @@ namespace SmartHome {
         return true;
     }
 
-    bool EventHandler::compareString(const nlohmann::json &value, const nlohmann::json &condition) const {
+    bool EventHandler::compareString(const nlohmann::json &value, const nlohmann::json &condition) {
         // TODO consider adding support for OR conditions
         static const std::unordered_map<std::string, std::function<bool(const std::string &, const std::string &)> >
                 stringOperators = {
@@ -495,9 +532,6 @@ namespace SmartHome {
                 throw std::invalid_argument("Unknown operator '" + op + "'");
             }
 
-            mpLogger->debugf("[EVENT_HANDLER] [TEST] %s %s %s = %b", to_string(value).c_str(), op.c_str(),
-                             to_string(target).c_str(), iter->second(stringValue, target.get<std::string>()));
-
             conditionResult = iter->second(stringValue, target.get<std::string>());
             if (!conditionResult) return false; // Return false immediately if any condition fails (AND condition logic)
         }
@@ -508,10 +542,9 @@ namespace SmartHome {
         if (!mIsRunning) return;
         mpLogger->debug("[EVENT_HANDLER] Dispatching action");
 
-        boost::asio::post(mIoContext, [action = action, deviceId, this] {
-            if (!mIsRunning) return;
-            constexpr std::string_view actionName = "Conditional event";
-            ActionHelpers::dispatchAutomatedDeviceAction(actionName, deviceId, action);
+        boost::asio::post(mIoContext, [self = shared_from_this(), action = action, deviceId] {
+            if (!self->mIsRunning) return;
+            self->mDispatchAction(Constants::AutomatedActionNames::CONDITIONAL_EVENT, deviceId, action);
         });
     }
 
@@ -519,10 +552,9 @@ namespace SmartHome {
         if (!mIsRunning) return;
         mpLogger->debugf("[EVENT_HANDLER] Dispatching module notification action for module [%u]", moduleId);
 
-        boost::asio::post(mIoContext, [action = action, moduleId, this] {
-            if (!mIsRunning) return;
-            constexpr std::string_view actionName = "Module notification";
-            ActionHelpers::dispatchAutomatedModuleAction(actionName, moduleId, action);
+        boost::asio::post(mIoContext, [self = shared_from_this(), action = action, moduleId] {
+            if (!self->mIsRunning) return;
+            self->mDispatchModuleAction(Constants::AutomatedActionNames::MODULE_NOTIFICATION, moduleId, action);
         });
     }
 }

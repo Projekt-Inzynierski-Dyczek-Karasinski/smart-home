@@ -181,7 +181,7 @@ namespace SmartHome {
             mpScheduler->loadFromCache();
             mpScheduler->start();
 
-            mpEventHandler = std::make_unique<EventHandler>(mCoreIoContext, mConfigCache, mpLogger);
+            mpEventHandler = std::make_shared<EventHandler>(mCoreIoContext, mConfigCache, mReadingsCache, mpLogger);
             mpEventHandler->loadFromCache();
             mpEventHandler->start();
 

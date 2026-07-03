@@ -8,16 +8,24 @@
 
 
 namespace SmartHome {
-    class EventHandler {
+    class EventHandler : public std::enable_shared_from_this<EventHandler> {
         friend class EventHandlerTest;
+        using ActionDispatcher =
+        std::function<void(std::string_view actionName, uint id, const nlohmann::json &action)>;
 
     public:
         EventHandler(ba::io_context &ioContext,
                      const ConfigCache &configCache,
-                     std::shared_ptr<Utils::AsyncLogger> pLogger)
+                     const ReadingsCache &readingsCache,
+                     std::shared_ptr<Utils::AsyncLogger> pLogger,
+                     ActionDispatcher dispatchAction = &ActionHelpers::dispatchAutomatedDeviceAction,
+                     ActionDispatcher dispatchModuleAction = &ActionHelpers::dispatchAutomatedModuleAction)
             : mIoContext(ioContext),
               mConfigCache(configCache),
-              mpLogger(std::move(pLogger)) {
+              mReadingsCache(readingsCache),
+              mpLogger(std::move(pLogger)),
+              mDispatchAction(std::move(dispatchAction)),
+              mDispatchModuleAction(std::move(dispatchModuleAction)) {
         }
 
         ~EventHandler();
@@ -69,15 +77,26 @@ namespace SmartHome {
 
         std::vector<Notification> parseModuleNotifications(uint moduleId, const nlohmann::json &notifications) const;
 
+        /**
+         *
+         * @param event
+         * @param reading
+         * @param deviceExpectedValuesFormat
+         * @return
+         *
+         * @note Parameter \p event might be modified by this function.
+         *
+         * @pre Caller must hold \c mMutex (exclusive).
+         */
         bool shouldEventTrigger(Event &event,
                                 const nlohmann::json &reading,
-                                const nlohmann::json::array_t &deviceExpectedValuesFormat) const;
+                                const nlohmann::json::array_t &deviceExpectedValuesFormat);
 
-        bool isConditionMet(const nlohmann::json &value, const nlohmann::json &condition) const;
+        static bool isConditionMet(const nlohmann::json &value, const nlohmann::json &condition);
 
-        bool compareNumeric(const nlohmann::json &value, const nlohmann::json &condition) const;
+        static bool compareNumeric(const nlohmann::json &value, const nlohmann::json &condition);
 
-        bool compareString(const nlohmann::json &value, const nlohmann::json &condition) const;
+        static bool compareString(const nlohmann::json &value, const nlohmann::json &condition);
 
         void dispatchAction(uint deviceId, const nlohmann::json &action) const;
 
@@ -87,16 +106,19 @@ namespace SmartHome {
 
         ba::io_context &mIoContext;
         const ConfigCache &mConfigCache;
+        const ReadingsCache &mReadingsCache;
         std::shared_ptr<Utils::AsyncLogger> mpLogger;
+
+        // Dispatch dependencies, used for DI in testing
+        ActionDispatcher mDispatchAction;
+        ActionDispatcher mDispatchModuleAction;
 
         /// Device ID: events
         std::map<uint, std::vector<Event> > mDeviceEvents;
 
         /// Module ID: {notification type: notifications}
         std::map<uint, std::unordered_map<std::string, std::vector<Notification> > > mModuleNotifications;
-        std::map<uint, uint> mLogicAddressToModuleId;
 
         std::atomic_bool mIsRunning{false};
-        std::atomic_bool mIsStopping{false};
     };
 }

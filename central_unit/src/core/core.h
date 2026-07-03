@@ -228,8 +228,9 @@ namespace SmartHome {
         // Scheduler
         std::unique_ptr<Scheduler> mpScheduler;
 
+        // TODO check other members shutdown sequence (fix hanging this by shared_from_this like in EventHandler)
         // Event handler
-        std::unique_ptr<EventHandler> mpEventHandler;
+        std::shared_ptr<EventHandler> mpEventHandler;
 
         // Socket server resources
         ba::io_context mSocketServerIoContext;
