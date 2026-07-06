@@ -213,10 +213,28 @@ namespace SmartHome {
          */
         static awaitOptApiResponse delegateToMediator(cmdMetaPtr pCommandMetadata, jsonPtr params);
 
+        /**
+         * @brief Dispatches an automated device action.
+         *
+         * @details Verifies action and creates InternalApi command which is passed to Actions pipeline for execution.
+         *
+         * @param actionName Action name for logging purposes.
+         * @param deviceId Device ID to which the action is dispatched.
+         * @param action JSON containing the action object.
+         */
         static void dispatchAutomatedDeviceAction(std::string_view actionName,
                                                   uint deviceId,
                                                   const nlohmann::json &action);
 
+        /**
+         * @brief Dispatches an automated module action.
+         *
+         * @details Verifies action and creates InternalApi command which is passed to Actions pipeline for execution.
+         *
+         * @param actionName Action name for logging purposes.
+         * @param moduleId Module ID to which the action is dispatched.
+         * @param action JSON containing the action object.
+         */
         static void dispatchAutomatedModuleAction(std::string_view actionName,
                                                   uint moduleId,
                                                   const nlohmann::json &action);

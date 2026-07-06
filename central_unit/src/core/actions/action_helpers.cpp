@@ -307,7 +307,7 @@ namespace SmartHome {
                                           API::InternalApi::Target(parsedTargetMethod.first));
 
 
-        // TODO !pr consider adding isInternal (or module related as internal call should be fast) flag to Request struct
+        // TODO consider adding isInternal (or module related as internal call should be fast) flag to Request struct
         //      That flag would be used to set different timeout, which would fix large batches of scheduled module
         //      calls timing out.
         API::InternalApi::Request request;
