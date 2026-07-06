@@ -436,10 +436,10 @@ namespace SmartHome {
                     "[EVENT_HANDLER] Invalid conditions not handled, check device [%u] config.",
                     event.deviceId);
             }
-        } else if (constexpr std::string_view defaultConditionStr = "$0";
-            conditions.contains(defaultConditionStr) && conditions.at(defaultConditionStr).is_object()) {
+        } else if (constexpr std::string_view defaultConditionKeyStr = "$0";
+            conditions.contains(defaultConditionKeyStr) && conditions.at(defaultConditionKeyStr).is_object()) {
             // Handle single value reading with condition in field with defaultConditionStr key in conditions object
-            result = checkCondition(conditions.at(defaultConditionStr), reading, deviceExpectedValuesFormat.front());
+            result = checkCondition(conditions.at(defaultConditionKeyStr), reading, deviceExpectedValuesFormat.front());
         } else {
             // Handle single value reading with condition directly in conditions object
             result = checkCondition(conditions, reading, deviceExpectedValuesFormat.front());
@@ -463,19 +463,23 @@ namespace SmartHome {
         return result;
     }
 
-    bool EventHandler::isConditionMet(const nlohmann::json &value, const nlohmann::json &condition) {
+    bool EventHandler::isConditionMet(const nlohmann::json &value, const nlohmann::json &conditions) {
         if (!value.is_number() && !value.is_string()) {
             throw std::invalid_argument("Unsupported value type for condition evaluation");
         }
 
-        if (value.is_number()) return compareNumeric(value, condition);
-        if (value.is_string()) return compareString(value, condition);
+        try {
+            if (value.is_number()) return compareNumeric(value, conditions);
+            if (value.is_string()) return compareString(value, conditions);
+        }
+        catch (const std::exception &e) {
+            throw; // propagate exception to caller
+        }
 
         throw std::logic_error("Unexpected error in condition evaluation");
     }
 
-    bool EventHandler::compareNumeric(const nlohmann::json &value, const nlohmann::json &condition) {
-        // TODO consider adding support for OR conditions
+    bool EventHandler::compareNumeric(const nlohmann::json &value, const nlohmann::json &conditions) {
         static const std::unordered_map<std::string, std::function<bool(double, double)> > numericalOperators = {
             {">", [](const double a, const double b) { return a > b; }},
             {"<", [](const double a, const double b) { return a < b; }},
@@ -485,14 +489,14 @@ namespace SmartHome {
             {"<=", [](const double a, const double b) { return a <= b; }},
         };
 
-        if (condition.empty()) {
-            throw std::invalid_argument("Empty condition provided");
+        if (conditions.empty()) {
+            throw std::invalid_argument("Empty conditions object provided");
         }
 
         const double numValue = value.get<double>();
         bool conditionResult = false;
 
-        for (const auto &[op, threshold]: condition.items()) {
+        for (const auto &[op, threshold]: conditions.items()) {
             if (!threshold.is_number()) {
                 throw std::invalid_argument("Threshold for operator '" + op + "' must be a number");
             }
@@ -507,8 +511,7 @@ namespace SmartHome {
         return true;
     }
 
-    bool EventHandler::compareString(const nlohmann::json &value, const nlohmann::json &condition) {
-        // TODO consider adding support for OR conditions
+    bool EventHandler::compareString(const nlohmann::json &value, const nlohmann::json &conditions) {
         static const std::unordered_map<std::string, std::function<bool(const std::string &, const std::string &)> >
                 stringOperators = {
                     {"=", [](const std::string &a, const std::string &b) { return a == b; }},
@@ -516,14 +519,14 @@ namespace SmartHome {
                     {"contains", [](const std::string &a, const std::string &b) { return a.contains(b); }}
                 };
 
-        if (condition.empty()) {
-            throw std::invalid_argument("Empty condition provided");
+        if (conditions.empty()) {
+            throw std::invalid_argument("Empty conditions object provided");
         }
 
         const auto stringValue = value.get<std::string>();
         bool conditionResult = false;
 
-        for (const auto &[op, target]: condition.items()) {
+        for (const auto &[op, target]: conditions.items()) {
             if (!target.is_string()) {
                 throw std::invalid_argument("Target for operator '" + op + "' must be a string");
             }
