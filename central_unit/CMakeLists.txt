@@ -81,6 +81,17 @@ else ()
     add_link_options(-Wl,--gc-sections,-s)
 endif ()
 
+# Coverage options
+if (ENABLE_COVERAGE AND CMAKE_CROSSCOMPILING)
+    message(WARNING "Coverage is not enabled when cross-compiling, forcing ENABLE_COVERAGE=OFF")
+    set(ENABLE_COVERAGE OFF)
+endif ()
+
+if(ENABLE_COVERAGE)
+    add_compile_options(--coverage)
+    add_link_options(--coverage)
+endif()
+
 # Add subdirectories
 add_subdirectory(src/common)
 
@@ -108,6 +119,7 @@ if (BUILD_GUI)
     add_subdirectory(src/gui)
 endif ()
 
+# Add tests
 if (BUILD_TESTS AND CMAKE_CROSSCOMPILING)
     message(WARNING "Tests are not built when cross-compiling, forcing BUILD_TESTS=OFF")
     set(BUILD_TESTS OFF)
