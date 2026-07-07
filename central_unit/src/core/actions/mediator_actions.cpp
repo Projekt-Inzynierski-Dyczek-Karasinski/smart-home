@@ -246,8 +246,7 @@ namespace SmartHome {
 
         resultResponse = co_await sendRequestToMediator(std::move(request), commandMetadata);
 
-        // TODO !pr implement function handling conditional events
-        // TODO consider implementing save reading/log to db function
+        // TODO consider implementing separate functions to save readings, logs to db and calling EventHandler's methods
         // Send to db
         if (resultResponse.result.has_value()) {
             DatabaseActions::updateModuleLastOnline(moduleId);

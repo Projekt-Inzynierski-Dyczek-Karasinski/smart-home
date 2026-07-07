@@ -13,7 +13,7 @@ namespace SmartHome {
     using namespace std::string_literals;
 
     namespace cdi = Constants::DatabaseIdentifiers;
-    // TODO !pr change strings to constatns
+    // TODO change strings to constants
 
     // Method handlers
 
