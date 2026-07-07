@@ -50,10 +50,6 @@ target_include_directories(smarthome_core_lib PUBLIC
         ${libical_BINARY_DIR}/src/libical
 )
 
-# TODO !pr check if needed
-target_compile_features(smarthome_core_lib PUBLIC cxx_std_23)
-target_compile_definitions(smarthome_core_lib PUBLIC BOOST_ASIO_HAS_CO_AWAIT)
-
 target_link_libraries(smarthome_core_lib PUBLIC
         smarthome::api
         smarthome::ipc
