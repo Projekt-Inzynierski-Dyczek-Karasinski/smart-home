@@ -11,4 +11,5 @@ target_link_libraries(smarthomectl PRIVATE
         smarthome::ipc
         smarthome::logger
         Boost::program_options
+        project_warnings
 )

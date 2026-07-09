@@ -8,22 +8,24 @@ find_package(nlohmann_json 3.11.2 REQUIRED)
 if (ENABLE_SYSTEMD)
     # Required PkgConfig for systemd
     find_package(PkgConfig REQUIRED)
-    pkg_check_modules(SYSTEMD REQUIRED libsystemd)
-
+    pkg_check_modules(SYSTEMD REQUIRED IMPORTED_TARGET libsystemd)
 endif ()
+
+include(FetchContent)
 
 FetchContent_Declare(
         libical
         GIT_REPOSITORY https://github.com/libical/libical.git
         GIT_TAG v3.0.20
+        GIT_SHALLOW ON
+        SYSTEM
+        EXCLUDE_FROM_ALL
 )
 
 set(STATIC_ONLY ON CACHE BOOL "" FORCE)
 set(ICAL_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-set(ICAL_BUILD_TESTING OFF CACHE BOOL "" FORCE)
-set(ICAL_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+set(LIBICAL_BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(ICAL_GLIB OFF CACHE BOOL "" FORCE)
-set(ICAL_GTK_DOC OFF CACHE BOOL "" FORCE)
 set(CMAKE_DISABLE_FIND_PACKAGE_ICU ON CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(libical)
@@ -46,6 +48,9 @@ add_library(smarthome::core_lib ALIAS smarthome_core_lib)
 
 target_include_directories(smarthome_core_lib PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}
+)
+
+target_include_directories(smarthome_core_lib SYSTEM PUBLIC
         ${libical_SOURCE_DIR}/src/libical
         ${libical_BINARY_DIR}/src/libical
 )
@@ -55,26 +60,24 @@ target_link_libraries(smarthome_core_lib PUBLIC
         smarthome::ipc
         smarthome::utility
         smarthome::constants
-        Boost::program_options
         nlohmann_json::nlohmann_json
         ical
         ical_cxx
+        PRIVATE
+        project_warnings
 )
-
-if(ENABLE_COVERAGE)
-    target_compile_options(smarthome_core_lib PRIVATE --coverage)
-    target_link_options(smarthome_core_lib PRIVATE --coverage)
-endif()
 
 if (ENABLE_SYSTEMD)
     # Add compile flag to signal systemd use
-    target_compile_definitions(smarthome_core_lib PUBLIC WITH_SYSTEMD)
+    target_compile_definitions(smarthome_core_lib PRIVATE WITH_SYSTEMD)
     # Link systemd
-    target_link_libraries(smarthome_core_lib PUBLIC ${SYSTEMD_LIBRARIES})
-    target_include_directories(smarthome_core_lib PUBLIC ${SYSTEMD_INCLUDE_DIRS})
+    target_link_libraries(smarthome_core_lib PRIVATE PkgConfig::SYSTEMD)
 endif ()
 
 # Target
 add_executable(smarthomed main.cpp)
-target_link_libraries(smarthomed PRIVATE smarthome::core_lib)
+target_link_libraries(smarthomed PRIVATE
+        smarthome::core_lib
+        Boost::program_options
+        project_warnings)
 
