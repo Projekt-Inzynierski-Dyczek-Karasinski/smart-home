@@ -268,6 +268,7 @@ namespace SmartHome {
         co_return co_await MediatorActions::mediatorSetHandler(pCommandMetadata);
     }
 
+    // FIXME when dispatched action is an notification its not logged as completed as there is no response
     void ActionHelpers::dispatchAutomatedDeviceAction(const std::string_view actionName,
                                                       uint deviceId,
                                                       const nlohmann::json &action) {
@@ -316,7 +317,7 @@ namespace SmartHome {
         request.commands.push_back(std::move(command));
 
         pLogger->debugf("[ACTION_HELPERS] [DEVICE_AUTOMATED_ACTION] Dispatching action '%s' for device [%u]",
-                        parsedTargetMethod.second.c_str(), deviceId);
+                        actionName.data(), deviceId);
 
         Actions::handleIncomingRequest(
             request, [pLogger, deviceId, actionName = std::string(actionName)](
@@ -403,7 +404,7 @@ namespace SmartHome {
         request.commands.push_back(std::move(command));
 
         pLogger->debugf("[ACTION_HELPERS] [MODULE_AUTOMATED_ACTION] Dispatching action '%s' for module [%u]",
-                        parsedTargetMethod.second.c_str(), moduleId);
+                        actionName.data(), moduleId);
 
         Actions::handleIncomingRequest(
             request, [pLogger, moduleId, actionName = std::string(actionName)](
