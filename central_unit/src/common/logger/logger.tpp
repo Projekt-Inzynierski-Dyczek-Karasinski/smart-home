@@ -8,27 +8,27 @@ namespace SmartHome::Utils {
 
     template<typename... Args>
     void Logger::criticalf(const char *format, Args... args) {
-        Logger::logf(LogLevels::Level::CRITICAL, format, args...);
+        Logger::logf(LogLevels::Level::Critical, format, args...);
     }
 
     template<typename... Args>
     void Logger::errorf(const char *format, Args... args) {
-        Logger::logf(LogLevels::Level::ERROR, format, args...);
+        Logger::logf(LogLevels::Level::Error, format, args...);
     }
 
     template<typename... Args>
     void Logger::warningf(const char *format, Args... args) {
-        Logger::logf(LogLevels::Level::WARNING, format, args...);
+        Logger::logf(LogLevels::Level::Warning, format, args...);
     }
 
     template<typename... Args>
     void Logger::infof(const char *format, Args... args) {
-        Logger::logf(LogLevels::Level::INFO, format, args...);
+        Logger::logf(LogLevels::Level::Info, format, args...);
     }
 
     template<typename... Args>
     void Logger::debugf(const char *format, Args... args) {
-        Logger::logf(LogLevels::Level::DEBUG, format, args...);
+        Logger::logf(LogLevels::Level::Debug, format, args...);
     }
 
     template<typename... Args>

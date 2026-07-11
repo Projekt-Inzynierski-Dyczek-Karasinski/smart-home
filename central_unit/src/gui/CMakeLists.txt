@@ -48,4 +48,5 @@ target_link_libraries(smarthomegui PRIVATE
         Qt6::Qml
         smarthome::logger
         smarthome::utility
+        project_warnings
 )

@@ -36,7 +36,7 @@ namespace SmartHome {
         configManager.getValue(root + ".config_path", mediatorConfig.configPath);
 
         // Db-service config
-        root = "services.db-service";
+        root = "services.db_service";
         configManager.getValue(root + ".enabled", dbServiceConfig.isEnabled);
         dbServiceConfig.serviceType = Utils::resolveServiceType(
             configManager.getValue<std::string>(root + ".service_type").value());

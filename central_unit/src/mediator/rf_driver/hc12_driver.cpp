@@ -51,7 +51,7 @@ namespace SmartHomeMediator {
 
     ba::awaitable<void> HC12Driver::write(const std::vector<uint8_t> data) {
         // TODO left for debug, remove before merging with main
-        if (mpLogger->getLevel() == SmartHome::Utils::LogLevels::Level::DEBUG) {
+        if (mpLogger->getLevel() == SmartHome::Utils::LogLevels::Level::Debug) {
             std::string tmp;
             for (const auto e: data) {
                 tmp += std::to_string(e) + ",";

@@ -8,6 +8,8 @@
 #include <boost/algorithm/string/classification.hpp>
 
 namespace SmartHome {
+    using namespace std::string_literals;
+
     ActionHelpers::CommandMetadata::CommandMetadata(API::InternalApi::Command command,
                                                     std::shared_ptr<ba::steady_timer> commandTimeoutTimer,
                                                     const apiId_t requestId)
@@ -264,5 +266,176 @@ namespace SmartHome {
 
         // Delegate command to mediator actions for resolving (for commands that are targeted at module or mediator)
         co_return co_await MediatorActions::mediatorSetHandler(pCommandMetadata);
+    }
+
+    // FIXME when dispatched action is an notification its not logged as completed as there is no response
+    void ActionHelpers::dispatchAutomatedDeviceAction(const std::string_view actionName,
+                                                      uint deviceId,
+                                                      const nlohmann::json &action) {
+        const auto pLogger = Core::Instance().mpLogger;
+
+        if (!action.contains(JsonRpcStrings::RequestKeys::METHOD) ||
+            !action[JsonRpcStrings::RequestKeys::METHOD].is_string()) {
+            pLogger->errorf("[ACTION_HELPERS] [DEVICE_AUTOMATED_ACTION] "
+                            "Invalid action for device [%u]: missing or invalid method", deviceId);
+            return;
+        }
+
+        if (!action.contains(JsonRpcStrings::RequestKeys::PARAMS) ||
+            !action[JsonRpcStrings::RequestKeys::PARAMS].is_object()) {
+            pLogger->errorf("[ACTION_HELPERS] [DEVICE_AUTOMATED_ACTION] "
+                            "Invalid action for device [%u]: missing or invalid params", deviceId);
+            return;
+        }
+
+        const auto &method = action[JsonRpcStrings::RequestKeys::METHOD].get<std::string>();
+        const auto &params = action[JsonRpcStrings::RequestKeys::PARAMS];
+
+        std::pair<std::string, std::string> parsedTargetMethod;
+        try {
+            parsedTargetMethod = API::parseTargetMethodString(method);
+        } catch (const std::exception &e) {
+            pLogger->errorf("[ACTION_HELPERS] [DEVICE_AUTOMATED_ACTION] "
+                            "Invalid method format in action for device [%u]: %s", deviceId,
+                            e.what());
+            return;
+        }
+
+        // Build InternalApi Command and Request
+        API::InternalApi::Command command(params,
+                                          API::ApiId(API::getNextApiId()),
+                                          API::InternalApi::Method(parsedTargetMethod.second),
+                                          API::InternalApi::Target(parsedTargetMethod.first));
+
+
+        // TODO consider adding isInternal (or module related as internal call should be fast) flag to Request struct
+        //      That flag would be used to set different timeout, which would fix large batches of scheduled module
+        //      calls timing out.
+        API::InternalApi::Request request;
+        request.connectionId = 0; // No real connection
+        request.isResultStructured = true;
+        request.commands.push_back(std::move(command));
+
+        pLogger->debugf("[ACTION_HELPERS] [DEVICE_AUTOMATED_ACTION] Dispatching action '%s' for device [%u]",
+                        actionName.data(), deviceId);
+
+        Actions::handleIncomingRequest(
+            request, [pLogger, deviceId, actionName = std::string(actionName)](
+        connectionId_t, const std::string &&response) {
+                pLogger->debugf("[ACTION_HELPERS] [DEVICE_AUTOMATED_ACTION] Action result for device [%u]: %s",
+                                deviceId, response.c_str());
+
+                try {
+                    const API::ApiResponse apiResponse(nlohmann::json::parse(response));
+                    const auto deviceOpt = Core::Instance().configCache().getDevice(deviceId);
+                    if (!deviceOpt.has_value()) {
+                        pLogger->error("[ACTION_HELPERS] [DEVICE_AUTOMATED_ACTION] Failed to get cached device data");
+                    }
+
+
+                    if (apiResponse.error.has_value()) {
+                        pLogger->errorf(
+                            "[ACTION_HELPERS] [DEVICE_AUTOMATED_ACTION] Action '%s' error for device [%u]: %s",
+                            actionName.c_str(),
+                            deviceId,
+                            apiResponse.error->data.c_str());
+
+                        if (deviceOpt.has_value()) {
+                            DatabaseActions::postLog(deviceOpt.value().moduleId,
+                                                     "error",
+                                                     "Automated action '"s + actionName
+                                                     + "' failed: " + apiResponse.error->data);
+                        }
+                    } else {
+                        // TODO add log levels to database post
+                        if (deviceOpt.has_value()) {
+                            DatabaseActions::postLog(deviceOpt.value().moduleId,
+                                                     "info",
+                                                     "Automated action '"s + actionName + "' completed");
+                        }
+                    }
+                } catch (const std::exception &e) {
+                    pLogger->errorf("[SCHEDULER] Failed to parse action response for device [%u]: %s", deviceId,
+                                    e.what());
+                }
+            });
+    }
+
+    void ActionHelpers::dispatchAutomatedModuleAction(const std::string_view actionName,
+                                                      uint moduleId,
+                                                      const nlohmann::json &action) {
+        const auto pLogger = Core::Instance().mpLogger;
+
+        if (!action.contains(JsonRpcStrings::RequestKeys::METHOD) ||
+            !action[JsonRpcStrings::RequestKeys::METHOD].is_string()) {
+            pLogger->errorf("[ACTION_HELPERS] [MODULE_AUTOMATED_ACTION] "
+                            "Invalid action for module [%u]: missing or invalid method", moduleId);
+            return;
+        }
+
+        if (!action.contains(JsonRpcStrings::RequestKeys::PARAMS) ||
+            !action[JsonRpcStrings::RequestKeys::PARAMS].is_object()) {
+            pLogger->errorf("[ACTION_HELPERS] [MODULE_AUTOMATED_ACTION] "
+                            "Invalid action for module [%u]: missing or invalid params", moduleId);
+            return;
+        }
+
+        const auto &method = action[JsonRpcStrings::RequestKeys::METHOD].get<std::string>();
+        const auto &params = action[JsonRpcStrings::RequestKeys::PARAMS];
+
+        std::pair<std::string, std::string> parsedTargetMethod;
+        try {
+            parsedTargetMethod = API::parseTargetMethodString(method);
+        } catch (const std::exception &e) {
+            pLogger->errorf("[ACTION_HELPERS] [MODULE_AUTOMATED_ACTION] "
+                            "Invalid method format in action for module [%u]: %s", moduleId,
+                            e.what());
+            return;
+        }
+
+        API::InternalApi::Command command(params,
+                                          API::ApiId(API::getNextApiId()),
+                                          API::InternalApi::Method(parsedTargetMethod.second),
+                                          API::InternalApi::Target(parsedTargetMethod.first));
+
+        API::InternalApi::Request request;
+        request.connectionId = 0;
+        request.isResultStructured = true;
+        request.commands.push_back(std::move(command));
+
+        pLogger->debugf("[ACTION_HELPERS] [MODULE_AUTOMATED_ACTION] Dispatching action '%s' for module [%u]",
+                        actionName.data(), moduleId);
+
+        Actions::handleIncomingRequest(
+            request, [pLogger, moduleId, actionName = std::string(actionName)](
+        connectionId_t, const std::string &&response) {
+                pLogger->debugf("[ACTION_HELPERS] [MODULE_AUTOMATED_ACTION] Action result for module [%u]: %s",
+                                moduleId, response.c_str());
+
+                try {
+                    const API::ApiResponse apiResponse(nlohmann::json::parse(response));
+
+                    if (apiResponse.error.has_value()) {
+                        pLogger->errorf(
+                            "[ACTION_HELPERS] [MODULE_AUTOMATED_ACTION] Action '%s' error for module [%u]: %s",
+                            actionName.c_str(),
+                            moduleId,
+                            apiResponse.error->data.c_str());
+
+                        DatabaseActions::postLog(moduleId,
+                                                 "error",
+                                                 "Automated action '"s + actionName
+                                                 + "' failed: " + apiResponse.error->data);
+                    } else {
+                        DatabaseActions::postLog(moduleId,
+                                                 "info",
+                                                 "Automated action '"s + actionName + "' completed");
+                    }
+                } catch (const std::exception &e) {
+                    pLogger->errorf("[ACTION_HELPERS] [MODULE_AUTOMATED_ACTION] "
+                                    "Failed to parse action response for module [%u]: %s", moduleId,
+                                    e.what());
+                }
+            });
     }
 }

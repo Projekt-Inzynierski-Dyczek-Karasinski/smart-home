@@ -7,6 +7,9 @@ FetchContent_Declare(
         yaml-cpp
         GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
         GIT_TAG c9371de
+        GIT_SHALLOW ON
+        SYSTEM
+        EXCLUDE_FROM_ALL
 )
 
 set(YAML_CPP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
@@ -26,8 +29,7 @@ find_package(Boost 1.74 REQUIRED COMPONENTS
 if (ENABLE_SYSTEMD)
     # Required PkgConfig for systemd
     find_package(PkgConfig REQUIRED)
-    pkg_check_modules(SYSTEMD REQUIRED libsystemd)
-
+    pkg_check_modules(SYSTEMD REQUIRED IMPORTED_TARGET libsystemd)
 endif ()
 
 
@@ -45,6 +47,7 @@ target_include_directories(smarthome_logger PUBLIC
 
 target_link_libraries(smarthome_logger PRIVATE
         Boost::system
+        project_warnings
 )
 
 # SMARTHOME API
@@ -56,6 +59,10 @@ add_library(smarthome::api ALIAS smarthome_api)
 
 target_include_directories(smarthome_api PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/api>
+)
+
+target_link_libraries(smarthome_api PRIVATE
+        project_warnings
 )
 
 # SMARTHOME IPC
@@ -79,6 +86,7 @@ target_link_libraries(smarthome_ipc PRIVATE
         smarthome::logger
         smarthome::api
         ZLIB::ZLIB
+        project_warnings
 )
 
 # SMARTHOME UTILITY
@@ -102,13 +110,13 @@ if (ENABLE_SYSTEMD)
     # Add compile flag to signal systemd use
     target_compile_definitions(smarthome_utility PRIVATE WITH_SYSTEMD)
     # Link systemd
-    target_link_libraries(smarthome_utility PRIVATE ${SYSTEMD_LIBRARIES})
-    target_include_directories(smarthome_utility PRIVATE ${SYSTEMD_INCLUDE_DIRS})
+    target_link_libraries(smarthome_utility PUBLIC PkgConfig::SYSTEMD)
 endif ()
 
 target_link_libraries(smarthome_utility
         PRIVATE
         yaml-cpp
+        project_warnings
         PUBLIC
         smarthome::logger
 )

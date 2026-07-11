@@ -1,5 +1,5 @@
 #pragma once
-#include <c++/12/string_view>
+#include <string_view>
 #include <set>
 
 namespace SmartHome::Constants {
@@ -115,11 +115,15 @@ namespace SmartHome::Constants {
         inline constexpr std::string_view MODULE_LOGS = "module_logs";
 
         // Notify types strings
-        // Sent to modules
+        // Sent to core
         inline constexpr std::string_view MANUAL_TRIGGER = "manual_trigger";
         inline constexpr std::string_view POWER_LOSS = "power_loss";
         inline constexpr std::string_view ALERT = "alert";
-        // Sent to core
+
+        inline const std::set MODULE_TO_CORE_NOTIFICATION_TYPES = {
+            MANUAL_TRIGGER, POWER_LOSS, ALERT
+        };
+        // Sent to modules
         inline constexpr std::string_view WAKE = "wake";
 
         // Execute types strings
@@ -226,7 +230,16 @@ namespace SmartHome::Constants {
 
         inline constexpr std::string_view EVENTS = "events";
         // Event keys
+        inline constexpr std::string_view TRIGGER = "trigger";
         inline constexpr std::string_view CONDITION = "condition";
+        // -----------------
+
+        // Triggers
+        inline constexpr std::string_view EDGE = "edge";
+        inline constexpr std::string_view LEVEL = "level";
+        inline const std::set TRIGGER_TYPES = {
+            EDGE, LEVEL
+        };
         // -----------------
 
         inline constexpr std::string_view SCHEDULE = "schedule";
@@ -254,8 +267,15 @@ namespace SmartHome::Constants {
         inline constexpr std::string_view POWER_SAVING = "power_saving";
         inline constexpr std::string_view DEFAULT_SLEEP_DURATION = "default_sleep_duration";
 
+        inline constexpr std::string_view ON_NOTIFICATION = "on_notification";
+        // Notification keys, duplicated from DeviceConfigKeys to keep configs consistent
+        inline constexpr std::string_view ENABLED = DeviceConfigKeys::ENABLED;
+        inline constexpr std::string_view ACTION = DeviceConfigKeys::ACTION;
+        // -----------------
+
+
         inline const std::set CONFIG_KEYS = {
-            CONNECTION, RF_CHANNEL, SLEEP_AFTER_SEND, POWER_SAVING, DEFAULT_SLEEP_DURATION
+            CONNECTION, RF_CHANNEL, SLEEP_AFTER_SEND, POWER_SAVING, DEFAULT_SLEEP_DURATION, ON_NOTIFICATION
         };
     }
 
@@ -267,6 +287,11 @@ namespace SmartHome::Constants {
         inline constexpr std::string_view NOT_IMPLEMENTED = "Not implemented";
         inline constexpr std::string_view INTERNAL_ERROR = "Internal error";
         inline constexpr std::string_view UNDEFINED_ERROR = "Undefined error";
+    }
+
+    namespace AutomatedActionNames {
+        inline constexpr std::string_view MODULE_NOTIFICATION = "Module notification";
+        inline constexpr std::string_view CONDITIONAL_EVENT  = "Conditional event";
     }
 
     // Utility functions

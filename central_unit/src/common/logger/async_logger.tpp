@@ -14,26 +14,26 @@ namespace SmartHome::Utils {
 
     template<typename... Args>
     void AsyncLogger::criticalf(const char *format, Args... args) {
-        AsyncLogger::logf(LogLevels::Level::CRITICAL, format, args...);
+        AsyncLogger::logf(LogLevels::Level::Critical, format, args...);
     }
 
     template<typename... Args>
     void AsyncLogger::errorf(const char *format, Args... args) {
-        AsyncLogger::logf(LogLevels::Level::ERROR, format, args...);
+        AsyncLogger::logf(LogLevels::Level::Error, format, args...);
     }
 
     template<typename... Args>
     void AsyncLogger::warningf(const char *format, Args... args) {
-        AsyncLogger::logf(LogLevels::Level::WARNING, format, args...);
+        AsyncLogger::logf(LogLevels::Level::Warning, format, args...);
     }
 
     template<typename... Args>
     void AsyncLogger::infof(const char *format, Args... args) {
-        AsyncLogger::logf(LogLevels::Level::INFO, format, args...);
+        AsyncLogger::logf(LogLevels::Level::Info, format, args...);
     }
 
     template<typename... Args>
     void AsyncLogger::debugf(const char *format, Args... args) {
-        AsyncLogger::logf(LogLevels::Level::DEBUG, format, args...);
+        AsyncLogger::logf(LogLevels::Level::Debug, format, args...);
     }
 }

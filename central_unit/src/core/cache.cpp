@@ -134,8 +134,8 @@ namespace SmartHome {
         const auto iter = mModules.find(moduleId);
         if (iter == mModules.end()) return;
 
-        mModules.erase(iter);
         removeFromModulesIndex(iter->second.logicAddress);
+        mModules.erase(iter);
     }
 
     void ConfigCache::updateModuleLastOnline(const uint moduleId,
@@ -203,8 +203,8 @@ namespace SmartHome {
         const auto iter = mDevices.find(deviceId);
         if (iter == mDevices.end()) return;
 
-        mDevices.erase(iter);
         removeFromDevicesIndex(iter->second.moduleId, iter->second.logicId);
+        mDevices.erase(iter);
     }
 
     std::optional<uint> ConfigCache::findModuleId(const uint logicAddress) const {

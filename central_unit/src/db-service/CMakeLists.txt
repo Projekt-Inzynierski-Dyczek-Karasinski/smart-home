@@ -12,17 +12,16 @@ FetchContent_Declare(
         GIT_REPOSITORY https://github.com/jtv/libpqxx.git
         GIT_TAG 7.10.5
         GIT_SHALLOW ON
+        SYSTEM
+        EXCLUDE_FROM_ALL
 )
 
 # Build libpqxx static
-set(BUILD_SHARED_LIBS OFF CACHE INTERNAL "")
-set(SKIP_BUILD_TEST ON CACHE INTERNAL "")
+set(BUILD_SHARED_LIBS OFF)
 set(SKIP_BUILD_TEST ON CACHE INTERNAL "")
 set(BUILD_DOC OFF CACHE INTERNAL "")
 
 FetchContent_MakeAvailable(libpqxx)
-
-find_package(PostgreSQL 15.15 REQUIRED)
 
 # Target
 add_executable(smarthome-database
@@ -44,10 +43,7 @@ target_link_libraries(smarthome-database PRIVATE
         Boost::program_options
         Boost::system
         pqxx
-        ${PostgreSQL_LIBRARIES}
+        project_warnings
 )
-
-target_include_directories(smarthome-database PRIVATE ${PQXX_INCLUDE_DIRS})
-
 
 

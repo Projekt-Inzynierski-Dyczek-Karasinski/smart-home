@@ -18,7 +18,7 @@ namespace SmartHome {
     }
 
     Scheduler::~Scheduler() {
-        if (mIsStoping.exchange(true, std::memory_order_acq_rel)) return;
+        if (mIsStopping.exchange(true, std::memory_order_acq_rel)) return;
         stop();
     }
 
@@ -268,67 +268,13 @@ namespace SmartHome {
     }
 
     void Scheduler::dispatchAction(const TaskPtr &task) const {
-        const auto &action = task->action;
+        mpLogger->debugf("[SCHEDULER] Dispatching action");
+        auto action = task->action;
+        auto deviceId = task->deviceId;
 
-        if (!action.contains(jrs::RequestKeys::METHOD) || !action[jrs::RequestKeys::METHOD].is_string()) {
-            mpLogger->errorf("[SCHEDULER] Invalid action for device [%u]: missing or invalid method", task->deviceId);
-            return;
-        }
-
-        if (!action.contains(jrs::RequestKeys::PARAMS) || !action[jrs::RequestKeys::PARAMS].is_object()) {
-            mpLogger->errorf("[SCHEDULER] Invalid action for device [%u]: missing or invalid params", task->deviceId);
-            return;
-        }
-
-        const auto &method = action[jrs::RequestKeys::METHOD].get<std::string>();
-        const auto &params = action[jrs::RequestKeys::PARAMS];
-
-        std::pair<std::string, std::string> parsedTargetMethod;
-        try {
-            parsedTargetMethod = API::parseTargetMethodString(method);
-        } catch (const std::exception &e) {
-            mpLogger->errorf("[SCHEDULER] Invalid method format in action for device [%u]: %s", task->deviceId,
-                             e.what());
-            return;
-        }
-
-        // Build InternalApi Command and Request
-        API::InternalApi::Command command(params,
-                                          API::ApiId(API::getNextApiId()),
-                                          API::InternalApi::Method(parsedTargetMethod.second),
-                                          API::InternalApi::Target(parsedTargetMethod.first));
-
-
-        API::InternalApi::Request request;
-        request.connectionId = 0; // No real connection
-        request.isResultStructured = true;
-        request.commands.push_back(std::move(command));
-
-        mpLogger->debugf("[SCHEDULER] Dispatching action '%s' for device [%u]",
-                         parsedTargetMethod.second.c_str(), task->deviceId);
-
-        Actions::handleIncomingRequest(
-            request, [this, deviceId = task->deviceId](connectionId_t, const std::string &&response) {
-                mpLogger->debugf("[SCHEDULER] Action result for device [%u]: %s", deviceId, response.c_str());
-
-                try {
-                    const API::ApiResponse apiResponse(nlohmann::json::parse(response));
-                    if (apiResponse.error.has_value()) {
-                        mpLogger->errorf("[SCHEDULER] Action error for device [%u]: %s",
-                                         deviceId,
-                                         apiResponse.error->data.c_str());
-
-                        const auto deviceOpt = Core::Instance().configCache().getDevice(deviceId);
-                        if (deviceOpt.has_value()) {
-                            DatabaseActions::postLog(deviceOpt.value().moduleId,
-                                                     "error",
-                                                     "Scheduled action failed: " + apiResponse.error->data);
-                        }
-                    }
-                } catch (const std::exception &e) {
-                    mpLogger->errorf("[SCHEDULER] Failed to parse action response for device [%u]: %s", deviceId,
-                                     e.what());
-                }
-            });
+        boost::asio::post(Core::Instance().coreIoContext(), [action, deviceId]  {
+            constexpr std::string_view actionName = "Scheduled action";
+            ActionHelpers::dispatchAutomatedDeviceAction(actionName, deviceId, action);
+        });
     }
 }

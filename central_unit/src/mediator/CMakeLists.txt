@@ -31,6 +31,7 @@ target_link_libraries(smarthome-mediator PRIVATE
         Boost::program_options
         Boost::system
         PkgConfig::GPIOD
+        project_warnings
 )
 
 

@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 6,
   "configurePresets": [
     {
       "name": "base",
@@ -10,35 +10,45 @@
     {
       "name": "native_debug",
       "inherits": "base",
-      "displayName": "Native Debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "TARGET_DEVICE": "Native"
+        "TARGET_DEVICE": "NATIVE",
+        "BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "native_debug_coverage",
+      "inherits": "native_debug",
+      "cacheVariables": {
+        "ENABLE_COVERAGE": "ON"
+      }
+    },
+    {
+      "name": "native_debug_asan",
+      "inherits": "native_debug",
+      "cacheVariables": {
+        "ENABLE_ASAN": "ON"
+      }
+    },
+    {
+      "name": "native_debug_tsan",
+      "inherits": "native_debug",
+      "cacheVariables": {
+        "ENABLE_TSAN": "ON"
       }
     },
     {
       "name": "native",
       "inherits": "base",
-      "displayName": "Native",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "TARGET_DEVICE": "Native"
-      }
-    },
-    {
-      "name": "rpi_zero_2w_debug",
-      "inherits": "base",
-      "displayName": "RPi Zero 2W Debug",
-      "toolchainFile": "${sourceDir}/cmake/rpi_zero_2w_toolchain.cmake",
-      "cacheVariables": {
-        "CMAKE_BUILD_TYPE": "Debug",
-        "TARGET_DEVICE": "RPI_ZERO_2W"
+        "TARGET_DEVICE": "NATIVE",
+        "BUILD_TESTS": "OFF"
       }
     },
     {
       "name": "rpi_zero_2w",
       "inherits": "base",
-      "displayName": "RPi Zero 2W Release",
       "toolchainFile": "${sourceDir}/cmake/rpi_zero_2w_toolchain.cmake",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",

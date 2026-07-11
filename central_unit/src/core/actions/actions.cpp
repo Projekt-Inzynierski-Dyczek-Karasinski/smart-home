@@ -371,6 +371,25 @@ namespace SmartHome {
                 }
             }
         }
+
+        // Outgoing requests cleanup
+        {
+            std::scoped_lock lock(msOutgoingRequestsLock);
+            for (const auto &outgoing: msOutgoingRequests | std::views::values) {
+                std::scoped_lock mdLock(outgoing->metadataMutex);
+                outgoing->sendTimer->cancel();
+                outgoing->timeoutTimer->cancel();
+                for (const auto &promise: outgoing->requestsPromises | std::views::values) {
+                    try {
+                        promise->set_exception(std::make_exception_ptr(std::runtime_error("Core shutdown")));
+                    } catch (const std::exception &e) {
+                        Core::Instance().mpLogger->errorf(
+                            "[ACTIONS] [ON_CORE_SHUTDOWN] Failed to set exception for outgoing request: {}", e.what());
+                    }
+                }
+            }
+            msOutgoingRequests.clear();
+        }
     }
 
 

@@ -15,6 +15,8 @@
 
 #include <boost/asio.hpp>
 
+#include "event_handler.h"
+
 namespace ba = boost::asio;
 namespace bs = boost::system;
 
@@ -127,23 +129,30 @@ namespace SmartHome {
         /**
          * @brief Configuration cache getter.
          *
-         * @return Reference to configuration cache instance.
+         * @return Reference to \c ConfigCache instance.
          */
         ConfigCache &configCache();
 
         /**
          * @brief Readings cache getter.
          *
-         * @return Reference to readings cache instance.
+         * @return Reference to \c ReadingsCache instance.
          */
         ReadingsCache &readingsCache();
 
         /**
          * @brief Scheduler getter.
          *
-         * @return Reference to scheduler instance.
+         * @return Reference to \c Scheduler instance.
          */
         Scheduler &scheduler() const;
+
+        /**
+         * @brief EventHandler getter.
+         *
+         * @return Reference to \c EventHandler instance.
+         */
+        EventHandler &eventHandler() const;
 
         /**
          * @brief Core utility IO context getter.
@@ -218,6 +227,10 @@ namespace SmartHome {
 
         // Scheduler
         std::unique_ptr<Scheduler> mpScheduler;
+
+        // TODO check other members shutdown sequence (fix hanging this by shared_from_this like in EventHandler)
+        // Event handler
+        std::shared_ptr<EventHandler> mpEventHandler;
 
         // Socket server resources
         ba::io_context mSocketServerIoContext;

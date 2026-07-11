@@ -1,6 +1,7 @@
 #include "mediator_actions.h"
 #include "database_actions.h"
 #include "constants.h"
+#include "../event_handler.h"
 
 namespace SmartHome {
     using ai = API::InternalApi;
@@ -245,6 +246,7 @@ namespace SmartHome {
 
         resultResponse = co_await sendRequestToMediator(std::move(request), commandMetadata);
 
+        // TODO consider implementing separate functions to save readings, logs to db and calling EventHandler's methods
         // Send to db
         if (resultResponse.result.has_value()) {
             DatabaseActions::updateModuleLastOnline(moduleId);
@@ -482,11 +484,12 @@ namespace SmartHome {
 
             const nlohmann::json readingMetadata = {{jp::TYPE, parsedParams.type.value()}};
 
+            // Post readings
             Core::Instance().readingsCache().set(deviceIdOpt.value(), result, readingMetadata);
+            DatabaseActions::postDeviceReading(deviceIdOpt.value(), result, readingMetadata);
 
-            DatabaseActions::postDeviceReading(deviceIdOpt.value(),
-                                               result,
-                                               readingMetadata);
+            // Handle conditional events
+            Core::Instance().eventHandler().handleEvents(deviceIdOpt.value());
             return;
         }
         Core::Instance().mpLogger->warningf(
