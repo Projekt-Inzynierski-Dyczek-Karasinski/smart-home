@@ -48,6 +48,9 @@ namespace SmartHome {
         }
 
         ~EventHandler();
+        
+        EventHandler (const EventHandler&) = delete;
+        EventHandler& operator= (const EventHandler&) = delete;
 
         /**
          * @brief Reload all device events and module notification rules from the config cache.

@@ -128,7 +128,6 @@ add_library(project_warnings INTERFACE)
 target_compile_options(project_warnings INTERFACE
         -Wall
         -Wextra
-        -Wshadow=local
         -Wnon-virtual-dtor
         -Wold-style-cast
         -Wcast-align
@@ -140,15 +139,22 @@ target_compile_options(project_warnings INTERFACE
         -Wdouble-promotion
         -Wformat=2
         -Wimplicit-fallthrough
-        -Warith-conversion
-        -Wuseless-cast
-        -Wduplicated-cond
-        -Wduplicated-branches
-        -Wlogical-op
         -Wmisleading-indentation
         -Wsuggest-override
         -Wnull-dereference
 )
+
+# warnings GCC only 
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_compile_options(project_warnings INTERFACE
+            -Wshadow=local
+            -Warith-conversion
+            -Wuseless-cast
+            -Wduplicated-cond
+            -Wduplicated-branches
+            -Wlogical-op
+    )
+endif()
 
 # Add subdirectories
 add_subdirectory(src/common)
