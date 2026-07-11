@@ -47,6 +47,9 @@ namespace SmartHome {
               mDispatchModuleAction(std::move(dispatchModuleAction)) {
         }
 
+        /**
+         * @brief Deconstruct the EventHandler instance. Stops handling new or pending events.
+         */
         ~EventHandler();
         
         EventHandler (const EventHandler&) = delete;
