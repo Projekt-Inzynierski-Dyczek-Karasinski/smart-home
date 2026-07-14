@@ -1,8 +1,5 @@
-add_executable(event_handler_test event_handler_test.cpp)
+set(test_names
+        event_handler_test
+)
 
-target_link_libraries(event_handler_test PRIVATE
-        smarthome::core_lib
-        GTest::gtest_main
-        project_warnings)
-
-gtest_discover_tests(event_handler_test TEST_PREFIX "core.")
+smarthome_add_test_group(core TESTS ${test_names} LIBS smarthome::core_lib)
