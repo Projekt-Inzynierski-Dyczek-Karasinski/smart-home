@@ -22,6 +22,8 @@ set(SKIP_BUILD_TEST ON CACHE INTERNAL "")
 set(BUILD_DOC OFF CACHE INTERNAL "")
 
 FetchContent_MakeAvailable(libpqxx)
+set_target_properties(pqxx PROPERTIES FOLDER "third_party")
+
 
 # Target
 add_executable(smarthome-database
