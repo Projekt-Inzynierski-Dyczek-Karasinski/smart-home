@@ -85,6 +85,9 @@ namespace SmartHome {
          * @return JSON object representing device state.
          */
         nlohmann::json to_json() const;
+
+    private:
+        static constexpr auto msDEFAULT_TTL = 60s;
     };
 
     /**

@@ -1,40 +1,45 @@
 #include "cache.h"
 #include "utils.h"
+#include "constants.h"
 
 #include <mutex>
 
 
 namespace SmartHome {
+    namespace cdbi = Constants::DatabaseIdentifiers;
+    namespace cdck = Constants::DeviceConfigKeys;
+    namespace cc = Constants::Common;
+
     bool CachedModule::isFresh() const {
         return !stale;
     }
 
     nlohmann::json CachedModule::to_json() const {
         nlohmann::json json;
-        json["id"] = id;
-        json["logic_address"] = logicAddress;
-        json["name"] = name;
-        json["config"] = config;
+        json[cdbi::ID] = id;
+        json[cdbi::LOGIC_ADDRESS] = logicAddress;
+        json[cdbi::NAME] = name;
+        json[cdbi::CONFIG] = config;
         if (lastOnline.has_value()) {
-            json["last_online"] = Utils::timePointToTimestampTz(lastOnline.value());
+            json[cdbi::LAST_ONLINE] = Utils::timePointToTimestampTz(lastOnline.value());
         } else {
-            json["last_online"] = nullptr;
+            json[cdbi::LAST_ONLINE] = nullptr;
         }
         return json;
     }
 
     bool CachedDevice::useCache() const {
-        if (config.contains("use_cache") && config["use_cache"].is_boolean()) {
-            return config["use_cache"].get<bool>();
+        if (config.contains(cdck::USE_CACHE) && config[cdck::USE_CACHE].is_boolean()) {
+            return config[cdck::USE_CACHE].get<bool>();
         }
         return true; // Default to using cache if not specified
     }
 
     std::chrono::seconds CachedDevice::cacheTTL() const {
-        if (config.contains("cache_ttl") && config["cache_ttl"].is_number_unsigned()) {
-            return std::chrono::seconds(config["cache_ttl"].get<uint64_t>());
+        if (config.contains(cdck::CACHE_TTL) && config[cdck::CACHE_TTL].is_number_unsigned()) {
+            return std::chrono::seconds(config[cdck::CACHE_TTL].get<uint64_t>());
         }
-        return 60s; // Default TTL of 60 seconds
+        return msDEFAULT_TTL;
     }
 
     bool CachedDevice::isFresh() const {
@@ -43,22 +48,22 @@ namespace SmartHome {
 
     nlohmann::json CachedDevice::to_json() const {
         nlohmann::json json;
-        json["id"] = id;
-        json["logic_id"] = logicId;
-        json["module_id"] = moduleId;
-        json["name"] = name;
-        json["type"] = type;
-        json["config"] = config;
+        json[cdbi::ID] = id;
+        json[cdbi::LOGIC_ID] = logicId;
+        json[cdbi::MODULE_ID] = moduleId;
+        json[cdbi::NAME] = name;
+        json[cdbi::TYPE] = type;
+        json[cdbi::CONFIG] = config;
         return json;
     }
 
     nlohmann::json CachedReading::to_json() const {
         nlohmann::json json;
-        json["device_id"] = deviceId;
-        json["value"] = value;
-        json["timestamp"] = Utils::timePointToTimestampTz(timestamp);
-        json["metadata"] = metadata;
-        json["stale"] = stale;
+        json[cdbi::DEVICE_ID] = deviceId;
+        json[cc::VALUE] = value;
+        json[cdbi::TIMESTAMP] = Utils::timePointToTimestampTz(timestamp);
+        json[cdbi::METADATA] = metadata;
+        json[cc::STALE] = stale;
         return json;
     }
 

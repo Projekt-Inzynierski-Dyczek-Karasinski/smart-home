@@ -11,6 +11,7 @@ namespace SmartHome::Constants {
         inline constexpr std::string_view VALUE = "value";
         inline constexpr std::string_view ERROR = "error";
         inline constexpr std::string_view STATUS = "status";
+        inline constexpr std::string_view STALE = "stale";
 
         // Special
         inline constexpr std::string_view UNDEFINED_BRACKETS = "<undefined>";
