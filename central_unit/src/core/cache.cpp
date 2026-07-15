@@ -6,9 +6,56 @@
 
 
 namespace SmartHome {
+    using namespace std::string_literals;
+
     namespace cdbi = Constants::DatabaseIdentifiers;
     namespace cdck = Constants::DeviceConfigKeys;
     namespace cc = Constants::Common;
+
+    CachedModule::CachedModule(const uint id,
+                               const uint logicAddress,
+                               const std::string &name,
+                               const nlohmann::json &config,
+                               const std::optional<std::chrono::system_clock::time_point> lastOnline)
+        : id(id), logicAddress(logicAddress), name(name), config(config), lastOnline(lastOnline) {
+    }
+
+    CachedModule::CachedModule(const nlohmann::json &moduleData) {
+        if (!moduleData.contains(cdbi::ID) ||
+            !moduleData[cdbi::ID].is_number_integer()) {
+            throw std::invalid_argument("Invalid or missing '"s + cdbi::ID.data() + "' field, it must be an integer");
+        }
+        id = moduleData[cdbi::ID];
+
+
+        if (!moduleData.contains(cdbi::LOGIC_ADDRESS) ||
+            !moduleData[cdbi::LOGIC_ADDRESS].is_number_integer()) {
+            throw std::invalid_argument(
+                "Invalid or missing '"s + cdbi::LOGIC_ADDRESS.data() + "' field, it must be an integer");
+        }
+        logicAddress = moduleData[cdbi::LOGIC_ADDRESS];
+
+        if (!moduleData.contains(cdbi::NAME) ||
+            !moduleData[cdbi::NAME].is_string()) {
+            throw std::invalid_argument("Invalid or missing '"s + cdbi::NAME.data() + "' field, it must be a string");
+        }
+        name = moduleData[cdbi::NAME];
+
+        if (!moduleData.contains(cdbi::CONFIG) ||
+            !moduleData[cdbi::CONFIG].is_object()) {
+            throw std::invalid_argument(
+                "Invalid or missing '"s + cdbi::CONFIG.data() + "' field, it must be an object");
+        }
+        config = moduleData[cdbi::CONFIG];
+
+        // LAST_ONLINE field is optional, return early if missing or null
+        if (!moduleData.contains(cdbi::LAST_ONLINE) || moduleData[cdbi::LAST_ONLINE].is_null()) return;
+
+        if (!moduleData[cdbi::LAST_ONLINE].is_string()) {
+            throw std::invalid_argument("Invalid '"s + cdbi::LAST_ONLINE.data() + "' field, it must be a string");
+        }
+        lastOnline = Utils::parseTimestampTz(moduleData[cdbi::LAST_ONLINE]);
+    }
 
     bool CachedModule::isFresh() const {
         return !stale;
@@ -26,6 +73,57 @@ namespace SmartHome {
             json[cdbi::LAST_ONLINE] = nullptr;
         }
         return json;
+    }
+
+    CachedDevice::CachedDevice(const uint id,
+                               const uint logicId,
+                               const uint moduleId,
+                               const std::string &name,
+                               const std::string &type,
+                               const nlohmann::json &config)
+        : id(id), logicId(logicId), moduleId(moduleId), name(name), type(type), config(config) {
+    }
+
+    CachedDevice::CachedDevice(const nlohmann::json &deviceData) {
+        if (!deviceData.contains(cdbi::ID) ||
+            !deviceData[cdbi::ID].is_number_integer()) {
+            throw std::invalid_argument("Invalid or missing '"s + cdbi::ID.data() + "' field, it must be an integer");
+        }
+        id = deviceData[cdbi::ID];
+
+
+        if (!deviceData.contains(cdbi::LOGIC_ID) ||
+            !deviceData[cdbi::LOGIC_ID].is_number_integer()) {
+            throw std::invalid_argument(
+                "Invalid or missing '"s + cdbi::LOGIC_ID.data() + "' field, it must be an integer");
+        }
+        logicId = deviceData[cdbi::LOGIC_ID];
+
+        if (!deviceData.contains(cdbi::MODULE_ID) ||
+            !deviceData[cdbi::MODULE_ID].is_number_integer()) {
+            throw std::invalid_argument(
+                "Invalid or missing '"s + cdbi::MODULE_ID.data() + "' field, it must be an integer");
+        }
+        moduleId = deviceData[cdbi::MODULE_ID];
+
+        if (!deviceData.contains(cdbi::NAME) ||
+            !deviceData[cdbi::NAME].is_string()) {
+            throw std::invalid_argument("Invalid or missing '"s + cdbi::NAME.data() + "' field, it must be a string");
+        }
+        name = deviceData[cdbi::NAME];
+
+        if (!deviceData.contains(cdbi::TYPE) ||
+            !deviceData[cdbi::TYPE].is_string()) {
+            throw std::invalid_argument("Invalid or missing '"s + cdbi::TYPE.data() + "' field, it must be a string");
+        }
+        type = deviceData[cdbi::TYPE];
+
+        if (!deviceData.contains(cdbi::CONFIG) ||
+            !deviceData[cdbi::CONFIG].is_object()) {
+            throw std::invalid_argument(
+                "Invalid or missing '"s + cdbi::CONFIG.data() + "' field, it must be an object");
+        }
+        config = deviceData[cdbi::CONFIG];
     }
 
     bool CachedDevice::useCache() const {

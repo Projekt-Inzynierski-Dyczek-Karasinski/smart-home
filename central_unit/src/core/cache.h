@@ -30,6 +30,28 @@ namespace SmartHome {
         bool stale = false; ///< Module object has changed, update pending
 
         /**
+         * TODO !pr
+         *
+         * @param id
+         * @param logicAddress
+         * @param name
+         * @param config
+         * @param lastOnline
+         */
+        CachedModule(uint id,
+                     uint logicAddress,
+                     const std::string &name,
+                     const nlohmann::json &config,
+                     std::optional<std::chrono::system_clock::time_point> lastOnline = std::nullopt);
+
+        /**
+         * TODO !pr
+         *
+         * @param moduleData
+         */
+        explicit CachedModule(const nlohmann::json &moduleData);
+
+        /**
          * @brief Check if the module configuration is up to date.
          *
          * @return true when module is not marked stale.
@@ -41,7 +63,7 @@ namespace SmartHome {
          *
          * @return JSON object representing module state.
          */
-        nlohmann::json to_json() const;
+        [[nodiscard]] nlohmann::json to_json() const;
     };
 
     /**
@@ -57,6 +79,30 @@ namespace SmartHome {
         std::string type; ///< Device type string
         nlohmann::json config; ///< Device configuration payload
         bool stale = false; ///< Device object has changed, update pending
+
+        /**
+         * TODO !pr
+         *
+         * @param id
+         * @param logicId
+         * @param moduleId
+         * @param name
+         * @param type
+         * @param config
+         */
+        CachedDevice(uint id,
+                     uint logicId,
+                     uint moduleId,
+                     const std::string &name,
+                     const std::string &type,
+                     const nlohmann::json &config);
+
+        /**
+         * TODO !pr
+         *
+         * @param deviceData
+         */
+        explicit CachedDevice(const nlohmann::json &deviceData);
 
         /**
          * @brief Check if readings for this device should be cached.
@@ -84,7 +130,7 @@ namespace SmartHome {
          *
          * @return JSON object representing device state.
          */
-        nlohmann::json to_json() const;
+        [[nodiscard]] nlohmann::json to_json() const;
 
     private:
         static constexpr auto msDEFAULT_TTL = 60s;
@@ -105,7 +151,7 @@ namespace SmartHome {
          *
          * @return JSON object representing reading state.
          */
-        nlohmann::json to_json() const;
+        [[nodiscard]] nlohmann::json to_json() const;
     };
 
     /**
@@ -133,6 +179,14 @@ namespace SmartHome {
          */
         [[nodiscard]] std::optional<CachedModule> getModule(uint moduleId, bool isFresh = false) const;
 
+        /**
+         * TODO !pr
+         *
+         * @param moduleId
+         * @param expected
+         * @param desired
+         * @return
+         */
         std::optional<bool> compareExchangeIsModuleFresh(uint moduleId, bool expected, bool desired);
 
         /**
@@ -184,6 +238,14 @@ namespace SmartHome {
         [[nodiscard]] std::optional<CachedDevice> getDevice(uint deviceId, bool isFresh = false) const;
 
 
+        /**
+         * TODO !pr
+         *
+         * @param deviceId
+         * @param expected
+         * @param desired
+         * @return
+         */
         std::optional<bool> compareExchangeIsDeviceFresh(uint deviceId, bool expected, bool desired);
 
         /**
