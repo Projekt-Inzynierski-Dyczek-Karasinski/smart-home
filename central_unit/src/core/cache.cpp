@@ -82,6 +82,7 @@ namespace SmartHome {
                                const std::string &type,
                                const nlohmann::json &config)
         : id(id), logicId(logicId), moduleId(moduleId), name(name), type(type), config(config) {
+        verifyTypeValue(type); // Throws if invalid
     }
 
     CachedDevice::CachedDevice(const nlohmann::json &deviceData) {
@@ -116,6 +117,7 @@ namespace SmartHome {
             !deviceData[cdbi::TYPE].is_string()) {
             throw std::invalid_argument("Invalid or missing '"s + cdbi::TYPE.data() + "' field, it must be a string");
         }
+        verifyTypeValue(deviceData[cdbi::TYPE].get<std::string_view>()); // Throws if invalid
         type = deviceData[cdbi::TYPE];
 
         if (!deviceData.contains(cdbi::CONFIG) ||
@@ -142,6 +144,21 @@ namespace SmartHome {
 
     bool CachedDevice::isFresh() const {
         return !stale;
+    }
+
+    void CachedDevice::verifyTypeValue(const std::string_view type) {
+        if (Constants::DeviceTypes::TYPES.contains(type)) return; // Return on valid
+
+        std::string validTypes = "";
+        bool isFirst = true;
+        for (const auto &validType: Constants::DeviceTypes::TYPES) {
+            if (!isFirst) validTypes += ", ";
+            validTypes += validType.data();
+            isFirst = false;
+        }
+
+        throw std::invalid_argument(
+            "Invalid '"s + cdbi::TYPE.data() + "' field value, valid values: " + validTypes);
     }
 
     nlohmann::json CachedDevice::to_json() const {

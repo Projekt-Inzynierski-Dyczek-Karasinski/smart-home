@@ -133,6 +133,13 @@ namespace SmartHome {
         [[nodiscard]] nlohmann::json to_json() const;
 
     private:
+        /**
+         * TODO !pr
+         *
+         * @param type
+         */
+        static void verifyTypeValue(std::string_view type);
+
         static constexpr auto msDEFAULT_TTL = 60s;
     };
 
