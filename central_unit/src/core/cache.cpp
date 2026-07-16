@@ -236,12 +236,14 @@ namespace SmartHome {
     }
 
     std::vector<CachedDevice> ConfigCache::getModuleDevices(const uint moduleId) const {
-        const auto devicesIds = getDeviceIdsForModule(moduleId);
+        std::shared_lock lock(mMutex);
+
+        const auto devicesIds = getDeviceIdsForModuleUnlocked(moduleId);
 
         std::vector<CachedDevice> devices;
         devices.reserve(devicesIds.size());
         for (const auto deviceId: devicesIds) {
-            const auto deviceOpt = getDevice(deviceId);
+            const auto deviceOpt = getDeviceUnlocked(deviceId);
             if (deviceOpt.has_value()) {
                 devices.push_back(deviceOpt.value());
             }
@@ -289,13 +291,7 @@ namespace SmartHome {
 
     std::optional<CachedDevice> ConfigCache::getDevice(const uint deviceId, const bool isFresh) const {
         std::shared_lock lock(mMutex);
-
-        const auto iter = mDevices.find(deviceId);
-        if (iter == mDevices.end()) return std::nullopt;
-        auto device = iter->second;
-
-        if (isFresh && !device.isFresh()) return std::nullopt;
-        return device;
+        return getDeviceUnlocked(deviceId, isFresh);
     }
 
     std::optional<bool> ConfigCache::compareExchangeIsDeviceFresh(const uint deviceId,
@@ -431,6 +427,16 @@ namespace SmartHome {
         removeFromDevicesIndex(iter->second.moduleId, iter->second.logicId);
         mDevices.erase(iter);
     }
+
+    std::optional<CachedDevice> ConfigCache::getDeviceUnlocked(const uint deviceId, const bool isFresh) const {
+        const auto iter = mDevices.find(deviceId);
+        if (iter == mDevices.end()) return std::nullopt;
+        auto device = iter->second;
+
+        if (isFresh && !device.isFresh()) return std::nullopt;
+        return device;
+    }
+
 
     ReadingsCache::ReadingsCache(const ConfigCache &configCache) : mConfigCache(configCache) {
     }

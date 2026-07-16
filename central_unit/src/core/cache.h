@@ -398,6 +398,15 @@ namespace SmartHome {
          */
         void eraseDeviceUnlocked(uint deviceId);
 
+        /**
+         * @brief Fetch cached device by device id.
+         *
+         * @param deviceId Device identifier.
+         * @param isFresh When true, returns std::nullopt if device is stale.
+         *
+         * @return Cached device or std::nullopt if missing or stale.
+         */
+        [[nodiscard]] std::optional<CachedDevice> getDeviceUnlocked(uint deviceId, bool isFresh = false) const;
     };
 
     /**
