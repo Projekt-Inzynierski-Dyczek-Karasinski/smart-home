@@ -215,10 +215,12 @@ namespace SmartHome {
         if (iter == mModules.end()) return std::nullopt;
         auto &module = iter->second;
 
-        const bool result = expected == module.isFresh();
-        module.stale = !desired; // Inverses isFresh and stale logic - desired isFresh = false means module is stale
+        if (expected != module.isFresh()) return false;
 
-        return result;
+        // Inverses isFresh and stale logic - desired isFresh = false means module is stale
+        module.stale = !desired;
+
+        return true;
     }
 
 
@@ -300,10 +302,12 @@ namespace SmartHome {
         if (iter == mDevices.end()) return std::nullopt;
         auto &device = iter->second;
 
-        const bool result = expected == device.isFresh();
-        device.stale = !desired; // Inverses isFresh and stale logic - desired (isFresh) = false means module is stale
+        if (expected != device.isFresh()) return false;
 
-        return result;
+        // Inverses isFresh and stale logic - desired (isFresh) = false means module is stale
+        device.stale = !desired;
+
+        return true;
     }
 
     std::vector<CachedDevice> ConfigCache::getAllDevices() const {
