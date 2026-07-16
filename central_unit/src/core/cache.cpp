@@ -256,6 +256,11 @@ namespace SmartHome {
         const auto iter = mModules.find(moduleId);
         if (iter == mModules.end()) return;
 
+        const auto deviceIds = getDeviceIdsForModuleUnlocked(moduleId);
+        for (const auto id: deviceIds) {
+            eraseDeviceUnlocked(id);
+        }
+
         removeFromModulesIndex(iter->second.logicAddress);
         mModules.erase(iter);
     }
@@ -323,12 +328,7 @@ namespace SmartHome {
 
     void ConfigCache::eraseDevice(const uint deviceId) {
         std::unique_lock lock(mMutex);
-
-        const auto iter = mDevices.find(deviceId);
-        if (iter == mDevices.end()) return;
-
-        removeFromDevicesIndex(iter->second.moduleId, iter->second.logicId);
-        mDevices.erase(iter);
+        eraseDeviceUnlocked(deviceId);
     }
 
     std::optional<uint> ConfigCache::findModuleId(const uint logicAddress) const {
@@ -363,15 +363,7 @@ namespace SmartHome {
 
     std::vector<uint> ConfigCache::getDeviceIdsForModule(const uint moduleId) const {
         std::shared_lock lock(mMutex);
-
-        std::vector<uint> deviceIds;
-
-        for (const auto &[key, deviceId]: mDevicesIndex) {
-            if (key.first == moduleId) {
-                deviceIds.push_back(deviceId);
-            }
-        }
-        return deviceIds;
+        return getDeviceIdsForModuleUnlocked(moduleId);
     }
 
     void ConfigCache::clearModules() {
@@ -421,6 +413,24 @@ namespace SmartHome {
         mDevicesIndex.erase({moduleId, logicId});
     }
 
+    std::vector<uint> ConfigCache::getDeviceIdsForModuleUnlocked(const uint moduleId) const {
+        std::vector<uint> deviceIds;
+
+        for (const auto &[key, deviceId]: mDevicesIndex) {
+            if (key.first == moduleId) {
+                deviceIds.push_back(deviceId);
+            }
+        }
+        return deviceIds;
+    }
+
+    void ConfigCache::eraseDeviceUnlocked(const uint deviceId) {
+        const auto iter = mDevices.find(deviceId);
+        if (iter == mDevices.end()) return;
+
+        removeFromDevicesIndex(iter->second.moduleId, iter->second.logicId);
+        mDevices.erase(iter);
+    }
 
     ReadingsCache::ReadingsCache(const ConfigCache &configCache) : mConfigCache(configCache) {
     }

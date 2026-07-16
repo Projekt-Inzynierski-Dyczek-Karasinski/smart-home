@@ -213,7 +213,7 @@ namespace SmartHome {
         [[nodiscard]] std::vector<CachedDevice> getModuleDevices(uint moduleId) const;
 
         /**
-         * @brief Remove cached module and its index entry.
+         * @brief Remove cached module, its index entry and all related devices.
          *
          * @param moduleId Module identifier.
          */
@@ -345,6 +345,8 @@ namespace SmartHome {
          * @brief Add module entry to logic address index.
          *
          * @param module Module snapshot to index.
+         *
+         * @pre Lock on \c mMutex (exclusive).
          */
         void addToModulesIndex(const CachedModule &module);
 
@@ -352,6 +354,8 @@ namespace SmartHome {
          * @brief Remove module entry from logic address index.
          *
          * @param logicAddress Logic address of the module to remove from index.
+         *
+         * @pre Lock on \c mMutex (exclusive).
          */
         void removeFromModulesIndex(uint logicAddress);
 
@@ -359,6 +363,8 @@ namespace SmartHome {
          * @brief Add device entry to module/logic index.
          *
          * @param device Device snapshot to index.
+         *
+         * @pre Lock on \c mMutex (exclusive).
          */
         void addToDevicesIndex(const CachedDevice &device);
 
@@ -367,8 +373,31 @@ namespace SmartHome {
          *
          * @param moduleId Module identifier of the device to remove from index.
          * @param logicId Logic identifier of the device to remove from index.
+         *
+         * @pre Lock on \c mMutex (exclusive).
          */
         void removeFromDevicesIndex(uint moduleId, uint logicId);
+
+        /**
+         * @brief List device ids for a given module.
+         *
+         * @param moduleId Module identifier.
+         *
+         * @return Vector of device ids.
+         *
+         * @pre Lock on \c mMutex.
+         */
+        [[nodiscard]] std::vector<uint> getDeviceIdsForModuleUnlocked(uint moduleId) const;
+
+        /**
+         * @brief Remove cached device and its index entry.
+         *
+         * @param deviceId Device identifier.
+         *
+         * @pre Lock on \c mMutex (exclusive).
+         */
+        void eraseDeviceUnlocked(uint deviceId);
+
     };
 
     /**
