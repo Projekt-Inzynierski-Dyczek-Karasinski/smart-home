@@ -451,7 +451,7 @@ namespace SmartHome {
         if (iter == mReadings.end()) return std::nullopt;
 
         // Copy reading before releasing lock
-        const auto &reading = iter->second;
+        const auto reading = iter->second;
         lock.unlock();
 
         // Check if reading is fresh based on device's TTL
