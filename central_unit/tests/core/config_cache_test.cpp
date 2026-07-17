@@ -3,7 +3,7 @@
 
 #include <gmock/gmock.h>
 
-namespace SmartHome {
+namespace SmartHome::Tests {
     //region helpers
     nlohmann::json ConfigCacheTest::validModuleConfigJson(const bool withLastOnline) {
         nlohmann::json json = {

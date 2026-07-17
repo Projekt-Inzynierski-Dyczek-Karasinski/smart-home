@@ -3,7 +3,7 @@
 
 #include <gtest/gtest.h>
 
-namespace SmartHome {
+namespace SmartHome::Tests {
     inline void PrintTo(const CachedModule &m, std::ostream *os) {
         *os << m.to_json().dump();
     }

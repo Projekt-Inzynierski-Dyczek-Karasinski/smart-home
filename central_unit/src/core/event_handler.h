@@ -7,6 +7,11 @@
 
 #include <nlohmann/json.hpp>
 
+// TODO consider reworking/refactoring EventHandler and its unit tests to remove need for friend class usage.
+namespace SmartHome::Tests {
+    class EventHandlerTest;
+}
+
 namespace SmartHome {
     /**
      * @brief Reacts to device reading changes and module notifications by dispatching configured actions.
@@ -18,7 +23,7 @@ namespace SmartHome {
      * @note All public methods are thread-safe.
      */
     class EventHandler : public std::enable_shared_from_this<EventHandler> {
-        friend class EventHandlerTest;
+        friend class Tests::EventHandlerTest;
         using ActionDispatcher =
         std::function<void(std::string_view actionName, uint id, const nlohmann::json &action)>;
 
@@ -51,9 +56,10 @@ namespace SmartHome {
          * @brief Deconstruct the EventHandler instance. Stops handling new or pending events.
          */
         ~EventHandler();
-        
-        EventHandler (const EventHandler&) = delete;
-        EventHandler& operator= (const EventHandler&) = delete;
+
+        EventHandler(const EventHandler &) = delete;
+
+        EventHandler &operator=(const EventHandler &) = delete;
 
         /**
          * @brief Reload all device events and module notification rules from the config cache.

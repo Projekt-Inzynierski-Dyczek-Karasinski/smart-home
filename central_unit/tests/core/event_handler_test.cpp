@@ -1,6 +1,6 @@
 #include "event_handler_test.h"
 
-namespace SmartHome {
+namespace SmartHome::Tests {
     // Setup method for the test fixture
     void EventHandlerTest::SetUp() {
         auto logger = std::make_shared<Utils::Logger>();
