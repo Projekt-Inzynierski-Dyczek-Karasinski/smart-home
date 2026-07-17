@@ -29,13 +29,13 @@ namespace SmartHome {
         bool stale = false; ///< Module object has changed, update pending
 
         /**
-         * TODO !pr
+         * @brief Construct a new Cached Module object.
          *
-         * @param id
-         * @param logicAddress
-         * @param name
-         * @param config
-         * @param lastOnline
+         * @param id Module ID.
+         * @param logicAddress Module logic address.
+         * @param name Module name.
+         * @param config Module configuration in JSON object format.
+         * @param lastOnline Optional last online timestamp.
          */
         CachedModule(uint id,
                      uint logicAddress,
@@ -44,9 +44,9 @@ namespace SmartHome {
                      std::optional<std::chrono::system_clock::time_point> lastOnline = std::nullopt);
 
         /**
-         * TODO !pr
+         * @brief Construct a new Cached Module object from JSON. Used for deserialization from DB query result.
          *
-         * @param moduleData
+         * @param moduleData Module data in JSON format. Expected keys: id, logic_address, name, config, last_online.
          */
         explicit CachedModule(const nlohmann::json &moduleData);
 
@@ -82,14 +82,16 @@ namespace SmartHome {
         bool stale = false; ///< Device object has changed, update pending
 
         /**
-         * TODO !pr
+         * @brief Construct a new Cached Device object.
          *
-         * @param id
-         * @param logicId
-         * @param moduleId
-         * @param name
-         * @param type
-         * @param config
+         * @param id Device ID.
+         * @param logicId Device logical identifier within module.
+         * @param moduleId Owning module ID.
+         * @param name Device name.
+         * @param type Device type string.
+         * @param config Device configuration in JSON object format.
+         *
+         * @throws std::invalid_argument If type is invalid.
          */
         CachedDevice(uint id,
                      uint logicId,
@@ -99,9 +101,11 @@ namespace SmartHome {
                      nlohmann::json config);
 
         /**
-         * TODO !pr
+         * @brief Construct a new Cached Device object from JSON data. Used for deserialization from DB query result.
          *
-         * @param deviceData
+         * @param deviceData Device data in JSON format. Expected fields: id, logicId, moduleId, name, type, config.
+         *
+         * @throws std::invalid_argument When required fields are missing or invalid.
          */
         explicit CachedDevice(const nlohmann::json &deviceData);
 
@@ -137,9 +141,11 @@ namespace SmartHome {
 
     private:
         /**
-         * TODO !pr
+         * @brief Verifies that device type is valid.
          *
-         * @param type
+         * @param type Type string to verify.
+         *
+         * @throws std::invalid_argument When type is not recognized.
          */
         static void verifyTypeValue(std::string_view type);
 
@@ -196,12 +202,13 @@ namespace SmartHome {
         [[nodiscard]] std::optional<CachedModule> getModule(uint moduleId, bool isFresh = false) const;
 
         /**
-         * TODO !pr
+         * @brief Compare and exchange freshness state of a module.
          *
-         * @param moduleId
-         * @param expected
-         * @param desired
-         * @return
+         * @param moduleId Module ID.
+         * @param expected Expected value.
+         * @param desired Desired value to set if current matches expected.
+         *
+         * @return \c true if exchange was successful, \c false otherwise, \c std::nullopt if module was not found.
          */
         std::optional<bool> compareExchangeIsModuleFresh(uint moduleId, bool expected, bool desired);
 
@@ -255,12 +262,13 @@ namespace SmartHome {
 
 
         /**
-         * TODO !pr
+         * @brief Atomically compare-and-exchange device freshness flag.
          *
-         * @param deviceId
-         * @param expected
-         * @param desired
-         * @return
+         * @param deviceId Device ID.
+         * @param expected Expected value.
+         * @param desired Desired value to set if current matches expected.
+         *
+         * @return \c true if exchange was successful, \c false otherwise, \c std::nullopt if device was not found.
          */
         std::optional<bool> compareExchangeIsDeviceFresh(uint deviceId, bool expected, bool desired);
 
