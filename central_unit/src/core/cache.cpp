@@ -173,6 +173,13 @@ namespace SmartHome {
         return json;
     }
 
+    CachedReading::CachedReading(const uint deviceId,
+                                 nlohmann::json value,
+                                 const std::chrono::system_clock::time_point timestamp,
+                                 nlohmann::json metadata)
+        : deviceId(deviceId), value(std::move(value)), timestamp(timestamp), metadata(std::move(metadata)) {
+    }
+
     nlohmann::json CachedReading::to_json() const {
         nlohmann::json json;
         json[cdbi::DEVICE_ID] = deviceId;
@@ -438,8 +445,8 @@ namespace SmartHome {
         return device;
     }
 
-
-    ReadingsCache::ReadingsCache(const ConfigCache &configCache) : mConfigCache(configCache) {
+    ReadingsCache::ReadingsCache(const ConfigCache &configCache, Clock clock)
+        : mConfigCache(configCache), mClock(std::move(clock)) {
     }
 
     std::optional<CachedReading> ReadingsCache::get(const uint deviceId) const {
@@ -468,7 +475,7 @@ namespace SmartHome {
         if (iter == mReadings.end()) return std::nullopt;
 
         // Copy reading before releasing lock
-        const auto reading = iter->second;
+        auto reading = iter->second;
         lock.unlock();
 
         // Check if reading is fresh based on device's TTL
@@ -490,13 +497,7 @@ namespace SmartHome {
     }
 
     void ReadingsCache::set(const uint deviceId, const nlohmann::json &value, const nlohmann::json &metadata) {
-        CachedReading reading{
-            .deviceId = deviceId,
-            .value = value,
-            .timestamp = std::chrono::system_clock::now(),
-            .metadata = metadata,
-            .stale = false
-        };
+        auto reading = CachedReading(deviceId, value, mClock(), metadata);
         std::unique_lock lock(mMutex);
         mReadings.insert_or_assign(deviceId, std::move(reading));
     }
@@ -524,8 +525,8 @@ namespace SmartHome {
         return 0s; // 0 TTL if device not found or caching disabled
     }
 
-    bool ReadingsCache::isFresh(const CachedReading &reading, const std::chrono::seconds ttl) {
-        const auto age = std::chrono::system_clock::now() - reading.timestamp;
+    bool ReadingsCache::isFresh(const CachedReading &reading, const std::chrono::seconds ttl) const {
+        const auto age = mClock() - reading.timestamp;
         return age < ttl;
     }
 }

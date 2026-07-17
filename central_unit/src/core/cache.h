@@ -156,6 +156,12 @@ namespace SmartHome {
         nlohmann::json metadata; ///< Optional metadata payload
         bool stale = false; ///< Indicates TTL expiration on access
 
+
+        CachedReading(uint deviceId,
+                      nlohmann::json value,
+                      std::chrono::system_clock::time_point timestamp,
+                      nlohmann::json metadata);
+
         /**
          * @brief Serialize cached reading into JSON.
          *
@@ -420,12 +426,16 @@ namespace SmartHome {
      */
     class ReadingsCache {
     public:
+        using Clock = std::function<std::chrono::system_clock::time_point()>;
+
         /**
          * @brief Construct readings cache with config cache reference.
          *
          * @param configCache Configuration cache used for TTL lookup.
+         * @param clock Time source used for freshness checks, defaults to system_clock::now().
          */
-        explicit ReadingsCache(const ConfigCache &configCache);
+        explicit ReadingsCache(const ConfigCache &configCache,
+                               Clock clock = [] { return std::chrono::system_clock::now(); });
 
         /**
          * @brief Fetch cached reading by device id.
@@ -484,6 +494,7 @@ namespace SmartHome {
         mutable std::shared_mutex mMutex;
 
         const ConfigCache &mConfigCache;
+        Clock mClock; ///< Clock used for freshness checks. Can be mocked in tests.
 
         std::unordered_map<uint, CachedReading> mReadings;
 
@@ -495,6 +506,6 @@ namespace SmartHome {
         /**
          * @brief Check if reading is within TTL window.
          */
-        [[nodiscard]] static bool isFresh(const CachedReading &reading, std::chrono::seconds ttl);
+        [[nodiscard]] bool isFresh(const CachedReading &reading, std::chrono::seconds ttl) const;
     };
 }
