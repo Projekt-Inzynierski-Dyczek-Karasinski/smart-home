@@ -3,6 +3,7 @@
 #include "constants.h"
 
 #include <mutex>
+#include <utility>
 
 
 namespace SmartHome {
@@ -14,10 +15,10 @@ namespace SmartHome {
 
     CachedModule::CachedModule(const uint id,
                                const uint logicAddress,
-                               const std::string &name,
-                               const nlohmann::json &config,
+                               std::string name,
+                               nlohmann::json config,
                                const std::optional<std::chrono::system_clock::time_point> lastOnline)
-        : id(id), logicAddress(logicAddress), name(name), config(config), lastOnline(lastOnline) {
+        : id(id), logicAddress(logicAddress), name(std::move(name)), config(std::move(config)), lastOnline(lastOnline) {
     }
 
     CachedModule::CachedModule(const nlohmann::json &moduleData) {
@@ -78,10 +79,10 @@ namespace SmartHome {
     CachedDevice::CachedDevice(const uint id,
                                const uint logicId,
                                const uint moduleId,
-                               const std::string &name,
+                               std::string name,
                                const std::string &type,
-                               const nlohmann::json &config)
-        : id(id), logicId(logicId), moduleId(moduleId), name(name), type(type), config(config) {
+                               nlohmann::json config)
+        : id(id), logicId(logicId), moduleId(moduleId), name(std::move(name)), type(type), config(std::move(config)) {
         verifyTypeValue(type); // Throws if invalid
     }
 
@@ -149,7 +150,7 @@ namespace SmartHome {
     void CachedDevice::verifyTypeValue(const std::string_view type) {
         if (Constants::DeviceTypes::TYPES.contains(type)) return; // Return on valid
 
-        std::string validTypes = "";
+        std::string validTypes;
         bool isFirst = true;
         for (const auto &validType: Constants::DeviceTypes::TYPES) {
             if (!isFirst) validTypes += ", ";
@@ -431,7 +432,7 @@ namespace SmartHome {
     std::optional<CachedDevice> ConfigCache::getDeviceUnlocked(const uint deviceId, const bool isFresh) const {
         const auto iter = mDevices.find(deviceId);
         if (iter == mDevices.end()) return std::nullopt;
-        auto device = iter->second;
+        auto &device = iter->second;
 
         if (isFresh && !device.isFresh()) return std::nullopt;
         return device;

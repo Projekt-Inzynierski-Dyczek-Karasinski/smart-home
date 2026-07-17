@@ -8,7 +8,6 @@
 #include <unordered_map>
 
 #include <nlohmann/json.hpp>
-#include <nlohmann/json_fwd.hpp>
 
 namespace SmartHome {
     using namespace std::chrono_literals;
@@ -40,8 +39,8 @@ namespace SmartHome {
          */
         CachedModule(uint id,
                      uint logicAddress,
-                     const std::string &name,
-                     const nlohmann::json &config,
+                     std::string name,
+                     nlohmann::json config,
                      std::optional<std::chrono::system_clock::time_point> lastOnline = std::nullopt);
 
         /**
@@ -50,6 +49,8 @@ namespace SmartHome {
          * @param moduleData
          */
         explicit CachedModule(const nlohmann::json &moduleData);
+
+        bool operator==(const CachedModule &) const = default;
 
         /**
          * @brief Check if the module configuration is up to date.
@@ -93,9 +94,9 @@ namespace SmartHome {
         CachedDevice(uint id,
                      uint logicId,
                      uint moduleId,
-                     const std::string &name,
+                     std::string name,
                      const std::string &type,
-                     const nlohmann::json &config);
+                     nlohmann::json config);
 
         /**
          * TODO !pr
@@ -103,6 +104,8 @@ namespace SmartHome {
          * @param deviceData
          */
         explicit CachedDevice(const nlohmann::json &deviceData);
+
+        bool operator==(const CachedDevice &) const = default;
 
         /**
          * @brief Check if readings for this device should be cached.
