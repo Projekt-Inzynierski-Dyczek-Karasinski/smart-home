@@ -444,7 +444,11 @@ namespace SmartHome {
          */
         explicit ReadingsCache(const ConfigCache &configCache,
                                Clock clock = [] { return std::chrono::system_clock::now(); });
+~ReadingsCache() = default;
 
+ReadingsCache(const ReadingsCache &) = delete;
+
+ReadingsCache &operator=(const ReadingsCache &) = delete;
         /**
          * @brief Fetch cached reading by device id.
          *
