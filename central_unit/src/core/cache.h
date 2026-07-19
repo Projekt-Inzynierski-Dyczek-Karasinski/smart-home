@@ -8,7 +8,6 @@
 #include <unordered_map>
 
 #include <nlohmann/json.hpp>
-#include <nlohmann/json_fwd.hpp>
 
 namespace SmartHome {
     using namespace std::chrono_literals;
@@ -30,6 +29,30 @@ namespace SmartHome {
         bool stale = false; ///< Module object has changed, update pending
 
         /**
+         * @brief Construct a new Cached Module object.
+         *
+         * @param id Module ID.
+         * @param logicAddress Module logic address.
+         * @param name Module name.
+         * @param config Module configuration in JSON object format.
+         * @param lastOnline Optional last online timestamp.
+         */
+        CachedModule(uint id,
+                     uint logicAddress,
+                     std::string name,
+                     nlohmann::json config,
+                     std::optional<std::chrono::system_clock::time_point> lastOnline = std::nullopt);
+
+        /**
+         * @brief Construct a new Cached Module object from JSON. Used for deserialization from DB query result.
+         *
+         * @param moduleData Module data in JSON format. Expected keys: id, logic_address, name, config, last_online.
+         */
+        explicit CachedModule(const nlohmann::json &moduleData);
+
+        bool operator==(const CachedModule &) const = default;
+
+        /**
          * @brief Check if the module configuration is up to date.
          *
          * @return true when module is not marked stale.
@@ -41,7 +64,7 @@ namespace SmartHome {
          *
          * @return JSON object representing module state.
          */
-        nlohmann::json to_json() const;
+        [[nodiscard]] nlohmann::json to_json() const;
     };
 
     /**
@@ -57,6 +80,36 @@ namespace SmartHome {
         std::string type; ///< Device type string
         nlohmann::json config; ///< Device configuration payload
         bool stale = false; ///< Device object has changed, update pending
+
+        /**
+         * @brief Construct a new Cached Device object.
+         *
+         * @param id Device ID.
+         * @param logicId Device logical identifier within module.
+         * @param moduleId Owning module ID.
+         * @param name Device name.
+         * @param type Device type string.
+         * @param config Device configuration in JSON object format.
+         *
+         * @throws std::invalid_argument If type is invalid.
+         */
+        CachedDevice(uint id,
+                     uint logicId,
+                     uint moduleId,
+                     std::string name,
+                     const std::string &type,
+                     nlohmann::json config);
+
+        /**
+         * @brief Construct a new Cached Device object from JSON data. Used for deserialization from DB query result.
+         *
+         * @param deviceData Device data in JSON format. Expected fields: id, logicId, moduleId, name, type, config.
+         *
+         * @throws std::invalid_argument When required fields are missing or invalid.
+         */
+        explicit CachedDevice(const nlohmann::json &deviceData);
+
+        bool operator==(const CachedDevice &) const = default;
 
         /**
          * @brief Check if readings for this device should be cached.
@@ -84,7 +137,19 @@ namespace SmartHome {
          *
          * @return JSON object representing device state.
          */
-        nlohmann::json to_json() const;
+        [[nodiscard]] nlohmann::json to_json() const;
+
+    private:
+        /**
+         * @brief Verifies that device type is valid.
+         *
+         * @param type Type string to verify.
+         *
+         * @throws std::invalid_argument When type is not recognized.
+         */
+        static void verifyTypeValue(std::string_view type);
+
+        static constexpr auto msDEFAULT_TTL = 60s;
     };
 
     /**
@@ -97,12 +162,18 @@ namespace SmartHome {
         nlohmann::json metadata; ///< Optional metadata payload
         bool stale = false; ///< Indicates TTL expiration on access
 
+
+        CachedReading(uint deviceId,
+                      nlohmann::json value,
+                      std::chrono::system_clock::time_point timestamp,
+                      nlohmann::json metadata);
+
         /**
          * @brief Serialize cached reading into JSON.
          *
          * @return JSON object representing reading state.
          */
-        nlohmann::json to_json() const;
+        [[nodiscard]] nlohmann::json to_json() const;
     };
 
     /**
@@ -130,6 +201,15 @@ namespace SmartHome {
          */
         [[nodiscard]] std::optional<CachedModule> getModule(uint moduleId, bool isFresh = false) const;
 
+        /**
+         * @brief Compare and exchange freshness state of a module.
+         *
+         * @param moduleId Module ID.
+         * @param expected Expected value.
+         * @param desired Desired value to set if current matches expected.
+         *
+         * @return \c true if exchange was successful, \c false otherwise, \c std::nullopt if module was not found.
+         */
         std::optional<bool> compareExchangeIsModuleFresh(uint moduleId, bool expected, bool desired);
 
         /**
@@ -149,7 +229,7 @@ namespace SmartHome {
         [[nodiscard]] std::vector<CachedDevice> getModuleDevices(uint moduleId) const;
 
         /**
-         * @brief Remove cached module and its index entry.
+         * @brief Remove cached module, its index entry and all related devices.
          *
          * @param moduleId Module identifier.
          */
@@ -181,6 +261,15 @@ namespace SmartHome {
         [[nodiscard]] std::optional<CachedDevice> getDevice(uint deviceId, bool isFresh = false) const;
 
 
+        /**
+         * @brief Atomically compare-and-exchange device freshness flag.
+         *
+         * @param deviceId Device ID.
+         * @param expected Expected value.
+         * @param desired Desired value to set if current matches expected.
+         *
+         * @return \c true if exchange was successful, \c false otherwise, \c std::nullopt if device was not found.
+         */
         std::optional<bool> compareExchangeIsDeviceFresh(uint deviceId, bool expected, bool desired);
 
         /**
@@ -273,6 +362,8 @@ namespace SmartHome {
          * @brief Add module entry to logic address index.
          *
          * @param module Module snapshot to index.
+         *
+         * @pre Lock on \c mMutex (exclusive).
          */
         void addToModulesIndex(const CachedModule &module);
 
@@ -280,6 +371,8 @@ namespace SmartHome {
          * @brief Remove module entry from logic address index.
          *
          * @param logicAddress Logic address of the module to remove from index.
+         *
+         * @pre Lock on \c mMutex (exclusive).
          */
         void removeFromModulesIndex(uint logicAddress);
 
@@ -287,6 +380,8 @@ namespace SmartHome {
          * @brief Add device entry to module/logic index.
          *
          * @param device Device snapshot to index.
+         *
+         * @pre Lock on \c mMutex (exclusive).
          */
         void addToDevicesIndex(const CachedDevice &device);
 
@@ -295,8 +390,40 @@ namespace SmartHome {
          *
          * @param moduleId Module identifier of the device to remove from index.
          * @param logicId Logic identifier of the device to remove from index.
+         *
+         * @pre Lock on \c mMutex (exclusive).
          */
         void removeFromDevicesIndex(uint moduleId, uint logicId);
+
+        /**
+         * @brief List device ids for a given module.
+         *
+         * @param moduleId Module identifier.
+         *
+         * @return Vector of device ids.
+         *
+         * @pre Lock on \c mMutex.
+         */
+        [[nodiscard]] std::vector<uint> getDeviceIdsForModuleUnlocked(uint moduleId) const;
+
+        /**
+         * @brief Remove cached device and its index entry.
+         *
+         * @param deviceId Device identifier.
+         *
+         * @pre Lock on \c mMutex (exclusive).
+         */
+        void eraseDeviceUnlocked(uint deviceId);
+
+        /**
+         * @brief Fetch cached device by device id.
+         *
+         * @param deviceId Device identifier.
+         * @param isFresh When true, returns std::nullopt if device is stale.
+         *
+         * @return Cached device or std::nullopt if missing or stale.
+         */
+        [[nodiscard]] std::optional<CachedDevice> getDeviceUnlocked(uint deviceId, bool isFresh = false) const;
     };
 
     /**
@@ -307,13 +434,21 @@ namespace SmartHome {
      */
     class ReadingsCache {
     public:
+        using Clock = std::function<std::chrono::system_clock::time_point()>;
+
         /**
          * @brief Construct readings cache with config cache reference.
          *
          * @param configCache Configuration cache used for TTL lookup.
+         * @param clock Time source used for freshness checks, defaults to system_clock::now().
          */
-        explicit ReadingsCache(const ConfigCache &configCache);
+        explicit ReadingsCache(const ConfigCache &configCache,
+                               Clock clock = [] { return std::chrono::system_clock::now(); });
+~ReadingsCache() = default;
 
+ReadingsCache(const ReadingsCache &) = delete;
+
+ReadingsCache &operator=(const ReadingsCache &) = delete;
         /**
          * @brief Fetch cached reading by device id.
          *
@@ -371,6 +506,7 @@ namespace SmartHome {
         mutable std::shared_mutex mMutex;
 
         const ConfigCache &mConfigCache;
+        Clock mClock; ///< Clock used for freshness checks. Can be mocked in tests.
 
         std::unordered_map<uint, CachedReading> mReadings;
 
@@ -382,6 +518,6 @@ namespace SmartHome {
         /**
          * @brief Check if reading is within TTL window.
          */
-        [[nodiscard]] static bool isFresh(const CachedReading &reading, std::chrono::seconds ttl);
+        [[nodiscard]] bool isFresh(const CachedReading &reading, std::chrono::seconds ttl) const;
     };
 }

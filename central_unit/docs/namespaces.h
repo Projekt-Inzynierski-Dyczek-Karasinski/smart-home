@@ -88,6 +88,15 @@ namespace SmartHome::Exceptions {
 }
 
 /**
+ * @namespace SmartHome::Tests
+ * @brief Namespace containing unit tests.
+ *
+ * @details Contains unit tests and mocks for classes and structs in \c SmartHome namespace.
+ */
+namespace SmartHome::Tests {
+}
+
+/**
  * @namespace SmartHomeCLI
  * @brief Command Line Interface for Smart Home system.
  *

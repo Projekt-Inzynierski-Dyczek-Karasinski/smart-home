@@ -1,6 +1,6 @@
 #include "event_handler_test.h"
 
-namespace SmartHome {
+namespace SmartHome::Tests {
     // Setup method for the test fixture
     void EventHandlerTest::SetUp() {
         auto logger = std::make_shared<Utils::Logger>();
@@ -87,14 +87,7 @@ namespace SmartHome {
     }
 
     void EventHandlerTest::seedDevice(const uint id, const nlohmann::json &config) {
-        CachedDevice device;
-        device.id = id;
-        device.logicId = id;
-        device.moduleId = 1;
-        device.name = "name";
-        device.type = "sensor";
-        device.config = config;
-        mConfigCache.setDevice(device);
+        mConfigCache.setDevice(CachedDevice(id, id, 1, "name", "sensor", config));
     }
 
     void EventHandlerTest::seedDeviceWithEventsField(const uint id, const nlohmann::json &eventsValue) {
@@ -137,12 +130,7 @@ namespace SmartHome {
     }
 
     void EventHandlerTest::seedModule(const uint moduleId, const uint logicAddress, const nlohmann::json &config) {
-        CachedModule module;
-        module.id = moduleId;
-        module.logicAddress = logicAddress;
-        module.name = "name";
-        module.config = config;
-        mConfigCache.setModule(module);
+        mConfigCache.setModule(CachedModule(moduleId, logicAddress, "name", config));
     }
 
     nlohmann::json EventHandlerTest::validValuesFormat(const size_t count) {

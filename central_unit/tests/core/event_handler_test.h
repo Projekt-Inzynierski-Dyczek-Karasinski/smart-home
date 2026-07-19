@@ -5,7 +5,7 @@
 #include "cache.h"
 #include "async_logger.h"
 
-namespace SmartHome {
+namespace SmartHome::Tests {
     class EventHandlerTest : public ::testing::Test {
     protected:
         struct CapturedDispatch {

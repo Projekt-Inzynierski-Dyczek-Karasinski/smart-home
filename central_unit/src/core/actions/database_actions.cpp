@@ -6,6 +6,7 @@ namespace SmartHome {
 
     namespace jmik = JsonRpcStrings::ModuleInfoKeys;
     namespace jp = JsonRpcStrings::ParamsKeys;
+    namespace cdbi = Constants::DatabaseIdentifiers;
 
     awaitOptApiResponse DatabaseActions::databaseRequestHandler(cmdMetaPtr commandMetadata) {
         Core::Instance().mpLogger->debug("[DATABASE_ACTIONS] [REQUEST_HANDLER] called");
@@ -32,6 +33,8 @@ namespace SmartHome {
 
         co_return commandResult;
     }
+
+    // TODO replace literals with constants
 
     ba::awaitable<nlohmann::json> DatabaseActions::getModuleAddressingInfo(uint moduleId) {
         API::ApiRequest request;
@@ -78,15 +81,10 @@ namespace SmartHome {
 
                 // Update config cache with retrieved info
                 try {
-                    auto module = CachedModule{
-                        .id = moduleId,
-                        .logicAddress = row[jmik::LOGIC_ADDRESS],
-                        .name = row["name"],
-                        .config = row["config"],
-                    };
+                    auto module = CachedModule(moduleId, row[cdbi::LOGIC_ADDRESS], row[cdbi::NAME], row[cdbi::CONFIG]);
 
-                    if (!row["last_online"].is_null()) {
-                        module.lastOnline = Utils::parseTimestampTz(row["last_online"]);
+                    if (!row[cdbi::LAST_ONLINE].is_null()) {
+                        module.lastOnline = Utils::parseTimestampTz(row[cdbi::LAST_ONLINE]);
                     }
 
                     Core::Instance().configCache().setModule(module);
@@ -203,20 +201,9 @@ namespace SmartHome {
 
             if (responseResultJson.contains(jp::AFFECTED_ROWS) &&
                 responseResultJson.contains(jp::ROWS)) {
-                for (const auto &row: responseResultJson[jp::ROWS]) {
+                for (const auto &moduleData: responseResultJson[jp::ROWS]) {
                     try {
-                        CachedModule module{
-                            .id = row["id"],
-                            .logicAddress = row["logic_address"],
-                            .name = row["name"],
-                            .config = row["config"],
-                        };
-
-                        if (!row["last_online"].is_null()) {
-                            module.lastOnline = Utils::parseTimestampTz(row["last_online"]);
-                        }
-
-                        cache.setModule(module);
+                        cache.setModule(CachedModule(moduleData));
                     } catch (const std::exception &e) {
                         Core::Instance().mpLogger->errorf(
                             "[DATABASE_ACTIONS] [FETCH_MODULE_CONFIGS] Failed to parse db response: %s", e.what());
@@ -268,17 +255,9 @@ namespace SmartHome {
 
             if (responseResultJson.contains(jp::AFFECTED_ROWS) &&
                 responseResultJson.contains(jp::ROWS)) {
-                for (const auto &row: responseResultJson[jp::ROWS]) {
+                for (const auto &deviceData: responseResultJson[jp::ROWS]) {
                     try {
-                        CachedDevice device{
-                            .id = row["id"],
-                            .logicId = row["logic_id"],
-                            .moduleId = row["module_id"],
-                            .name = row["name"],
-                            .type = row["type"],
-                            .config = row["config"]
-                        };
-                        cache.setDevice(device);
+                        cache.setDevice(CachedDevice(deviceData));
                     } catch (const std::exception &e) {
                         Core::Instance().mpLogger->errorf(
                             "[DATABASE_ACTIONS] [FETCH_DEVICES_CONFIGS] Failed to parse db response: %s", e.what());
