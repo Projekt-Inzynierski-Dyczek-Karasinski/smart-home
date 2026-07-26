@@ -168,6 +168,12 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     )
 endif ()
 
+set(SMARTHOME_INCLUDE_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/src)
+
+# Add cmake files
+list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
+include(smarthome_targets) # Target helpers
+
 # Add subdirectories
 add_subdirectory(src/common)
 

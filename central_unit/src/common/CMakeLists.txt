@@ -1,4 +1,5 @@
 # TODO cleanup common dir (add per lib/sub-dir CMakeLists)
+# TODO consider extracting finding/fetching dependencies to separate .cmake file in cmake dir
 # Fetching yaml-cpp from github for static build
 include(FetchContent)
 
@@ -33,7 +34,6 @@ if (ENABLE_SYSTEMD)
     find_package(PkgConfig REQUIRED)
     pkg_check_modules(SYSTEMD REQUIRED IMPORTED_TARGET libsystemd)
 endif ()
-
 
 # SMARTHOME LOGGER
 add_library(smarthome_logger STATIC
@@ -137,3 +137,6 @@ add_library(smarthome::constants ALIAS smarthome_constants)
 target_include_directories(smarthome_constants INTERFACE
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/constants>
 )
+
+# Add subdirectories
+add_subdirectory(time)
