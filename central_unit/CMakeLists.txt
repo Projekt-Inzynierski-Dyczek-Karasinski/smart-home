@@ -1,11 +1,13 @@
-cmake_minimum_required(VERSION 3.28)
+cmake_minimum_required(VERSION 3.28...4.3)
 project(SmartHome)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_STANDARD 23) # TODO delete after refactoring targets definitions using helpers
+set(CMAKE_CXX_STANDARD_REQUIRED ON) # TODO delete after refactoring targets definitions using helpers
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-
+# TODO delete after dependencies update
 # Policy for boost compatibility
 if (POLICY CMP0167)
     cmake_policy(SET CMP0167 OLD)
@@ -61,6 +63,7 @@ endif ()
 
 # Config info
 message(STATUS "==================[ Build Configuration ]=====================")
+message(STATUS "CMAKE_VERSION: ${CMAKE_VERSION}")
 message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 message(STATUS "CMAKE_SYSTEM_NAME: ${CMAKE_SYSTEM_NAME}")
 message(STATUS "CMAKE_SYSTEM_PROCESSOR: ${CMAKE_SYSTEM_PROCESSOR}")
