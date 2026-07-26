@@ -1,8 +1,10 @@
 cmake_minimum_required(VERSION 3.28...4.3)
 project(SmartHome)
 
-set(CMAKE_CXX_STANDARD 23)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+if (MSVC)
+    message(FATAL_ERROR "MSVC not supported")
+endif ()
+
 set(CMAKE_CXX_STANDARD 23) # TODO delete after refactoring targets definitions using helpers
 set(CMAKE_CXX_STANDARD_REQUIRED ON) # TODO delete after refactoring targets definitions using helpers
 set(CMAKE_CXX_EXTENSIONS OFF)
