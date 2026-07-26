@@ -83,53 +83,52 @@ if (TARGET_DEVICE STREQUAL "RPI_ZERO_2W")
     add_compile_options(-mtune=cortex-a53)
 endif ()
 
+# Set release flags
+set(CMAKE_C_FLAGS_RELEASE "-O2 -DNDEBUG")
+set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
     # Additional options for debuging
-    add_compile_options(
-            -O0
-            -g3
-            -DDEBUG
-    )
+    add_compile_options(-g3)
+    add_compile_definitions(DEBUG)
 else ()
     # Additional options for release optimization
-    add_compile_options(
-            -O2
-            -DNDEBUG
-            -ffunction-sections
-            -fdata-sections
-    )
-    add_link_options(-Wl,--gc-sections,-s)
+    add_compile_options(-ffunction-sections -fdata-sections)
+    add_link_options(-Wl,--gc-sections -s)
 endif ()
 
 # Enable coverage
-if (ENABLE_COVERAGE AND CMAKE_CROSSCOMPILING)
-    message(WARNING "Coverage is not enabled when cross-compiling, forcing ENABLE_COVERAGE=OFF")
-    set(ENABLE_COVERAGE OFF)
+set(coverage_enabled ${ENABLE_COVERAGE})
+if (coverage_enabled AND CMAKE_CROSSCOMPILING)
+    message(WARNING "Coverage is not enabled when cross-compiling")
+    set(coverage_enabled OFF)
 endif ()
 
-if (ENABLE_COVERAGE)
+if (coverage_enabled)
     add_compile_options(--coverage)
     add_link_options(--coverage)
 endif ()
 
+
 # Enable sanitizers
-if (ENABLE_ASAN AND ENABLE_TSAN)
+set(asan_enabled ${ENABLE_ASAN})
+set(tsan_enabled ${ENABLE_TSAN})
+if (asan_enabled AND tsan_enabled)
     message(FATAL_ERROR "ASan and TSan cannot be enabled simultaneously")
 endif ()
 
-if ((ENABLE_ASAN OR ENABLE_TSAN) AND CMAKE_CROSSCOMPILING)
-    message(WARNING "Sanitizers are not supported with cross-compilation, forcing ENABLE_ASAN=OFF and ENABLE_TSAN=OFF")
-    set(ENABLE_ASAN OFF)
-    set(ENABLE_TSAN OFF)
+if ((asan_enabled OR tsan_enabled) AND CMAKE_CROSSCOMPILING)
+    message(WARNING "Sanitizers are not supported with cross-compilation")
+    set(asan_enabled OFF)
+    set(tsan_enabled OFF)
 endif ()
 
-if (ENABLE_ASAN)
+if (asan_enabled)
     add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
     add_link_options(-fsanitize=address,undefined)
 endif ()
 
-if (ENABLE_TSAN)
+if (tsan_enabled)
     add_compile_options(-fsanitize=thread -fno-omit-frame-pointer)
     add_link_options(-fsanitize=thread)
 endif ()
@@ -197,12 +196,13 @@ if (BUILD_GUI)
 endif ()
 
 # Add tests
-if (BUILD_TESTS AND CMAKE_CROSSCOMPILING)
-    message(WARNING "Tests are not built when cross-compiling, forcing BUILD_TESTS=OFF")
-    set(BUILD_TESTS OFF)
+set(build_test_enabled ${BUILD_TESTS})
+if (build_test_enabled AND CMAKE_CROSSCOMPILING)
+    message(WARNING "Tests are not built when cross-compiling")
+    set(build_test_enabled OFF)
 endif ()
 
-if (BUILD_TESTS)
+if (build_test_enabled)
     enable_testing()
     add_subdirectory(tests)
 endif ()
