@@ -28,10 +28,10 @@ target_link_libraries(smarthome-mediator PRIVATE
         smarthome::utility
         smarthome::logger
         smarthome::constants
+        smarthome::warnings
         Boost::program_options
         Boost::system
         PkgConfig::GPIOD
-        project_warnings
 )
 
 

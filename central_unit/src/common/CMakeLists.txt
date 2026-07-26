@@ -51,7 +51,7 @@ target_include_directories(smarthome_logger PUBLIC
 
 target_link_libraries(smarthome_logger PRIVATE
         Boost::system
-        project_warnings
+        smarthome::warnings
 )
 
 # SMARTHOME API
@@ -67,7 +67,7 @@ target_include_directories(smarthome_api PUBLIC
 )
 
 target_link_libraries(smarthome_api PRIVATE
-        project_warnings
+        smarthome::warnings
 )
 
 # SMARTHOME IPC
@@ -89,10 +89,10 @@ target_link_libraries(smarthome_ipc PRIVATE
         Boost::system
         Boost::regex
         Boost::iostreams
+        smarthome::warnings
         smarthome::logger
         smarthome::api
         ZLIB::ZLIB
-        project_warnings
 )
 
 # SMARTHOME UTILITY
@@ -124,7 +124,7 @@ endif ()
 target_link_libraries(smarthome_utility
         PRIVATE
         yaml-cpp
-        project_warnings
+        smarthome::warnings
         PUBLIC
         smarthome::logger
 )

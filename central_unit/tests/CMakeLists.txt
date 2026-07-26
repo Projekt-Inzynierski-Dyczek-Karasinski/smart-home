@@ -38,7 +38,7 @@ function(smarthome_add_test_group GROUP)
             ${ARG_LIBS}
             PRIVATE
             GTest::gtest_main
-            project_warnings
+            smarthome::warnings
     )
 
     gtest_discover_tests(${GROUP}_tests
@@ -67,5 +67,5 @@ target_link_libraries(all_tests
         ${all_libs}
         PRIVATE
         GTest::gtest_main
-        project_warnings
+        smarthome::warnings
 )

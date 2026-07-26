@@ -130,8 +130,10 @@ if (ENABLE_TSAN)
 endif ()
 
 # Additional warnings
-add_library(project_warnings INTERFACE)
-target_compile_options(project_warnings INTERFACE
+add_library(smarthome_warnings INTERFACE)
+add_library(smarthome::warnings ALIAS smarthome_warnings)
+
+target_compile_options(smarthome_warnings INTERFACE
         -Wall
         -Wextra
         -Wnon-virtual-dtor
@@ -150,9 +152,9 @@ target_compile_options(project_warnings INTERFACE
         -Wnull-dereference
 )
 
-# warnings GCC only 
+# Additional warnings GCC only
 if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    target_compile_options(project_warnings INTERFACE
+    target_compile_options(smarthome_warnings INTERFACE
             -Wshadow=local
             -Warith-conversion
             -Wuseless-cast

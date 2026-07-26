@@ -68,7 +68,7 @@ target_link_libraries(smarthome_core_lib PUBLIC
         ical
         ical_cxx
         PRIVATE
-        project_warnings
+        smarthome::warnings
 )
 
 if (ENABLE_SYSTEMD)
@@ -82,6 +82,6 @@ endif ()
 add_executable(smarthomed main.cpp)
 target_link_libraries(smarthomed PRIVATE
         smarthome::core_lib
-        Boost::program_options
-        project_warnings)
+        smarthome::warnings
+        Boost::program_options)
 
