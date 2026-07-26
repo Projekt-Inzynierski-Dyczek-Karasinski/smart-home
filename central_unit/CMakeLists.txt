@@ -11,6 +11,12 @@ if (POLICY CMP0167)
     cmake_policy(SET CMP0167 OLD)
 endif ()
 
+# Define folders for target organization
+set(LIBRARIES_TARGETS_FOLDER "Libs" CACHE STRING "Folder where libraries targets are placed")
+set(THIRD_PARTY_TARGETS_FOLDER "ThirdParty" CACHE STRING
+        "Folder where third party libraries and tools targets are placed")
+set(TESTS_TARGETS_FOLDER "Tests" CACHE STRING "Folder where tests targets are placed")
+
 # Define defaults for build variables
 set(TARGET_DEVICE "NATIVE" CACHE STRING "Target device type")
 set_property(CACHE TARGET_DEVICE PROPERTY STRINGS "NATIVE" "RPI_ZERO_2W")
@@ -145,7 +151,7 @@ target_compile_options(project_warnings INTERFACE
 )
 
 # warnings GCC only 
-if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+if (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     target_compile_options(project_warnings INTERFACE
             -Wshadow=local
             -Warith-conversion
@@ -154,7 +160,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
             -Wduplicated-branches
             -Wlogical-op
     )
-endif()
+endif ()
 
 # Add subdirectories
 add_subdirectory(src/common)

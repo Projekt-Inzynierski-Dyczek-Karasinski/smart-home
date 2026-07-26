@@ -10,7 +10,7 @@ set(INSTALL_GTEST OFF CACHE BOOL "" FORCE)
 set(BUILD_GMOCK ON CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(googletest)
-set_target_properties(gtest gtest_main gmock gmock_main PROPERTIES FOLDER "third_party")
+set_target_properties(gtest gtest_main gmock gmock_main PROPERTIES FOLDER "${THIRD_PARTY_TARGETS_FOLDER}")
 
 include(GoogleTest)
 
@@ -30,7 +30,7 @@ function(smarthome_add_test_group GROUP)
     endforeach ()
 
     add_executable(${GROUP}_tests ${sources})
-    set_target_properties(${GROUP}_tests PROPERTIES FOLDER "tests")
+    set_target_properties(${GROUP}_tests PROPERTIES FOLDER "${TESTS_TARGETS_FOLDER}")
     target_link_libraries(${GROUP}_tests
             PUBLIC
             GTest::gtest
@@ -59,7 +59,7 @@ get_property(all_sources GLOBAL PROPERTY SMARTHOME_TEST_SOURCES)
 get_property(all_libs GLOBAL PROPERTY SMARTHOME_TEST_LIBS)
 
 add_executable(all_tests ${all_sources})
-set_target_properties(all_tests PROPERTIES FOLDER "tests")
+set_target_properties(all_tests PROPERTIES FOLDER "${TESTS_TARGETS_FOLDER}")
 target_link_libraries(all_tests
         PUBLIC
         GTest::gtest

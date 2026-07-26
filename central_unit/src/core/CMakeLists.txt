@@ -30,7 +30,7 @@ set(CMAKE_DISABLE_FIND_PACKAGE_ICU ON CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(libical)
 set_target_properties(ical ical-header ical_cxx icalss icalss-header icalss_cxx icalvcal
-        PROPERTIES FOLDER "third_party")
+        PROPERTIES FOLDER "${THIRD_PARTY_TARGETS_FOLDER}")
 
 
 # Core library
@@ -46,7 +46,7 @@ add_library(smarthome_core_lib STATIC
         actions/mediator_actions.cpp
         actions/database_actions.cpp
 )
-set_target_properties(smarthome_core_lib PROPERTIES FOLDER "lib")
+set_target_properties(smarthome_core_lib PROPERTIES FOLDER "${LIBRARIES_TARGETS_FOLDER}")
 
 add_library(smarthome::core_lib ALIAS smarthome_core_lib)
 

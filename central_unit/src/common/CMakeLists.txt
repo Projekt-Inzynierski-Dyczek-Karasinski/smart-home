@@ -1,3 +1,4 @@
+# TODO cleanup common dir (add per lib/sub-dir CMakeLists)
 # Fetching yaml-cpp from github for static build
 include(FetchContent)
 
@@ -18,6 +19,7 @@ set(YAML_BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 set(YAML_CPP_INSTALL OFF CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(yaml-cpp)
+set_target_properties(yaml-cpp PROPERTIES FOLDER "${THIRD_PARTY_TARGETS_FOLDER}")
 
 # Boost required
 find_package(Boost 1.74 REQUIRED COMPONENTS
@@ -38,7 +40,7 @@ add_library(smarthome_logger STATIC
         logger/logger.cpp
         logger/async_logger.cpp
 )
-set_target_properties(smarthome_logger PROPERTIES FOLDER "lib")
+set_target_properties(smarthome_logger PROPERTIES FOLDER "${LIBRARIES_TARGETS_FOLDER}")
 
 
 add_library(smarthome::logger ALIAS smarthome_logger)
@@ -56,7 +58,7 @@ target_link_libraries(smarthome_logger PRIVATE
 add_library(smarthome_api STATIC
         api/api.cpp
 )
-set_target_properties(smarthome_api PROPERTIES FOLDER "lib")
+set_target_properties(smarthome_api PROPERTIES FOLDER "${LIBRARIES_TARGETS_FOLDER}")
 
 add_library(smarthome::api ALIAS smarthome_api)
 
@@ -75,7 +77,7 @@ add_library(smarthome_ipc STATIC
         ipc/socket_server_connection.cpp
         ipc/socket_server.cpp
 )
-set_target_properties(smarthome_ipc PROPERTIES FOLDER "lib")
+set_target_properties(smarthome_ipc PROPERTIES FOLDER "${LIBRARIES_TARGETS_FOLDER}")
 
 add_library(smarthome::ipc ALIAS smarthome_ipc)
 
@@ -101,7 +103,7 @@ add_library(smarthome_utility STATIC
         utils/service_manager/standalone_service.cpp
         utils/service_manager/systemd_service.cpp
 )
-set_target_properties(smarthome_utility PROPERTIES FOLDER "lib")
+set_target_properties(smarthome_utility PROPERTIES FOLDER "${LIBRARIES_TARGETS_FOLDER}")
 
 
 add_library(smarthome::utility ALIAS smarthome_utility)

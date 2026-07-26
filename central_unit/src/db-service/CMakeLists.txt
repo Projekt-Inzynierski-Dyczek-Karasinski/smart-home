@@ -22,7 +22,7 @@ set(SKIP_BUILD_TEST ON CACHE INTERNAL "")
 set(BUILD_DOC OFF CACHE INTERNAL "")
 
 FetchContent_MakeAvailable(libpqxx)
-set_target_properties(pqxx PROPERTIES FOLDER "third_party")
+set_target_properties(pqxx PROPERTIES FOLDER "${THIRD_PARTY_TARGETS_FOLDER}")
 
 
 # Target
