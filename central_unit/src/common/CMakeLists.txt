@@ -89,10 +89,11 @@ target_link_libraries(smarthome_ipc PRIVATE
         Boost::system
         Boost::regex
         Boost::iostreams
+        ZLIB::ZLIB
         smarthome::warnings
+        PUBLIC
         smarthome::logger
         smarthome::api
-        ZLIB::ZLIB
 )
 
 # SMARTHOME UTILITY
