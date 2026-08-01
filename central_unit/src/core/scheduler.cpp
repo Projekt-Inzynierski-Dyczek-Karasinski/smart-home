@@ -304,7 +304,7 @@ namespace SmartHome {
     void Scheduler::dispatchAction(const TaskPtr &pTask) const {
         if (!mIsRunning) return;
         mpLogger->debugf("[SCHEDULER] Dispatching %s for device [%u]",
-                         c::AutomatedActionNames::SCHEDULED_ACTION, pTask->deviceId);
+                         c::AutomatedActionNames::SCHEDULED_ACTION.data(), pTask->deviceId);
 
         boost::asio::post(mIoContext, [self = shared_from_this(), pTask] {
             if (!self->mIsRunning || pTask->removed) return;
