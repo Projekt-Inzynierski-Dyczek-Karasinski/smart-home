@@ -28,6 +28,9 @@ namespace SmartHome {
     template<typename T>
     using ValidationResult = std::expected<T, API::ApiError>;
 
+    using ActionDispatcher =
+    std::function<void(std::string_view actionName, uint id, const nlohmann::json &action)>;
+
     /**
      * @brief Shared utilities and command metadata for action handlers.
      *

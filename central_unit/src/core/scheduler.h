@@ -28,9 +28,6 @@ namespace SmartHome {
      */
     class Scheduler : public std::enable_shared_from_this<Scheduler> {
     public:
-        using ActionDispatcher =
-        std::function<void(std::string_view actionName, uint id, const nlohmann::json &action)>;
-
         /**
          * @brief Construct scheduler bound to an io_context and config cache.
          *
