@@ -10,11 +10,15 @@ namespace SmartHome {
 
     Scheduler::Scheduler(ba::io_context &ioContext,
                          const ConfigCache &configCache,
-                         const std::shared_ptr<Utils::AsyncLogger> &logger)
+                         const std::shared_ptr<Utils::AsyncLogger> &logger,
+                         Time::ITimeProvider &timeProvider,
+                         ActionDispatcher dispatchAction)
         : mIoContext(ioContext),
-          mTimer(ioContext),
           mConfigCache(configCache),
-          mpLogger(logger) {
+          mpLogger(logger),
+          mTimeProvider(timeProvider),
+          mDispatchAction(std::move(dispatchAction)) {
+        mpTimer = mTimeProvider.createTimer();
     }
 
     Scheduler::~Scheduler() {
@@ -161,6 +165,8 @@ namespace SmartHome {
         if (!config.contains(c::DeviceConfigKeys::SCHEDULE) || !config[c::DeviceConfigKeys::SCHEDULE].is_array()) {
             return;
         }
+        const auto now = mTimeProvider.now();
+        const auto icalNow = timePointToIcal(now);
 
         for (const auto &entry: config[c::DeviceConfigKeys::SCHEDULE]) {
             if (!entry.is_object()) {
@@ -178,15 +184,27 @@ namespace SmartHome {
                 continue;
             }
 
-            icaltimetype dtstart;
-            if (entry.contains(c::DeviceConfigKeys::DTSTART) && entry[c::DeviceConfigKeys::DTSTART].is_string()) {
-                dtstart = icaltime_from_string(entry[c::DeviceConfigKeys::DTSTART].get<std::string>().c_str());
+            if (!entry[c::DeviceConfigKeys::ENABLED].get<bool>()) continue; // skip disabled events
+
+            icaltimetype dtstart = icaltime_null_time();
+            if (entry.contains(c::DeviceConfigKeys::DTSTART)) {
+                if (entry[c::DeviceConfigKeys::DTSTART].is_string()) {
+                    dtstart = icaltime_from_string(entry[c::DeviceConfigKeys::DTSTART].get<std::string>().c_str());
+                }
                 if (icaltime_is_null_time(dtstart)) {
-                    dtstart = icaltime_current_time_with_zone(icaltimezone_get_utc_timezone());
+                    mpLogger->errorf("[SCHEDULER] Failed to parse '%s' (%s) for device [%u], "
+                                     "defaulting to now and skipping first occurrence",
+                                     c::DeviceConfigKeys::DTSTART.data(),
+                                     entry[c::DeviceConfigKeys::DTSTART].dump().c_str(),
+                                     deviceId);
                 }
             } else {
-                dtstart = icaltime_current_time_with_zone(icaltimezone_get_utc_timezone());
+                mpLogger->debugf(
+                    "[SCHEDULER] No 'dtstart' for device [%u], defaulting to now and skipping first occurrence",
+                    deviceId);
             }
+
+            if (icaltime_is_null_time(dtstart)) dtstart = icalNow;
 
             const auto &rruleStr = entry[c::DeviceConfigKeys::RRULE].get<std::string>();
             auto rruleIter = createRRuleIterator(rruleStr, dtstart);
@@ -202,7 +220,6 @@ namespace SmartHome {
 
             // Advance to first future occurrence
             if (task->advanceToNext()) {
-                const auto now = std::chrono::system_clock::now();
                 // If nextRun is in the past, advance until it's in the future or recurrence ends
                 while (task->nextRun <= now) {
                     if (!task->advanceToNext()) break;
@@ -230,17 +247,17 @@ namespace SmartHome {
         }
 
         const auto &nextTask = mTaskQueue.top();
-        mTimer.expires_at(nextTask->nextRun);
-        mTimer.async_wait([this](const boost::system::error_code &ec) {
-            onTimerExpired(ec);
+        mpTimer->expiresAt(nextTask->nextRun);
+        mpTimer->asyncWait([self = weak_from_this()](const std::error_code &ec) {
+            if (const auto p = self.lock()) p->onTimerExpired(ec);
         });
     }
 
-    void Scheduler::onTimerExpired(const boost::system::error_code &ec) {
+    void Scheduler::onTimerExpired(const std::error_code &ec) {
         if (ec || !mIsRunning) return;
 
         std::scoped_lock lock(mMutex);
-        const auto now = std::chrono::system_clock::now();
+        const auto now = mTimeProvider.now();
 
         while (!mTaskQueue.empty()) {
             // Skip and remove tasks that were flagged as removed
@@ -267,14 +284,14 @@ namespace SmartHome {
         scheduleNextTimer();
     }
 
-    void Scheduler::dispatchAction(const TaskPtr &task) const {
-        mpLogger->debugf("[SCHEDULER] Dispatching action");
-        auto action = task->action;
-        auto deviceId = task->deviceId;
+    void Scheduler::dispatchAction(const TaskPtr &pTask) const {
+        if (!mIsRunning) return;
+        mpLogger->debugf("[SCHEDULER] Dispatching %s for device [%u]",
+                         c::AutomatedActionNames::SCHEDULED_ACTION, pTask->deviceId);
 
-        boost::asio::post(Core::Instance().coreIoContext(), [action, deviceId]  {
-            constexpr std::string_view actionName = "Scheduled action";
-            ActionHelpers::dispatchAutomatedDeviceAction(actionName, deviceId, action);
+        boost::asio::post(mIoContext, [self = shared_from_this(), pTask] {
+            if (!self->mIsRunning || pTask->removed) return;
+            self->mDispatchAction(c::AutomatedActionNames::SCHEDULED_ACTION, pTask->deviceId, pTask->action);
         });
     }
 }

@@ -177,7 +177,7 @@ namespace SmartHome {
             if (!mIsRunning) co_return;
 
             // Start scheduler and event handler after populating cache
-            mpScheduler = std::make_unique<Scheduler>(mCoreIoContext, mConfigCache, mpLogger);
+            mpScheduler = std::make_unique<Scheduler>(mCoreIoContext, mConfigCache, mpLogger, mTimeProvider);
             mpScheduler->loadFromCache();
             mpScheduler->start();
 

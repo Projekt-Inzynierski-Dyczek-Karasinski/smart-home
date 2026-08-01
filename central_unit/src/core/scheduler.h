@@ -1,6 +1,8 @@
 #pragma once
 #include "cache.h"
 #include "async_logger.h"
+#include "actions/action_helpers.h"
+#include "common/time/time_provider.h"
 
 #include <queue>
 
@@ -19,18 +21,26 @@ namespace SmartHome {
      *
      * @note All public methods are thread-safe.
      */
-    class Scheduler {
+    class Scheduler : public std::enable_shared_from_this<Scheduler> {
     public:
+        using ActionDispatcher =
+        std::function<void(std::string_view actionName, uint id, const nlohmann::json &action)>;
+
         /**
          * @brief Construct scheduler bound to an io_context and config cache.
          *
          * @param ioContext Boost.Asio context for timer operations.
          * @param configCache Configuration cache for device schedule lookup.
          * @param logger Logger instance.
+         * @param timeProvider Time source abstraction used for scheduling calculations (injectable for testing).
+         * @param dispatchAction Callable used to dispatch device actions (injectable for testing).
          */
         Scheduler(ba::io_context &ioContext,
                   const ConfigCache &configCache,
-                  const std::shared_ptr<Utils::AsyncLogger> &logger);
+                  const std::shared_ptr<Utils::AsyncLogger> &logger,
+                  Time::ITimeProvider &timeProvider,
+                  ActionDispatcher dispatchAction = &ActionHelpers::dispatchAutomatedDeviceAction);
+
 
         ~Scheduler();
 
@@ -174,22 +184,24 @@ namespace SmartHome {
          *
          * @param ec Error code from async_wait.
          */
-        void onTimerExpired(const boost::system::error_code &ec);
+        void onTimerExpired(const std::error_code &ec);
 
         /**
          * @brief Dispatch a scheduled action through \c Actions pipeline.
          *
-         * @param task Task whose action to execute.
+         * @param pTask Task whose action to execute.
          */
-        void dispatchAction(const TaskPtr &task) const;
+        void dispatchAction(const TaskPtr &pTask) const;
 
         ba::io_context &mIoContext;
-        ba::system_timer mTimer;
         const ConfigCache &mConfigCache;
         std::shared_ptr<Utils::AsyncLogger> mpLogger;
+        Time::ITimeProvider &mTimeProvider;
 
-        TaskQueue mTaskQueue;
+        ActionDispatcher mDispatchAction; ///< Device action dispatcher (injectable for testing)
         mutable std::mutex mMutex;
+        std::unique_ptr<Time::ITimer> mpTimer;
+        TaskQueue mTaskQueue; /// All tasks including retired ones pending removal.
         std::atomic_bool mIsRunning{false};
         std::atomic_bool mIsStopping{false};
     };

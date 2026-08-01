@@ -6,6 +6,7 @@
 #include "api/internal_api.h"
 #include "cache.h"
 #include "scheduler.h"
+#include "common/time/asio_time_provider.h"
 
 #include <atomic>
 #include <memory>
@@ -244,6 +245,7 @@ namespace SmartHome {
         /// Thread running utility IO_context
         std::optional<std::thread> mCoreUtilityThread;
         std::optional<ba::executor_work_guard<ba::io_context::executor_type> > mCoreUtilityGuard;
+        Time::AsioTimeProvider mTimeProvider{mCoreUtilityIoContext.get_executor()};
         std::optional<ba::signal_set> mSignals;
         /// Signals defined to handle in signalHandler
         static constexpr std::array ms_SIGNALS_TO_HANDLE = {SIGINT, SIGTERM, SIGHUP};

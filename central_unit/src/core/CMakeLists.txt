@@ -64,6 +64,7 @@ target_link_libraries(smarthome_core_lib PUBLIC
         smarthome::ipc
         smarthome::utility
         smarthome::constants
+        smarthome::time
         nlohmann_json::nlohmann_json
         ical
         ical_cxx
@@ -83,5 +84,6 @@ add_executable(smarthomed main.cpp)
 target_link_libraries(smarthomed PRIVATE
         smarthome::core_lib
         smarthome::warnings
+        smarthome::time_asio
         Boost::program_options)
 
