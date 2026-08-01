@@ -57,7 +57,7 @@ namespace SmartHome::Tests {
 
     TEST_F(ReadingsCacheTest, ReadingsCacheEraseReading) {
         populateReadings();
-        EXPECT_TRUE( mReadingsCache.get(1).has_value());
+        EXPECT_TRUE(mReadingsCache.get(1).has_value());
 
         mReadingsCache.erase(1);
         EXPECT_FALSE(mReadingsCache.get(1).has_value());
@@ -96,21 +96,21 @@ namespace SmartHome::Tests {
     }
 
     TEST_F(ReadingsCacheTest, ReadingsCacheGetFreshReadingStaleNoCache) {
-        populateDevices(1,false);
+        populateDevices(1, false);
         populateReadings();
 
         EXPECT_FALSE(mReadingsCache.getFresh(1).has_value());
     }
 
     TEST_F(ReadingsCacheTest, ReadingsCacheGetFreshReadingStaleZeroTime) {
-        populateDevices(1,true, 0);
+        populateDevices(1, true, 0);
         populateReadings();
 
         EXPECT_FALSE(mReadingsCache.getFresh(1).has_value());
     }
 
     TEST_F(ReadingsCacheTest, ReadingsCacheGetFreshReadingTurnedStale) {
-        populateDevices(1,true);
+        populateDevices(1, true);
         populateReadings();
 
         EXPECT_TRUE(mReadingsCache.getFresh(1).has_value());
