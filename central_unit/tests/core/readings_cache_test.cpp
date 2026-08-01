@@ -115,11 +115,11 @@ namespace SmartHome::Tests {
 
         EXPECT_TRUE(mReadingsCache.getFresh(1).has_value());
 
-        mNow += 59s;
+        mTimeProvider.advanceBy(59s);
 
         EXPECT_TRUE(mReadingsCache.getFresh(1).has_value());
 
-        mNow += 2s;
+        mTimeProvider.advanceBy(2s);
 
         EXPECT_FALSE(mReadingsCache.getFresh(1).has_value());
     }
@@ -144,7 +144,7 @@ namespace SmartHome::Tests {
     TEST_F(ReadingsCacheTest, ReadingsCacheOverrideRefreshesTimestamp) {
         populateDevices(1, true);
         populateReadings(1);
-        mNow += 61s;
+        mTimeProvider.advanceBy(61s);
         ASSERT_FALSE(mReadingsCache.getFresh(1).has_value());
 
         populateReadings(1); // Overwrite resets timestamp

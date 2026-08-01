@@ -1,9 +1,10 @@
 #pragma once
-
-#include <gtest/gtest.h>
 #include "event_handler.h"
 #include "cache.h"
 #include "async_logger.h"
+#include "common/time/testing/fake_time_provider.h"
+
+#include <gtest/gtest.h>
 
 namespace SmartHome::Tests {
     class EventHandlerTest : public ::testing::Test {
@@ -75,12 +76,13 @@ namespace SmartHome::Tests {
 
         // Event handler members
         ConfigCache mConfigCache;
-        ReadingsCache mReadingsCache{mConfigCache};
+        ReadingsCache mReadingsCache{mConfigCache, mTimeProvider};
         ba::io_context mIoContext;
         std::shared_ptr<Utils::AsyncLogger> mpLogger;
 
 
         // Members used for testing
+        Time::Testing::FakeTimeProvider mTimeProvider{std::chrono::system_clock::now()};
         std::shared_ptr<EventHandler> mpHandler;
         std::vector<CapturedDispatch> mDeviceDispatches;
         std::vector<CapturedDispatch> mModuleDispatches;

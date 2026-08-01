@@ -445,8 +445,8 @@ namespace SmartHome {
         return device;
     }
 
-    ReadingsCache::ReadingsCache(const ConfigCache &configCache, Clock clock)
-        : mConfigCache(configCache), mClock(std::move(clock)) {
+    ReadingsCache::ReadingsCache(const ConfigCache &configCache, Time::ITimeProvider &timeProvider)
+        : mConfigCache(configCache), mTimeProvider(timeProvider) {
     }
 
     std::optional<CachedReading> ReadingsCache::get(const uint deviceId) const {
@@ -497,7 +497,7 @@ namespace SmartHome {
     }
 
     void ReadingsCache::set(const uint deviceId, const nlohmann::json &value, const nlohmann::json &metadata) {
-        auto reading = CachedReading(deviceId, value, mClock(), metadata);
+        auto reading = CachedReading(deviceId, value, mTimeProvider.now(), metadata);
         std::unique_lock lock(mMutex);
         mReadings.insert_or_assign(deviceId, std::move(reading));
     }
@@ -526,7 +526,7 @@ namespace SmartHome {
     }
 
     bool ReadingsCache::isFresh(const CachedReading &reading, const std::chrono::seconds ttl) const {
-        const auto age = mClock() - reading.timestamp;
+        const auto age = mTimeProvider.now() - reading.timestamp;
         return age < ttl;
     }
 }

@@ -224,7 +224,7 @@ namespace SmartHome {
 
         // Cache
         ConfigCache mConfigCache;
-        ReadingsCache mReadingsCache{mConfigCache};
+        ReadingsCache mReadingsCache{mConfigCache, mTimeProvider};
 
         // Scheduler
         std::unique_ptr<Scheduler> mpScheduler;

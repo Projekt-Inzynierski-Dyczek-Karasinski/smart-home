@@ -1,4 +1,5 @@
 #pragma once
+#include "common/time/time_provider.h"
 
 #include <chrono>
 #include <map>
@@ -434,16 +435,13 @@ namespace SmartHome {
      */
     class ReadingsCache {
     public:
-        using Clock = std::function<std::chrono::system_clock::time_point()>;
-
         /**
          * @brief Construct readings cache with config cache reference.
          *
          * @param configCache Configuration cache used for TTL lookup.
-         * @param clock Time source used for freshness checks, defaults to system_clock::now().
+         * @param timeProvider Time source abstraction for freshness check (injectable for testing).
          */
-        explicit ReadingsCache(const ConfigCache &configCache,
-                               Clock clock = [] { return std::chrono::system_clock::now(); });
+        explicit ReadingsCache(const ConfigCache &configCache, Time::ITimeProvider &timeProvider);
 
         ~ReadingsCache() = default;
 
@@ -508,7 +506,7 @@ namespace SmartHome {
         mutable std::shared_mutex mMutex;
 
         const ConfigCache &mConfigCache;
-        Clock mClock; ///< Clock used for freshness checks. Can be mocked in tests.
+        Time::ITimeProvider &mTimeProvider;
 
         std::unordered_map<uint, CachedReading> mReadings;
 
