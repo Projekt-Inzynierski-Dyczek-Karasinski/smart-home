@@ -104,6 +104,8 @@ if (coverage_enabled AND CMAKE_CROSSCOMPILING)
     set(coverage_enabled OFF)
 endif ()
 
+# TODO Change to library interface (similar to warnings) and add directly to targets in smarthome_targets helpers
+#      Consider same thing for sanitizers
 if (coverage_enabled)
     add_compile_options(--coverage)
     add_link_options(--coverage)
