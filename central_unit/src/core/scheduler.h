@@ -5,17 +5,22 @@
 #include "common/time/time_provider.h"
 
 #include <queue>
+#include <unordered_map>
+#include <shared_mutex>
+#include <memory>
 
 #include <boost/asio.hpp>
+#include <nlohmann/json.hpp>
 #include <ical.h>
 
-
 namespace SmartHome {
+    namespace ba = boost::asio;
+
     /**
      * @brief Scheduled task execution engine using iCalendar RRULE recurrence.
      *
-     * @details Maintains a priority queue of scheduled tasks parsed from device configurations.
-     *          A single system_timer fires for the nearest task,
+     * @details Maintains a priority queue of tasks parsed from device configurations, plus a
+     *          per-device index used for removal. A single ITimer fires for the nearest task,
      *          dispatches the action through the existing Actions command pipeline,
      *          advances the RRULE iterator, and re-enqueues the task.
      *
@@ -42,6 +47,9 @@ namespace SmartHome {
                   ActionDispatcher dispatchAction = &ActionHelpers::dispatchAutomatedDeviceAction);
 
 
+        /**
+         * @brief Destructor. Calls \c stop().
+         */
         ~Scheduler();
 
         Scheduler(const Scheduler &) = delete;
@@ -57,20 +65,8 @@ namespace SmartHome {
          */
         void loadFromCache();
 
-        // TODO Unused for now, use after db trigger rework (adding payload with changed ids)
         /**
-         * @brief Reload schedule entries for a specific device.
-         *
-         * @details Removes existing tasks for the device and reparses its schedule config.
-         *
-         * @note Used after LISTEN/NOTIFY config changes.
-         *
-         * @param deviceId Device identifier to reload.
-         */
-        void reloadDevice(uint deviceId);
-
-        /**
-         * @brief Remove all scheduled tasks for a device.
+         * @brief Marks tasks as removed in \c mTaskQueue for lazy deletion and deletes them from \c mTasksByDevice.
          *
          * @param deviceId Device identifier.
          */
@@ -92,7 +88,7 @@ namespace SmartHome {
         [[nodiscard]] bool isRunning() const;
 
         /**
-         * @brief Number of tasks currently in the queue.
+         * @brief Number of live tasks (excludes removed and exhausted ones).
          */
         [[nodiscard]] size_t taskCount() const;
 
@@ -123,7 +119,7 @@ namespace SmartHome {
             nlohmann::json action; ///< Action definition from config
             std::chrono::system_clock::time_point nextRun; ///< Next scheduled execution time
             IcalIterPtr rruleIterator; ///< libical recurrence iterator
-            bool removed = false; ///< delete flag for preventing dispatch of removed tasks
+            bool removed = false; ///< Lazy-delete flag: skipped in the queue and suppresses dispatch
 
             /**
              * @brief Advance iterator to next occurrence.
@@ -147,10 +143,10 @@ namespace SmartHome {
         using TaskQueue = std::priority_queue<TaskPtr, std::vector<TaskPtr>, TaskComparator>;
 
         /**
-         * @brief Parse RRULE string and create iterator starting from now.
+         * @brief Parse RRULE string and create an iterator anchored at dtstart.
          *
          * @param rruleStr RRULE string (e.g. "FREQ=MINUTELY;INTERVAL=5").
-         * @param dtstart Output parameter receiving the start time used.
+         * @param dtstart Start time for the recurrence iterator.
          *
          * @return Iterator pointer or nullptr on parse failure.
          */
@@ -158,9 +154,14 @@ namespace SmartHome {
                                                const icaltimetype &dtstart);
 
         /**
-         * @brief Convert icaltimetype to system_clock time_point.
+         * @brief Convert \c icaltimetype to \c system_clock::time_point.
          */
         static std::chrono::system_clock::time_point icalToTimePoint(const icaltimetype &time);
+
+        /**
+         * @brief Convert \c system_clock::time_point to \c icaltimetype.
+         */
+        static icaltimetype timePointToIcal(std::chrono::system_clock::time_point timePoint);
 
         /**
          * @brief Parse device config \b schedule array and enqueue tasks.
@@ -193,16 +194,44 @@ namespace SmartHome {
          */
         void dispatchAction(const TaskPtr &pTask) const;
 
+        /**
+         * @brief Register a newly parsed task in both the queue and the device index.
+         *
+         * @param pTask Task to register.
+         */
+        void enqueueTask(const TaskPtr &pTask);
+
+        /**
+         * @brief Return an already-indexed task to the queue after advancing its iterator.
+         *
+         * @param pTask Task to requeue.
+         *
+         * @pre The task's iterator is advanced before requeue.
+         */
+        void requeueTask(const TaskPtr &pTask);
+
+        /**
+         * @brief Remove a task from the device index.
+         *
+         * @param pTask Task to remove.
+         *
+         * @note A dispatch already posted for this task still runs, \c removeDevice() can no longer suppress it,
+         *       as the task is no longer reachable from the index.
+         */
+        void retireTask(const TaskPtr &pTask);
+
+        mutable std::shared_mutex mMutex;
+
         ba::io_context &mIoContext;
         const ConfigCache &mConfigCache;
         std::shared_ptr<Utils::AsyncLogger> mpLogger;
         Time::ITimeProvider &mTimeProvider;
 
         ActionDispatcher mDispatchAction; ///< Device action dispatcher (injectable for testing)
-        mutable std::mutex mMutex;
+
         std::unique_ptr<Time::ITimer> mpTimer;
         TaskQueue mTaskQueue; /// All tasks including retired ones pending removal.
+        std::unordered_map<uint, std::vector<TaskPtr> > mTasksByDevice; /// Live tasks by device.
         std::atomic_bool mIsRunning{false};
-        std::atomic_bool mIsStopping{false};
     };
 };
