@@ -8,17 +8,13 @@ namespace SmartHome {
 
     using namespace std::string_literals;
 
-    Scheduler::Scheduler(ba::io_context &ioContext,
-                         const ConfigCache &configCache,
-                         const std::shared_ptr<Utils::AsyncLogger> &logger,
-                         Time::ITimeProvider &timeProvider,
-                         ActionDispatcher dispatchAction)
-        : mIoContext(ioContext),
-          mConfigCache(configCache),
-          mpLogger(logger),
-          mTimeProvider(timeProvider),
-          mDispatchAction(std::move(dispatchAction)) {
-        mpTimer = mTimeProvider.createTimer();
+    std::shared_ptr<Scheduler> Scheduler::create(ba::io_context &ioContext,
+                                                 const ConfigCache &configCache,
+                                                 const std::shared_ptr<Utils::AsyncLogger> &logger,
+                                                 Time::ITimeProvider &timeProvider,
+                                                 ActionDispatcher dispatchAction) {
+        return std::shared_ptr<Scheduler>(
+            new Scheduler(ioContext, configCache, logger, timeProvider, std::move(dispatchAction)));
     }
 
     Scheduler::~Scheduler() {
@@ -103,6 +99,19 @@ namespace SmartHome {
         }
 
         return earliest;
+    }
+
+    Scheduler::Scheduler(ba::io_context &ioContext,
+                         const ConfigCache &configCache,
+                         const std::shared_ptr<Utils::AsyncLogger> &logger,
+                         Time::ITimeProvider &timeProvider,
+                         ActionDispatcher dispatchAction)
+        : mIoContext(ioContext),
+          mConfigCache(configCache),
+          mpLogger(logger),
+          mTimeProvider(timeProvider),
+          mDispatchAction(std::move(dispatchAction)) {
+        mpTimer = mTimeProvider.createTimer();
     }
 
     bool Scheduler::ScheduledTask::advanceToNext() {

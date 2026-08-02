@@ -29,20 +29,23 @@ namespace SmartHome {
     class Scheduler : public std::enable_shared_from_this<Scheduler> {
     public:
         /**
-         * @brief Construct scheduler bound to an io_context and config cache.
+         * @brief Creates an new instance of \c Scheduler.
          *
          * @param ioContext Boost.Asio context for timer operations.
          * @param configCache Configuration cache for device schedule lookup.
          * @param logger Logger instance.
          * @param timeProvider Time source abstraction used for scheduling calculations (injectable for testing).
          * @param dispatchAction Callable used to dispatch device actions (injectable for testing).
+         *
+         * @return A new instance of \c Scheduler. Ownership is transferred to the caller.
          */
-        Scheduler(ba::io_context &ioContext,
-                  const ConfigCache &configCache,
-                  const std::shared_ptr<Utils::AsyncLogger> &logger,
-                  Time::ITimeProvider &timeProvider,
-                  ActionDispatcher dispatchAction = &ActionHelpers::dispatchAutomatedDeviceAction);
-
+        [[nodiscard]] static std::shared_ptr<Scheduler> create(
+            ba::io_context &ioContext,
+            const ConfigCache &configCache,
+            const std::shared_ptr<Utils::AsyncLogger> &logger,
+            Time::ITimeProvider &timeProvider,
+            ActionDispatcher dispatchAction = &ActionHelpers::dispatchAutomatedDeviceAction
+        );
 
         /**
          * @brief Destructor. Calls \c stop().
@@ -97,6 +100,24 @@ namespace SmartHome {
         std::optional<std::chrono::system_clock::time_point> getNextRunForModule(uint moduleId) const;
 
     private:
+        /**
+         * @brief Construct scheduler bound to an io_context and config cache.
+         *
+         * @note This constructor is private and only used internally.
+         *       Use the static create() method to instantiate a scheduler.
+         *
+         * @param ioContext Boost.Asio context for timer operations.
+         * @param configCache Configuration cache for device schedule lookup.
+         * @param logger Logger instance.
+         * @param timeProvider Time source abstraction used for scheduling calculations (injectable for testing).
+         * @param dispatchAction Callable used to dispatch device actions (injectable for testing).
+         */
+        Scheduler(ba::io_context &ioContext,
+                  const ConfigCache &configCache,
+                  const std::shared_ptr<Utils::AsyncLogger> &logger,
+                  Time::ITimeProvider &timeProvider,
+                  ActionDispatcher dispatchAction);
+
         /**
          * @brief RAII wrapper for icalrecur_iterator lifecycle.
          */

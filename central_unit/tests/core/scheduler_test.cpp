@@ -21,8 +21,7 @@ namespace SmartHome::Tests {
         };
 
         mpLogger = std::make_shared<Utils::AsyncLogger>(logger, mIoContext);
-        mpScheduler = std::make_shared<Scheduler>(
-            mIoContext, mConfigCache, mpLogger, mTimeProvider, deviceFakeDispatch);
+        mpScheduler = Scheduler::create(mIoContext, mConfigCache, mpLogger, mTimeProvider, deviceFakeDispatch);
 
         mpScheduler->start();
     }

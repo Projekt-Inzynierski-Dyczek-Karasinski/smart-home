@@ -222,14 +222,11 @@ namespace SmartHome {
         std::unique_ptr<Utils::ServiceManager> mpService;
         std::shared_ptr<API::InternalApi> mpApi;
 
-        // Cache
-        ConfigCache mConfigCache;
-        ReadingsCache mReadingsCache{mConfigCache, mTimeProvider};
-
         // Scheduler
-        std::unique_ptr<Scheduler> mpScheduler;
+        std::shared_ptr<Scheduler> mpScheduler;
 
         // TODO check other members shutdown sequence (fix hanging this by shared_from_this like in EventHandler)
+        //      Implement static create (like in Scheduler) to avoid problems with shared_from_this
         // Event handler
         std::shared_ptr<EventHandler> mpEventHandler;
 
@@ -251,6 +248,10 @@ namespace SmartHome {
         static constexpr std::array ms_SIGNALS_TO_HANDLE = {SIGINT, SIGTERM, SIGHUP};
         /// Shutdown timeout timer value in ms
         static constexpr auto ms_SHUTDOWN_TIMEOUT = 5000ms;
+
+        // Cache
+        ConfigCache mConfigCache;
+        ReadingsCache mReadingsCache{mConfigCache, mTimeProvider};
 
         //Core workers
         ba::io_context mCoreWorkerIoContext;
