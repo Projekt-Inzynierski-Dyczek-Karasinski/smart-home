@@ -21,8 +21,7 @@ namespace SmartHome {
 
     bool ActionHelpers::CommandMetadata::cancel() {
         if (const auto timer = commandTimeoutTimer.exchange(nullptr)) timer->cancel();
-        auto expected = State::PENDING;
-        if (state.compare_exchange_strong(expected, State::CANCELLED)) return true;
+        if (auto expected = State::PENDING; state.compare_exchange_strong(expected, State::CANCELLED)) return true;
         return false;
     }
 
@@ -36,7 +35,7 @@ namespace SmartHome {
             return std::unexpected(API::ApiError(
                 API::ErrorCodes::INVALID_PARAMS,
                 errorCodeToString(API::ErrorCodes::INVALID_PARAMS),
-                "Command requires parameters object in params field"
+                "Command requires parameters object in '"s + JsonRpcStrings::RequestKeys::PARAMS.data() + "' field"
             ));
         }
         return std::make_shared<nlohmann::json>(cmdMetadata.command.params.value());
@@ -48,20 +47,19 @@ namespace SmartHome {
             return std::unexpected(API::ApiError(
                 API::ErrorCodes::INVALID_PARAMS,
                 errorCodeToString(API::ErrorCodes::INVALID_PARAMS),
-                "Type of command is required and must be string in 'type' parameter"
-            ));
+                "Type of command is required and must be string in '"s + jp::TYPE.data() + "' parameter"));
         }
         return params.at(jp::TYPE).get<std::string>();
     }
 
-
+    // TODO consider returning unexpected instead of 0 on negative integers when only positive are expected
     ValidationResult<uint> ActionHelpers::requireModuleId(const nlohmann::json &params) {
         if (!params.contains(jp::MODULE_ID) ||
             !params.at(jp::MODULE_ID).is_number_integer()) {
             return std::unexpected(API::ApiError(
                 API::ErrorCodes::INVALID_PARAMS,
                 errorCodeToString(API::ErrorCodes::INVALID_PARAMS),
-                "Module ID is required and must be an unsigned integer in 'module_id' parameter"));
+                "Module ID is required and must be an unsigned integer in '"s + jp::MODULE_ID.data() + "' parameter"));
         }
 
         const auto value = params.at(jp::MODULE_ID).get<int>();
@@ -76,7 +74,8 @@ namespace SmartHome {
             return std::unexpected(API::ApiError(
                 API::ErrorCodes::INVALID_PARAMS,
                 errorCodeToString(API::ErrorCodes::INVALID_PARAMS),
-                "Requires limit argument as unsigned integer in last element of 'args' array parameter"));
+                "Requires limit argument as unsigned integer in last element of '"s
+                + jp::ARGS.data() + "' array parameter"));
         }
 
         const auto value = params.at(jp::ARGS).back().get<int>();
@@ -91,7 +90,8 @@ namespace SmartHome {
             return std::unexpected(API::ApiError(
                 API::ErrorCodes::INVALID_PARAMS,
                 errorCodeToString(API::ErrorCodes::INVALID_PARAMS),
-                "Requires device logic ID argument as unsigned integer in first element of 'args' array parameter"));
+                "Requires device logic ID argument as unsigned integer in first element of '"s
+                + jp::ARGS.data() + "' array parameter"));
         }
 
         const auto value = params.at(jp::ARGS).front().get<int>();
@@ -106,8 +106,9 @@ namespace SmartHome {
             return std::unexpected(API::ApiError(
                 API::ErrorCodes::INVALID_PARAMS,
                 errorCodeToString(API::ErrorCodes::INVALID_PARAMS),
-                "Requires device ID as unsigned integer in first element of 'args' array parameter, "
-                "or module ID in 'module_id' parameter with device logic ID as first element of 'args' array"));
+                "Requires device ID as unsigned integer in first element of "s + jp::ARGS.data() + " array parameter, "
+                "or module ID in '"s + jp::MODULE_ID.data() + "' parameter with device logic ID as first element of '"s
+                + jp::ARGS.data() + "' array"));
         }
         int value = 0;
 
@@ -140,7 +141,7 @@ namespace SmartHome {
             return std::unexpected(API::ApiError(
                 API::ErrorCodes::INVALID_PARAMS,
                 errorCodeToString(API::ErrorCodes::INVALID_PARAMS),
-                "Set mode is required as string in 'mode' parameter."));
+                "Set mode is required as string in '"s + jp::MODE.data() + "' parameter."));
         }
 
         auto mode = params.at(jp::MODE).get<std::string>();
@@ -161,7 +162,8 @@ namespace SmartHome {
             return std::unexpected(API::ApiError(
                 API::ErrorCodes::INVALID_PARAMS,
                 errorCodeToString(API::ErrorCodes::INVALID_PARAMS),
-                "Set path is required as string in 'path' parameter. Path must be in dot separated format"));
+                "Set path is required as string in '"s + jp::PATH.data()
+                + "' parameter. Path must be in dot separated format"));
         }
 
         auto path = params.at(jp::PATH).get<std::string>();
@@ -206,7 +208,7 @@ namespace SmartHome {
             return std::unexpected(API::ApiError(
                 API::ErrorCodes::INVALID_PARAMS,
                 errorCodeToString(API::ErrorCodes::INVALID_PARAMS),
-                "Set value is required as primitive/object in 'value' parameter."));
+                "Set value is required as primitive/object in '"s + jp::VALUE.data() + "' parameter."));
         }
 
         return params.at(jp::VALUE);
