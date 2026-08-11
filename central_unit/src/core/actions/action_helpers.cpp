@@ -173,13 +173,6 @@ namespace SmartHome {
         std::vector<std::string_view> keys = {};
         boost::split(keys, path, boost::is_any_of("."));
 
-        if (keys.empty()) {
-            return std::unexpected(API::ApiError(
-                API::ErrorCodes::INVALID_PARAMS,
-                errorCodeToString(API::ErrorCodes::INVALID_PARAMS),
-                "Set path must be a non empty, when more then one key is present keys must be dot separated."));
-        }
-
         // Check base key
         if (!cdi::ALL_IDENTIFIERS.contains(keys.front())) {
             return std::unexpected(API::ApiError(
