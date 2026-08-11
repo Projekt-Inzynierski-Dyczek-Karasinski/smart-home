@@ -98,7 +98,8 @@ namespace SmartHome {
         return value >= 0 ? static_cast<uint>(value) : 0;
     }
 
-    ValidationResult<uint> ActionHelpers::resolveDeviceId(const nlohmann::json &params) {
+    ValidationResult<uint> ActionHelpers::resolveDeviceId(const nlohmann::json &params,
+                                                          const ConfigCache &configCache) {
         if (!params.contains(jp::ARGS) ||
             !params.at(jp::ARGS).is_array() ||
             params.at(jp::ARGS).empty() ||
@@ -112,6 +113,7 @@ namespace SmartHome {
         }
         int value = 0;
 
+        // TODO consider making invalid module ID return unexpected
         if (params.contains(jp::MODULE_ID) &&
             params.at(jp::MODULE_ID).is_number_integer()) {
             value = params.at(jp::MODULE_ID).get<int>();
@@ -119,7 +121,7 @@ namespace SmartHome {
 
             value = params.at(jp::ARGS).front().get<int>();
             const auto logicId = value >= 0 ? static_cast<uint>(value) : 0;
-            const auto deviceIdOpt = Core::Instance().configCache().findDeviceId(moduleId, logicId);
+            const auto deviceIdOpt = configCache.findDeviceId(moduleId, logicId);
 
             if (!deviceIdOpt.has_value()) {
                 return std::unexpected(API::ApiError(

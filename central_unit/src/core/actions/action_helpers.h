@@ -1,6 +1,7 @@
 #pragma once
 #include "api.h"
 #include "constants.h"
+#include "cache.h"
 #include "../api/internal_api.h"
 
 #include <expected>
@@ -151,10 +152,11 @@ namespace SmartHome {
          * @details Resolves from either device_id or module_id + device_logic_id.
          *
          * @param params Request params JSON.
+         * @param configCache Configuration cache used for device and module config lookup.
          *
          * @return Resolved device id on success, API error on failure.
          */
-        static ValidationResult<uint> resolveDeviceId(const nlohmann::json &params);
+        static ValidationResult<uint> resolveDeviceId(const nlohmann::json &params, const ConfigCache &configCache);
 
         /**
          * @brief Require mode field in params.
