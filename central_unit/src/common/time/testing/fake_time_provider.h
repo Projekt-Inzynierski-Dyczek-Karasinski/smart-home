@@ -172,6 +172,10 @@ namespace SmartHome::Time::Testing {
                 mState->alive = false;
             }
 
+            FakeTimer(const FakeTimer &) = delete;
+
+            FakeTimer &operator=(const FakeTimer &) = delete;
+
             /**
              * @brief Set expiry time.
              *
@@ -227,6 +231,10 @@ namespace SmartHome::Time::Testing {
             ~FakeSteadyTimer() override {
                 mState->alive = false;
             }
+
+            FakeSteadyTimer(const FakeSteadyTimer &) = delete;
+
+            FakeSteadyTimer &operator=(const FakeSteadyTimer &) = delete;
 
             /**
              * @brief Set expiry relative to now.
