@@ -2,19 +2,15 @@
 #include "constants.h"
 
 #include <ranges>
+#include <utility>
 
 namespace SmartHome {
     namespace c = Constants;
 
     using namespace std::string_literals;
 
-    std::shared_ptr<Scheduler> Scheduler::create(ba::io_context &ioContext,
-                                                 const ConfigCache &configCache,
-                                                 const std::shared_ptr<Utils::AsyncLogger> &logger,
-                                                 Time::ITimeProvider &timeProvider,
-                                                 ActionDispatcher dispatchAction) {
-        return std::shared_ptr<Scheduler>(
-            new Scheduler(ioContext, configCache, logger, timeProvider, std::move(dispatchAction)));
+    std::shared_ptr<Scheduler> Scheduler::create(Config config) {
+        return std::shared_ptr<Scheduler>(new Scheduler(std::move(config)));
     }
 
     Scheduler::~Scheduler() {
@@ -101,16 +97,12 @@ namespace SmartHome {
         return earliest;
     }
 
-    Scheduler::Scheduler(ba::io_context &ioContext,
-                         const ConfigCache &configCache,
-                         const std::shared_ptr<Utils::AsyncLogger> &logger,
-                         Time::ITimeProvider &timeProvider,
-                         ActionDispatcher dispatchAction)
-        : mIoContext(ioContext),
-          mConfigCache(configCache),
-          mpLogger(logger),
-          mTimeProvider(timeProvider),
-          mDispatchAction(std::move(dispatchAction)) {
+    Scheduler::Scheduler(Config config)
+        : mTimeProvider(config.timeProvider),
+          mConfigCache(config.configCache),
+          mExecutor(std::move(config.executor)),
+          mpLogger(std::move(config.logger)),
+          mDispatchAction(std::move(config.dispatchAction)) {
         mpTimer = mTimeProvider.createTimer();
     }
 
@@ -149,11 +141,11 @@ namespace SmartHome {
                                              icaltimezone_get_utc_timezone());
     }
 
-    void Scheduler::parseDeviceSchedule(const uint deviceId, const nlohmann::json &config) {
-        if (!config.contains(c::DeviceConfigKeys::SCHEDULE)) {
+    void Scheduler::parseDeviceSchedule(const uint deviceId, const nlohmann::json &deviceConfig) {
+        if (!deviceConfig.contains(c::DeviceConfigKeys::SCHEDULE)) {
             return; // Skip devices without schedule field
         }
-        if (!config[c::DeviceConfigKeys::SCHEDULE].is_array()) {
+        if (!deviceConfig[c::DeviceConfigKeys::SCHEDULE].is_array()) {
             mpLogger->errorf(
                 ("[SCHEDULER] Skipped parsing scheduled events for device [%u]: "
                     "'%s' device config field must be an array"),
@@ -168,7 +160,7 @@ namespace SmartHome {
         const auto now = mTimeProvider.now();
         const auto icalNow = timePointToIcal(now);
 
-        for (const auto &entry: config[c::DeviceConfigKeys::SCHEDULE]) {
+        for (const auto &entry: deviceConfig[c::DeviceConfigKeys::SCHEDULE]) {
             if (!entry.is_object()) {
                 mpLogger->error(errorLogStr + "scheduled event entry must be an object");
                 continue;
@@ -315,7 +307,7 @@ namespace SmartHome {
         mpLogger->debugf("[SCHEDULER] Dispatching %s for device [%u]",
                          c::AutomatedActionNames::SCHEDULED_ACTION.data(), pTask->deviceId);
 
-        boost::asio::post(mIoContext, [self = shared_from_this(), pTask] {
+        boost::asio::post(mExecutor, [self = shared_from_this(), pTask] {
             if (!self->mIsRunning || pTask->removed) return;
             self->mDispatchAction(c::AutomatedActionNames::SCHEDULED_ACTION, pTask->deviceId, pTask->action);
         });

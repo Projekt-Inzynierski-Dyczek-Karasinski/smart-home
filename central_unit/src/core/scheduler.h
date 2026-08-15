@@ -29,23 +29,29 @@ namespace SmartHome {
     class Scheduler : public std::enable_shared_from_this<Scheduler> {
     public:
         /**
+         * @brief Construction parameters for \c Scheduler.
+         */
+        struct Config {
+            /// Time source abstraction used for scheduling calculations (injectable for testing).
+            Time::ITimeProvider &timeProvider;
+            /// Configuration cache for device schedule lookup.
+            const ConfigCache &configCache;
+            /// Boost.Asio executor for timer operations.
+            ba::any_io_executor executor;
+            /// Logger instance.
+            std::shared_ptr<Utils::AsyncLogger> logger;
+            /// Device action dispatcher (injectable for testing)
+            ActionDispatcher dispatchAction = &ActionHelpers::dispatchAutomatedDeviceAction;
+        };
+
+        /**
          * @brief Creates an new instance of \c Scheduler.
          *
-         * @param ioContext Boost.Asio context for timer operations.
-         * @param configCache Configuration cache for device schedule lookup.
-         * @param logger Logger instance.
-         * @param timeProvider Time source abstraction used for scheduling calculations (injectable for testing).
-         * @param dispatchAction Callable used to dispatch device actions (injectable for testing).
+         * @param config Construction parameters.
          *
          * @return A new instance of \c Scheduler. Ownership is transferred to the caller.
          */
-        [[nodiscard]] static std::shared_ptr<Scheduler> create(
-            ba::io_context &ioContext,
-            const ConfigCache &configCache,
-            const std::shared_ptr<Utils::AsyncLogger> &logger,
-            Time::ITimeProvider &timeProvider,
-            ActionDispatcher dispatchAction = &ActionHelpers::dispatchAutomatedDeviceAction
-        );
+        [[nodiscard]] static std::shared_ptr<Scheduler> create(Config config);
 
         /**
          * @brief Destructor. Calls \c stop().
@@ -101,22 +107,14 @@ namespace SmartHome {
 
     private:
         /**
-         * @brief Construct scheduler bound to an io_context and config cache.
+         * @brief Construct scheduler bound to an executor and config cache.
          *
          * @note This constructor is private and only used internally.
          *       Use the static create() method to instantiate a scheduler.
          *
-         * @param ioContext Boost.Asio context for timer operations.
-         * @param configCache Configuration cache for device schedule lookup.
-         * @param logger Logger instance.
-         * @param timeProvider Time source abstraction used for scheduling calculations (injectable for testing).
-         * @param dispatchAction Callable used to dispatch device actions (injectable for testing).
+         * @param config Construction parameters.
          */
-        Scheduler(ba::io_context &ioContext,
-                  const ConfigCache &configCache,
-                  const std::shared_ptr<Utils::AsyncLogger> &logger,
-                  Time::ITimeProvider &timeProvider,
-                  ActionDispatcher dispatchAction);
+        explicit Scheduler(Config config);
 
         /**
          * @brief RAII wrapper for icalrecur_iterator lifecycle.
@@ -185,9 +183,9 @@ namespace SmartHome {
          * @brief Parse device config \b schedule array and enqueue tasks.
          *
          * @param deviceId Device identifier.
-         * @param config Device configuration JSON containing \b schedule key.
+         * @param deviceConfig Device configuration JSON containing \b schedule key.
          */
-        void parseDeviceSchedule(uint deviceId, const nlohmann::json &config);
+        void parseDeviceSchedule(uint deviceId, const nlohmann::json &deviceConfig);
 
         /**
          * @brief Set timer to fire at the earliest task's nextRun.
@@ -240,10 +238,10 @@ namespace SmartHome {
 
         mutable std::shared_mutex mMutex;
 
-        ba::io_context &mIoContext;
-        const ConfigCache &mConfigCache;
-        std::shared_ptr<Utils::AsyncLogger> mpLogger;
         Time::ITimeProvider &mTimeProvider;
+        const ConfigCache &mConfigCache;
+        ba::any_io_executor mExecutor;
+        std::shared_ptr<Utils::AsyncLogger> mpLogger;
 
         ActionDispatcher mDispatchAction; ///< Device action dispatcher (injectable for testing)
 

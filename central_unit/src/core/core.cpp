@@ -177,7 +177,13 @@ namespace SmartHome {
             if (!mIsRunning) co_return;
 
             // Start scheduler and event handler after populating cache
-            mpScheduler = Scheduler::create(mCoreIoContext, mConfigCache, mpLogger, mTimeProvider);
+            Scheduler::Config schedulerConfig{
+                .timeProvider = mTimeProvider,
+                .configCache = mConfigCache,
+                .executor = mCoreIoContext.get_executor(),
+                .logger = mpLogger
+            };
+            mpScheduler = Scheduler::create(std::move(schedulerConfig));
             mpScheduler->loadFromCache();
             mpScheduler->start();
 
