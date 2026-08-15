@@ -162,14 +162,14 @@ namespace SmartHome::Time::Testing {
              * @param state The shared state tracked by the owning provider.
              */
             explicit FakeTimer(std::shared_ptr<State<std::chrono::system_clock> > state)
-                : mState(std::move(state)) {
+                : mpState(std::move(state)) {
             }
 
             /**
              * @brief Deregisters from the provider, pending handler is queued for the next fireDue().
              */
             ~FakeTimer() override {
-                mState->alive = false;
+                mpState->alive = false;
             }
 
             FakeTimer(const FakeTimer &) = delete;
@@ -185,8 +185,8 @@ namespace SmartHome::Time::Testing {
              *       is invoked with \c std::errc::operation_canceled (matching Asio semantics).
              */
             void expiresAt(const std::chrono::system_clock::time_point timePoint) override {
-                mState->abort(); // Re-arm cancels a pending wait, as in Asio
-                mState->expiry = timePoint;
+                mpState->abort(); // Re-arm cancels a pending wait, as in Asio
+                mpState->expiry = timePoint;
             }
 
             /**
@@ -195,18 +195,18 @@ namespace SmartHome::Time::Testing {
              * @param handler The handler to invoke when the timer expires.
              */
             void asyncWait(TimerHandler handler) override {
-                mState->arm(std::move(handler));
+                mpState->arm(std::move(handler));
             }
 
             /**
              * @brief Cancel pending wait, its handler is invoked with \c std::errc::operation_canceled.
              */
             void cancel() override {
-                mState->abort();
+                mpState->abort();
             }
 
         private:
-            std::shared_ptr<State<std::chrono::system_clock> > mState;
+            std::shared_ptr<State<std::chrono::system_clock> > mpState;
         };
 
         /**
@@ -222,14 +222,14 @@ namespace SmartHome::Time::Testing {
              */
             FakeSteadyTimer(FakeTimeProvider &parent,
                             std::shared_ptr<State<std::chrono::steady_clock> > state)
-                : mParent(parent), mState(std::move(state)) {
+                : mParent(parent), mpState(std::move(state)) {
             }
 
             /**
              * @brief Deregisters from the provider; pending handler is queued for the next fireDue().
              */
             ~FakeSteadyTimer() override {
-                mState->alive = false;
+                mpState->alive = false;
             }
 
             FakeSteadyTimer(const FakeSteadyTimer &) = delete;
@@ -245,8 +245,8 @@ namespace SmartHome::Time::Testing {
              *       is invoked with \c std::errc::operation_canceled (matching Asio semantics).
              */
             void expiresAfter(const std::chrono::steady_clock::duration delta) override {
-                mState->abort(); // Re-arm cancels a pending wait, as in Asio
-                mState->expiry = mParent.mSteadyNow + delta;
+                mpState->abort(); // Re-arm cancels a pending wait, as in Asio
+                mpState->expiry = mParent.mSteadyNow + delta;
             }
 
             /**
@@ -255,19 +255,19 @@ namespace SmartHome::Time::Testing {
              * @param handler The handler to invoke when the timer expires.
              */
             void asyncWait(TimerHandler handler) override {
-                mState->arm(std::move(handler));
+                mpState->arm(std::move(handler));
             }
 
             /**
              * @brief Cancel pending wait, its handler is invoked with \c std::errc::operation_canceled.
              */
             void cancel() override {
-                mState->abort();
+                mpState->abort();
             }
 
         private:
             FakeTimeProvider &mParent;
-            std::shared_ptr<State<std::chrono::steady_clock> > mState;
+            std::shared_ptr<State<std::chrono::steady_clock> > mpState;
         };
 
         /**
