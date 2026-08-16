@@ -17,6 +17,13 @@
       }
     },
     {
+      "name": "native_debug_verify",
+      "inherits": "native_debug",
+      "cacheVariables": {
+        "CMAKE_VERIFY_INTERFACE_HEADER_SETS": "ON"
+      }
+    },
+    {
       "name": "native_debug_coverage",
       "inherits": "native_debug",
       "cacheVariables": {

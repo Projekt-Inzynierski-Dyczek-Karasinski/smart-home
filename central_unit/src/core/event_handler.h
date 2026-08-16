@@ -24,8 +24,6 @@ namespace SmartHome {
      */
     class EventHandler : public std::enable_shared_from_this<EventHandler> {
         friend class Tests::EventHandlerTest;
-        using ActionDispatcher =
-        std::function<void(std::string_view actionName, uint id, const nlohmann::json &action)>;
 
     public:
         /**

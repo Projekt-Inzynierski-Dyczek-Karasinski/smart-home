@@ -293,6 +293,7 @@ namespace SmartHome::Constants {
     namespace AutomatedActionNames {
         inline constexpr std::string_view MODULE_NOTIFICATION = "Module notification";
         inline constexpr std::string_view CONDITIONAL_EVENT  = "Conditional event";
+        inline constexpr std::string_view SCHEDULED_ACTION  = "Scheduled action";
     }
 
     // Utility functions

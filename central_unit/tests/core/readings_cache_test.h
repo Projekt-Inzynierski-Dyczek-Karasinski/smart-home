@@ -1,5 +1,6 @@
 #pragma once
 #include "cache.h"
+#include "common/time/testing/fake_time_provider.h"
 
 #include <gtest/gtest.h>
 
@@ -14,10 +15,8 @@ namespace SmartHome::Tests {
 
         void populateReadings(uint id = 1, const nlohmann::json &value = 12.34, const nlohmann::json &metadata = {});
 
-        // Controllable time source injected into ReadingsCache via the Clock lambda
-        std::chrono::system_clock::time_point mNow = std::chrono::system_clock::now();
-
+        Time::Testing::FakeTimeProvider mTimeProvider{std::chrono::system_clock::now()};
         ConfigCache mConfigCache;
-        ReadingsCache mReadingsCache{mConfigCache, [this] { return mNow; }};
+        ReadingsCache mReadingsCache{mConfigCache, mTimeProvider};
     };
 }

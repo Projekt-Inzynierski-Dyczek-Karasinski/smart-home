@@ -57,7 +57,7 @@ namespace SmartHome::Tests {
 
     TEST_F(ReadingsCacheTest, ReadingsCacheEraseReading) {
         populateReadings();
-        EXPECT_TRUE( mReadingsCache.get(1).has_value());
+        EXPECT_TRUE(mReadingsCache.get(1).has_value());
 
         mReadingsCache.erase(1);
         EXPECT_FALSE(mReadingsCache.get(1).has_value());
@@ -96,30 +96,30 @@ namespace SmartHome::Tests {
     }
 
     TEST_F(ReadingsCacheTest, ReadingsCacheGetFreshReadingStaleNoCache) {
-        populateDevices(1,false);
+        populateDevices(1, false);
         populateReadings();
 
         EXPECT_FALSE(mReadingsCache.getFresh(1).has_value());
     }
 
     TEST_F(ReadingsCacheTest, ReadingsCacheGetFreshReadingStaleZeroTime) {
-        populateDevices(1,true, 0);
+        populateDevices(1, true, 0);
         populateReadings();
 
         EXPECT_FALSE(mReadingsCache.getFresh(1).has_value());
     }
 
     TEST_F(ReadingsCacheTest, ReadingsCacheGetFreshReadingTurnedStale) {
-        populateDevices(1,true);
+        populateDevices(1, true);
         populateReadings();
 
         EXPECT_TRUE(mReadingsCache.getFresh(1).has_value());
 
-        mNow += 59s;
+        mTimeProvider.advanceBy(59s);
 
         EXPECT_TRUE(mReadingsCache.getFresh(1).has_value());
 
-        mNow += 2s;
+        mTimeProvider.advanceBy(2s);
 
         EXPECT_FALSE(mReadingsCache.getFresh(1).has_value());
     }
@@ -144,7 +144,7 @@ namespace SmartHome::Tests {
     TEST_F(ReadingsCacheTest, ReadingsCacheOverrideRefreshesTimestamp) {
         populateDevices(1, true);
         populateReadings(1);
-        mNow += 61s;
+        mTimeProvider.advanceBy(61s);
         ASSERT_FALSE(mReadingsCache.getFresh(1).has_value());
 
         populateReadings(1); // Overwrite resets timestamp

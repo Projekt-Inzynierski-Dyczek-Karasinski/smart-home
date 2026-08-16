@@ -10,6 +10,6 @@ add_executable(smarthomectl
 target_link_libraries(smarthomectl PRIVATE
         smarthome::ipc
         smarthome::logger
+        smarthome::warnings
         Boost::program_options
-        project_warnings
 )

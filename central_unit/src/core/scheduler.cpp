@@ -1,33 +1,29 @@
 #include "scheduler.h"
 #include "constants.h"
-#include "api/internal_api.h"
-#include "actions/actions.h"
-#include "actions/database_actions.h"
+
+#include <ranges>
+#include <utility>
 
 namespace SmartHome {
-    namespace jrs = JsonRpcStrings;
     namespace c = Constants;
 
-    Scheduler::Scheduler(ba::io_context &ioContext,
-                         const ConfigCache &configCache,
-                         const std::shared_ptr<Utils::AsyncLogger> &logger)
-        : mIoContext(ioContext),
-          mTimer(ioContext),
-          mConfigCache(configCache),
-          mpLogger(logger) {
+    using namespace std::string_literals;
+
+    std::shared_ptr<Scheduler> Scheduler::create(Config config) {
+        return std::shared_ptr<Scheduler>(new Scheduler(std::move(config)));
     }
 
     Scheduler::~Scheduler() {
-        if (mIsStopping.exchange(true, std::memory_order_acq_rel)) return;
         stop();
     }
 
     void Scheduler::loadFromCache() {
-        std::scoped_lock lock(mMutex);
+        std::unique_lock lock(mMutex);
 
-        // Clear existing tasks queue by swapping with an empty queue
+        // Drop all tasks: queue by swap, index by clear
         TaskQueue empty;
         std::swap(mTaskQueue, empty);
+        mTasksByDevice.clear();
 
         for (const auto &device: mConfigCache.getAllDevices()) {
             parseDeviceSchedule(device.id, device.config);
@@ -37,43 +33,14 @@ namespace SmartHome {
         if (mIsRunning) scheduleNextTimer();
     }
 
-    void Scheduler::reloadDevice(const uint deviceId) {
-        removeDevice(deviceId);
-
-        std::scoped_lock lock(mMutex);
-
-        // Reparse device schedule from current cache state
-        const auto deviceOpt = mConfigCache.getDevice(deviceId);
-        if (deviceOpt.has_value()) {
-            parseDeviceSchedule(deviceId, deviceOpt->config);
-        }
-
-        mpLogger->debugf("[SCHEDULER] Reloaded schedule for device [%u], queue size: %zu",
-                         deviceId, mTaskQueue.size());
-
-        if (mIsRunning) scheduleNextTimer();
-    }
-
     void Scheduler::removeDevice(const uint deviceId) {
-        std::scoped_lock lock(mMutex);
+        std::unique_lock lock(mMutex);
 
-        // Clear existing tasks queue by swapping with an empty queue
-        TaskQueue tempQueue;
-        std::swap(mTaskQueue, tempQueue);
-
-        // Filter out tasks for the device and keep the rest, flag removed tasks to avoid dispatching them
-        while (!tempQueue.empty()) {
-            auto task = tempQueue.top();
-            tempQueue.pop();
-            if (task->deviceId == deviceId) {
-                task->removed = true;
-            } else {
-                mTaskQueue.push(std::move(task));
-            }
+        if (const auto iter = mTasksByDevice.find(deviceId); iter != mTasksByDevice.end()) {
+            for (const auto &pTask: iter->second)
+                pTask->removed = true;
+            mTasksByDevice.erase(iter);
         }
-
-        mpLogger->debugf("[SCHEDULER] Removed tasks for device [%u], queue size: %zu",
-                         deviceId, mTaskQueue.size());
 
         if (mIsRunning) scheduleNextTimer();
     }
@@ -81,7 +48,7 @@ namespace SmartHome {
     void Scheduler::start() {
         if (mIsRunning.exchange(true, std::memory_order_acq_rel)) return;
 
-        std::scoped_lock lock(mMutex);
+        std::unique_lock lock(mMutex);
         mpLogger->info("[SCHEDULER] Starting scheduler");
         scheduleNextTimer();
     }
@@ -89,9 +56,9 @@ namespace SmartHome {
     void Scheduler::stop() {
         if (!mIsRunning.exchange(false, std::memory_order_acq_rel)) return;
 
-        std::scoped_lock lock(mMutex);
+        std::unique_lock lock(mMutex);
         mpLogger->info("[SCHEDULER] Stopping scheduler");
-        mTimer.cancel();
+        mpTimer->cancel();
     }
 
     bool Scheduler::isRunning() const {
@@ -99,23 +66,27 @@ namespace SmartHome {
     }
 
     size_t Scheduler::taskCount() const {
-        std::scoped_lock lock(mMutex);
-        return mTaskQueue.size();
+        std::shared_lock lock(mMutex);
+
+        size_t count = 0;
+        for (const auto &deviceTasks: mTasksByDevice | std::views::values) {
+            count += deviceTasks.size();
+        }
+
+        return count;
     }
 
     std::optional<std::chrono::system_clock::time_point> Scheduler::getNextRunForModule(const uint moduleId) const {
-        std::scoped_lock lock(mMutex);
+        std::shared_lock lock(mMutex);
 
         auto queueCopy = mTaskQueue;
         std::optional<std::chrono::system_clock::time_point> earliest;
 
         while (!queueCopy.empty()) {
-            const auto &task = queueCopy.top();
-
-            if (!task->removed) {
-                const auto device = mConfigCache.getDevice(task->deviceId);
-                if (device.has_value() && device->moduleId == moduleId) {
-                    earliest = task->nextRun;
+            if (const auto &pTask = queueCopy.top(); !pTask->removed) {
+                if (const auto &device = mConfigCache.getDevice(pTask->deviceId);
+                    device.has_value() && device->moduleId == moduleId) {
+                    earliest = pTask->nextRun;
                     break;
                 }
             }
@@ -124,6 +95,15 @@ namespace SmartHome {
         }
 
         return earliest;
+    }
+
+    Scheduler::Scheduler(Config config)
+        : mTimeProvider(config.timeProvider),
+          mConfigCache(config.configCache),
+          mExecutor(std::move(config.executor)),
+          mpLogger(std::move(config.logger)),
+          mDispatchAction(std::move(config.dispatchAction)) {
+        mpTimer = mTimeProvider.createTimer();
     }
 
     bool Scheduler::ScheduledTask::advanceToNext() {
@@ -137,11 +117,7 @@ namespace SmartHome {
     }
 
     Scheduler::IcalIterPtr Scheduler::createRRuleIterator(const std::string &rruleStr, const icaltimetype &dtstart) {
-        // Parse RRULE string
-        icalrecurrencetype recurrence;
-        icalrecurrencetype_clear(&recurrence); // Zero-initialize
-        recurrence = icalrecurrencetype_from_string(rruleStr.c_str());
-
+        const auto recurrence = icalrecurrencetype_from_string(rruleStr.c_str());
         if (recurrence.freq == ICAL_NO_RECURRENCE) {
             return nullptr;
         }
@@ -157,36 +133,75 @@ namespace SmartHome {
         return std::chrono::system_clock::from_time_t(timestamp);
     }
 
-    void Scheduler::parseDeviceSchedule(const uint deviceId, const nlohmann::json &config) {
-        if (!config.contains(c::DeviceConfigKeys::SCHEDULE) || !config[c::DeviceConfigKeys::SCHEDULE].is_array()) {
+    icaltimetype Scheduler::timePointToIcal(const std::chrono::system_clock::time_point timePoint) {
+        const auto seconds = std::chrono::floor<std::chrono::seconds>(timePoint);
+        constexpr bool isDate = false;
+        return icaltime_from_timet_with_zone(std::chrono::system_clock::to_time_t(seconds),
+                                             isDate,
+                                             icaltimezone_get_utc_timezone());
+    }
+
+    void Scheduler::parseDeviceSchedule(const uint deviceId, const nlohmann::json &deviceConfig) {
+        if (!deviceConfig.contains(c::DeviceConfigKeys::SCHEDULE)) {
+            return; // Skip devices without schedule field
+        }
+        if (!deviceConfig[c::DeviceConfigKeys::SCHEDULE].is_array()) {
+            mpLogger->errorf(
+                ("[SCHEDULER] Skipped parsing scheduled events for device [%u]: "
+                    "'%s' device config field must be an array"),
+                deviceId,
+                c::DeviceConfigKeys::SCHEDULE.data());
             return;
         }
 
-        for (const auto &entry: config[c::DeviceConfigKeys::SCHEDULE]) {
+        const std::string errorLogStr = "[SCHEDULER] Failed to parse scheduled event for device ["s +
+                                        std::to_string(deviceId) + "]: ";
+
+        const auto now = mTimeProvider.now();
+        const auto icalNow = timePointToIcal(now);
+
+        for (const auto &entry: deviceConfig[c::DeviceConfigKeys::SCHEDULE]) {
             if (!entry.is_object()) {
+                mpLogger->error(errorLogStr + "scheduled event entry must be an object");
                 continue;
             }
-            if (entry.contains(c::DeviceConfigKeys::ENABLED) &&
-                entry[c::DeviceConfigKeys::ENABLED].is_boolean() &&
-                !entry[c::DeviceConfigKeys::ENABLED].get<bool>()) {
+            if (!entry.contains(c::DeviceConfigKeys::ENABLED) || !entry[c::DeviceConfigKeys::ENABLED].is_boolean()) {
+                mpLogger->error(errorLogStr + "scheduled event entry must contain boolean '"
+                                + c::DeviceConfigKeys::ENABLED.data() + "' field");
                 continue;
             }
             if (!entry.contains(c::DeviceConfigKeys::RRULE) || !entry[c::DeviceConfigKeys::RRULE].is_string()) {
+                mpLogger->error(errorLogStr + "scheduled event entry must contain string '"
+                                + c::DeviceConfigKeys::RRULE.data() + "' field");
                 continue;
             }
             if (!entry.contains(c::DeviceConfigKeys::ACTION) || !entry[c::DeviceConfigKeys::ACTION].is_object()) {
+                mpLogger->error(errorLogStr + "scheduled event entry must contain an '"
+                                + c::DeviceConfigKeys::ACTION.data() + "' object");
                 continue;
             }
 
-            icaltimetype dtstart;
-            if (entry.contains(c::DeviceConfigKeys::DTSTART) && entry[c::DeviceConfigKeys::DTSTART].is_string()) {
-                dtstart = icaltime_from_string(entry[c::DeviceConfigKeys::DTSTART].get<std::string>().c_str());
+            if (!entry[c::DeviceConfigKeys::ENABLED].get<bool>()) continue; // skip disabled events
+
+            icaltimetype dtstart = icaltime_null_time();
+            if (entry.contains(c::DeviceConfigKeys::DTSTART)) {
+                if (entry[c::DeviceConfigKeys::DTSTART].is_string()) {
+                    dtstart = icaltime_from_string(entry[c::DeviceConfigKeys::DTSTART].get<std::string>().c_str());
+                }
                 if (icaltime_is_null_time(dtstart)) {
-                    dtstart = icaltime_current_time_with_zone(icaltimezone_get_utc_timezone());
+                    mpLogger->errorf("[SCHEDULER] Failed to parse '%s' (%s) for device [%u], "
+                                     "defaulting to now and skipping first occurrence",
+                                     c::DeviceConfigKeys::DTSTART.data(),
+                                     entry[c::DeviceConfigKeys::DTSTART].dump().c_str(),
+                                     deviceId);
                 }
             } else {
-                dtstart = icaltime_current_time_with_zone(icaltimezone_get_utc_timezone());
+                mpLogger->debugf(
+                    "[SCHEDULER] No 'dtstart' for device [%u], defaulting to now and skipping first occurrence",
+                    deviceId);
             }
+
+            if (icaltime_is_null_time(dtstart)) dtstart = icalNow;
 
             const auto &rruleStr = entry[c::DeviceConfigKeys::RRULE].get<std::string>();
             auto rruleIter = createRRuleIterator(rruleStr, dtstart);
@@ -195,24 +210,42 @@ namespace SmartHome {
                 continue;
             }
 
-            auto task = std::make_shared<ScheduledTask>();
-            task->deviceId = deviceId;
-            task->action = entry[c::DeviceConfigKeys::ACTION];
-            task->rruleIterator = std::move(rruleIter);
+            auto pTask = std::make_shared<ScheduledTask>();
+            pTask->deviceId = deviceId;
+            pTask->action = entry[c::DeviceConfigKeys::ACTION];
+            pTask->rruleIterator = std::move(rruleIter);
+
+            // Fast forward if possible
+            if (icaltime_compare(dtstart, icalNow) < 0) {
+                if (!icalrecur_iterator_set_start(pTask->rruleIterator.get(), icalNow)) {
+                    mpLogger->debugf("[SCHEDULER] Fast-forward unavailable for device [%u], RRULE: %s\n"
+                                     "RRULE with COUNT is not supported by fast-forward\n "
+                                     "Check RRULE if errors occur",
+                                     deviceId, rruleStr.c_str());
+                }
+            }
 
             // Advance to first future occurrence
-            if (task->advanceToNext()) {
-                const auto now = std::chrono::system_clock::now();
+            if (pTask->advanceToNext()) {
                 // If nextRun is in the past, advance until it's in the future or recurrence ends
-                while (task->nextRun <= now) {
-                    if (!task->advanceToNext()) break;
+                uint iterations = 0;
+                while (pTask->nextRun <= now) {
+                    if (!pTask->advanceToNext()) {
+                        break; // No next recurrence
+                    }
+                    if (constexpr uint iterationLimit = 20'000; ++iterations > iterationLimit) {
+                        mpLogger->errorf("[SCHEDULER] Failed to advance to next task for device [%u]: "
+                                         "reached iteration limit, dtstart may be too far in the past",
+                                         deviceId);
+                        break; // Reached iteration limit
+                    }
                 }
 
-                if (task->nextRun > now) {
+                if (pTask->nextRun > now) {
                     mpLogger->debugf("[SCHEDULER] Enqueued task for device [%u], next run in %lld s",
                                      deviceId,
-                                     std::chrono::duration_cast<std::chrono::seconds>(task->nextRun - now).count());
-                    mTaskQueue.push(std::move(task));
+                                     std::chrono::duration_cast<std::chrono::seconds>(pTask->nextRun - now).count());
+                    enqueueTask(pTask);
                 }
             }
         }
@@ -225,22 +258,22 @@ namespace SmartHome {
         }
 
         if (mTaskQueue.empty()) {
-            mpLogger->debugf("[SCHEDULER] No task in queue");
+            mpLogger->debug("[SCHEDULER] No tasks in queue");
             return;
         }
 
         const auto &nextTask = mTaskQueue.top();
-        mTimer.expires_at(nextTask->nextRun);
-        mTimer.async_wait([this](const boost::system::error_code &ec) {
-            onTimerExpired(ec);
+        mpTimer->expiresAt(nextTask->nextRun);
+        mpTimer->asyncWait([self = weak_from_this()](const std::error_code &ec) {
+            if (const auto p = self.lock()) p->onTimerExpired(ec);
         });
     }
 
-    void Scheduler::onTimerExpired(const boost::system::error_code &ec) {
+    void Scheduler::onTimerExpired(const std::error_code &ec) {
         if (ec || !mIsRunning) return;
 
-        std::scoped_lock lock(mMutex);
-        const auto now = std::chrono::system_clock::now();
+        std::unique_lock lock(mMutex);
+        const auto now = mTimeProvider.now();
 
         while (!mTaskQueue.empty()) {
             // Skip and remove tasks that were flagged as removed
@@ -252,29 +285,48 @@ namespace SmartHome {
             // Break if the earliest task is not ready yet
             if (mTaskQueue.top()->nextRun > now) break;
 
-            auto task = mTaskQueue.top();
+            auto pTask = mTaskQueue.top();
             mTaskQueue.pop();
 
-            // Advance to next occurrence before dispatching current one
-            if (task->advanceToNext()) {
-                mTaskQueue.push(task);
+            // Advance to next occurrence before dispatching current one, retire task if it has no more occurrences
+            if (pTask->advanceToNext()) {
+                requeueTask(pTask);
+            } else {
+                retireTask(pTask);
             }
 
-            dispatchAction(task);
+            dispatchAction(pTask);
         }
 
         // Set timer for next occurrence
         scheduleNextTimer();
     }
 
-    void Scheduler::dispatchAction(const TaskPtr &task) const {
-        mpLogger->debugf("[SCHEDULER] Dispatching action");
-        auto action = task->action;
-        auto deviceId = task->deviceId;
+    void Scheduler::dispatchAction(const TaskPtr &pTask) const {
+        if (!mIsRunning) return;
+        mpLogger->debugf("[SCHEDULER] Dispatching %s for device [%u]",
+                         c::AutomatedActionNames::SCHEDULED_ACTION.data(), pTask->deviceId);
 
-        boost::asio::post(Core::Instance().coreIoContext(), [action, deviceId]  {
-            constexpr std::string_view actionName = "Scheduled action";
-            ActionHelpers::dispatchAutomatedDeviceAction(actionName, deviceId, action);
+        boost::asio::post(mExecutor, [self = shared_from_this(), pTask] {
+            if (!self->mIsRunning || pTask->removed) return;
+            self->mDispatchAction(c::AutomatedActionNames::SCHEDULED_ACTION, pTask->deviceId, pTask->action);
         });
+    }
+
+    void Scheduler::enqueueTask(const TaskPtr &pTask) {
+        mTaskQueue.push(pTask);
+        mTasksByDevice[pTask->deviceId].push_back(pTask);
+    }
+
+    void Scheduler::requeueTask(const TaskPtr &pTask) {
+        mTaskQueue.push(pTask);
+    }
+
+    void Scheduler::retireTask(const TaskPtr &pTask) {
+        const auto iter = mTasksByDevice.find(pTask->deviceId);
+        if (iter == mTasksByDevice.end()) return;
+
+        std::erase(iter->second, pTask);
+        if (iter->second.empty()) mTasksByDevice.erase(iter);
     }
 }
