@@ -108,6 +108,23 @@ namespace SmartHome {
             ba::post(*mCoreWorkerThreadPool, [this] { mCoreWorkerIoContext.run(); });
         }
 
+        const Actions::Config actionsCfg{
+            .isCoreRunning = [this] { return isRunning(); },
+            .logger = mpLogger,
+            .coreExecutor = coreIoContext().get_executor(),
+            .workerExecutor = coreWorkerIoContext().get_executor(),
+            .utilityExecutor = coreUtilityIoContext().get_executor(),
+            .timeProvider = mTimeProvider,
+            .handleOutgoingRequests = [&](const connectionId_t id, std::string &&message)-> void {
+                API::InternalApi().handleOutgoing(id, std::move(message));
+            }
+        };
+
+        if (const auto actionsInitResult = Actions::initialize(actionsCfg); !actionsInitResult) {
+            logger->errorf("[CORE] Actions initialization failed: %s", actionsInitResult.error());
+            return false;
+        }
+
         mIsInitialized.store(true);
         logger->debug("[CORE] Core successfully initialized");
 
