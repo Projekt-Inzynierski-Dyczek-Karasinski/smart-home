@@ -221,6 +221,7 @@ namespace SmartHome::API {
          */
         explicit ApiError(std::string_view value);
 
+        // TODO consider fully replacing with new overload
         /**
          * @brief Construct error with specific values.
          *
@@ -229,6 +230,16 @@ namespace SmartHome::API {
          * @param newData Additional error data.
          */
         ApiError(ErrorCodes newCode, std::string_view newMessage, std::string_view newData);
+
+        /**
+         * @brief Construct error with specific values.
+         *
+         * @param newCode Error code.
+         * @param newData Additional error data.
+         *
+         * @note Uses \c errorCodeToString function to fill \c message field.
+         */
+        ApiError(ErrorCodes newCode, std::string_view newData);
 
         /**
          * @brief Convert error to JSON object.

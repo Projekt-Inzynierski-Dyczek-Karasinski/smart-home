@@ -84,6 +84,12 @@ namespace SmartHome::API {
         data = newData;
     }
 
+    ApiError::ApiError(const ErrorCodes newCode, const std::string_view newData) {
+        code = newCode;
+        message = errorCodeToString(newCode);
+        data = newData;
+    }
+
     nlohmann::json ApiError::to_json() const {
         nlohmann::json json;
 
