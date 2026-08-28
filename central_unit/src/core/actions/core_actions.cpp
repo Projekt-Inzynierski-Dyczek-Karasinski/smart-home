@@ -50,7 +50,7 @@ namespace SmartHome {
 
         const auto type = ActionHelpers::requireType(*pParams);
         if (!type.has_value()) {
-            commandResult.error = params.error();
+            commandResult.error = type.error();
             co_return commandResult;
         }
 
@@ -94,7 +94,7 @@ namespace SmartHome {
 
         const auto type = ActionHelpers::requireType(*pParams);
         if (!type.has_value()) {
-            commandResult.error = params.error();
+            commandResult.error = type.error();
             co_return commandResult;
         }
 
