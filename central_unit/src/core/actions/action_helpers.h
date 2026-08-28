@@ -3,6 +3,7 @@
 #include "constants.h"
 #include "cache.h"
 #include "../api/internal_api.h"
+#include "common/time/time_provider.h"
 
 #include <expected>
 
@@ -64,7 +65,7 @@ namespace SmartHome {
             /// Command data
             API::InternalApi::Command command;
             /// Command-specific timeout timer
-            std::atomic<std::shared_ptr<ba::steady_timer> > commandTimeoutTimer;
+            std::atomic<std::shared_ptr<Time::ISteadyTimer> > commandTimeoutTimer;
             /// Parent request ID
             apiId_t requestId;
             /// Current command state
@@ -80,7 +81,7 @@ namespace SmartHome {
              * @param requestId Parent request identifier.
              */
             CommandMetadata(API::InternalApi::Command command,
-                            std::shared_ptr<ba::steady_timer> commandTimeoutTimer,
+                            std::shared_ptr<Time::ISteadyTimer> commandTimeoutTimer,
                             apiId_t requestId);
 
             /**

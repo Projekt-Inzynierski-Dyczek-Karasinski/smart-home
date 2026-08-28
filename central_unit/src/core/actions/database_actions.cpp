@@ -368,7 +368,7 @@ namespace SmartHome {
         API::InternalApi::Command command(request);
         const auto pCmdMeta = std::make_shared<ActionHelpers::CommandMetadata>(
             command,
-            std::make_shared<ba::steady_timer>(Core::Instance().coreUtilityIoContext()),
+            Actions::getConfig()->timeProvider.createSteadyTimer(),
             Actions::getNextId());
 
         co_return co_await sendRequestToDbService(std::move(request), pCmdMeta);

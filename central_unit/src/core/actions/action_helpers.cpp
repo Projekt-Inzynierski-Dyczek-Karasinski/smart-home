@@ -11,7 +11,7 @@ namespace SmartHome {
     using namespace std::string_literals;
 
     ActionHelpers::CommandMetadata::CommandMetadata(API::InternalApi::Command command,
-                                                    std::shared_ptr<ba::steady_timer> commandTimeoutTimer,
+                                                    std::shared_ptr<Time::ISteadyTimer> commandTimeoutTimer,
                                                     const apiId_t requestId)
         : command(std::move(command)),
           commandTimeoutTimer(std::move(commandTimeoutTimer)),
