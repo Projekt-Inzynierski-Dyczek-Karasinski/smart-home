@@ -34,6 +34,11 @@ namespace SmartHome::Tests {
         mpScheduler->start();
     }
 
+    void SchedulerTest::TearDown() {
+        if (mpScheduler) mpScheduler->stop();
+        mpScheduler.reset();
+    }
+
 
     //region Helpers
     nlohmann::json SchedulerTest::validDeviceConfigJson(uint deviceId, uint moduleId, const nlohmann::json &schedule) {
@@ -269,10 +274,13 @@ namespace SmartHome::Tests {
         auto promiseFinished = std::make_shared<std::promise<bool> >();
         auto futureResult = promiseFinished->get_future();
 
-        std::jthread([scheduler = mpScheduler, promiseFinished] {
-            scheduler->loadFromCache();
-            promiseFinished->set_value(true);
-        }).detach();
+        // Thread in anonymous block to ensure shr_ptr cleanup
+        {
+            std::jthread([scheduler = mpScheduler, promiseFinished] {
+                scheduler->loadFromCache();
+                promiseFinished->set_value(true);
+            }).detach();
+        }
 
         EXPECT_TRUE(futureResult.wait_for(150ms)!=std::future_status::timeout);
     }
@@ -290,10 +298,13 @@ namespace SmartHome::Tests {
         auto promiseFinished = std::make_shared<std::promise<size_t> >();
         auto futureResult = promiseFinished->get_future();
 
-        std::jthread([scheduler = mpScheduler, promiseFinished] {
-            scheduler->loadFromCache();
-            promiseFinished->set_value(scheduler->taskCount());
-        }).detach();
+        // Thread in anonymous block to ensure shr_ptr cleanup
+        {
+            std::jthread([scheduler = mpScheduler, promiseFinished] {
+                scheduler->loadFromCache();
+                promiseFinished->set_value(scheduler->taskCount());
+            }).detach();
+        }
 
         ASSERT_TRUE(futureResult.wait_for(150ms)!=std::future_status::timeout) << "Scheduler stalled";
         EXPECT_EQ(futureResult.get(), 0);
