@@ -4,6 +4,7 @@ set(test_names
         readings_cache_test
         scheduler_test
         action_helpers_test
+        actions_test
 )
 
 smarthome_add_test_group(core TESTS ${test_names} LIBS smarthome::core_lib smarthome::time_testing)
