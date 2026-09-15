@@ -313,10 +313,21 @@ namespace SmartHome {
          * @details Decrements pending count and triggers response if complete.
          *
          * @param requestId Request to update.
-         * @param lockMutex Whether to lock mutex (false if already locked).
+         * @param cfg Active \c Actions configuration.
          */
-        static void updateRequestStatus(apiId_t requestId, const std::shared_ptr<const Config> &cfg,
-                                        bool lockMutex = true);
+        static void updateRequestStatus(apiId_t requestId, const std::shared_ptr<const Config> &cfg);
+
+        /**
+         * @brief Update request completion status.
+         *
+         * @details Decrements pending count and triggers response if complete.
+         *
+         * @param requestId Request to update.
+         * @param cfg Active \c Actions configuration.
+         *
+         * @pre \c msActiveRequestsLock must be locked.
+         */
+        static void updateRequestStatusUnlocked(apiId_t requestId, const std::shared_ptr<const Config> &cfg);
 
         /**
          * @brief Handle request timeout expiration.

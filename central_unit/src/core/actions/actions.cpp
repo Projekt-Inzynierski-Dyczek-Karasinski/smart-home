@@ -509,7 +509,6 @@ namespace SmartHome {
                 request.cancel();
 
                 for (auto &commandMD: request.commands) {
-                    constexpr bool lockMutex = false;
                     if (cleanupTimeoutCalled) break;
                     if (commandMD && commandMD->state == ActionHelpers::CommandMetadata::State::CANCELLED
                         && commandMD->command.commandId.hasValue()) {
@@ -525,7 +524,7 @@ namespace SmartHome {
 
                         addCommandResultToResponse(commandMD, std::move(timeoutResult));
                     }
-                    updateRequestStatus(commandMD->requestId, cfg, lockMutex);
+                    updateRequestStatusUnlocked(commandMD->requestId, cfg);
                 }
             }
         }
@@ -671,7 +670,7 @@ namespace SmartHome {
 
         if (response.has_value()) handleCommandResult(commandMetadata, std::move(response.value()), cfg);
 
-        else updateRequestStatus(commandMetadata->requestId, cfg, true);
+        else updateRequestStatus(commandMetadata->requestId, cfg);
         co_return;
     }
 
@@ -733,21 +732,23 @@ namespace SmartHome {
         }
     }
 
-    void Actions::updateRequestStatus(const apiId_t requestId,
-                                      const std::shared_ptr<const Config> &cfg,
-                                      const bool lockMutex) {
-        if (lockMutex) std::scoped_lock lock(msActiveRequestsLock); // FIXME !pr instantly unlocked
+    void Actions::updateRequestStatus(const apiId_t requestId, const std::shared_ptr<const Config> &cfg) {
+        std::scoped_lock lock(msActiveRequestsLock);
+        updateRequestStatusUnlocked(requestId, cfg);
+    }
+
+    void Actions::updateRequestStatusUnlocked(const apiId_t requestId, const std::shared_ptr<const Config> &cfg) {
         const auto iter = msActiveRequests.find(requestId);
-        if (iter != msActiveRequests.end()) {
-            auto &request = iter->second;
-            if (request.pendingCommands.fetch_sub(1) == 1) {
-                if (const auto reqTimer = request.requestTimeoutTimer.load()) reqTimer->cancel();
-                ba::post(cfg->coreExecutor, [requestId, cfg] {
-                    handleOutgoingResponse(requestId);
-                    cleanupRequest(requestId, cfg);
-                });
-            }
-        }
+        if (iter == msActiveRequests.end()) return;
+
+        auto &request = iter->second;
+        if (request.pendingCommands.fetch_sub(1) != 1) return;
+
+        if (const auto reqTimer = request.requestTimeoutTimer.load()) reqTimer->cancel();
+        ba::post(cfg->coreExecutor, [requestId, cfg] {
+            handleOutgoingResponse(requestId);
+            cleanupRequest(requestId, cfg);
+        });
     }
 
     void Actions::handleRequestTimeout(const apiId_t requestId, const std::shared_ptr<const Config> &cfg) {
