@@ -902,6 +902,8 @@ namespace SmartHome::Tests {
 
         Actions::onCoreShutdown();
         drain();
+        mTimeProvider.advanceBy(msCLEANUP_TIMEOUT_TESTS + 1s);
+        drain();
 
         API::ApiResponse response;
         ASSERT_NO_FATAL_FAILURE(expectSingleParsedResponse(response));

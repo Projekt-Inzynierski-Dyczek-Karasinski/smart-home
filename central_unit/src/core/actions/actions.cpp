@@ -483,19 +483,22 @@ namespace SmartHome {
         const auto cfg = mspConfig.load();
         if (!cfg) return;
 
-        auto cleanupTimeout = cfg->timeProvider.createSteadyTimer();
-        cleanupTimeout->expiresAfter(msCLEANUP_TIMEOUT);
-        std::atomic_bool cleanupTimeoutCalled = false;
-        auto cleanup = [&cleanupTimeout, &cleanupTimeoutCalled] {
-            auto expected = false;
-            if (cleanupTimeoutCalled.compare_exchange_strong(expected, true)) return;
-            cleanupTimeout->cancel();
+        struct CleanupState {
+            std::shared_ptr<Time::ISteadyTimer> timer;
+            std::atomic_bool timeoutCalled{false};
+        };
+        auto cleanupState = std::make_shared<CleanupState>(cfg->timeProvider.createSteadyTimer());
+        cleanupState->timer->expiresAfter(msCLEANUP_TIMEOUT);
+
+        auto cleanup = [cleanupState] {
+            if (auto expected = false; !cleanupState->timeoutCalled.compare_exchange_strong(expected, true)) return;
+            cleanupState->timer->cancel();
             std::scoped_lock lock(msActiveRequestsLock, msResponsesLock);
             msActiveRequests.clear();
             msResponses.clear();
         };
 
-        cleanupTimeout->asyncWait([cleanup](const std::error_code &ec) {
+        cleanupState->timer->asyncWait([cleanup](const std::error_code &ec) {
             if (!ec) {
                 cleanup();
             }
@@ -505,11 +508,11 @@ namespace SmartHome {
         {
             std::scoped_lock lock(msActiveRequestsLock);
             for (auto &request: msActiveRequests | std::views::values) {
-                if (cleanupTimeoutCalled) break;
+                if (cleanupState->timeoutCalled) break;
                 request.cancel();
 
                 for (auto &commandMD: request.commands) {
-                    if (cleanupTimeoutCalled) break;
+                    if (cleanupState->timeoutCalled) break;
                     if (commandMD && commandMD->state == ActionHelpers::CommandMetadata::State::CANCELLED
                         && commandMD->command.commandId.hasValue()) {
                         API::ApiResponse timeoutResult;

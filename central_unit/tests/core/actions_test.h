@@ -73,6 +73,8 @@ namespace SmartHome::Tests {
         static constexpr auto msAGGREGATE_OUTGOING_TIMEOUT_TESTS = 10ms; // msAGGREGATE_OUTGOING_TIMEOUT = 10ms
         static constexpr auto msCOMMAND_TIMEOUT_TESTS = 60s; // msCOMMAND_TIMEOUT = 60s
         static constexpr auto msREQUEST_TIMEOUT_TESTS = 5min; // msREQUEST_TIMEOUT = 5min
+        static constexpr auto msCLEANUP_TIMEOUT_TESTS = 5s; // msCLEANUP_TIMEOUT = 5s
+
 
         std::shared_ptr<Utils::Logger> mpLogger;
         ba::io_context mIoContext;
