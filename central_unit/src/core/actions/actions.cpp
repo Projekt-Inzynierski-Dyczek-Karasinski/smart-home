@@ -138,9 +138,8 @@ namespace SmartHome {
         if (request.commands.empty()) {
             cfg->logger->warning("[ACTIONS] [HANDLE_INCOMING_REQUEST] Rejected request with no commands");
 
-            API::ApiError error{API::ErrorCodes::INVALID_REQUEST, "Request contains no commands"};
             API::ApiResponse response;
-            response.error = error;
+            response.error = API::ApiError{API::ErrorCodes::INVALID_REQUEST, "Request contains no commands"};
             response.id = API::ApiId(nullptr);
 
             callback(request.connectionId, response.to_string());
@@ -151,83 +150,56 @@ namespace SmartHome {
 
         // TODO add ActiveRequest limit
 
-        // Requests mutex block, attempt to insert new request into msActiveRequest map
+        const std::shared_ptr timer = cfg->timeProvider.createSteadyTimer();
+        timer->expiresAfter(msREQUEST_TIMEOUT);
+
+        std::optional<API::ApiError> setupError;
+
+        // Setup request and response objects needed for further handling
         {
-            auto timer = cfg->timeProvider.createSteadyTimer();
-            timer->expiresAfter(msREQUEST_TIMEOUT);
+            std::scoped_lock lock(msActiveRequestsLock, msResponsesLock);
 
-            std::scoped_lock lock(msActiveRequestsLock);
-            auto [_, inserted] = msActiveRequests.try_emplace(
-                requestId,
-                request,
-                std::move(timer),
-                request.commands.size(),
-                callback
-            );
+            const auto [reqIter, reqInserted] =
+                    msActiveRequests.try_emplace(requestId, request, timer, request.commands.size(), callback);
 
-            if (!inserted) {
+            if (!reqInserted) {
                 cfg->logger->error(
-                    "[ACTIONS] [HANDLE_INCOMING_REQUEST]  Handling new request failed: duplicate request ID");
-                return;
+                    "[ACTIONS] [HANDLE_INCOMING_REQUEST] Handling new request failed: duplicate request ID");
+                setupError = API::ApiError{API::ErrorCodes::INTERNAL_ERROR, "Duplicate request ID"};
+            } else {
+                const auto [resIter, resInserted] = msResponses.try_emplace(
+                    requestId, request.connectionId, std::vector<API::ApiResponse>{}, request.isResultStructured);
+
+                if (!resInserted) {
+                    cfg->logger->error(
+                        "[ACTIONS] [HANDLE_INCOMING_REQUEST] Handling new request failed: duplicate response entry");
+                    msActiveRequests.erase(reqIter);
+                    setupError = API::ApiError{
+                        API::ErrorCodes::INTERNAL_ERROR, "Failed to create response object for request"
+                    };
+                } else {
+                    resIter->second.apiResponses.reserve(request.commands.size());
+                }
             }
         }
 
-        API::ApiError error;
-
-        // Responses mutex block, attempt to prepare response struct in msResponses map
-        {
-            std::scoped_lock lock(msResponsesLock);
-            auto [_, inserted] = msResponses.try_emplace(
-                requestId,
-                request.connectionId,
-                std::vector<API::ApiResponse>{},
-                request.isResultStructured
-            );
-
-            if (!inserted) {
-                cfg->logger->error(
-                    "[ACTIONS] [HANDLE_INCOMING_REQUEST]  Handling new request failed: Failed to create response object");
-                msActiveRequests.erase(requestId);
-                error.code = API::ErrorCodes::INTERNAL_ERROR;
-                error.data = "Failed to create response object for request";
-            }
-
-            try {
-                msResponses[requestId].apiResponses.reserve(request.commands.size());
-            } catch (const std::exception &e) {
-                cfg->logger->errorf(
-                    "[ACTIONS] [HANDLE_INCOMING_REQUEST] Handling new request failed on reserving responses space: %s",
-                    e.what());
-                std::scoped_lock lockAR(msActiveRequestsLock);
-                msActiveRequests.erase(requestId);
-                error.code = API::ErrorCodes::INTERNAL_ERROR;
-                error.data = e.what();
-            }
-        }
-
-        if (error.code != API::ErrorCodes::NO_ERROR) {
-            error.message = API::errorCodeToString(error.code);
-
+        if (setupError.has_value()) {
             API::ApiResponse response;
-            response.error = error;
+            response.error = std::move(setupError);
             response.id = API::ApiId(nullptr);
-
             callback(request.connectionId, response.to_string());
             return;
         }
 
-        // FIXME !pr access without lock
-        msActiveRequests.at(requestId).requestTimeoutTimer.load()->asyncWait(
-            [requestId, cfg](const std::error_code &ec) {
-                // Request mutex block, returns from callback if request is already completed or does not exist
-                {
-                    std::scoped_lock lock(msActiveRequestsLock);
-                    const auto iter = msActiveRequests.find(requestId);
-                    if (iter == msActiveRequests.end() || iter->second.pendingCommands == 0) return;
-                }
-                if (!ec) handleRequestTimeout(requestId, cfg);
+        timer->asyncWait([requestId, cfg](const std::error_code &ec) {
+            {
+                std::scoped_lock lock(msActiveRequestsLock);
+                if (const auto iter = msActiveRequests.find(requestId);
+                    iter == msActiveRequests.end() || iter->second.pendingCommands == 0)
+                    return;
             }
-        );
+            if (!ec) handleRequestTimeout(requestId, cfg);
+        });
 
         for (const auto &command: request.commands) {
             const CommandHandler handler = resolveCommand(command, cfg);
