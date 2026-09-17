@@ -722,6 +722,21 @@ namespace SmartHome::Tests {
             << "timeout and stalled handler completion both produced output - CAS on state failed";
     }
 
+    TEST_F(ActionsTest, TimeoutAfterResponseDoesNotThrow) {
+        initActionsWithDefaultHandler();
+        constexpr apiId_t requestId = 1;
+
+        auto future = sendOutgoingRequest(msCONNECTION_ID, makeApiRequest("core.get", {{"value", 2}}, requestId));
+        mTimeProvider.advanceBy(msAGGREGATE_OUTGOING_TIMEOUT_TESTS + 1ms);
+
+        Actions::handleIncomingResponse(msCONNECTION_ID, makeApiResponse(requestId, "ok"));
+        ASSERT_EQ(future.wait_for(0s), std::future_status::ready);
+
+        // Timeout firing after the response must be a no-op, not a second set on the promise
+        EXPECT_NO_THROW(mTimeProvider.advanceBy(msREQUEST_TIMEOUT_TESTS + 1s));
+        EXPECT_EQ(future.get().result, "ok");
+    }
+
     //endregion
 
     // region Outgoing traffic
@@ -869,9 +884,10 @@ namespace SmartHome::Tests {
         mTimeProvider.advanceBy(msAGGREGATE_OUTGOING_TIMEOUT_TESTS + 1ms);
 
         mTimeProvider.advanceBy(msREQUEST_TIMEOUT_TESTS + 1s);
+        ASSERT_EQ(future.wait_for(0s), std::future_status::ready);
 
-        // Late response must not attempt a second set on the already broken promise
-        Actions::handleIncomingResponse(msCONNECTION_ID, makeApiResponse(requestId, "late"));
+        EXPECT_NO_THROW(Actions::handleIncomingResponse(msCONNECTION_ID, makeApiResponse(requestId, "late")))
+            << "late response must find no promise, not hit a satisfied one";
         drain();
 
         EXPECT_THROW(future.get(), std::runtime_error);
@@ -955,6 +971,47 @@ namespace SmartHome::Tests {
 
         ASSERT_EQ(mCapturedOutgoingResponses.size(), 2);
         EXPECT_EQ(mCapturedOutgoingResponses.back().connectionId, msCONNECTION_ID);
+    }
+
+    TEST_F(ActionsTest, OutgoingRequestRejectedWhenCoreNotRunning) {
+        initActionsWithDefaultHandler();
+        mIsCoreRunning = false;
+
+        auto future = sendOutgoingRequest(msCONNECTION_ID, makeApiRequest("core.get", {{"value", 2}}, 1));
+
+        ASSERT_EQ(future.wait_for(0s), std::future_status::ready)
+            << "promise must be resolved immediately, not left hanging";
+        EXPECT_THROW(future.get(), std::runtime_error);
+
+        mTimeProvider.advanceBy(msAGGREGATE_OUTGOING_TIMEOUT_TESTS + 1ms);
+        EXPECT_TRUE(mCapturedOutgoingRequests.empty()) << "nothing may be sent while core is stopped";
+    }
+
+    TEST_F(ActionsTest, DuplicateOutgoingRequestIdRejected) {
+        initActionsWithDefaultHandler();
+        constexpr apiId_t requestId = 1;
+        const std::string resultValue = "ok";
+
+        auto first = sendOutgoingRequest(msCONNECTION_ID, makeApiRequest("core.get", {{"value", 1}}, requestId));
+        auto second = sendOutgoingRequest(msCONNECTION_ID, makeApiRequest("core.get", {{"value", 2}}, requestId));
+
+        // Rejected promise is failed synchronously, the original one stays pending
+        ASSERT_EQ(second.wait_for(0s), std::future_status::ready);
+        EXPECT_THROW(second.get(), std::runtime_error);
+        EXPECT_EQ(first.wait_for(0s), std::future_status::timeout);
+
+        // Only the first request goes out - as a single object, not a two-element batch
+        mTimeProvider.advanceBy(msAGGREGATE_OUTGOING_TIMEOUT_TESTS + 1ms);
+        ASSERT_EQ(mCapturedOutgoingRequests.size(), 1);
+        const auto sentJson = nlohmann::json::parse(mCapturedOutgoingRequests.front().message);
+        ASSERT_TRUE(sentJson.is_object()) << "duplicate must not be queued for sending";
+        EXPECT_EQ(sentJson["id"], requestId);
+        EXPECT_EQ(sentJson["params"]["value"], 1);
+
+        // The original promise is still wired to its id
+        Actions::handleIncomingResponse(msCONNECTION_ID, makeApiResponse(requestId, resultValue));
+        ASSERT_EQ(first.wait_for(0s), std::future_status::ready);
+        EXPECT_EQ(first.get().result, resultValue);
     }
 
     // endregion
