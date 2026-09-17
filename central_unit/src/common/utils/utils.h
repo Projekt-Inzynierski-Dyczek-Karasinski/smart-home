@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <future>
 #include <memory>
 
 namespace SmartHome::Utils {
@@ -53,6 +54,18 @@ namespace SmartHome::Utils {
      * @return Timestamp string in the ISO 8601 format "YYYY-MM-DDTHH:MM:SSZ" (UTC time).
      */
     std::string timePointToTimestampTz(const std::chrono::system_clock::time_point &timePoint);
+
+    /**
+     * @brief Set an exception on a promise, safely handling null or already satisfied promises.
+     *
+     * @tparam T Type of value held by the promise.
+     * @param promise Promise to fail, ignored if null.
+     * @param reason Message used to construct the \c std::runtime_error set as the promise's exception.
+     *
+     * @note If the promise is already satisfied, the resulting exception from \c set_exception is silently ignored.
+     */
+    template<typename T>
+    void failPromise(const std::shared_ptr<std::promise<T> > &promise, std::string_view reason);
 
     /**
      * @brief RAII wrapper for exclusive file locking.
@@ -112,3 +125,5 @@ namespace SmartHome::Utils {
         std::string mLockFilePath;
     };
 }
+
+#include "utils.tpp"

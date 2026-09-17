@@ -511,13 +511,8 @@ namespace SmartHome {
                 std::scoped_lock mdLock(outgoing->metadataMutex);
                 outgoing->sendTimer->cancel();
                 outgoing->timeoutTimer->cancel();
-                for (const auto &promise: outgoing->requestsPromises | std::views::values) {
-                    try {
-                        promise->set_exception(std::make_exception_ptr(std::runtime_error("Core shutdown")));
-                    } catch (const std::exception &e) {
-                        cfg->logger->errorf(
-                            "[ACTIONS] [ON_CORE_SHUTDOWN] Failed to set exception for outgoing request: {}", e.what());
-                    }
+                for (const auto &pPromise: outgoing->requestsPromises | std::views::values) {
+                    Utils::failPromise(pPromise, "Core shutdown");
                 }
             }
             msOutgoingRequests.clear();
