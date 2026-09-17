@@ -303,6 +303,7 @@ namespace SmartHome {
     }
 
     // FIXME segfault can happen when received unexpected response
+    // TODO Consider removing above FIXME as it is not reproducible and was likely fixed after fixes in SH-223 branch
     void Actions::handleIncomingResponse(const connectionId_t connectionId, const API::ApiResponse &response) {
         const auto cfg = mspConfig.load();
         if (!cfg || !cfg->isCoreRunning()) return;
@@ -349,70 +350,75 @@ namespace SmartHome {
                                         API::ApiRequest &&apiRequest,
                                         const std::shared_ptr<std::promise<API::ApiResponse> > &pResponsePromise) {
         const auto cfg = mspConfig.load();
-        if (!cfg || !cfg->isCoreRunning()) return;
+        if (!cfg) {
+            Utils::failPromise(pResponsePromise, "Actions are not initialized");
+            return;
+        }
+        if (!cfg->isCoreRunning()) {
+            Utils::failPromise(pResponsePromise, "Core is not running");
+            return;
+        }
 
         cfg->logger->debug("[ACTIONS] [HANDLE_OUTGOING_REQUEST] called");
+
         std::scoped_lock lockRequestMap(msOutgoingRequestsLock);
 
-        if (!msOutgoingRequests.contains(connectionId)) {
-            msOutgoingRequests[connectionId] = std::make_shared<OutgoingRequestMetadata>(cfg->timeProvider);
-        }
-        auto &outgoingRequest = msOutgoingRequests.at(connectionId);
+        auto &mapEntry = msOutgoingRequests[connectionId];
+        if (!mapEntry) mapEntry = std::make_shared<OutgoingRequestMetadata>(cfg->timeProvider);
+        const auto outgoingRequest = mapEntry;
+
         std::scoped_lock lockRequestMetadata(outgoingRequest->metadataMutex);
 
-        outgoingRequest->sendTimer->cancel();
-
-
-        outgoingRequest->requestsToSend.push_back(apiRequest);
         if (apiRequest.id.hasValue()) {
-            if (!outgoingRequest->requestsPromises.contains(apiRequest.id.value()))
-                outgoingRequest->requestsPromises[apiRequest.id.value()] = pResponsePromise;
-            else
-                cfg->logger->warning(
-                    "[ACTIONS] [HANDLE_OUTGOING_REQUEST] ApiRequest with duplicate id ignored");
-        }
+            const auto [_, inserted] =
+                    outgoingRequest->requestsPromises.try_emplace(apiRequest.id.value(), pResponsePromise);
 
-        // TODO !pr consider weak_ptr of outgoingRequest
-        const auto timeoutHandler = [outgoingRequest, connectionId](const std::error_code &timeOutEc) {
-            if (!timeOutEc) {
-                std::scoped_lock timeoutLock(outgoingRequest->metadataMutex, msOutgoingRequestsLock);
-                for (const auto &promise: outgoingRequest->requestsPromises | std::views::values) {
-                    promise->set_exception(std::make_exception_ptr(std::runtime_error("Request timeout")));
-                }
-
-                if (outgoingRequest->requestsToSend.empty()) {
-                    msOutgoingRequests.erase(connectionId);
-                }
+            if (!inserted) {
+                cfg->logger->warning("[ACTIONS] [HANDLE_OUTGOING_REQUEST] ApiRequest with duplicate id rejected");
+                Utils::failPromise(pResponsePromise, "Duplicate request id");
+                return;
             }
+        }
+        outgoingRequest->requestsToSend.push_back(std::move(apiRequest));
+
+        const auto timeoutHandler = [outgoingRequest, connectionId](const std::error_code &ec) {
+            if (ec) return;
+            std::scoped_lock timeoutLock(outgoingRequest->metadataMutex, msOutgoingRequestsLock);
+
+            for (const auto &pPromise: outgoingRequest->requestsPromises | std::views::values) {
+                Utils::failPromise(pPromise, "Request timeout");
+            }
+            outgoingRequest->requestsPromises.clear();
+
+            if (outgoingRequest->requestsToSend.empty()) msOutgoingRequests.erase(connectionId);
         };
 
-        // TODO !pr consider weak_ptr of outgoingRequest
-        const auto sendTimerHandler =
-                [outgoingRequest, connectionId, timeoutHandler, cfg](const std::error_code &sendEc) {
-            if (!sendEc) {
-                std::scoped_lock sendLock(outgoingRequest->metadataMutex, msOutgoingRequestsLock);
-                auto &requests = outgoingRequest->requestsToSend;
+        const auto sendTimerHandler = [outgoingRequest, connectionId, timeoutHandler, cfg](const std::error_code &ec) {
+            if (ec) return;
+            std::string messageToSend;
 
-                std::string messageToSend;
+            // Prepare message to send
+            {
+                std::scoped_lock sendLock(outgoingRequest->metadataMutex);
+                auto &requests = outgoingRequest->requestsToSend;
 
                 if (requests.size() == 1) {
                     messageToSend = requests.front().to_string();
                 } else {
                     auto messageJsonArray = nlohmann::json::array();
-                    for (const auto &request: requests) {
-                        messageJsonArray.push_back(request.to_json());
-                    }
+                    for (const auto &request: requests) messageJsonArray.push_back(request.to_json());
                     messageToSend = to_string(messageJsonArray);
                 }
-                cfg->handleOutgoingRequests(connectionId, std::move(messageToSend));
                 requests.clear();
 
                 outgoingRequest->timeoutTimer->expiresAfter(msREQUEST_TIMEOUT);
                 outgoingRequest->timeoutTimer->asyncWait(timeoutHandler);
             }
+            cfg->handleOutgoingRequests(connectionId, std::move(messageToSend));
         };
 
         // Aggregate outgoing requests
+        outgoingRequest->sendTimer->cancel();
         outgoingRequest->sendTimer->expiresAfter(msAGGREGATE_OUTGOING_TIMEOUT);
         outgoingRequest->sendTimer->asyncWait(sendTimerHandler);
     }
@@ -845,6 +851,7 @@ namespace SmartHome {
 
         // Wait asynchronously for long operation result.
         while (future.wait_for(25ms) != std::future_status::ready) {
+            // TODO Current ITimeProvider does not support co_await consider reworking placeholder / template handler
             co_await ba::steady_timer(co_await ba::this_coro::executor, 75ms).async_wait(ba::use_awaitable);
         }
 
