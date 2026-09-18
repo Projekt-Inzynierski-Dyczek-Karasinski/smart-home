@@ -34,6 +34,11 @@ namespace SmartHome {
         friend class DatabaseActions;
 
     public:
+        // TODO consider rework (timeout timer is bound to connection lifecycle and not to request lifecycle, request
+        //      can wait indefinitely on a busy connection)
+        /**
+         * @brief Per-connection state for outgoing request aggregation and lifecycle tracking.
+         */
         struct OutgoingRequestMetadata {
             std::mutex metadataMutex;
             /// Outgoing requests
@@ -45,6 +50,11 @@ namespace SmartHome {
             /// Request-level timeout timer
             std::shared_ptr<Time::ISteadyTimer> timeoutTimer;
 
+            /**
+             * @brief Construct outgoing request metadata with a fresh send and timeout timer.
+             *
+             * @param timeProvider Time provider used to create the aggregation and timeout timers.
+             */
             explicit OutgoingRequestMetadata(Time::ITimeProvider &timeProvider);
         };
 
@@ -96,17 +106,39 @@ namespace SmartHome {
         /// InternalApi handler type used for callbacks and forwarding outgoing requests
         using InternalApiHandler = std::function<void(connectionId_t connectionId, std::string &&response)>;
 
-
+        /**
+         * @brief Build the default command registry mapping targets/actions to their handlers.
+         *
+         * @return Populated \c CommandsRegistry used when \c Config::commandsRegistry is not overridden.
+         */
         static CommandsRegistry defaultCommandsRegistry();
 
+        /**
+         * @brief Injectable dependencies and settings required to run \c Actions.
+         */
         struct Config {
+            /// Returns whether \c Core is currently running, so work is skipped/cancelled during shutdown.
             std::function<bool()> isCoreRunning;
+
+            /// Logger used for all \c Actions diagnostic output.
             std::shared_ptr<Utils::Logger> logger;
+
+            /// Executor for \c Core's main event loop - used to dispatch command coroutines and callbacks.
             ba::any_io_executor coreExecutor;
+
+            /// Executor for \c Core's worker thread pool - used to run command handler work off the main event loop.
             ba::any_io_executor workerExecutor;
+
+            /// Executor for \c Core's utility thread - used for auxiliary work such as logging and timers.
             ba::any_io_executor utilityExecutor;
+
+            /// Registry mapping target/action command keys to their handlers.
             CommandsRegistry commandsRegistry = defaultCommandsRegistry();
+
+            /// Time provider used to create steady timers for requests, commands and aggregation.
             Time::ITimeProvider &timeProvider;
+
+            /// Callback used to forward aggregated outgoing requests to their destination connection.
             InternalApiHandler handleOutgoingRequests;
 
             /**
@@ -119,6 +151,15 @@ namespace SmartHome {
             [[nodiscard]] std::expected<void, std::string> validate() const;
         };
 
+        /**
+         * @brief Initializes \c Actions with config values.
+         *
+         * @param config Configuration to validate and store for subsequent \c Actions calls.
+         *
+         * @return Nothing on success, otherwise a description of the validation failure.
+         *
+         * @note Must be called to start handling requests.
+         */
         static std::expected<void, std::string> initialize(const Config &config);
 
         /**
@@ -129,6 +170,11 @@ namespace SmartHome {
          */
         static void reset();
 
+        /**
+         * @brief Retrieves the currently active configuration.
+         *
+         * @return Shared pointer to the active \c Config, or nullptr if \c Actions has not been initialized.
+         */
         static std::shared_ptr<const Config> getConfig();
 
         /**
@@ -252,6 +298,8 @@ namespace SmartHome {
          * @brief Lookup command handler from registry.
          *
          * @param command Command to resolve handler for.
+         * @param cfg Active \c Actions configuration.
+         *
          * @return Handler function or nullptr if not found.
          */
         static CommandHandler resolveCommand(const API::InternalApi::Command &command,
@@ -266,6 +314,7 @@ namespace SmartHome {
          * @param handler Command handler function.
          * @param newCommand Command to execute.
          * @param requestId Parent request identifier.
+         * @param cfg Active \c Actions configuration.
          */
         static void executeCommandAsync(const CommandHandler &handler,
                                         const API::InternalApi::Command &newCommand,
@@ -276,6 +325,8 @@ namespace SmartHome {
          *
          * @param commandMetadata Command execution metadata.
          * @param handler Command handler function.
+         * @param cfg Active \c Actions configuration.
+         *
          * @return Awaitable void result.
          */
         static ba::awaitable<void> processCommand(cmdMetaPtr commandMetadata,
@@ -287,6 +338,7 @@ namespace SmartHome {
          *
          * @param commandMetadata Command that completed.
          * @param commandResult Result from command handler.
+         * @param cfg Active \c Actions configuration.
          */
         static void handleCommandResult(const cmdMetaPtr &commandMetadata,
                                         API::ApiResponse &&commandResult, const std::shared_ptr<const Config> &cfg);
@@ -295,6 +347,7 @@ namespace SmartHome {
          * @brief Handle command timeout expiration.
          *
          * @param commandMetadata Timed-out command metadata.
+         * @param cfg Active \c Actions configuration.
          */
         static void handleCommandTimeout(const cmdMetaPtr &commandMetadata, const std::shared_ptr<const Config> &cfg);
 
@@ -333,6 +386,7 @@ namespace SmartHome {
          * @brief Handle request timeout expiration.
          *
          * @param requestId Timed-out request identifier.
+         * @param cfg Active \c Actions configuration.
          */
         static void handleRequestTimeout(apiId_t requestId, const std::shared_ptr<const Config> &cfg);
 
@@ -340,9 +394,11 @@ namespace SmartHome {
          * @brief Cleanup request resources.
          *
          * @param requestId Request to cleanup.
+         * @param cfg Active \c Actions configuration.
          */
         static void cleanupRequest(apiId_t requestId, const std::shared_ptr<const Config> &cfg);
 
+        /// Currently active configuration, set by \c initialize and cleared by \c reset.
         static std::atomic<std::shared_ptr<const Config> > mspConfig;
 
         /// Active request tracking map
@@ -350,7 +406,9 @@ namespace SmartHome {
         /// Mutex for active requests map access
         static std::mutex msActiveRequestsLock;
 
+        /// Per-connection outgoing request aggregation state
         static std::unordered_map<connectionId_t, std::shared_ptr<OutgoingRequestMetadata> > msOutgoingRequests;
+        /// Mutex for outgoing requests map access
         static std::mutex msOutgoingRequestsLock;
 
         /// Response collection map
@@ -358,10 +416,14 @@ namespace SmartHome {
         /// Mutex for responses map access
         static std::mutex msResponsesLock;
 
+        /// Maps connection IDs to their target component type
         static std::unordered_map<connectionId_t, sai::TargetTypes> msConnectionsMap;
+        /// Mutex for connections map access
         static std::shared_mutex msConnectionsMapLock;
 
+        /// Maps target component type to the set of connection IDs of that type
         static std::unordered_map<sai::TargetTypes, std::unordered_set<connectionId_t> > msConnectionTypeMap;
+        /// Mutex for connection type map access
         static std::shared_mutex msConnectionTypeMapLock;
 
         /// After not adding new messages to send for timeout duration, send aggregated batch message.
