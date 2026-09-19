@@ -56,6 +56,12 @@ namespace SmartHome {
              * @param timeProvider Time provider used to create the aggregation and timeout timers.
              */
             explicit OutgoingRequestMetadata(Time::ITimeProvider &timeProvider);
+
+            ~OutgoingRequestMetadata() = default;
+
+            OutgoingRequestMetadata(const OutgoingRequestMetadata &other) = delete;
+
+            OutgoingRequestMetadata &operator=(const OutgoingRequestMetadata &other) = delete;
         };
 
         /**
