@@ -15,6 +15,8 @@ namespace SmartHome::Tests {
 
         void SetUp() override;
 
+        void TearDown() override;
+
         static nlohmann::json validDeviceConfigJson(uint deviceId = 1,
                                                     uint moduleId = 1,
                                                     const nlohmann::json &schedule = {

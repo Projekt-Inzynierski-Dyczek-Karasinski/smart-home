@@ -30,6 +30,23 @@ namespace SmartHome::Time::Testing {
         }
 
         /**
+         * @brief Destroys every handler that has not been invoked yet, without invoking it (\c io_context semantics).
+         *        Handlers are released before the ready queue so that a handler owning a timer cannot keep the queue
+         *        alive past the provider.
+         */
+        ~FakeTimeProvider() override {
+            const auto timers = std::move(mTimers);
+            const auto steadyTimers = std::move(mSteadyTimers);
+            for (const auto &state: timers) state->handler = nullptr;
+            for (const auto &state: steadyTimers) state->handler = nullptr;
+            mpReady->clear();
+        }
+
+        FakeTimeProvider(const FakeTimeProvider &) = delete;
+
+        FakeTimeProvider &operator=(const FakeTimeProvider &) = delete;
+
+        /**
          * @brief Current fake wall-clock time.
          *
          * @return The time last set via construction or \c advanceBy() / \c advanceTo() / \c advanceSystemOnly().
@@ -114,7 +131,8 @@ namespace SmartHome::Time::Testing {
 
     private:
         using PendingHandler = std::pair<TimerHandler, std::error_code>;
-        using ReadyQueuePtr = std::shared_ptr<std::vector<PendingHandler> >;
+        using ReadyQueue = std::vector<PendingHandler>;
+        using ReadyQueuePtr = std::shared_ptr<ReadyQueue>;
 
         /**
          * @brief Shared timer state, outliving the timer object so a snapshot stays valid.
@@ -123,7 +141,7 @@ namespace SmartHome::Time::Testing {
         struct State {
             Clock::time_point expiry{};
             TimerHandler handler;
-            ReadyQueuePtr pReady;
+            std::weak_ptr<ReadyQueue> pReady;
             bool alive = true; ///< false once the owning timer has been destroyed
 
             /**
@@ -137,17 +155,27 @@ namespace SmartHome::Time::Testing {
              * @brief Queue pending handler with operation_canceled (cancel / re-arm / destroy path).
              */
             void abort() {
-                if (auto pending = std::exchange(handler, nullptr))
-                    pReady->emplace_back(std::move(pending), std::make_error_code(std::errc::operation_canceled));
+                enqueue(std::make_error_code(std::errc::operation_canceled));
             }
 
             /**
              * @brief Queue the pending handler with a success error code if expiry has passed.
              */
             void fireIfDue(const Clock::time_point now) {
-                if (handler && expiry <= now)
-                    if (auto pending = std::exchange(handler, nullptr))
-                        pReady->emplace_back(std::move(pending), std::error_code{});
+                if (handler && expiry <= now) enqueue(std::error_code{});
+            }
+
+        private:
+            /**
+             * @brief Move the pending handler to the provider's ready queue.
+             *
+             * @details If the provider is already gone the handler is destroyed without being invoked,
+             *          matching \c io_context semantics for operations outstanding at destruction.
+             */
+            void enqueue(const std::error_code ec) {
+                auto pending = std::exchange(handler, nullptr);
+                if (!pending) return;
+                if (const auto ready = pReady.lock()) ready->emplace_back(std::move(pending), ec);
             }
         };
 

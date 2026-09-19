@@ -5,99 +5,213 @@
 
 #include <memory>
 
-
 namespace SmartHome {
-    void Actions::handleIncomingRequest(const API::InternalApi::Request &request, const RequestCallback &callback) {
-        Core::Instance().mpLogger->debug("[ACTIONS] [HANDLE_INCOMING_REQUEST] called");
-        if (!Core::Instance().isRunning()) return;
-        const auto logger = Core::Instance().mpLogger;
-        const auto requestId = getNextId();
+    Actions::OutgoingRequestMetadata::OutgoingRequestMetadata(Time::ITimeProvider &timeProvider) {
+        sendTimer = timeProvider.createSteadyTimer();
+        timeoutTimer = timeProvider.createSteadyTimer();
+    }
 
-        // TODO add ActiveRequest limit
+    Actions::CommandKey::CommandKey(const sai::TargetTypes newTarget, const sai::MethodTypes newAction) {
+        target = newTarget;
+        action = newAction;
+    }
 
-        // Requests mutex block, attempt to insert new request into msActiveRequest map
-        {
-            std::scoped_lock lock(msActiveRequestsLock);
-            auto [_, inserted] = msActiveRequests.try_emplace(
-                requestId,
-                request,
-                std::make_shared<ba::steady_timer>(
-                    Core::Instance().coreUtilityIoContext(), msREQUEST_TIMEOUT),
-                request.commands.size(),
-                callback
-            );
 
-            if (!inserted) {
-                logger->error("[ACTIONS] [HANDLE_INCOMING_REQUEST]  Handling new request failed: duplicate request ID");
-                return;
-            }
+    Actions::CommandKey::CommandKey(const API::InternalApi::Command &command) {
+        target = command.target.type;
+        action = command.method.type;
+    }
+
+    bool Actions::CommandKey::operator==(const CommandKey &other) const {
+        return target == other.target && action == other.action;
+    }
+
+    std::size_t Actions::CommandKeyHash::operator()(const CommandKey &key) const {
+        return static_cast<size_t>(key.target) << 8 | static_cast<size_t>(key.action);
+    }
+
+    Actions::CommandsRegistry Actions::defaultCommandsRegistry() {
+        using ca = CoreActions;
+        using ma = MediatorActions;
+        using da = DatabaseActions;
+
+        return {
+            // TODO implement actions needed for basic functionality
+            // TODO rework handlers/handler invoking to remove redundant code from within handlers
+            //Core
+            {{sai::TargetTypes::CORE, sai::MethodTypes::GET}, ca::coreGetHandler},
+            {{sai::TargetTypes::CORE, sai::MethodTypes::SET}, ca::coreSetHandler},
+            {{sai::TargetTypes::CORE, sai::MethodTypes::DELETE}, ca::coreDeleteHandler},
+            {{sai::TargetTypes::CORE, sai::MethodTypes::EXECUTE}, placeholderHandler},
+            {{sai::TargetTypes::CORE, sai::MethodTypes::NOTIFY}, ca::coreNotifyHandler},
+            {{sai::TargetTypes::CORE, sai::MethodTypes::ECHO_REQUEST}, ca::coreEchoHandler},
+            {{sai::TargetTypes::CORE, sai::MethodTypes::PING_REQUEST}, placeholderHandler},
+            //Mediator
+            {{sai::TargetTypes::MODULE_MEDIATOR, sai::MethodTypes::GET}, ma::mediatorGetHandler},
+            {{sai::TargetTypes::MODULE_MEDIATOR, sai::MethodTypes::SET}, ma::mediatorSetHandler},
+            {{sai::TargetTypes::MODULE_MEDIATOR, sai::MethodTypes::EXECUTE}, ma::mediatorExecuteHandler},
+            {{sai::TargetTypes::MODULE_MEDIATOR, sai::MethodTypes::PING_REQUEST}, ma::mediatorPingHandler},
+            //Database
+            {{sai::TargetTypes::DATABASE, sai::MethodTypes::GET}, da::databaseRequestHandler},
+            {{sai::TargetTypes::DATABASE, sai::MethodTypes::SET}, da::databaseRequestHandler},
+            {{sai::TargetTypes::DATABASE, sai::MethodTypes::DELETE}, da::databaseRequestHandler},
+            // TODO consider implementing database ping and execute
+            //CLI
+            {{sai::TargetTypes::CLI, sai::MethodTypes::SET}, placeholderHandler},
+            {{sai::TargetTypes::CLI, sai::MethodTypes::EXECUTE}, placeholderHandler},
+            //GUI
+            {{sai::TargetTypes::GUI, sai::MethodTypes::SET}, placeholderHandler},
+            {{sai::TargetTypes::GUI, sai::MethodTypes::EXECUTE}, placeholderHandler},
+            //Webserver
+            {{sai::TargetTypes::WEB_SERVER, sai::MethodTypes::GET}, placeholderHandler},
+            {{sai::TargetTypes::WEB_SERVER, sai::MethodTypes::SET}, placeholderHandler},
+            {{sai::TargetTypes::WEB_SERVER, sai::MethodTypes::EXECUTE}, placeholderHandler},
+            {{sai::TargetTypes::WEB_SERVER, sai::MethodTypes::PING_REQUEST}, placeholderHandler}
+        };
+    }
+
+    std::expected<void, std::string> Actions::Config::validate() const {
+        std::vector<std::string_view> problems;
+
+        if (!isCoreRunning) problems.emplace_back("isCoreRunning is empty");
+        if (!logger) problems.emplace_back("logger is null");
+        if (!coreExecutor) problems.emplace_back("coreExecutor is unset");
+        if (!workerExecutor) problems.emplace_back("workerExecutor is unset");
+        if (!utilityExecutor) problems.emplace_back("utilityExecutor is unset");
+        if (!handleOutgoingRequests) problems.emplace_back("handleOutgoingRequests is empty");
+
+        if (commandsRegistry.empty()) {
+            problems.emplace_back("commandsRegistry is empty");
+        } else if (std::ranges::any_of(commandsRegistry | std::views::values,
+                                       [](const CommandHandler &handler) { return !handler; })) {
+            problems.emplace_back("commandsRegistry contains a null handler");
         }
 
-        API::ApiError error;
+        if (problems.empty()) return {};
 
-        // Responses mutex block, attempt to prepare response struct in msResponses map
-        {
-            std::scoped_lock lock(msResponsesLock);
-            auto [_, inserted] = msResponses.try_emplace(
-                requestId,
-                request.connectionId,
-                std::vector<API::ApiResponse>{},
-                request.isResultStructured
-            );
+        std::string message = "Invalid Actions::Config:";
+        for (const auto &problem: problems) message += " " + std::string(problem) + ";";
+        return std::unexpected(std::move(message));
+    }
 
-            if (!inserted) {
-                logger->error(
-                    "[ACTIONS] [HANDLE_INCOMING_REQUEST]  Handling new request failed: Failed to create response object");
-                msActiveRequests.erase(requestId);
-                error.code = API::ErrorCodes::INTERNAL_ERROR;
-                error.data = "Failed to create response object for request";
-            }
+    std::expected<void, std::string> Actions::initialize(const Config &config) {
+        // Propagate return from validate on unexpected
+        if (auto validation = config.validate(); !validation) return validation;
 
-            try {
-                msResponses[requestId].apiResponses.reserve(request.commands.size());
-            } catch (const std::exception &e) {
-                logger->errorf(
-                    "[ACTIONS] [HANDLE_INCOMING_REQUEST] Handling new request failed on reserving responses space: %s",
-                    e.what());
-                std::scoped_lock lockAR(msActiveRequestsLock);
-                msActiveRequests.erase(requestId);
-                error.code = API::ErrorCodes::INTERNAL_ERROR;
-                error.data = e.what();
-            }
+        mspConfig.store(std::make_shared<const Config>(config));
+        return {};
+    }
+
+    void Actions::reset() {
+        std::scoped_lock lock(msActiveRequestsLock,
+                              msResponsesLock,
+                              msOutgoingRequestsLock,
+                              msConnectionsMapLock,
+                              msConnectionTypeMapLock);
+
+        for (auto &request: msActiveRequests | std::views::values) request.cancel();
+        for (const auto &outgoing: msOutgoingRequests | std::views::values) {
+            std::scoped_lock mdLock(outgoing->metadataMutex);
+            outgoing->sendTimer->cancel();
+            outgoing->timeoutTimer->cancel();
         }
 
-        if (error.code != API::ErrorCodes::NO_ERROR) {
-            error.message = API::errorCodeToString(error.code);
+        msActiveRequests.clear();
+        msResponses.clear();
+        msOutgoingRequests.clear();
+        msConnectionsMap.clear();
+        msConnectionTypeMap.clear();
+
+        mspConfig.store(nullptr);
+    }
+
+    std::shared_ptr<const Actions::Config> Actions::getConfig() {
+        return mspConfig.load();
+    }
+
+    void Actions::handleIncomingRequest(const API::InternalApi::Request &request, const InternalApiHandler &callback) {
+        const auto cfg = mspConfig.load();
+        if (!cfg || !cfg->isCoreRunning()) return;
+
+        cfg->logger->debug("[ACTIONS] [HANDLE_INCOMING_REQUEST] called");
+
+        if (request.commands.empty()) {
+            cfg->logger->warning("[ACTIONS] [HANDLE_INCOMING_REQUEST] Rejected request with no commands");
 
             API::ApiResponse response;
-            response.error = error;
+            response.error = API::ApiError{API::ErrorCodes::INVALID_REQUEST, "Request contains no commands"};
             response.id = API::ApiId(nullptr);
 
             callback(request.connectionId, response.to_string());
             return;
         }
 
-        msActiveRequests.at(requestId).requestTimeoutTimer.load()->async_wait(
-            [requestId](const bs::error_code &ec) {
-                // Request mutex block, returns from callback if request is already completed or does not exist
-                {
-                    std::scoped_lock lock(msActiveRequestsLock);
-                    const auto iter = msActiveRequests.find(requestId);
-                    if (iter == msActiveRequests.end() || iter->second.pendingCommands == 0) return;
+        const auto requestId = getNextId();
+
+        // TODO add ActiveRequest limit
+
+        const std::shared_ptr timer = cfg->timeProvider.createSteadyTimer();
+        timer->expiresAfter(msREQUEST_TIMEOUT);
+
+        std::optional<API::ApiError> setupError;
+
+        // Setup request and response objects needed for further handling
+        {
+            std::scoped_lock lock(msActiveRequestsLock, msResponsesLock);
+
+            const auto [reqIter, reqInserted] =
+                    msActiveRequests.try_emplace(requestId, request, timer, request.commands.size(), callback);
+
+            if (!reqInserted) {
+                cfg->logger->error(
+                    "[ACTIONS] [HANDLE_INCOMING_REQUEST] Handling new request failed: duplicate request ID");
+                setupError = API::ApiError{API::ErrorCodes::INTERNAL_ERROR, "Duplicate request ID"};
+            } else {
+                const auto [resIter, resInserted] = msResponses.try_emplace(
+                    requestId, request.connectionId, std::vector<API::ApiResponse>{}, request.isResultStructured);
+
+                if (!resInserted) {
+                    cfg->logger->error(
+                        "[ACTIONS] [HANDLE_INCOMING_REQUEST] Handling new request failed: duplicate response entry");
+                    msActiveRequests.erase(reqIter);
+                    setupError = API::ApiError{
+                        API::ErrorCodes::INTERNAL_ERROR, "Failed to create response object for request"
+                    };
+                } else {
+                    resIter->second.apiResponses.reserve(request.commands.size());
                 }
-                if (!ec) handleRequestTimeout(requestId);
             }
-        );
+        }
+
+        if (setupError.has_value()) {
+            API::ApiResponse response;
+            response.error = std::move(setupError);
+            response.id = API::ApiId(nullptr);
+            callback(request.connectionId, response.to_string());
+            return;
+        }
+
+        timer->asyncWait([requestId, cfg](const std::error_code &ec) {
+            {
+                std::scoped_lock lock(msActiveRequestsLock);
+                if (const auto iter = msActiveRequests.find(requestId);
+                    iter == msActiveRequests.end() || iter->second.pendingCommands == 0)
+                    return;
+            }
+            if (!ec) handleRequestTimeout(requestId, cfg);
+        });
 
         for (const auto &command: request.commands) {
-            const CommandHandler handler = resolveCommand(command);
-            executeCommandAsync(handler, command, requestId);
+            const CommandHandler handler = resolveCommand(command, cfg);
+            executeCommandAsync(handler, command, requestId, cfg);
         }
     }
 
     void Actions::handleOutgoingResponse(const apiId_t responseId) {
-        const auto logger = Core::Instance().mpLogger;
-        RequestCallback requestCallback;
+        const auto cfg = mspConfig.load();
+        if (!cfg) return;
+
+        InternalApiHandler requestCallback;
         std::string responseString;
         connectionId_t id;
 
@@ -109,8 +223,8 @@ namespace SmartHome {
             std::scoped_lock lock(msResponsesLock);
             const auto iter = msResponses.find(responseId);
             if (iter == msResponses.end()) {
-                logger->errorf("[ACTIONS] [HANDLE_OUTGOING_RESPONSE] response for request [ID:%d] not found",
-                               responseId);
+                cfg->logger->errorf("[ACTIONS] [HANDLE_OUTGOING_RESPONSE] response for request [ID:%d] not found",
+                                    responseId);
                 return;
             }
             const auto &internalResponse = iter->second;
@@ -125,7 +239,8 @@ namespace SmartHome {
             std::scoped_lock lock(msActiveRequestsLock);
             const auto iter = msActiveRequests.find(responseId);
             if (iter == msActiveRequests.end()) {
-                logger->errorf("[ACTIONS] [HANDLE_OUTGOING_RESPONSE] request [ID:%d] metadata not found", responseId);
+                cfg->logger->errorf("[ACTIONS] [HANDLE_OUTGOING_RESPONSE] request [ID:%d] metadata not found",
+                                    responseId);
                 return;
             }
             const auto &requestMetadata = iter->second;
@@ -188,10 +303,14 @@ namespace SmartHome {
     }
 
     // FIXME segfault can happen when received unexpected response
+    // TODO Consider removing above FIXME as it is not reproducible and was likely fixed after fixes in SH-223 branch
     void Actions::handleIncomingResponse(const connectionId_t connectionId, const API::ApiResponse &response) {
-        Core::Instance().mpLogger->debug("[ACTIONS] [HANDLE_INCOMING_RESPONSE] called");
+        const auto cfg = mspConfig.load();
+        if (!cfg || !cfg->isCoreRunning()) return;
+
+        cfg->logger->debug("[ACTIONS] [HANDLE_INCOMING_RESPONSE] called");
         if (!response.id.hasValue()) {
-            Core::Instance().mpLogger->warningf(
+            cfg->logger->warningf(
                 "[ACTIONS] [HANDLE_INCOMING_RESPONSE] Ignored incoming response for connection [%d] - response id is missing",
                 connectionId);
             return;
@@ -200,7 +319,7 @@ namespace SmartHome {
         std::scoped_lock lock(msOutgoingRequestsLock);
 
         if (!msOutgoingRequests.contains(connectionId)) {
-            Core::Instance().mpLogger->warningf(
+            cfg->logger->warningf(
                 "[ACTIONS] [HANDLE_INCOMING_RESPONSE] Ignored incoming response for connection [%d] - no pending request",
                 connectionId);
             return;
@@ -212,7 +331,7 @@ namespace SmartHome {
         const auto &responseId = response.id.value();
 
         if (!pendingRequest->requestsPromises.contains(responseId)) {
-            Core::Instance().mpLogger->warningf(
+            cfg->logger->warningf(
                 "[ACTIONS] [HANDLE_INCOMING_RESPONSE] Ignored incoming response for connection [%d] - no pending request with response ID [%d]",
                 connectionId,
                 responseId);
@@ -230,67 +349,78 @@ namespace SmartHome {
     void Actions::handleOutgoingRequest(const connectionId_t connectionId,
                                         API::ApiRequest &&apiRequest,
                                         const std::shared_ptr<std::promise<API::ApiResponse> > &pResponsePromise) {
-        Core::Instance().mpLogger->debug("[ACTIONS] [HANDLE_OUTGOING_REQUEST] called");
+        const auto cfg = mspConfig.load();
+        if (!cfg) {
+            Utils::failPromise(pResponsePromise, "Actions are not initialized");
+            return;
+        }
+        if (!cfg->isCoreRunning()) {
+            Utils::failPromise(pResponsePromise, "Core is not running");
+            return;
+        }
+
+        cfg->logger->debug("[ACTIONS] [HANDLE_OUTGOING_REQUEST] called");
+
         std::scoped_lock lockRequestMap(msOutgoingRequestsLock);
 
-        if (!msOutgoingRequests.contains(connectionId)) {
-            msOutgoingRequests[connectionId] = std::make_shared<OutgoingRequestMetadata>();
-        }
-        auto &outgoingRequest = msOutgoingRequests.at(connectionId);
+        auto &mapEntry = msOutgoingRequests[connectionId];
+        if (!mapEntry) mapEntry = std::make_shared<OutgoingRequestMetadata>(cfg->timeProvider);
+        const auto outgoingRequest = mapEntry;
+
         std::scoped_lock lockRequestMetadata(outgoingRequest->metadataMutex);
 
-        outgoingRequest->sendTimer->cancel();
-
-
-        outgoingRequest->requestsToSend.push_back(apiRequest);
         if (apiRequest.id.hasValue()) {
-            if (!outgoingRequest->requestsPromises.contains(apiRequest.id.value()))
-                outgoingRequest->requestsPromises[apiRequest.id.value()] = pResponsePromise;
-            else
-                Core::Instance().mpLogger->warning(
-                    "[ACTIONS] [HANDLE_OUTGOING_REQUEST] ApiRequest with duplicate id ignored");
-        }
+            const auto [_, inserted] =
+                    outgoingRequest->requestsPromises.try_emplace(apiRequest.id.value(), pResponsePromise);
 
-        const auto timeoutHandler = [outgoingRequest, connectionId](const bs::error_code &timeOutEc) {
-            if (!timeOutEc) {
-                std::scoped_lock timeoutLock(outgoingRequest->metadataMutex, msOutgoingRequestsLock);
-                for (const auto &promise: outgoingRequest->requestsPromises | std::views::values) {
-                    promise->set_exception(std::make_exception_ptr(std::runtime_error("Request timeout")));
-                }
-
-                if (outgoingRequest->requestsToSend.empty()) {
-                    msOutgoingRequests.erase(connectionId);
-                }
+            if (!inserted) {
+                cfg->logger->warning("[ACTIONS] [HANDLE_OUTGOING_REQUEST] ApiRequest with duplicate id rejected");
+                Utils::failPromise(pResponsePromise, "Duplicate request id");
+                return;
             }
+        }
+        outgoingRequest->requestsToSend.push_back(std::move(apiRequest));
+
+        const auto timeoutHandler = [outgoingRequest, connectionId](const std::error_code &ec) {
+            if (ec) return;
+            std::scoped_lock timeoutLock(outgoingRequest->metadataMutex, msOutgoingRequestsLock);
+
+            for (const auto &pPromise: outgoingRequest->requestsPromises | std::views::values) {
+                Utils::failPromise(pPromise, "Request timeout");
+            }
+            outgoingRequest->requestsPromises.clear();
+
+            if (outgoingRequest->requestsToSend.empty()) msOutgoingRequests.erase(connectionId);
         };
 
-        const auto sendTimerHandler = [outgoingRequest, connectionId, timeoutHandler](const bs::error_code &sendEc) {
-            if (!sendEc) {
-                std::scoped_lock sendLock(outgoingRequest->metadataMutex, msOutgoingRequestsLock);
-                auto &requests = outgoingRequest->requestsToSend;
+        const auto sendTimerHandler = [outgoingRequest, connectionId, timeoutHandler, cfg](const std::error_code &ec) {
+            if (ec) return;
+            std::string messageToSend;
 
-                std::string messageToSend;
+            // Prepare message to send
+            {
+                std::scoped_lock sendLock(outgoingRequest->metadataMutex);
+                auto &requests = outgoingRequest->requestsToSend;
 
                 if (requests.size() == 1) {
                     messageToSend = requests.front().to_string();
                 } else {
                     auto messageJsonArray = nlohmann::json::array();
-                    for (const auto &request: requests) {
-                        messageJsonArray.push_back(request.to_json());
-                    }
+                    for (const auto &request: requests) messageJsonArray.push_back(request.to_json());
                     messageToSend = to_string(messageJsonArray);
                 }
-                API::InternalApi().handleOutgoing(connectionId, std::move(messageToSend));
                 requests.clear();
 
-                outgoingRequest->timeoutTimer->expires_after(msREQUEST_TIMEOUT);
-                outgoingRequest->timeoutTimer->async_wait(timeoutHandler);
+                outgoingRequest->timeoutTimer->expiresAfter(msREQUEST_TIMEOUT);
+                outgoingRequest->timeoutTimer->asyncWait(timeoutHandler);
             }
+            cfg->handleOutgoingRequests(connectionId, std::move(messageToSend));
         };
 
         // Aggregate outgoing requests
-        outgoingRequest->sendTimer->expires_after(msAGGREGATE_OUTGOING_TIMEOUT);
-        outgoingRequest->sendTimer->async_wait(sendTimerHandler);
+        outgoingRequest->sendTimer->cancel();
+        outgoingRequest->sendTimer->expiresAfter(msAGGREGATE_OUTGOING_TIMEOUT);
+        outgoingRequest->sendTimer->asyncWait(sendTimerHandler);
     }
 
     std::optional<API::InternalApi::Request> Actions::getRequest(const apiId_t requestId) {
@@ -307,16 +437,19 @@ namespace SmartHome {
     }
 
     void Actions::startCommandTimeoutTimer(cmdMetaPtr commandMetadata) {
+        const auto cfg = mspConfig.load();
+        if (!cfg || !cfg->isCoreRunning()) return;
+
         // Notifications do not require timeout
         if (commandMetadata->isNotification) {
             return;
         }
 
         if (const auto timer = commandMetadata->commandTimeoutTimer.load()) {
-            timer->expires_after(msCOMMAND_TIMEOUT);
-            timer->async_wait([commandMetadata](const bs::error_code &ec) {
+            timer->expiresAfter(msCOMMAND_TIMEOUT);
+            timer->asyncWait([commandMetadata, cfg](const std::error_code &ec) {
                 if (!ec) {
-                    handleCommandTimeout(commandMetadata);
+                    handleCommandTimeout(commandMetadata, cfg);
                 } else {
                     commandMetadata->cancel();
                 }
@@ -325,19 +458,25 @@ namespace SmartHome {
     }
 
     void Actions::onCoreShutdown() {
-        auto cleanupTimeout = std::make_shared<ba::steady_timer>(Core::Instance().coreUtilityIoContext(),
-                                                                 msCLEANUP_TIMEOUT);
-        std::atomic_bool cleanupTimeoutCalled = false;
-        auto cleanup = [&cleanupTimeout, &cleanupTimeoutCalled] {
-            auto expected = false;
-            if (cleanupTimeoutCalled.compare_exchange_strong(expected, true)) return;
-            cleanupTimeout->cancel();
+        const auto cfg = mspConfig.load();
+        if (!cfg) return;
+
+        struct CleanupState {
+            std::shared_ptr<Time::ISteadyTimer> timer;
+            std::atomic_bool timeoutCalled{false};
+        };
+        auto cleanupState = std::make_shared<CleanupState>(cfg->timeProvider.createSteadyTimer());
+        cleanupState->timer->expiresAfter(msCLEANUP_TIMEOUT);
+
+        auto cleanup = [cleanupState] {
+            if (auto expected = false; !cleanupState->timeoutCalled.compare_exchange_strong(expected, true)) return;
+            cleanupState->timer->cancel();
             std::scoped_lock lock(msActiveRequestsLock, msResponsesLock);
             msActiveRequests.clear();
             msResponses.clear();
         };
 
-        cleanupTimeout->async_wait([cleanup](const bs::error_code &ec) {
+        cleanupState->timer->asyncWait([cleanup](const std::error_code &ec) {
             if (!ec) {
                 cleanup();
             }
@@ -347,12 +486,11 @@ namespace SmartHome {
         {
             std::scoped_lock lock(msActiveRequestsLock);
             for (auto &request: msActiveRequests | std::views::values) {
-                if (cleanupTimeoutCalled) break;
+                if (cleanupState->timeoutCalled) break;
                 request.cancel();
 
                 for (auto &commandMD: request.commands) {
-                    constexpr bool lockMutex = false;
-                    if (cleanupTimeoutCalled) break;
+                    if (cleanupState->timeoutCalled) break;
                     if (commandMD && commandMD->state == ActionHelpers::CommandMetadata::State::CANCELLED
                         && commandMD->command.commandId.hasValue()) {
                         API::ApiResponse timeoutResult;
@@ -367,7 +505,7 @@ namespace SmartHome {
 
                         addCommandResultToResponse(commandMD, std::move(timeoutResult));
                     }
-                    updateRequestStatus(commandMD->requestId, lockMutex);
+                    updateRequestStatusUnlocked(commandMD->requestId, cfg);
                 }
             }
         }
@@ -379,44 +517,18 @@ namespace SmartHome {
                 std::scoped_lock mdLock(outgoing->metadataMutex);
                 outgoing->sendTimer->cancel();
                 outgoing->timeoutTimer->cancel();
-                for (const auto &promise: outgoing->requestsPromises | std::views::values) {
-                    try {
-                        promise->set_exception(std::make_exception_ptr(std::runtime_error("Core shutdown")));
-                    } catch (const std::exception &e) {
-                        Core::Instance().mpLogger->errorf(
-                            "[ACTIONS] [ON_CORE_SHUTDOWN] Failed to set exception for outgoing request: {}", e.what());
-                    }
+                for (const auto &pPromise: outgoing->requestsPromises | std::views::values) {
+                    Utils::failPromise(pPromise, "Core shutdown");
                 }
             }
             msOutgoingRequests.clear();
         }
     }
 
-
-    Actions::CommandKey::CommandKey(const sai::TargetTypes newTarget, const sai::MethodTypes newAction) {
-        target = newTarget;
-        action = newAction;
-    }
-
-
-    Actions::CommandKey::CommandKey(const API::InternalApi::Command &command) {
-        target = command.target.type;
-        action = command.method.type;
-    }
-
-    bool Actions::CommandKey::operator==(const CommandKey &other) const {
-        return target == other.target && action == other.action;
-    }
-
-    std::size_t Actions::CommandKeyHash::operator()(const CommandKey &key) const {
-        return static_cast<size_t>(key.target) << 8 | static_cast<size_t>(key.action);
-    }
-
-
     Actions::RequestMetadata::RequestMetadata(API::InternalApi::Request request,
-                                              std::shared_ptr<ba::steady_timer> requestTimeoutTimer,
+                                              std::shared_ptr<Time::ISteadyTimer> requestTimeoutTimer,
                                               const size_t pendingCommands,
-                                              RequestCallback onComplete)
+                                              InternalApiHandler onComplete)
         : request(std::move(request)),
           requestTimeoutTimer(std::move(requestTimeoutTimer)),
           pendingCommands(pendingCommands),
@@ -434,17 +546,19 @@ namespace SmartHome {
     }
 
 
-    Actions::CommandHandler Actions::resolveCommand(const API::InternalApi::Command &command) {
-        const auto iter = msCommandsRegistry.find(CommandKey(command));
-        return iter != msCommandsRegistry.end() ? iter->second : nullptr;
+    Actions::CommandHandler Actions::resolveCommand(const API::InternalApi::Command &command,
+                                                    const std::shared_ptr<const Config> &cfg) {
+        const auto iter = cfg->commandsRegistry.find(CommandKey(command));
+        return iter != cfg->commandsRegistry.end() ? iter->second : nullptr;
     }
 
     void Actions::executeCommandAsync(const CommandHandler &handler,
                                       const API::InternalApi::Command &newCommand,
-                                      apiId_t requestId) {
+                                      apiId_t requestId,
+                                      const std::shared_ptr<const Config> &cfg) {
         const auto commandMetadata = std::make_shared<ActionHelpers::CommandMetadata>(
             newCommand,
-            std::make_shared<ba::steady_timer>(Core::Instance().coreUtilityIoContext()),
+            cfg->timeProvider.createSteadyTimer(),
             requestId
         );
 
@@ -496,19 +610,20 @@ namespace SmartHome {
             response.error = error;
             response.id = commandMetadata->command.commandId;
 
-            handleCommandResult(commandMetadata, std::move(response));
+            handleCommandResult(commandMetadata, std::move(response), cfg);
 
             return;
         }
 
-        ba::co_spawn(Core::Instance().coreIoContext(),
-                     processCommand(commandMetadata, handler),
+        ba::co_spawn(cfg->coreExecutor,
+                     processCommand(commandMetadata, handler, cfg),
                      ba::detached);
     }
 
 
     ba::awaitable<void> Actions::processCommand(const cmdMetaPtr commandMetadata,
-                                                const CommandHandler handler) {
+                                                const CommandHandler handler,
+                                                const std::shared_ptr<const Config> cfg) {
         if (!commandMetadata->isPending()) co_return; // Skip handling stale commands
         std::optional<API::ApiResponse> response;
 
@@ -529,14 +644,15 @@ namespace SmartHome {
 
         if (!commandMetadata->isPending()) co_return;
 
-        if (response.has_value()) handleCommandResult(commandMetadata, std::move(response.value()));
+        if (response.has_value()) handleCommandResult(commandMetadata, std::move(response.value()), cfg);
 
-        else updateRequestStatus(commandMetadata->requestId, true);
+        else updateRequestStatus(commandMetadata->requestId, cfg);
         co_return;
     }
 
     void Actions::handleCommandResult(const cmdMetaPtr &commandMetadata,
-                                      API::ApiResponse &&commandResult) {
+                                      API::ApiResponse &&commandResult,
+                                      const std::shared_ptr<const Config> &cfg) {
         if (const auto timer = commandMetadata->commandTimeoutTimer.exchange(nullptr)) timer->cancel();
 
         auto expected = ActionHelpers::CommandMetadata::State::PENDING;
@@ -549,10 +665,10 @@ namespace SmartHome {
         if (!commandMetadata->command.isNotification) {
             addCommandResultToResponse(commandMetadata, std::move(commandResult));
         }
-        updateRequestStatus(commandMetadata->requestId);
+        updateRequestStatus(commandMetadata->requestId, cfg);
     }
 
-    void Actions::handleCommandTimeout(const cmdMetaPtr &commandMetadata) {
+    void Actions::handleCommandTimeout(const cmdMetaPtr &commandMetadata, const std::shared_ptr<const Config> &cfg) {
         if (const auto timer = commandMetadata->commandTimeoutTimer.exchange(nullptr)) timer->cancel();
 
         auto expected = ActionHelpers::CommandMetadata::State::PENDING;
@@ -572,10 +688,10 @@ namespace SmartHome {
 
             addCommandResultToResponse(commandMetadata, std::move(timeoutResponse));
         }
-        updateRequestStatus(commandMetadata->requestId);
+        updateRequestStatus(commandMetadata->requestId, cfg);
 
 
-        Core::Instance().mpLogger->errorf(
+        cfg->logger->errorf(
             "[ACTIONS] [HANDLE_COMMAND_TIMEOUT] Command timeout - request ID: %d command ID: %s",
             commandMetadata->requestId,
             commandMetadata->command.commandId.hasValue()
@@ -592,24 +708,28 @@ namespace SmartHome {
         }
     }
 
-    void Actions::updateRequestStatus(const apiId_t requestId, const bool lockMutex) {
-        if (lockMutex) std::scoped_lock lock(msActiveRequestsLock);
-        const auto iter = msActiveRequests.find(requestId);
-        if (iter != msActiveRequests.end()) {
-            auto &request = iter->second;
-            if (request.pendingCommands.fetch_sub(1) == 1) {
-                if (const auto reqTimer = request.requestTimeoutTimer.load()) reqTimer->cancel();
-                ba::post(Core::Instance().coreIoContext(), [requestId] {
-                    handleOutgoingResponse(requestId);
-                    cleanupRequest(requestId);
-                });
-            }
-        }
+    void Actions::updateRequestStatus(const apiId_t requestId, const std::shared_ptr<const Config> &cfg) {
+        std::scoped_lock lock(msActiveRequestsLock);
+        updateRequestStatusUnlocked(requestId, cfg);
     }
 
-    void Actions::handleRequestTimeout(const apiId_t requestId) {
-        Core::Instance().mpLogger->errorf("[ACTIONS] [HANDLE_REQUEST_TIMEOUT] Request timeout - request ID: %d",
-                                          requestId);
+    void Actions::updateRequestStatusUnlocked(const apiId_t requestId, const std::shared_ptr<const Config> &cfg) {
+        const auto iter = msActiveRequests.find(requestId);
+        if (iter == msActiveRequests.end()) return;
+
+        auto &request = iter->second;
+        if (request.pendingCommands.fetch_sub(1) != 1) return;
+
+        if (const auto reqTimer = request.requestTimeoutTimer.load()) reqTimer->cancel();
+        ba::post(cfg->coreExecutor, [requestId, cfg] {
+            handleOutgoingResponse(requestId);
+            cleanupRequest(requestId, cfg);
+        });
+    }
+
+    void Actions::handleRequestTimeout(const apiId_t requestId, const std::shared_ptr<const Config> &cfg) {
+        cfg->logger->errorf("[ACTIONS] [HANDLE_REQUEST_TIMEOUT] Request timeout - request ID: %d",
+                            requestId);
 
         std::vector<cmdMetaPtr> commandsMD;
 
@@ -638,12 +758,12 @@ namespace SmartHome {
                 timeoutResult.error = error;
 
                 addCommandResultToResponse(commandMD, std::move(timeoutResult));
-                updateRequestStatus(commandMD->requestId);
+                updateRequestStatus(commandMD->requestId, cfg);
             }
         }
     }
 
-    void Actions::cleanupRequest(const apiId_t requestId) {
+    void Actions::cleanupRequest(const apiId_t requestId, const std::shared_ptr<const Config> &cfg) {
         std::scoped_lock lock(msActiveRequestsLock, msResponsesLock);
 
         const auto iter = msActiveRequests.find(requestId);
@@ -657,45 +777,10 @@ namespace SmartHome {
 
         msActiveRequests.erase(requestId);
         msResponses.erase(requestId);
-        Core::Instance().mpLogger->debugf("[ACTIONS] [CLEANUP_REQUEST] Request deleted - request ID: %d", requestId);
+        cfg->logger->debugf("[ACTIONS] [CLEANUP_REQUEST] Request deleted - request ID: %d", requestId);
     }
 
-
-    std::unordered_map<Actions::CommandKey, Actions::CommandHandler, Actions::CommandKeyHash>
-    Actions::msCommandsRegistry =
-    {
-        // TODO implement actions needed for basic functionality
-        // TODO rework handlers/handler invoking to remove redundant code from within handlers
-        //Core
-        {{sai::TargetTypes::CORE, sai::MethodTypes::GET}, CoreActions::coreGetHandler},
-        {{sai::TargetTypes::CORE, sai::MethodTypes::SET}, CoreActions::coreSetHandler},
-        {{sai::TargetTypes::CORE, sai::MethodTypes::DELETE}, CoreActions::coreDeleteHandler},
-        {{sai::TargetTypes::CORE, sai::MethodTypes::EXECUTE}, placeholderHandler},
-        {{sai::TargetTypes::CORE, sai::MethodTypes::NOTIFY}, CoreActions::coreNotifyHandler},
-        {{sai::TargetTypes::CORE, sai::MethodTypes::ECHO_REQUEST}, CoreActions::coreEchoHandler},
-        {{sai::TargetTypes::CORE, sai::MethodTypes::PING_REQUEST}, placeholderHandler},
-        //Mediator
-        {{sai::TargetTypes::MODULE_MEDIATOR, sai::MethodTypes::GET}, MediatorActions::mediatorGetHandler},
-        {{sai::TargetTypes::MODULE_MEDIATOR, sai::MethodTypes::SET}, MediatorActions::mediatorSetHandler},
-        {{sai::TargetTypes::MODULE_MEDIATOR, sai::MethodTypes::EXECUTE}, MediatorActions::mediatorExecuteHandler},
-        {{sai::TargetTypes::MODULE_MEDIATOR, sai::MethodTypes::PING_REQUEST}, MediatorActions::mediatorPingHandler},
-        //Database
-        {{sai::TargetTypes::DATABASE, sai::MethodTypes::GET}, DatabaseActions::databaseRequestHandler},
-        {{sai::TargetTypes::DATABASE, sai::MethodTypes::SET}, DatabaseActions::databaseRequestHandler},
-        {{sai::TargetTypes::DATABASE, sai::MethodTypes::DELETE}, DatabaseActions::databaseRequestHandler},
-        // TODO consider implementing database ping and execute
-        //CLI
-        {{sai::TargetTypes::CLI, sai::MethodTypes::SET}, placeholderHandler},
-        {{sai::TargetTypes::CLI, sai::MethodTypes::EXECUTE}, placeholderHandler},
-        //GUI
-        {{sai::TargetTypes::GUI, sai::MethodTypes::SET}, placeholderHandler},
-        {{sai::TargetTypes::GUI, sai::MethodTypes::EXECUTE}, placeholderHandler},
-        //Webserver
-        {{sai::TargetTypes::WEB_SERVER, sai::MethodTypes::GET}, placeholderHandler},
-        {{sai::TargetTypes::WEB_SERVER, sai::MethodTypes::SET}, placeholderHandler},
-        {{sai::TargetTypes::WEB_SERVER, sai::MethodTypes::EXECUTE}, placeholderHandler},
-        {{sai::TargetTypes::WEB_SERVER, sai::MethodTypes::PING_REQUEST}, placeholderHandler}
-    };
+    std::atomic<std::shared_ptr<const Actions::Config> > Actions::mspConfig{nullptr};
 
     std::unordered_map<apiId_t, Actions::RequestMetadata> Actions::msActiveRequests;
 
@@ -721,8 +806,11 @@ namespace SmartHome {
 
     // THIS PLACEHOLDER IS AN EXAMPLE AND IT SHOULD BE USED AS A TEMPLATE FOR OTHER COMMAND HANDLERS.
     awaitOptApiResponse Actions::placeholderHandler(cmdMetaPtr commandMetadata) {
+        const auto cfg = mspConfig.load();
+        if (!cfg || !cfg->isCoreRunning()) co_return std::nullopt;
+
         // Optional debug log
-        Core::Instance().mpLogger->debug("[ACTIONS] [PLACEHOLDER_HANDLER] called");
+        cfg->logger->debug("[ACTIONS] [PLACEHOLDER_HANDLER] called");
         // Universal command variables' definition.
         const auto &command = commandMetadata->command;
         API::ApiResponse commandResult;
@@ -745,7 +833,7 @@ namespace SmartHome {
         auto future = promise->get_future();
 
         // Be sure to implement timeouts and periodic isPending checks to avoid infinitely running operations.
-        ba::post(Core::Instance().coreWorkerIoContext(), [promise, commandMetadata, operationDuration] {
+        ba::post(cfg->workerExecutor, [promise, commandMetadata, operationDuration, cfg] {
             // This example simulates chain of operations with periodic checking for cancellation and command timeout.
             // While command timeout is not needed as request timeout exists, it is advised to use it especially for
             // longer operations in batch requests.
@@ -763,6 +851,7 @@ namespace SmartHome {
 
         // Wait asynchronously for long operation result.
         while (future.wait_for(25ms) != std::future_status::ready) {
+            // TODO Current ITimeProvider does not support co_await consider reworking placeholder / template handler
             co_await ba::steady_timer(co_await ba::this_coro::executor, 75ms).async_wait(ba::use_awaitable);
         }
 

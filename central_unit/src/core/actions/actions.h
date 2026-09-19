@@ -3,6 +3,7 @@
 #include "../api/internal_api.h"
 #include "../core.h"
 #include "action_helpers.h"
+#include "common/time/time_provider.h"
 
 #include <unordered_set>
 
@@ -33,6 +34,11 @@ namespace SmartHome {
         friend class DatabaseActions;
 
     public:
+        // TODO consider rework (timeout timer is bound to connection lifecycle and not to request lifecycle, request
+        //      can wait indefinitely on a busy connection)
+        /**
+         * @brief Per-connection state for outgoing request aggregation and lifecycle tracking.
+         */
         struct OutgoingRequestMetadata {
             std::mutex metadataMutex;
             /// Outgoing requests
@@ -40,15 +46,142 @@ namespace SmartHome {
             /// ApiRequest response promise map {ApiRequest.id: shared_ptr<promise<ApiResponse>>}
             std::unordered_map<apiId_t, std::shared_ptr<std::promise<API::ApiResponse> > > requestsPromises;
             /// For aggregating request to send in batch
-            std::shared_ptr<ba::steady_timer> sendTimer = std::make_shared<ba::steady_timer>(
-                Core::Instance().coreIoContext());
+            std::shared_ptr<Time::ISteadyTimer> sendTimer;
             /// Request-level timeout timer
-            std::shared_ptr<ba::steady_timer> timeoutTimer = std::make_shared<ba::steady_timer>(
-                Core::Instance().coreIoContext());
+            std::shared_ptr<Time::ISteadyTimer> timeoutTimer;
+
+            /**
+             * @brief Construct outgoing request metadata with a fresh send and timeout timer.
+             *
+             * @param timeProvider Time provider used to create the aggregation and timeout timers.
+             */
+            explicit OutgoingRequestMetadata(Time::ITimeProvider &timeProvider);
+
+            ~OutgoingRequestMetadata() = default;
+
+            OutgoingRequestMetadata(const OutgoingRequestMetadata &other) = delete;
+
+            OutgoingRequestMetadata &operator=(const OutgoingRequestMetadata &other) = delete;
         };
 
-        /// Callback type for request completion notification
-        using RequestCallback = std::function<void(connectionId_t connectionId, std::string &&response)>;
+        /**
+         * @brief Command registry key for target-method pairs.
+         */
+        struct CommandKey {
+            API::InternalApi::TargetTypes target; ///< Command target component
+            API::InternalApi::MethodTypes action; ///< Command action type
+
+            CommandKey() = default;
+
+            /**
+             * @brief Construct key from target and action types.
+             *
+             * @param newTarget Target component type.
+             * @param newAction Method type.
+             */
+            CommandKey(API::InternalApi::TargetTypes newTarget, API::InternalApi::MethodTypes newAction);
+
+            /**
+             * @brief Extract key from command structure.
+             *
+             * @param command Command to extract key from.
+             */
+            explicit CommandKey(const API::InternalApi::Command &command);
+
+            /// Compare with another CommandKey
+            bool operator==(const CommandKey &other) const;
+        };
+
+        /**
+         * @brief Hash function for CommandKey map usage.
+         */
+        struct CommandKeyHash {
+            /// Calculate hash value for command key.
+            std::size_t operator()(const CommandKey &key) const;
+        };
+
+        /**
+         * @brief Command handler function type.
+         *
+         * @details Handlers receive command metadata and return API response asynchronously.
+         */
+        using CommandHandler = std::function<awaitOptApiResponse(cmdMetaPtr)>;
+
+        using CommandsRegistry = std::unordered_map<CommandKey, CommandHandler, CommandKeyHash>;
+
+        /// InternalApi handler type used for callbacks and forwarding outgoing requests
+        using InternalApiHandler = std::function<void(connectionId_t connectionId, std::string &&response)>;
+
+        /**
+         * @brief Build the default command registry mapping targets/actions to their handlers.
+         *
+         * @return Populated \c CommandsRegistry used when \c Config::commandsRegistry is not overridden.
+         */
+        static CommandsRegistry defaultCommandsRegistry();
+
+        /**
+         * @brief Injectable dependencies and settings required to run \c Actions.
+         */
+        struct Config {
+            /// Returns whether \c Core is currently running, so work is skipped/cancelled during shutdown.
+            std::function<bool()> isCoreRunning;
+
+            /// Logger used for all \c Actions diagnostic output.
+            std::shared_ptr<Utils::Logger> logger;
+
+            /// Executor for \c Core's main event loop - used to dispatch command coroutines and callbacks.
+            ba::any_io_executor coreExecutor;
+
+            /// Executor for \c Core's worker thread pool - used to run command handler work off the main event loop.
+            ba::any_io_executor workerExecutor;
+
+            /// Executor for \c Core's utility thread - used for auxiliary work such as logging and timers.
+            ba::any_io_executor utilityExecutor;
+
+            /// Registry mapping target/action command keys to their handlers.
+            CommandsRegistry commandsRegistry = defaultCommandsRegistry();
+
+            /// Time provider used to create steady timers for requests, commands and aggregation.
+            Time::ITimeProvider &timeProvider;
+
+            /// Callback used to forward aggregated outgoing requests to their destination connection.
+            InternalApiHandler handleOutgoingRequests;
+
+            /**
+             * @brief Verify that every dependency required by Actions is usable.
+             *
+             * @return Nothing on success, otherwise a description of detected problems.
+             *
+             * @note Called by \c Actions::initialize a Config that fails validation is never stored.
+             */
+            [[nodiscard]] std::expected<void, std::string> validate() const;
+        };
+
+        /**
+         * @brief Initializes \c Actions with config values.
+         *
+         * @param config Configuration to validate and store for subsequent \c Actions calls.
+         *
+         * @return Nothing on success, otherwise a description of the validation failure.
+         *
+         * @note Must be called to start handling requests.
+         */
+        static std::expected<void, std::string> initialize(const Config &config);
+
+        /**
+         * @brief Forcefully reset \c Actions state.
+         *
+         * @details Clears all requests, timers and handlers without any further handling.
+         *          Resets configurable variables to default state.
+         */
+        static void reset();
+
+        /**
+         * @brief Retrieves the currently active configuration.
+         *
+         * @return Shared pointer to the active \c Config, or nullptr if \c Actions has not been initialized.
+         */
+        static std::shared_ptr<const Config> getConfig();
 
         /**
          * @brief Process incoming API request.
@@ -59,7 +192,7 @@ namespace SmartHome {
          * @param request Internal API request structure.
          * @param callback Function called when request processing completes.
          */
-        static void handleIncomingRequest(const API::InternalApi::Request &request, const RequestCallback &callback);
+        static void handleIncomingRequest(const API::InternalApi::Request &request, const InternalApiHandler &callback);
 
         /**
          * @brief Send aggregated response for request.
@@ -132,42 +265,6 @@ namespace SmartHome {
 
     private:
         /**
-         * @brief Command registry key for target-method pairs.
-         */
-        struct CommandKey {
-            API::InternalApi::TargetTypes target; ///< Command target component
-            API::InternalApi::MethodTypes action; ///< Command action type
-
-            CommandKey() = default;
-
-            /**
-             * @brief Construct key from target and action types.
-             *
-             * @param newTarget Target component type.
-             * @param newAction Method type.
-             */
-            CommandKey(API::InternalApi::TargetTypes newTarget, API::InternalApi::MethodTypes newAction);
-
-            /**
-             * @brief Extract key from command structure.
-             *
-             * @param command Command to extract key from.
-             */
-            explicit CommandKey(const API::InternalApi::Command &command);
-
-            /// Compare with another CommandKey
-            bool operator==(const CommandKey &other) const;
-        };
-
-        /**
-         * @brief Hash function for CommandKey map usage.
-         */
-        struct CommandKeyHash {
-            /// Calculate hash value for command key.
-            std::size_t operator()(const CommandKey &key) const;
-        };
-
-        /**
          * @brief Request metadata containing all commands and state.
          */
         struct RequestMetadata {
@@ -176,11 +273,11 @@ namespace SmartHome {
             /// Command metadata pointers
             std::vector<cmdMetaPtr> commands;
             /// Request-level timeout timer
-            std::atomic<std::shared_ptr<ba::steady_timer> > requestTimeoutTimer;
+            std::atomic<std::shared_ptr<Time::ISteadyTimer> > requestTimeoutTimer;
             /// Count of incomplete commands
             std::atomic<size_t> pendingCommands;
             /// Completion callback
-            RequestCallback onComplete;
+            InternalApiHandler onComplete;
 
             /**
              * @brief Construct request metadata.
@@ -191,9 +288,9 @@ namespace SmartHome {
              * @param onComplete Callback for request completion.
              */
             RequestMetadata(API::InternalApi::Request request,
-                            std::shared_ptr<ba::steady_timer> requestTimeoutTimer,
+                            std::shared_ptr<Time::ISteadyTimer> requestTimeoutTimer,
                             size_t pendingCommands,
-                            RequestCallback onComplete);
+                            InternalApiHandler onComplete);
 
 
             /**
@@ -204,19 +301,15 @@ namespace SmartHome {
 
 
         /**
-         * @brief Command handler function type.
-         *
-         * @details Handlers receive command metadata and return API response asynchronously.
-         */
-        using CommandHandler = std::function<awaitOptApiResponse(cmdMetaPtr)>;
-
-        /**
          * @brief Lookup command handler from registry.
          *
          * @param command Command to resolve handler for.
+         * @param cfg Active \c Actions configuration.
+         *
          * @return Handler function or nullptr if not found.
          */
-        static CommandHandler resolveCommand(const API::InternalApi::Command &command);
+        static CommandHandler resolveCommand(const API::InternalApi::Command &command,
+                                             const std::shared_ptr<const Config> &cfg);
 
 
         /**
@@ -227,20 +320,23 @@ namespace SmartHome {
          * @param handler Command handler function.
          * @param newCommand Command to execute.
          * @param requestId Parent request identifier.
+         * @param cfg Active \c Actions configuration.
          */
         static void executeCommandAsync(const CommandHandler &handler,
                                         const API::InternalApi::Command &newCommand,
-                                        apiId_t requestId);
+                                        apiId_t requestId, const std::shared_ptr<const Config> &cfg);
 
         /**
          * @brief Coroutine for command processing.
          *
          * @param commandMetadata Command execution metadata.
          * @param handler Command handler function.
+         * @param cfg Active \c Actions configuration.
+         *
          * @return Awaitable void result.
          */
         static ba::awaitable<void> processCommand(cmdMetaPtr commandMetadata,
-                                                  CommandHandler handler);
+                                                  CommandHandler handler, std::shared_ptr<const Config> cfg);
 
 
         /**
@@ -248,16 +344,18 @@ namespace SmartHome {
          *
          * @param commandMetadata Command that completed.
          * @param commandResult Result from command handler.
+         * @param cfg Active \c Actions configuration.
          */
         static void handleCommandResult(const cmdMetaPtr &commandMetadata,
-                                        API::ApiResponse &&commandResult);
+                                        API::ApiResponse &&commandResult, const std::shared_ptr<const Config> &cfg);
 
         /**
          * @brief Handle command timeout expiration.
          *
          * @param commandMetadata Timed-out command metadata.
+         * @param cfg Active \c Actions configuration.
          */
-        static void handleCommandTimeout(const cmdMetaPtr &commandMetadata);
+        static void handleCommandTimeout(const cmdMetaPtr &commandMetadata, const std::shared_ptr<const Config> &cfg);
 
         /**
          * @brief Add command result to response collection.
@@ -274,34 +372,49 @@ namespace SmartHome {
          * @details Decrements pending count and triggers response if complete.
          *
          * @param requestId Request to update.
-         * @param lockMutex Whether to lock mutex (false if already locked).
+         * @param cfg Active \c Actions configuration.
          */
-        static void updateRequestStatus(apiId_t requestId, bool lockMutex = true);
+        static void updateRequestStatus(apiId_t requestId, const std::shared_ptr<const Config> &cfg);
+
+        /**
+         * @brief Update request completion status.
+         *
+         * @details Decrements pending count and triggers response if complete.
+         *
+         * @param requestId Request to update.
+         * @param cfg Active \c Actions configuration.
+         *
+         * @pre \c msActiveRequestsLock must be locked.
+         */
+        static void updateRequestStatusUnlocked(apiId_t requestId, const std::shared_ptr<const Config> &cfg);
 
         /**
          * @brief Handle request timeout expiration.
          *
          * @param requestId Timed-out request identifier.
+         * @param cfg Active \c Actions configuration.
          */
-        static void handleRequestTimeout(apiId_t requestId);
+        static void handleRequestTimeout(apiId_t requestId, const std::shared_ptr<const Config> &cfg);
 
         /**
          * @brief Cleanup request resources.
          *
          * @param requestId Request to cleanup.
+         * @param cfg Active \c Actions configuration.
          */
-        static void cleanupRequest(apiId_t requestId);
+        static void cleanupRequest(apiId_t requestId, const std::shared_ptr<const Config> &cfg);
 
-
-        /// Registry mapping command keys to handler functions
-        static std::unordered_map<CommandKey, CommandHandler, CommandKeyHash> msCommandsRegistry;
+        /// Currently active configuration, set by \c initialize and cleared by \c reset.
+        static std::atomic<std::shared_ptr<const Config> > mspConfig;
 
         /// Active request tracking map
         static std::unordered_map<apiId_t, RequestMetadata> msActiveRequests;
         /// Mutex for active requests map access
         static std::mutex msActiveRequestsLock;
 
+        /// Per-connection outgoing request aggregation state
         static std::unordered_map<connectionId_t, std::shared_ptr<OutgoingRequestMetadata> > msOutgoingRequests;
+        /// Mutex for outgoing requests map access
         static std::mutex msOutgoingRequestsLock;
 
         /// Response collection map
@@ -309,10 +422,14 @@ namespace SmartHome {
         /// Mutex for responses map access
         static std::mutex msResponsesLock;
 
+        /// Maps connection IDs to their target component type
         static std::unordered_map<connectionId_t, sai::TargetTypes> msConnectionsMap;
+        /// Mutex for connections map access
         static std::shared_mutex msConnectionsMapLock;
 
+        /// Maps target component type to the set of connection IDs of that type
         static std::unordered_map<sai::TargetTypes, std::unordered_set<connectionId_t> > msConnectionTypeMap;
+        /// Mutex for connection type map access
         static std::shared_mutex msConnectionTypeMapLock;
 
         /// After not adding new messages to send for timeout duration, send aggregated batch message.

@@ -50,7 +50,7 @@ namespace SmartHome {
 
         const auto type = ActionHelpers::requireType(*pParams);
         if (!type.has_value()) {
-            commandResult.error = params.error();
+            commandResult.error = type.error();
             co_return commandResult;
         }
 
@@ -94,7 +94,7 @@ namespace SmartHome {
 
         const auto type = ActionHelpers::requireType(*pParams);
         if (!type.has_value()) {
-            commandResult.error = params.error();
+            commandResult.error = type.error();
             co_return commandResult;
         }
 
@@ -334,7 +334,7 @@ namespace SmartHome {
         API::ApiResponse handlerResult;
         handlerResult.id = pCommandMetadata->command.commandId;
 
-        const auto deviceId = ActionHelpers::resolveDeviceId(*pParams);
+        const auto deviceId = ActionHelpers::resolveDeviceId(*pParams, Core::Instance().configCache());
         if (!deviceId.has_value()) {
             handlerResult.error = deviceId.error();
             co_return handlerResult;
@@ -359,7 +359,7 @@ namespace SmartHome {
         API::ApiResponse handlerResult;
         handlerResult.id = pCommandMetadata->command.commandId;
 
-        const auto deviceId = ActionHelpers::resolveDeviceId(*pParams);
+        const auto deviceId = ActionHelpers::resolveDeviceId(*pParams, Core::Instance().configCache());
         if (!deviceId.has_value()) {
             handlerResult.error = deviceId.error();
             co_return handlerResult;
@@ -553,7 +553,7 @@ namespace SmartHome {
             }
             entityId = moduleId.value();
         } else {
-            const auto deviceId = ActionHelpers::resolveDeviceId(*pParams);
+            const auto deviceId = ActionHelpers::resolveDeviceId(*pParams, Core::Instance().configCache());
             if (!deviceId.has_value()) {
                 handlerResult.error = deviceId.error();
                 co_return handlerResult;
@@ -592,7 +592,7 @@ namespace SmartHome {
         API::ApiResponse handlerResult;
         handlerResult.id = pCommandMetadata->command.commandId;
 
-        const auto deviceId = ActionHelpers::resolveDeviceId(*pParams);
+        const auto deviceId = ActionHelpers::resolveDeviceId(*pParams, Core::Instance().configCache());
         if (!deviceId.has_value()) {
             handlerResult.error = deviceId.error();
             co_return handlerResult;
@@ -870,7 +870,7 @@ namespace SmartHome {
             co_return handlerResult;
         }
 
-        const auto deviceId = ActionHelpers::resolveDeviceId(*pParams);
+        const auto deviceId = ActionHelpers::resolveDeviceId(*pParams, Core::Instance().configCache());
         if (!deviceId.has_value()) {
             handlerResult.error = deviceId.error();
             co_return handlerResult;
@@ -1019,7 +1019,7 @@ namespace SmartHome {
         nlohmann::json &&value) {
         Core::Instance().mpLogger->debugf("[CORE_ACTIONS] [UPDATE_DEVICE] called");
 
-        const auto deviceId = ActionHelpers::resolveDeviceId(*pParams);
+        const auto deviceId = ActionHelpers::resolveDeviceId(*pParams, Core::Instance().configCache());
         if (!deviceId)
             co_return std::unexpected(deviceId.error());
 

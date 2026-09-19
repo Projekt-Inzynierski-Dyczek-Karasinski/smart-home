@@ -127,7 +127,7 @@ namespace SmartHome::API {
         return type == other;
     }
 
-
+    // TODO Rework Command constructors (normalize params value check)
     InternalApi::Command::Command(const ApiRequest &value) {
         // Throws if method string is invalid
         auto [targetStr, methodStr] = parseTargetMethodString(value.method);
@@ -226,7 +226,7 @@ namespace SmartHome::API {
                     } catch (const std::exception &exception) {
                         // On parse error push command with unknown Method and Target with ApiError in params so it is
                         // handled and send back as a part of batch response on request completion
-                        requestStruct.commands.emplace_back(
+                        Command errorCommand(
                             ApiError(
                                 ErrorCodes::PARSE_ERROR,
                                 errorCodeToString(ErrorCodes::PARSE_ERROR).data(),
@@ -235,6 +235,14 @@ namespace SmartHome::API {
                             ApiId(nullptr),
                             Method(MethodTypes::UNKNOWN),
                             Target(TargetTypes::UNKNOWN));
+
+                        /**
+                         * FIXME TEMPORARY FIX - rework InternalApi structs after adding unit tests
+                         *  Rework Command struct, consider isErrorMessage flag which ignores isNotification
+                         *  Parse error is not a notification, it must receive a response with null id per JSON-RPC doc
+                         */
+                        errorCommand.isNotification = false;
+                        requestStruct.commands.push_back(std::move(errorCommand));
 
                         pLogger->error(
                             "[INTERNAL_API] [HANDLE_INCOMING] JSON-RPC batch request parse error: " +
@@ -300,7 +308,8 @@ namespace SmartHome::API {
                 try {
                     connection->writeAsync(std::move(message));
                 } catch (const std::exception &e) {
-                    Core::Instance().mpLogger->errorf("[INTERNAL_API] [HANDLE_OUTGOING] async write failed: %s", e.what());
+                    Core::Instance().mpLogger->errorf("[INTERNAL_API] [HANDLE_OUTGOING] async write failed: %s",
+                                                      e.what());
                 }
             }
         });
