@@ -2,7 +2,7 @@
 #include "actions/actions.h"
 #include "common/time/testing/fake_time_provider.h"
 
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 namespace SmartHome::Tests {
     class ActionsTest : public ::testing::Test {
