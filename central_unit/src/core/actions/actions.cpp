@@ -450,8 +450,6 @@ namespace SmartHome {
             timer->asyncWait([commandMetadata, cfg](const std::error_code &ec) {
                 if (!ec) {
                     handleCommandTimeout(commandMetadata, cfg);
-                } else {
-                    commandMetadata->cancel();
                 }
             });
         }

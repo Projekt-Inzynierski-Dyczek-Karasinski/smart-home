@@ -1014,5 +1014,37 @@ namespace SmartHome::Tests {
         EXPECT_EQ(first.get().result, resultValue);
     }
 
+    TEST_F(ActionsTest, CommandTimerRearmDoesNotCancelCommand) {
+        auto stalling = makeStallingHandler(true);
+        ASSERT_NO_FATAL_FAILURE(initActions({
+            {{sai::TargetTypes::CORE, sai::MethodTypes::GET},
+            [stalling](const cmdMetaPtr pCmdMeta) -> awaitOptApiResponse {
+            Actions::startCommandTimeoutTimer(pCmdMeta); // re-armed inside stalling handler
+            co_return co_await stalling(pCmdMeta);
+            }}
+            }));
+
+        receiveIncomingRequest({makeCommand("core.get", {{"value", 2}}, 1)});
+        ASSERT_GT(drain(), 0) << "handler did not start";
+        EXPECT_EQ(mHandlersExecutedCounter, 1);
+
+        // Deliver operation_canceled from the re-arm while the handler is still running
+        mTimeProvider.poll();
+        drain();
+        EXPECT_TRUE(mCapturedOutgoingResponses.empty()) << "response before handler finished";
+
+        mReleaseSignal.cancel();
+        ASSERT_GT(drain(), 0) << "stalled handler did not finish";
+
+        API::ApiResponse response;
+        ASSERT_NO_FATAL_FAILURE(expectSingleParsedResponse(response));
+        EXPECT_FALSE(response.error.has_value()) << "aborted command timer must not cancel the command";
+        EXPECT_EQ(response.result, "released");
+
+        mTimeProvider.advanceBy(msREQUEST_TIMEOUT_TESTS + 1s);
+        drain();
+        EXPECT_EQ(mCapturedOutgoingResponses.size(), 1) << "request timeout produced a second response";
+    }
+
     // endregion
 }
