@@ -468,9 +468,11 @@ namespace SmartHome::API {
     /**
      * @brief Get next unique API identifier.
      *
-     * @return Next unique API identifier.
+     * @return Next unique API identifier. Never returns 0, the first identifier is 1.
      *
-     * @note Starts from 1, and wraps around to 1 after reaching maximum value of apiId_t.
+     * @note Thread-safe and lock-free.
+     * @note Identifiers are unique for the lifetime of the process
+     *       (64-bit counter, overflow is not reachable in practice).
      */
     apiId_t getNextApiId();
 

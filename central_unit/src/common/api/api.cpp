@@ -492,13 +492,16 @@ namespace SmartHome::API {
         }
     }
 
+    static_assert(std::is_same_v<apiId_t, std::uint64_t>,
+                  "API::getNextApiId() relies on 64-bit apiId_t to make wrap-around practically impossible. "
+                  "Modify the implementation if the type changes");
+
+    static_assert(std::atomic<apiId_t>::is_always_lock_free,
+                  "Unsupported platform: std::atomic<apiId_t> must be lock-free, "
+                  "as required by the current API::getNextApiId() implementation");
+
     apiId_t getNextApiId() {
         static std::atomic<apiId_t> id = 1;
-        apiId_t expected = std::numeric_limits<apiId_t>::max(); // Wrap around check
-        // Set to 1 after wrap around
-        if (id.compare_exchange_strong(expected, 1, std::memory_order::relaxed)) [[unlikely]] {
-            return expected; // Return max value before wrap around
-        }
         return id.fetch_add(1, std::memory_order::relaxed);
     }
 }
