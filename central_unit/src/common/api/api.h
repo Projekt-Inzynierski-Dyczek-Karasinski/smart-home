@@ -12,7 +12,6 @@ namespace SmartHome::JsonRpcStrings {
     /// JSON-RPC 2.0 protocol constants
     namespace Constants {
         inline constexpr std::string_view VERSION = "2.0";
-        inline constexpr std::string_view NULL_VALUE = "null";
     }
 
     /// Common JSON-RPC keys

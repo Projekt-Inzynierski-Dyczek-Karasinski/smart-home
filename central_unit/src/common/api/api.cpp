@@ -37,25 +37,29 @@ namespace SmartHome::API {
         nlohmann::json result;
 
         if (hasValue()) result[JsonRpcStrings::Keys::ID] = mValue;
-        else result[JsonRpcStrings::Keys::ID] = JsonRpcStrings::Constants::NULL_VALUE;
-
+        else result[JsonRpcStrings::Keys::ID] = nullptr;
         return result;
     }
 
     ApiId ApiId::fromJson(const nlohmann::json &json) {
-        const auto iter = json.find(JsonRpcStrings::Keys::ID);
-        if (iter == json.end()) {
+        if (!json.contains(JsonRpcStrings::Keys::ID)) {
             mState = State::UNDEFINED;
-        } else if (iter->is_number() && iter.value() != nullptr) {
-            mValue = json[JsonRpcStrings::Keys::ID];
-            mState = State::HAS_VALUE;
-        } else if (iter->is_string() && iter.value() == JsonRpcStrings::Constants::NULL_VALUE ||
-                   iter.value() == nullptr) {
-            mState = State::NULL_VALUE;
-        } else {
-            throw std::runtime_error("Cannot cast json to ApiId - Invalid ID value");
+            return *this;
         }
-        return *this;
+
+        const auto &idJson = json.at(JsonRpcStrings::Keys::ID);
+
+        if (idJson.is_null()) {
+            mState = State::NULL_VALUE;
+            return *this;
+        }
+        if (idJson.is_number_integer()) {
+            mState = State::HAS_VALUE;
+            mValue = idJson.get<apiId_t>();
+            return *this;
+        }
+
+        throw std::runtime_error("Cannot cast json to ApiId - Invalid ID value");
     }
 
     ApiId &ApiId::operator=(const apiId_t value) {
@@ -203,7 +207,7 @@ namespace SmartHome::API {
         jsonrpc = json[JsonRpcStrings::Keys::JSONRPC];
         method = json[JsonRpcStrings::RequestKeys::METHOD];
         if (json.contains(JsonRpcStrings::RequestKeys::PARAMS)) params = json[JsonRpcStrings::RequestKeys::PARAMS];
-        if (json.contains(JsonRpcStrings::Keys::ID)) id = json[JsonRpcStrings::Keys::ID];
+        id.fromJson(json);
     }
 
     void ApiRequest::setValues(const std::string_view string) {
@@ -309,12 +313,7 @@ namespace SmartHome::API {
         else throw std::invalid_argument("Invalid JSON-RPC request: response must contain either result or error");
 
         jsonrpc = json[JsonRpcStrings::Keys::JSONRPC];
-        auto &idJson = json[JsonRpcStrings::Keys::ID];
-        if (idJson.is_number()) {
-            id = idJson.get<int>();
-        } else if (idJson == nullptr || idJson.is_null()) {
-            id = nullptr;
-        }
+        id.fromJson(json);
     }
 
     std::string getTargetMethodString(std::string_view target, std::string_view method) {
