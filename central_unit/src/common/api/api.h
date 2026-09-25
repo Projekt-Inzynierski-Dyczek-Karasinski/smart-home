@@ -169,6 +169,8 @@ namespace SmartHome::API {
 
         /// Assign null value to ID
         ApiId &operator=(std::nullptr_t);
+
+        bool operator==(const ApiId &) const = default;
     };
 
     /**
@@ -196,6 +198,8 @@ namespace SmartHome::API {
     struct ApiError {
         ErrorCodes code = ErrorCodes::NO_ERROR; ///< JSON-RPC error code
         std::string message; ///< Message explaining error code
+        // TODO consider changing data field to JSON
+        //      as JSON-RPC error data field is specified as primitive or structured value
         std::string data; ///< Optional additional error data
 
         ApiError() = default;
