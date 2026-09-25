@@ -42,6 +42,7 @@ namespace SmartHome::API {
     }
 
     ApiId ApiId::fromJson(const nlohmann::json &json) {
+        *this = ApiId();
         if (!json.contains(JsonRpcStrings::Keys::ID)) {
             mState = State::UNDEFINED;
             return *this;
@@ -109,6 +110,7 @@ namespace SmartHome::API {
     }
 
     void ApiError::setValues(nlohmann::json json) {
+        clear();
         char errorMessage[ERROR_MESSAGE_BUFFER_SIZE];
         if (!json.contains(JsonRpcStrings::ErrorKeys::CODE)) {
             sprintf(errorMessage, "Invalid JSON-RPC error: missing '%s' field",
@@ -136,6 +138,11 @@ namespace SmartHome::API {
         message = json[JsonRpcStrings::ErrorKeys::MESSAGE].get<std::string>();
         if (json.contains(JsonRpcStrings::ErrorKeys::DATA) && json[JsonRpcStrings::ErrorKeys::DATA].is_string())
             data = json[JsonRpcStrings::ErrorKeys::DATA].get<std::string>();
+
+    void ApiError::clear() {
+        code = ErrorCodes::NO_ERROR;
+        message = "";
+        data = "";
     }
 
     ApiRequest::ApiRequest(const nlohmann::json &value) {
@@ -180,6 +187,7 @@ namespace SmartHome::API {
     }
 
     void ApiRequest::setValues(const nlohmann::json &json) {
+        clear();
         char errorMessage[ERROR_MESSAGE_BUFFER_SIZE];
         if (!json.contains(JsonRpcStrings::Keys::JSONRPC)) {
             sprintf(errorMessage, "Invalid JSON-RPC request: missing '%s' field",
@@ -211,6 +219,7 @@ namespace SmartHome::API {
     }
 
     void ApiRequest::setValues(const std::string_view string) {
+        clear();
         std::vector<std::string> splitRequest = {};
         boost::split(splitRequest, string, boost::is_any_of(" "), boost::token_compress_on);
 
@@ -244,6 +253,13 @@ namespace SmartHome::API {
                 }
             }
         }
+    }
+
+    void ApiRequest::clear() {
+        jsonrpc.clear();
+        method.clear();
+        params.reset();
+        id = ApiId();
     }
 
     ApiResponse::ApiResponse(const nlohmann::json &json) {
@@ -289,6 +305,7 @@ namespace SmartHome::API {
     }
 
     void ApiResponse::setValues(const nlohmann::json &json) {
+        clear();
         if (!(json.contains(JsonRpcStrings::Keys::JSONRPC) &&
               json[JsonRpcStrings::Keys::JSONRPC].get<std::string>() == JsonRpcStrings::Constants::VERSION.data())) {
             char errorMessage[256];
@@ -314,6 +331,13 @@ namespace SmartHome::API {
 
         jsonrpc = json[JsonRpcStrings::Keys::JSONRPC];
         id.fromJson(json);
+    }
+
+    void ApiResponse::clear() {
+        jsonrpc.clear();
+        result.reset();
+        error.reset();
+        id = ApiId();
     }
 
     std::string getTargetMethodString(std::string_view target, std::string_view method) {

@@ -262,6 +262,8 @@ namespace SmartHome::API {
          * @throws std::invalid_argument Throws invalid argument when passed JSON object is not in JSON-RPC 2.0 error format
          */
         void setValues(nlohmann::json json);
+
+        void clear();
     };
 
     /**
@@ -326,6 +328,8 @@ namespace SmartHome::API {
          * @throws std::invalid_argument Throws invalid argument when passed string does not contain target and method.
          */
         void setValues(std::string_view string);
+
+        void clear();
     };
 
 
@@ -380,6 +384,8 @@ namespace SmartHome::API {
          * @throws std::invalid_argument Throws invalid argument when passed JSON object is not in JSON-RPC 2.0 format.
          */
         void setValues(const nlohmann::json &json);
+
+        void clear();
     };
 
 
