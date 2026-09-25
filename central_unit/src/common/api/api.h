@@ -481,7 +481,4 @@ namespace SmartHome::API {
      *       (64-bit counter, overflow is not reachable in practice).
      */
     apiId_t getNextApiId();
-
-    /// Buffer size for error message formatting
-    inline constexpr uint16_t ERROR_MESSAGE_BUFFER_SIZE = 1024;
 }
