@@ -212,7 +212,7 @@ namespace SmartHome::API {
         if (!json.contains(jrqk::METHOD)) {
             throw std::invalid_argument(errPrefix + "missing '"s.append(jrqk::METHOD).append("' field"));
         }
-        const auto methodJson = json[jrqk::METHOD];
+        const auto &methodJson = json[jrqk::METHOD];
         if (!methodJson.is_string() || methodJson.get<std::string>().empty()) {
             throw std::invalid_argument(errPrefix + "'"s.append(jrqk::METHOD).append("' must be a non-empty string"));
         }
