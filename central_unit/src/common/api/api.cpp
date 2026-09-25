@@ -10,6 +10,9 @@
 namespace SmartHome::API {
     using namespace std::string_literals;
 
+    namespace jk = JsonRpcStrings::Keys;
+    namespace jek = JsonRpcStrings::ErrorKeys;
+
     ApiId::ApiId(const apiId_t value) : mState(State::HAS_VALUE), mValue(value) {
     }
 
@@ -114,33 +117,35 @@ namespace SmartHome::API {
 
     void ApiError::setValues(nlohmann::json json) {
         clear();
-        char errorMessage[ERROR_MESSAGE_BUFFER_SIZE];
-        if (!json.contains(JsonRpcStrings::ErrorKeys::CODE)) {
-            sprintf(errorMessage, "Invalid JSON-RPC error: missing '%s' field",
-                    JsonRpcStrings::ErrorKeys::CODE.data());
-            throw std::invalid_argument(errorMessage);
-        }
-        if (!json[JsonRpcStrings::ErrorKeys::CODE].is_number_integer()) {
-            sprintf(errorMessage, "Invalid JSON-RPC error: '%s' must be integer",
-                    JsonRpcStrings::ErrorKeys::CODE.data());
-            throw std::invalid_argument(errorMessage);
-        }
+        constexpr auto errPrefix = "Invalid JSON-RPC error: ";
 
-        if (!json.contains(JsonRpcStrings::ErrorKeys::MESSAGE)) {
-            sprintf(errorMessage, "Invalid JSON-RPC error: missing '%s' field",
-                    JsonRpcStrings::ErrorKeys::MESSAGE.data());
-            throw std::invalid_argument(errorMessage);
+        if (!json.contains(jek::CODE)) {
+            throw std::invalid_argument(errPrefix + "missing '"s.append(jek::CODE).append("' field"));
         }
-        if (json[JsonRpcStrings::ErrorKeys::MESSAGE].get<std::string>().empty()) {
-            sprintf(errorMessage, "Invalid JSON-RPC error: '%s' cannot be empty",
-                    JsonRpcStrings::ErrorKeys::MESSAGE.data());
-            throw std::invalid_argument(errorMessage);
+        const auto codeJson = json[jek::CODE];
+        if (!codeJson.is_number_integer()) {
+            throw std::invalid_argument(errPrefix + "missing '"s.append(jek::CODE).append("' must be integer"));
         }
+        code = static_cast<ErrorCodes>(codeJson.get<int>());
 
-        code = static_cast<ErrorCodes>(json[JsonRpcStrings::ErrorKeys::CODE].get<int>());
-        message = json[JsonRpcStrings::ErrorKeys::MESSAGE].get<std::string>();
-        if (json.contains(JsonRpcStrings::ErrorKeys::DATA) && json[JsonRpcStrings::ErrorKeys::DATA].is_string())
-            data = json[JsonRpcStrings::ErrorKeys::DATA].get<std::string>();
+        if (!json.contains(jek::MESSAGE)) {
+            throw std::invalid_argument(errPrefix + "missing '"s.append(jek::MESSAGE).append("' field"));
+        }
+        const auto messageJson = json[jek::MESSAGE];
+        if (!messageJson.is_string() || messageJson.get<std::string>().empty()) {
+            throw std::invalid_argument(
+                errPrefix + "missing '"s.append(jek::MESSAGE).append("' must be a non-empty string"));
+        }
+        message = messageJson.get<std::string>();
+
+        if (json.contains(jek::DATA)) {
+            if (const auto &dataJson = json[jek::DATA]; dataJson.is_string()) {
+                data = dataJson.get<std::string>();
+                return;
+            }
+            throw std::invalid_argument("Invalid JSON-RPC error: '"s.append(jek::DATA).append("' must be a string"));
+        }
+    }
 
     void ApiError::clear() {
         code = ErrorCodes::NO_ERROR;
