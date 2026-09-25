@@ -80,7 +80,10 @@ namespace SmartHome::API {
     }
 
     ApiError::ApiError(const std::string_view value) {
-        setValues(nlohmann::json::parse(value));
+        const auto parsedValue = nlohmann::json::parse(value, nullptr, false);
+        if (parsedValue.is_discarded())
+            throw std::invalid_argument("ApiError parsing failed: string was not a valid JSON");
+        setValues(parsedValue);
     }
 
     ApiError::ApiError(const ErrorCodes newCode, const std::string_view newMessage, const std::string_view newData) {
@@ -150,11 +153,9 @@ namespace SmartHome::API {
     }
 
     ApiRequest::ApiRequest(std::string_view value) {
-        if (nlohmann::json::accept(value)) {
-            setValues(nlohmann::json::parse(value));
-        } else {
-            setValues(value);
-        }
+        const auto parsedValue = nlohmann::json::parse(value, nullptr, false);
+        if (parsedValue.is_discarded()) setValues(value);
+        else setValues(parsedValue);
     }
 
     nlohmann::json ApiRequest::to_json() const {
@@ -178,11 +179,9 @@ namespace SmartHome::API {
     }
 
     ApiRequest ApiRequest::operator()(std::string_view value) {
-        if (nlohmann::json::accept(value)) {
-            setValues(nlohmann::json::parse(value));
-        } else {
-            setValues(value);
-        }
+        const auto parsedValue = nlohmann::json::parse(value, nullptr, false);
+        if (parsedValue.is_discarded()) setValues(value);
+        else setValues(parsedValue);
         return *this;
     }
 
@@ -271,9 +270,12 @@ namespace SmartHome::API {
 
         json[JsonRpcStrings::Keys::JSONRPC] = jsonrpc;
         if (result.has_value()) {
-            if (nlohmann::json::accept(result.value()))
-                json[JsonRpcStrings::ResponseKeys::RESULT] = nlohmann::json::parse(result.value());
-            else json[JsonRpcStrings::ResponseKeys::RESULT] = result.value();
+            const auto parsedValue = nlohmann::json::parse(result.value(), nullptr, false);
+            if (parsedValue.is_discarded()) {
+                json[JsonRpcStrings::ResponseKeys::RESULT] = result.value();
+            } else {
+                json[JsonRpcStrings::ResponseKeys::RESULT] = parsedValue;
+            }
         } else if (error.has_value()) {
             json[JsonRpcStrings::ResponseKeys::ERROR] = error.value().to_json();
         } else {
@@ -299,8 +301,10 @@ namespace SmartHome::API {
     }
 
     ApiResponse ApiResponse::operator()(std::string_view value) {
-        const nlohmann::json json = nlohmann::json::parse(value);
-        setValues(json);
+        const auto parsedValue = nlohmann::json::parse(value, nullptr, false);
+        if (parsedValue.is_discarded())
+            throw std::invalid_argument("ApiResponsee parsing failed: string was not a valid JSON");
+        setValues(parsedValue);
         return *this;
     }
 
@@ -497,22 +501,15 @@ namespace SmartHome::API {
             throw std::invalid_argument("Invalid raw string request: empty key in key=value parameter");
         }
 
-        bool isJsonParseSuccessful = false;
-        //Check for an JSON object
-        if (nlohmann::json::accept(value)) {
-            try {
-                params[std::string(key)] = nlohmann::json::parse(value);
-                isJsonParseSuccessful = true;
-            } catch (...) {
-            }
-        }
-        // Check for a value list
-        if (!isJsonParseSuccessful && value.find(',') != std::string_view::npos) {
+        const auto parsedValue = nlohmann::json::parse(value, nullptr, false);
+        if (parsedValue.is_discarded() && value.find(',') != std::string_view::npos) {
             std::vector<std::string> values;
             boost::split(values, value, boost::is_any_of(","));
-            params[std::string(key)] = parseVector(values);
-        } else if (!isJsonParseSuccessful) {
-            params[std::string(key)] = parseValue(value);
+            params[key] = parseVector(values);
+        } else if (parsedValue.is_discarded()) {
+            params[key] = parseValue(value);
+        } else {
+            params[key] = parsedValue;
         }
     }
 
