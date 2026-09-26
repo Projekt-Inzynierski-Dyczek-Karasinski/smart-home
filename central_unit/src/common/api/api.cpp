@@ -151,8 +151,8 @@ namespace SmartHome::API {
 
     void ApiError::clear() {
         code = ErrorCodes::NO_ERROR;
-        message = "";
-        data = "";
+        message.clear();
+        data.clear();
     }
 
     ApiRequest::ApiRequest(const nlohmann::json &value) {
