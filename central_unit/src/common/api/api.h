@@ -275,6 +275,9 @@ namespace SmartHome::API {
          */
         void setValues(nlohmann::json json);
 
+        /**
+         * @brief Resets struct fields to default values.
+         */
         void clear();
     };
 
@@ -345,6 +348,9 @@ namespace SmartHome::API {
          */
         void setValues(std::string_view string);
 
+        /**
+         * @brief Resets struct fields to default values.
+         */
         void clear();
     };
 
@@ -408,6 +414,9 @@ namespace SmartHome::API {
          */
         void setValues(const nlohmann::json &json);
 
+        /**
+         * @brief Resets struct fields to default values.
+         */
         void clear();
     };
 
