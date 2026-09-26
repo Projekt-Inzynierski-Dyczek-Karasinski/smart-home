@@ -52,6 +52,7 @@ endfunction()
 
 # Tests subdirectories
 add_subdirectory(core)
+add_subdirectory(common)
 
 
 # All tests in one target

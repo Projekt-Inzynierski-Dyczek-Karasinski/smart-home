@@ -12,7 +12,6 @@ namespace SmartHome::JsonRpcStrings {
     /// JSON-RPC 2.0 protocol constants
     namespace Constants {
         inline constexpr std::string_view VERSION = "2.0";
-        inline constexpr std::string_view NULL_VALUE = "null";
     }
 
     /// Common JSON-RPC keys
@@ -108,14 +107,14 @@ namespace SmartHome::API {
         ApiId() = default;
 
         /**
-         * @brief Sets numeric value for ApiId.
+         * @brief Construct ID with numeric value.
          *
          * @param value Numeric value to set ID to.
          */
         explicit ApiId(apiId_t value);
 
         /**
-         * @brief Sets numeric value to null.
+         * @brief Construct ID with null value.
          */
         explicit ApiId(std::nullptr_t);
 
@@ -144,6 +143,7 @@ namespace SmartHome::API {
          * @brief Get numeric value of ID.
          *
          * @return Stored ID value.
+         *
          * @throws std::runtime_error If ID has no value.
          */
         [[nodiscard]] apiId_t value() const;
@@ -151,17 +151,24 @@ namespace SmartHome::API {
         /**
          * @brief Convert ID to JSON object.
          *
-         * @return JSON object with id field.
+         * @return JSON object with id field, null ID is serialized as JSON null.
+         *
          * @throws std::runtime_error If ID is undefined.
          */
         [[nodiscard]] nlohmann::json toJson() const;
 
+        // TODO reject negative integers (currently wrapped to apiId_t)
         /**
          * @brief Parse ID from JSON object.
          *
-         * @param json JSON object to parse.
-         * @return Reference to this object.
-         * @throws std::runtime_error If JSON contains invalid ID value.
+         * @details Resets previous state. Missing 'id' field results in undefined ID,
+         *          JSON null in null ID and integer in numeric ID.
+         *
+         * @param json JSON object containing optional id field.
+         *
+         * @return Copy of this object after update.
+         *
+         * @throws std::runtime_error If 'id' field is neither null nor an integer.
          */
         ApiId fromJson(const nlohmann::json &json);
 
@@ -170,6 +177,8 @@ namespace SmartHome::API {
 
         /// Assign null value to ID
         ApiId &operator=(std::nullptr_t);
+
+        bool operator==(const ApiId &) const = default;
     };
 
     /**
@@ -197,7 +206,9 @@ namespace SmartHome::API {
     struct ApiError {
         ErrorCodes code = ErrorCodes::NO_ERROR; ///< JSON-RPC error code
         std::string message; ///< Message explaining error code
-        std::string data; ///< Optional additional error data
+        // TODO consider changing data field to JSON
+        //      as JSON-RPC error data field is specified as primitive or structured value
+        std::string data; ///< Optional additional error data, only string values are supported
 
         ApiError() = default;
 
@@ -206,7 +217,6 @@ namespace SmartHome::API {
          *
          * @param value JSON object containing error fields.
          *
-         * @throws nlohmann::json::parse_error Throws parse error on failed parse.
          * @throws std::invalid_argument Throws invalid argument when passed JSON object is not in JSON-RPC 2.0 error format.
          */
         explicit ApiError(const nlohmann::json &value);
@@ -216,7 +226,7 @@ namespace SmartHome::API {
          *
          * @param value JSON string containing error object.
          *
-         * @throws nlohmann::json::parse_error Throws parse error on failed parse.
+         * @throws std::invalid_argument When string is not a valid JSON or not in JSON-RPC 2.0 error format.
          * @throws std::invalid_argument Throws invalid argument when passed JSON string is not in JSON-RPC 2.0 error format.
          */
         explicit ApiError(std::string_view value);
@@ -260,9 +270,15 @@ namespace SmartHome::API {
          * @brief Setter for struct variables.
          *
          * @param json JSON object to parse.
+         *
          * @throws std::invalid_argument Throws invalid argument when passed JSON object is not in JSON-RPC 2.0 error format
          */
         void setValues(nlohmann::json json);
+
+        /**
+         * @brief Resets struct fields to default values.
+         */
+        void clear();
     };
 
     /**
@@ -282,7 +298,7 @@ namespace SmartHome::API {
          *
          * @param value JSON object containing request fields.
          *
-         * @throws nlohmann::json::parse_error Throws parse error on failed parse.
+         * @throws std::runtime_error When id is neither null nor an integer.
          * @throws std::invalid_argument Throws invalid argument when passed JSON object is not in JSON-RPC 2.0 format.
          */
         explicit ApiRequest(const nlohmann::json &value);
@@ -291,13 +307,15 @@ namespace SmartHome::API {
          * @brief Construct request from string (JSON or raw format).
          *
          * @details Accepts either JSON-RPC formatted string or space-separated raw format:
-         *          "target method [params...]"
+         *          "target.method [params...]" or "target method [params...]".
+         *          Strings that are not a valid JSON are parsed as raw format.
+         *          Raw format request always has params object and a new ID from \c getNextApiId().
          *
          * @param value JSON string or raw command string.
          *
-         * @throws nlohmann::json::parse_error Throws parse error on failed parse.
          * @throws std::invalid_argument Throws invalid argument when passed JSON string is not in JSON-RPC 2.0 format
          *         or raw string formated request does not contain target and method.
+         * @throws std::runtime_error When id is neither null nor an integer.
          */
         explicit ApiRequest(std::string_view value);
 
@@ -305,10 +323,10 @@ namespace SmartHome::API {
 
         [[nodiscard]] std::string to_string() const;
 
-        /// Update request from JSON object.
+        /// Replace request contents with parsed value (same rules and exceptions as constructor).
         ApiRequest operator()(const nlohmann::json &value);
 
-        /// Update request from string.
+        /// Replace request contents with parsed value (same rules and exceptions as constructor).
         ApiRequest operator()(std::string_view value);
 
     private:
@@ -316,6 +334,7 @@ namespace SmartHome::API {
          * @brief Setter for struct variables.
          *
          * @param json Json object to parse.
+         *
          * @throws std::invalid_argument Throws invalid argument when passed JSON object is not in JSON-RPC 2.0 format.
          */
         void setValues(const nlohmann::json &json);
@@ -324,9 +343,15 @@ namespace SmartHome::API {
          * @brief Setter for struct variables.
          *
          * @param string Raw string formatted request.
+         *
          * @throws std::invalid_argument Throws invalid argument when passed string does not contain target and method.
          */
         void setValues(std::string_view string);
+
+        /**
+         * @brief Resets struct fields to default values.
+         */
+        void clear();
     };
 
 
@@ -335,7 +360,7 @@ namespace SmartHome::API {
      */
     struct ApiResponse {
         std::string jsonrpc = JsonRpcStrings::Constants::VERSION.data(); ///< JSON-RPC version
-        std::optional<std::string> result; ///< Result string or JSON object stored as string
+        std::optional<std::string> result; ///< String result stored as-is, other JSON values stored serialized
         std::optional<ApiError> error; ///< Error object if request failed
         ApiId id; ///< Response identifier matching request
 
@@ -347,6 +372,7 @@ namespace SmartHome::API {
          *
          * @param json nlohmann::json object to be parsed into ApiResponse.
          *
+         * @throws std::runtime_error When id is neither null nor an integer.
          * @throws std::invalid_argument Throws invalid argument when passed JSON object is not in JSON-RPC 2.0 format.
          */
         explicit ApiResponse(const nlohmann::json &json);
@@ -355,7 +381,11 @@ namespace SmartHome::API {
          * @brief Convert response to JSON object.
          *
          * @return JSON object representation of response.
+         *
+         * @note Undefined id is omitted from output.
+         *
          * @throws std::invalid_argument If neither result nor error is set.
+         * @throws std::invalid_argument If id is undefined.
          */
         [[nodiscard]] nlohmann::json to_json() const;
 
@@ -363,14 +393,16 @@ namespace SmartHome::API {
          * @brief Convert response to JSON string.
          *
          * @return JSON string representation of response.
+         *
          * @throws std::invalid_argument If neither result nor error is set.
+         * @throws std::invalid_argument If id is undefined.
          */
         [[nodiscard]] std::string to_string() const;
 
-        /// Update response from JSON object.
+        /// Replace response contents with parsed value (same rules and exceptions as constructor).
         ApiResponse operator()(const nlohmann::json &value);
 
-        /// Update response from JSON string.
+        /// Replace response contents with parsed value (same rules and exceptions as constructor).
         ApiResponse operator()(std::string_view value);
 
     private:
@@ -381,6 +413,11 @@ namespace SmartHome::API {
          * @throws std::invalid_argument Throws invalid argument when passed JSON object is not in JSON-RPC 2.0 format.
          */
         void setValues(const nlohmann::json &json);
+
+        /**
+         * @brief Resets struct fields to default values.
+         */
+        void clear();
     };
 
 
@@ -411,6 +448,8 @@ namespace SmartHome::API {
     /**
      * @brief Get "target.method" formatted string.
      *
+     * @details Empty target or method is replaced with Constants::Common::UNDEFINED_BRACKETS.
+     *
      * @param target String_view with target name.
      * @param method String_view with method name.
      *
@@ -420,6 +459,8 @@ namespace SmartHome::API {
 
     /**
      * @brief Parse "target.method" formatted string.
+     *
+     * @details Splits on the first dot, "a.b.c" results in {"a", "b.c"}.
      *
      * @param targetMethodStr String in "target.method" format.
      *
@@ -433,16 +474,21 @@ namespace SmartHome::API {
      * @brief Get string representation of API error codes.
      *
      * @param errorCode Error code to get string representation for.
-     * @return String representation of error code.
+     *
+     * @return String representation of error code. "Undefined error" for codes outside ErrorCodes.
      */
     std::string_view errorCodeToString(ErrorCodes errorCode);
 
     /**
      * @brief Parse string value to appropriate JSON type.
      *
-     * @details Attempts to parse as int, float, bool, defaulting to string.
+     * @details Integer: optional '-' followed by digits, within int64 range.
+     *          Float: optional '-', digits with exactly one '.', no exponent.
+     *          Boolean: exactly "true" or "false".
+     *          Any other value stays a string.
      *
      * @param value String value to parse.
+     *
      * @return JSON object with appropriate type.
      */
     nlohmann::json parseValue(std::string_view value);
@@ -451,6 +497,7 @@ namespace SmartHome::API {
      * @brief Parse vector of strings to JSON array.
      *
      * @param values Vector of string values.
+     *
      * @return JSON array with parsed values.
      */
     nlohmann::json parseVector(const std::vector<std::string> &values);
@@ -458,23 +505,27 @@ namespace SmartHome::API {
     /**
      * @brief Add parameter to JSON params object.
      *
-     * @details Parses parameter as key=value pair or single value.
-     *          Supports JSON objects, comma-separated lists, and basic types.
+     * @details Empty parameter is ignored.
+     *          Parameter without '=' is appended to "args" array (parsed with parseValue).
+     *          For key=value the value is parsed as JSON if valid,
+     *          otherwise as comma-separated list (\c parseVector) if it contains ',',
+     *          otherwise with \c parseValue.
      *
      * @param params JSON params object to modify.
      * @param parameter Parameter string to parse and add.
+     *
+     * @throws std::invalid_argument When key in key=value parameter is empty.
      */
     void emplaceParameter(nlohmann::json &params, std::string_view parameter);
 
     /**
      * @brief Get next unique API identifier.
      *
-     * @return Next unique API identifier.
+     * @return Next unique API identifier. Never returns 0, the first identifier is 1.
      *
-     * @note Starts from 1, and wraps around to 1 after reaching maximum value of apiId_t.
+     * @note Thread-safe and lock-free.
+     * @note Identifiers are unique for the lifetime of the process
+     *       (64-bit counter, overflow is not reachable in practice).
      */
     apiId_t getNextApiId();
-
-    /// Buffer size for error message formatting
-    inline constexpr uint16_t ERROR_MESSAGE_BUFFER_SIZE = 1024;
 }

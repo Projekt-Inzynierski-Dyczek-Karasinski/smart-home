@@ -10,6 +10,12 @@
 namespace SmartHome::API {
     using namespace std::string_literals;
 
+    namespace jc = JsonRpcStrings::Constants;
+    namespace jk = JsonRpcStrings::Keys;
+    namespace jek = JsonRpcStrings::ErrorKeys;
+    namespace jrqk = JsonRpcStrings::RequestKeys;
+    namespace jrsk = JsonRpcStrings::ResponseKeys;
+
     ApiId::ApiId(const apiId_t value) : mState(State::HAS_VALUE), mValue(value) {
     }
 
@@ -36,26 +42,31 @@ namespace SmartHome::API {
 
         nlohmann::json result;
 
-        if (hasValue()) result[JsonRpcStrings::Keys::ID] = mValue;
-        else result[JsonRpcStrings::Keys::ID] = JsonRpcStrings::Constants::NULL_VALUE;
-
+        if (hasValue()) result[jk::ID] = mValue;
+        else result[jk::ID] = nullptr;
         return result;
     }
 
     ApiId ApiId::fromJson(const nlohmann::json &json) {
-        const auto iter = json.find(JsonRpcStrings::Keys::ID);
-        if (iter == json.end()) {
+        *this = ApiId();
+        if (!json.contains(jk::ID)) {
             mState = State::UNDEFINED;
-        } else if (iter->is_number() && iter.value() != nullptr) {
-            mValue = json[JsonRpcStrings::Keys::ID];
-            mState = State::HAS_VALUE;
-        } else if (iter->is_string() && iter.value() == JsonRpcStrings::Constants::NULL_VALUE ||
-                   iter.value() == nullptr) {
-            mState = State::NULL_VALUE;
-        } else {
-            throw std::runtime_error("Cannot cast json to ApiId - Invalid ID value");
+            return *this;
         }
-        return *this;
+
+        const auto &idJson = json.at(jk::ID);
+
+        if (idJson.is_null()) {
+            mState = State::NULL_VALUE;
+            return *this;
+        }
+        if (idJson.is_number_integer()) {
+            mState = State::HAS_VALUE;
+            mValue = idJson.get<apiId_t>();
+            return *this;
+        }
+
+        throw std::runtime_error("Cannot cast json to ApiId - Invalid ID value");
     }
 
     ApiId &ApiId::operator=(const apiId_t value) {
@@ -75,7 +86,10 @@ namespace SmartHome::API {
     }
 
     ApiError::ApiError(const std::string_view value) {
-        setValues(nlohmann::json::parse(value));
+        const auto parsedValue = nlohmann::json::parse(value, nullptr, false);
+        if (parsedValue.is_discarded())
+            throw std::invalid_argument("ApiError parsing failed: string was not a valid JSON");
+        setValues(parsedValue);
     }
 
     ApiError::ApiError(const ErrorCodes newCode, const std::string_view newMessage, const std::string_view newData) {
@@ -93,9 +107,9 @@ namespace SmartHome::API {
     nlohmann::json ApiError::to_json() const {
         nlohmann::json json;
 
-        json[JsonRpcStrings::ErrorKeys::CODE] = code;
-        json[JsonRpcStrings::ErrorKeys::MESSAGE] = message;
-        if (!data.empty()) json[JsonRpcStrings::ErrorKeys::DATA] = data;
+        json[jek::CODE] = code;
+        json[jek::MESSAGE] = message;
+        if (!data.empty()) json[jek::DATA] = data;
 
         return json;
     }
@@ -105,33 +119,40 @@ namespace SmartHome::API {
     }
 
     void ApiError::setValues(nlohmann::json json) {
-        char errorMessage[ERROR_MESSAGE_BUFFER_SIZE];
-        if (!json.contains(JsonRpcStrings::ErrorKeys::CODE)) {
-            sprintf(errorMessage, "Invalid JSON-RPC error: missing '%s' field",
-                    JsonRpcStrings::ErrorKeys::CODE.data());
-            throw std::invalid_argument(errorMessage);
-        }
-        if (!json[JsonRpcStrings::ErrorKeys::CODE].is_number_integer()) {
-            sprintf(errorMessage, "Invalid JSON-RPC error: '%s' must be integer",
-                    JsonRpcStrings::ErrorKeys::CODE.data());
-            throw std::invalid_argument(errorMessage);
-        }
+        constexpr auto errPrefix = "Invalid JSON-RPC error: ";
+        clear();
 
-        if (!json.contains(JsonRpcStrings::ErrorKeys::MESSAGE)) {
-            sprintf(errorMessage, "Invalid JSON-RPC error: missing '%s' field",
-                    JsonRpcStrings::ErrorKeys::MESSAGE.data());
-            throw std::invalid_argument(errorMessage);
+        if (!json.contains(jek::CODE)) {
+            throw std::invalid_argument(errPrefix + "missing '"s.append(jek::CODE).append("' field"));
         }
-        if (json[JsonRpcStrings::ErrorKeys::MESSAGE].get<std::string>().empty()) {
-            sprintf(errorMessage, "Invalid JSON-RPC error: '%s' cannot be empty",
-                    JsonRpcStrings::ErrorKeys::MESSAGE.data());
-            throw std::invalid_argument(errorMessage);
+        const auto codeJson = json[jek::CODE];
+        if (!codeJson.is_number_integer()) {
+            throw std::invalid_argument(errPrefix + "'"s.append(jek::CODE).append("' must be integer"));
         }
+        code = static_cast<ErrorCodes>(codeJson.get<int>());
 
-        code = static_cast<ErrorCodes>(json[JsonRpcStrings::ErrorKeys::CODE].get<int>());
-        message = json[JsonRpcStrings::ErrorKeys::MESSAGE].get<std::string>();
-        if (json.contains(JsonRpcStrings::ErrorKeys::DATA) && json[JsonRpcStrings::ErrorKeys::DATA].is_string())
-            data = json[JsonRpcStrings::ErrorKeys::DATA].get<std::string>();
+        if (!json.contains(jek::MESSAGE)) {
+            throw std::invalid_argument(errPrefix + "missing '"s.append(jek::MESSAGE).append("' field"));
+        }
+        const auto messageJson = json[jek::MESSAGE];
+        if (!messageJson.is_string() || messageJson.get<std::string>().empty()) {
+            throw std::invalid_argument(errPrefix + "'"s.append(jek::MESSAGE).append("' must be a non-empty string"));
+        }
+        message = messageJson.get<std::string>();
+
+        if (json.contains(jek::DATA)) {
+            if (const auto &dataJson = json[jek::DATA]; dataJson.is_string()) {
+                data = dataJson.get<std::string>();
+                return;
+            }
+            throw std::invalid_argument(errPrefix + "'"s.append(jek::DATA).append("' must be a string"));
+        }
+    }
+
+    void ApiError::clear() {
+        code = ErrorCodes::NO_ERROR;
+        message.clear();
+        data.clear();
     }
 
     ApiRequest::ApiRequest(const nlohmann::json &value) {
@@ -139,19 +160,17 @@ namespace SmartHome::API {
     }
 
     ApiRequest::ApiRequest(std::string_view value) {
-        if (nlohmann::json::accept(value)) {
-            setValues(nlohmann::json::parse(value));
-        } else {
-            setValues(value);
-        }
+        const auto parsedValue = nlohmann::json::parse(value, nullptr, false);
+        if (parsedValue.is_discarded()) setValues(value);
+        else setValues(parsedValue);
     }
 
     nlohmann::json ApiRequest::to_json() const {
         nlohmann::json json;
 
-        json[JsonRpcStrings::Keys::JSONRPC] = jsonrpc;
-        json[JsonRpcStrings::RequestKeys::METHOD] = method;
-        if (params.has_value()) json[JsonRpcStrings::RequestKeys::PARAMS] = *params;
+        json[jk::JSONRPC] = jsonrpc;
+        json[jrqk::METHOD] = method;
+        if (params.has_value()) json[jrqk::PARAMS] = *params;
         if (!id.isUndefined()) json.update(id.toJson());
 
         return json;
@@ -167,46 +186,45 @@ namespace SmartHome::API {
     }
 
     ApiRequest ApiRequest::operator()(std::string_view value) {
-        if (nlohmann::json::accept(value)) {
-            setValues(nlohmann::json::parse(value));
-        } else {
-            setValues(value);
-        }
+        const auto parsedValue = nlohmann::json::parse(value, nullptr, false);
+        if (parsedValue.is_discarded()) setValues(value);
+        else setValues(parsedValue);
         return *this;
     }
 
     void ApiRequest::setValues(const nlohmann::json &json) {
-        char errorMessage[ERROR_MESSAGE_BUFFER_SIZE];
-        if (!json.contains(JsonRpcStrings::Keys::JSONRPC)) {
-            sprintf(errorMessage, "Invalid JSON-RPC request: missing '%s' field",
-                    JsonRpcStrings::Keys::JSONRPC.data());
-            throw std::invalid_argument(errorMessage);
+        constexpr auto errPrefix = "Invalid JSON-RPC request: ";
+        clear();
+
+        if (!json.contains(jk::JSONRPC)) {
+            throw std::invalid_argument(errPrefix + "missing '"s.append(jk::JSONRPC).append("' field"));
         }
-        if (json[JsonRpcStrings::Keys::JSONRPC].get<std::string>() != JsonRpcStrings::Constants::VERSION.data()) {
-            sprintf(errorMessage, "Invalid JSON-RPC request: %s must be equal '%s'",
-                    JsonRpcStrings::Keys::JSONRPC.data(),
-                    JsonRpcStrings::Constants::VERSION.data());
-            throw std::invalid_argument(errorMessage);
+        const auto &jsonRpc = json[jk::JSONRPC];
+        if (!jsonRpc.is_string()) {
+            throw std::invalid_argument(errPrefix + "'"s.append(jk::JSONRPC).append("' must be a string"));
+        }
+        const auto jsonRpcStr = jsonRpc.get<std::string>();
+        if (jsonRpcStr != jc::VERSION) {
+            throw std::invalid_argument(
+                errPrefix + "'"s.append(jk::JSONRPC).append("' must be equal '").append(jc::VERSION).append("'"));
         }
 
-        if (!json.contains(JsonRpcStrings::RequestKeys::METHOD)) {
-            sprintf(errorMessage, "Invalid JSON-RPC request: missing '%s' field",
-                    JsonRpcStrings::RequestKeys::METHOD.data());
-            throw std::invalid_argument(errorMessage);
+        if (!json.contains(jrqk::METHOD)) {
+            throw std::invalid_argument(errPrefix + "missing '"s.append(jrqk::METHOD).append("' field"));
         }
-        if (json[JsonRpcStrings::RequestKeys::METHOD].get<std::string>().empty()) {
-            sprintf(errorMessage, "Invalid JSON-RPC request: '%s' cannot be empty",
-                    JsonRpcStrings::RequestKeys::METHOD.data());
-            throw std::invalid_argument(errorMessage);
+        const auto &methodJson = json[jrqk::METHOD];
+        if (!methodJson.is_string() || methodJson.get<std::string>().empty()) {
+            throw std::invalid_argument(errPrefix + "'"s.append(jrqk::METHOD).append("' must be a non-empty string"));
         }
 
-        jsonrpc = json[JsonRpcStrings::Keys::JSONRPC];
-        method = json[JsonRpcStrings::RequestKeys::METHOD];
-        if (json.contains(JsonRpcStrings::RequestKeys::PARAMS)) params = json[JsonRpcStrings::RequestKeys::PARAMS];
-        if (json.contains(JsonRpcStrings::Keys::ID)) id = json[JsonRpcStrings::Keys::ID];
+        jsonrpc = jsonRpc;
+        method = methodJson.get<std::string>();
+        if (json.contains(jrqk::PARAMS)) params = json[jrqk::PARAMS];
+        id.fromJson(json);
     }
 
     void ApiRequest::setValues(const std::string_view string) {
+        clear();
         std::vector<std::string> splitRequest = {};
         boost::split(splitRequest, string, boost::is_any_of(" "), boost::token_compress_on);
 
@@ -214,7 +232,7 @@ namespace SmartHome::API {
             throw std::invalid_argument("Invalid raw string request: request must have target.method or target method");
         }
 
-        jsonrpc = JsonRpcStrings::Constants::VERSION.data();
+        jsonrpc = jc::VERSION.data();
         params.emplace(nlohmann::json::object());
         auto &paramsJsonObject = params.value();
 
@@ -242,6 +260,13 @@ namespace SmartHome::API {
         }
     }
 
+    void ApiRequest::clear() {
+        jsonrpc.clear();
+        method.clear();
+        params.reset();
+        id = ApiId();
+    }
+
     ApiResponse::ApiResponse(const nlohmann::json &json) {
         setValues(json);
     }
@@ -249,21 +274,28 @@ namespace SmartHome::API {
     nlohmann::json ApiResponse::to_json() const {
         nlohmann::json json;
 
-        json[JsonRpcStrings::Keys::JSONRPC] = jsonrpc;
+        if (id.isUndefined()) {
+            throw std::invalid_argument("Invalid JSON-RPC response: response must have an ID");
+        }
+
+        json[jk::JSONRPC] = jsonrpc;
         if (result.has_value()) {
-            if (nlohmann::json::accept(result.value()))
-                json[JsonRpcStrings::ResponseKeys::RESULT] = nlohmann::json::parse(result.value());
-            else json[JsonRpcStrings::ResponseKeys::RESULT] = result.value();
+            const auto parsedValue = nlohmann::json::parse(result.value(), nullptr, false);
+            if (parsedValue.is_discarded()) {
+                json[jrsk::RESULT] = result.value();
+            } else {
+                json[jrsk::RESULT] = parsedValue;
+            }
         } else if (error.has_value()) {
-            json[JsonRpcStrings::ResponseKeys::ERROR] = error.value().to_json();
+            json[jrsk::ERROR] = error.value().to_json();
         } else {
             throw std::invalid_argument("Invalid JSON-RPC response: response must have result or error");
         }
 
         if (id.hasValue()) {
-            json[JsonRpcStrings::Keys::ID] = id.value();
+            json[jk::ID] = id.value();
         } else if (id.isNull()) {
-            json[JsonRpcStrings::Keys::ID] = nullptr;
+            json[jk::ID] = nullptr;
         }
 
         return json;
@@ -279,42 +311,52 @@ namespace SmartHome::API {
     }
 
     ApiResponse ApiResponse::operator()(std::string_view value) {
-        const nlohmann::json json = nlohmann::json::parse(value);
-        setValues(json);
+        const auto parsedValue = nlohmann::json::parse(value, nullptr, false);
+        if (parsedValue.is_discarded())
+            throw std::invalid_argument("ApiResponse parsing failed: string was not a valid JSON");
+        setValues(parsedValue);
         return *this;
     }
 
     void ApiResponse::setValues(const nlohmann::json &json) {
-        if (!(json.contains(JsonRpcStrings::Keys::JSONRPC) &&
-              json[JsonRpcStrings::Keys::JSONRPC].get<std::string>() == JsonRpcStrings::Constants::VERSION.data())) {
-            char errorMessage[256];
-            sprintf(errorMessage, "Invalid JSON-RPC request: %s must be equal '%s'",
-                    JsonRpcStrings::Keys::JSONRPC.data(),
-                    JsonRpcStrings::Constants::VERSION.data());
-            throw std::invalid_argument(errorMessage);
+        constexpr auto errPrefix = "Invalid JSON-RPC response: ";
+        clear();
+
+        if (!json.contains(jk::JSONRPC)) {
+            throw std::invalid_argument(errPrefix + "missing '"s.append(jk::JSONRPC).append("' field"));
         }
-        if (!json.contains(JsonRpcStrings::Keys::ID)) {
-            throw std::invalid_argument("Invalid JSON-RPC request: response must contain id");
+        const auto &jsonRpc = json[jk::JSONRPC];
+        if (!jsonRpc.is_string()) {
+            throw std::invalid_argument(errPrefix + "'"s.append(jk::JSONRPC).append("' must be a string"));
+        }
+        const auto jsonRpcStr = jsonRpc.get<std::string>();
+        if (jsonRpcStr != jc::VERSION) {
+            throw std::invalid_argument(
+                errPrefix + "'"s.append(jk::JSONRPC).append("' must be equal '").append(jc::VERSION).append("'"));
         }
 
-        if (json.contains(JsonRpcStrings::ResponseKeys::RESULT) && !json.
-            contains(JsonRpcStrings::ResponseKeys::ERROR)) {
-            auto &jsonResult = json[JsonRpcStrings::ResponseKeys::RESULT];
+        if (!json.contains(jk::ID)) {
+            throw std::invalid_argument(errPrefix + "response must contain '"s.append(jk::ID).append("' field"));
+        }
+
+        if (json.contains(jrsk::RESULT) && !json.contains(jrsk::ERROR)) {
+            auto &jsonResult = json[jrsk::RESULT];
             if (jsonResult.is_string()) result = jsonResult.get<std::string>();
             else result = jsonResult.dump();
-        } else if (json.contains(JsonRpcStrings::ResponseKeys::ERROR) && !json.contains(
-                       JsonRpcStrings::ResponseKeys::RESULT))
+        } else if (json.contains(jrsk::ERROR) && !json.contains(
+                       jrsk::RESULT))
             error.emplace(
-                json[JsonRpcStrings::ResponseKeys::ERROR]);
-        else throw std::invalid_argument("Invalid JSON-RPC request: response must contain either result or error");
+                json[jrsk::ERROR]);
+        else throw std::invalid_argument(errPrefix + "response must contain either result or error"s);
+        jsonrpc = jsonRpcStr;
+        id.fromJson(json);
+    }
 
-        jsonrpc = json[JsonRpcStrings::Keys::JSONRPC];
-        auto &idJson = json[JsonRpcStrings::Keys::ID];
-        if (idJson.is_number()) {
-            id = idJson.get<int>();
-        } else if (idJson == nullptr || idJson.is_null()) {
-            id = nullptr;
-        }
+    void ApiResponse::clear() {
+        jsonrpc.clear();
+        result.reset();
+        error.reset();
+        id = ApiId();
     }
 
     std::string getTargetMethodString(std::string_view target, std::string_view method) {
@@ -331,7 +373,7 @@ namespace SmartHome::API {
         const auto dotPos = targetMethodStr.find('.');
 
         if (dotPos == std::string_view::npos || dotPos == 0 || dotPos == targetMethodStr.size() - 1) {
-            throw std::invalid_argument("Invalid target.method string: "s + targetMethodStr.data());
+            throw std::invalid_argument("Invalid target.method string: "s.append(targetMethodStr));
         }
 
         const auto target = std::string(targetMethodStr.substr(0, dotPos));
@@ -474,32 +516,28 @@ namespace SmartHome::API {
             throw std::invalid_argument("Invalid raw string request: empty key in key=value parameter");
         }
 
-        bool isJsonParseSuccessful = false;
-        //Check for an JSON object
-        if (nlohmann::json::accept(value)) {
-            try {
-                params[std::string(key)] = nlohmann::json::parse(value);
-                isJsonParseSuccessful = true;
-            } catch (...) {
-            }
-        }
-        // Check for a value list
-        if (!isJsonParseSuccessful && value.find(',') != std::string_view::npos) {
+        const auto parsedValue = nlohmann::json::parse(value, nullptr, false);
+        if (parsedValue.is_discarded() && value.find(',') != std::string_view::npos) {
             std::vector<std::string> values;
             boost::split(values, value, boost::is_any_of(","));
-            params[std::string(key)] = parseVector(values);
-        } else if (!isJsonParseSuccessful) {
-            params[std::string(key)] = parseValue(value);
+            params[key] = parseVector(values);
+        } else if (parsedValue.is_discarded()) {
+            params[key] = parseValue(value);
+        } else {
+            params[key] = parsedValue;
         }
     }
 
+    static_assert(std::is_same_v<apiId_t, std::uint64_t>,
+                  "API::getNextApiId() relies on 64-bit apiId_t to make wrap-around practically impossible. "
+                  "Modify the implementation if the type changes");
+
+    static_assert(std::atomic<apiId_t>::is_always_lock_free,
+                  "Unsupported platform: std::atomic<apiId_t> must be lock-free, "
+                  "as required by the current API::getNextApiId() implementation");
+
     apiId_t getNextApiId() {
         static std::atomic<apiId_t> id = 1;
-        apiId_t expected = std::numeric_limits<apiId_t>::max(); // Wrap around check
-        // Set to 1 after wrap around
-        if (id.compare_exchange_strong(expected, 1, std::memory_order::relaxed)) [[unlikely]] {
-            return expected; // Return max value before wrap around
-        }
         return id.fetch_add(1, std::memory_order::relaxed);
     }
 }
